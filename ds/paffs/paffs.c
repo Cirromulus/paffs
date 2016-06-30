@@ -4,6 +4,7 @@
  */
 
 #include "paffs.h"
+#include "paffs_flash.h"
 #include "btree.h"
 #include <stdlib.h>
 #include <linux/string.h>
@@ -20,6 +21,18 @@ static pDentry* dentry_buf[DENTRY_BUFSIZE];
 static unsigned char dentrys_buf_used = 0;
 */
 
+/*p_addr combineAddress(unsigned int area, unsigned int page){
+	unsigned long long ar = area;
+	return  ar << 8 * 4;// << (sizeof(unsigned long) * 8) | page;
+}
+
+unsigned int extractArea(p_addr addr){
+	return addr >> (sizeof(unsigned long) * 8);	//Whut?
+}
+
+unsigned int extractPage(p_addr addr){
+	return addr & 0xFFFFFFFF;
+}*/
 
 const char* paffs_err_msg(PAFFS_RESULT pr){
 	return PAFFS_RESULT_MSG[pr];
@@ -34,7 +47,9 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 	p_param* param = &device->param;
 	param->areas_no = param->blocks / 2;	//For now: 16 b -> 8 Areas
 	param->blocks_per_area = param->blocks / param->areas_no;
+	param->data_bytes_per_page = param->total_bytes_per_page - param->oob_bytes_per_page;
 	device->areaMap = malloc(sizeof(p_area) * device->param.areas_no);
+	device->drv.drv_initialise_fn(dev);
 	return PAFFS_OK;
 }
 
@@ -54,7 +69,7 @@ PAFFS_RESULT paffs_mnt(const char* devicename){
 			device->areaMap[area].status = EMPTY;
 			device->areaMap[area].erasecount = 0;
 			device->areaMap[area].position = area;
-			device->areaMap[area].dirtyBytes = 0;
+			device->areaMap[area].dirtyPages = 0;
 
 			if(!had_superblock){
 				device->areaMap[area].type = SUPERBLOCKAREA;
@@ -99,9 +114,13 @@ pInode* paffs_createDirInode(paffs_permission mask){
 	pInode *newFolder = paffs_createInode(mask);
 	newFolder->type = PINODE_DIR;
 	newFolder->size = sizeof(unsigned int);		//For directoryentrycount
-	newFolder->direct[0] = malloc (newFolder->size);
-	memset(newFolder->direct[0], 0, sizeof(unsigned int));
-	newFolder->reservedSize = newFolder->size;
+
+	unsigned int buf = 0;
+	PAFFS_RESULT r = writeInodeData(newFolder, 0, sizeof(unsigned int), &buf, device);
+	if(r != PAFFS_OK){
+		paffs_lasterr = r;
+		return NULL;
+	}
 	return newFolder;
 }
 
@@ -112,7 +131,7 @@ pInode* paffs_createFilInode(paffs_permission mask){
 }
 
 void paffs_destroyInode(pInode* node){
-	free(node->direct[0]);
+	deleteInodeData(node, device);
 	free(node);
 }
 
@@ -153,25 +172,33 @@ pInode* paffs_getInodeInDir(pInode* folder, const char* name){
             return NULL;
         }
         
-        if(folder->direct[0] == NULL){
+        char* buf = malloc(folder->size);
+        PAFFS_RESULT r = readInodeData(folder, 0, folder->size, &buf, device);
+        if(r != PAFFS_OK){
+        	free(buf);
+        	paffs_lasterr = r;
+        	return NULL;
+        }
+
+        if(buf == NULL){
         	paffs_lasterr = PAFFS_NF;
         	return NULL;
         }
 
         unsigned int p = sizeof(unsigned int);		//skip directory entry count
         while(p < folder->size){
-                unsigned int direntryl = folder->direct[0][p];
+                unsigned int direntryl = buf[p];
                 if(direntryl < sizeof(unsigned int)){
-                	paffs_lasterr == PAFFS_BUG;
+                	paffs_lasterr = PAFFS_BUG;
                 	return NULL;
                 }
                 unsigned int dirnamel = direntryl - sizeof(unsigned int) - sizeof(pInode_no);
                 p += sizeof(unsigned int);
                 pInode_no tmp;
-                memcpy(&tmp, &folder->direct[0][p], sizeof(pInode_no));
+                memcpy(&tmp, &buf[p], sizeof(pInode_no));
                 p += sizeof(pInode_no);
                 char* tmpname = malloc((dirnamel+1) * sizeof(char));
-                memcpy(tmpname, &folder->direct[0][p], dirnamel);
+                memcpy(tmpname, &buf[p], dirnamel);
                 tmpname[dirnamel] = 0;
                 p += dirnamel;
                 if(strcmp(name, tmpname) == 0){
@@ -181,10 +208,12 @@ pInode* paffs_getInodeInDir(pInode* folder, const char* name){
                     if(out == NULL){
                         paffs_lasterr = PAFFS_BUG;
                     }
+                    free(buf);
                     return out;
                 }
                 free(tmpname);
         }
+        free(buf);
         paffs_lasterr = PAFFS_NF;
         return NULL;
         
@@ -252,24 +281,29 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 
 	memcpy(&buf[sizeof(unsigned int) + sizeof(pInode_no)], name, dirnamel);
 
-	if(contDir->size + direntryl > contDir->reservedSize){							//Todo: Bigger steps
-		contDir->direct[0] = realloc(contDir->direct[0], contDir->size +  direntryl);
-		contDir->reservedSize = contDir->size + direntryl;
+	char* dirData = malloc(contDir->size +  direntryl);
+
+	PAFFS_RESULT r = readInodeData(contDir, 0, contDir->size, dirData, device);
+	if(r != PAFFS_OK){
+		paffs_lasterr = r;
+		free(dirData);
+		return r;
 	}
 
 	//append record
-	memcpy (&contDir->direct[0][contDir->size], buf, direntryl);
+	memcpy (&dirData[contDir->size], buf, direntryl);
 
 	unsigned int directoryEntryCount = 0;
-	memcpy (&directoryEntryCount, contDir->direct[0], sizeof(unsigned int));
+	memcpy (&directoryEntryCount, dirData, sizeof(unsigned int));
 	directoryEntryCount ++;
-	memcpy (contDir->direct[0], &directoryEntryCount, sizeof(unsigned int));
+	memcpy (dirData, &directoryEntryCount, sizeof(unsigned int));
 
 	contDir->size += direntryl;
 
-	free(buf);
+	r = writeInodeData(contDir, 0, contDir->size, dirData, device);
 
-	return PAFFS_OK;
+	free(buf);
+	return r;
 
 }
 
@@ -297,12 +331,20 @@ paffs_dir* paffs_opendir(const char* path){
 		return NULL;
 	}
 
+	char* dirData = malloc(dirPinode->size);
+	PAFFS_RESULT r = readInodeData(dirPinode, 0, dirPinode->size, dirData, device);
+	if(r != PAFFS_OK){
+		paffs_lasterr = r;
+		return NULL;
+	}
+
+
 	paffs_dir* dir = malloc(sizeof(paffs_dir));
 	dir->dentry = malloc(sizeof(pDentry));
 	dir->dentry->name = "not_impl.";	//Sollte in paffs_getInodeOfDir(path) gecached werden
 	dir->dentry->iNode = dirPinode;
 	dir->dentry->parent = NULL;
-	dir->no_entrys = dirPinode->direct[0][0];
+	dir->no_entrys = dirData[0];
 	dir->dirents = malloc(dir->no_entrys * sizeof(paffs_dirent*));
 	dir->pos = 0;
 
@@ -311,14 +353,14 @@ paffs_dir* paffs_opendir(const char* path){
 	for(entry = 0; p < dirPinode->size; entry++){
 
 		dir->dirents[entry] = malloc (sizeof(paffs_dirent));
-		unsigned int direntryl = dirPinode->direct[0][p];
+		unsigned int direntryl = dirData[p];
 		unsigned int dirnamel = direntryl - sizeof(unsigned int) - sizeof(pInode_no);
 		p += sizeof(unsigned int);
-		memcpy(&dir->dirents[entry]->node_no, &dirPinode->direct[0][p], sizeof(pInode_no));
+		memcpy(&dir->dirents[entry]->node_no, &dirData[p], sizeof(pInode_no));
                 dir->dirents[entry]->node = NULL;
 		p += sizeof(pInode_no);
 		dir->dirents[entry]->name = malloc((dirnamel+2) * sizeof(char));    //+2 weil 1. Nullbyte und 2. Vielleicht ein Zeichen '/' dazukommt
-		memcpy(dir->dirents[entry]->name, &dirPinode->direct[0][p], dirnamel);
+		memcpy(dir->dirents[entry]->name, &dirData[p], dirnamel);
 		dir->dirents[entry]->name[dirnamel] = 0;
 		p += dirnamel;
 	}

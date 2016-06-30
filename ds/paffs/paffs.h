@@ -17,7 +17,8 @@ typedef enum PAFFS_RESULT{
 	PAFFS_NF,
 	PAFFS_EINVAL,
 	PAFFS_NIMPL,
-	PAFFS_BUG
+	PAFFS_BUG,
+	PAFFS_NOSP
 } PAFFS_RESULT;
 
 static const char* PAFFS_RESULT_MSG[] = {
@@ -26,7 +27,8 @@ static const char* PAFFS_RESULT_MSG[] = {
 		"Object not found",
 		"Input values malformed",
 		"Operation not yet supported",
-		"Gratulations, you found a Bug"
+		"Gratulations, you found a Bug",
+		"No (usable) space left on device"
 };
 
 typedef enum pinode_type{
@@ -59,9 +61,11 @@ typedef enum paffs_seekmode{
 typedef struct p_param{
 	const char *name;
 	unsigned int total_bytes_per_page;
+	unsigned int oob_bytes_per_page;
 	unsigned int pages_per_block;
 	unsigned int blocks;
 	/*Automatically filled*/
+	unsigned int data_bytes_per_page;
 	unsigned long areas_no;
 	unsigned int blocks_per_area;
 } p_param;
@@ -69,8 +73,11 @@ typedef struct p_param{
 
 typedef unsigned long p_date;
 
-//typedef unsigned int p_addr;    //4,2e^9 * Page Size (512..4096)
-typedef char* p_addr;
+typedef unsigned long long p_addr;
+
+/*p_addr combineAddress(unsigned int area, unsigned int page);
+unsigned int extractArea(p_addr addr);
+unsigned int extractPage(p_addr addr);*/
 
 typedef unsigned int pInode_no;
 
@@ -125,13 +132,13 @@ typedef struct paffs_objInfo{
 struct p_dev;
 
 typedef struct p_driver {
-	PAFFS_RESULT (*drv_write_page_fn) (struct p_dev *dev, unsigned int page_no,
-				   void* data, unsigned int data_len);
-	PAFFS_RESULT (*drv_read_page_fn) (struct p_dev *dev, unsigned int page_no,
-				   void* data, unsigned int data_len);
-	PAFFS_RESULT (*drv_erase_fn) (struct p_dev *dev, unsigned int block_no);
-	PAFFS_RESULT (*drv_mark_bad_fn) (struct p_dev *dev, unsigned int block_no);
-	PAFFS_RESULT (*drv_check_bad_fn) (struct p_dev *dev, unsigned int block_no);
+	PAFFS_RESULT (*drv_write_page_fn) (struct p_dev *dev, unsigned long long page_no,
+			void* data, unsigned int data_len);
+	PAFFS_RESULT (*drv_read_page_fn) (struct p_dev *dev, unsigned long long page_no,
+			void* data, unsigned int data_len);
+	PAFFS_RESULT (*drv_erase_fn) (struct p_dev *dev, unsigned long block_no);
+	PAFFS_RESULT (*drv_mark_bad_fn) (struct p_dev *dev, unsigned long block_no);
+	PAFFS_RESULT (*drv_check_bad_fn) (struct p_dev *dev, unsigned long block_no);
 	PAFFS_RESULT (*drv_initialise_fn) (struct p_dev *dev);
 	PAFFS_RESULT (*drv_deinitialise_fn) (struct p_dev *dev);
 } p_driver;
@@ -149,12 +156,19 @@ typedef enum p_areaStatus{
 	EMPTY
 } p_areaStatus;
 
+typedef enum p_summaryEntry{
+	FREE = 0,
+	USED,
+	DIRTY
+}p_summaryEntry;
+
 typedef struct p_area{
 	p_areaType type;
 	p_areaStatus status;
 	unsigned int erasecount;
 	unsigned int position;	//physical position, not logical
-	unsigned long dirtyBytes;
+	p_summaryEntry* areaSummary; //May be invalid if status == closed;
+	unsigned int dirtyPages; 	//redundant to contents of areaSummary
 } p_area;
 
 

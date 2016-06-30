@@ -15,6 +15,8 @@
 void listDir(const char* path){
 	printf("Opening Dir '%s'.\n", path);
 	paffs_dir* rewt = paffs_opendir(path);
+	if(paffs_getLastErr() != PAFFS_OK)
+			printf("%s\n", paffs_err_msg(paffs_getLastErr()));
 	if(rewt == NULL){
 		printf("Opendir: Result %s\n", paffs_err_msg(paffs_getLastErr()));
 		return;
@@ -47,13 +49,21 @@ int main( int argc, char ** argv ) {
 	PAFFS_RESULT r = paffs_mnt("1");
 
 	paffs_permission p = 0;
-	paffs_mkdir("/a", p);
+	r = paffs_mkdir("/a", p);
+	if(r != PAFFS_OK)
+		printf("%s\n", paffs_err_msg(paffs_getLastErr()));
 
-	paffs_mkdir("/b", p);
+	r = paffs_mkdir("/b", p);
+	if(r != PAFFS_OK)
+			printf("%s\n", paffs_err_msg(paffs_getLastErr()));
 
-	paffs_mkdir("/b/c", p);
+	r = paffs_mkdir("/b/c", p);
+	if(r != PAFFS_OK)
+			printf("%s\n", paffs_err_msg(paffs_getLastErr()));
 
-	paffs_touch ("/b/file");
+	r = paffs_touch ("/b/file");
+	if(r != PAFFS_OK)
+			printf("%s\n", paffs_err_msg(paffs_getLastErr()));
 
 
 	listDir("/");
@@ -65,10 +75,14 @@ int main( int argc, char ** argv ) {
 	sleep(1);
 
 	//paffs_obj* file = paffs_open("/b/file", PAFFS_FW);
-	paffs_touch("/b/file");
+	r = paffs_touch("/b/file");
+	if(r != PAFFS_OK)
+			printf("%s\n", paffs_err_msg(paffs_getLastErr()));
 
-	paffs_objInfo fileInfo;
-	paffs_getObjInfo("/b/file", &fileInfo);
+	paffs_objInfo fileInfo = {0};
+	r = paffs_getObjInfo("/b/file", &fileInfo);
+	if(r != PAFFS_OK)
+			printf("%s\n", paffs_err_msg(paffs_getLastErr()));
 	printInfo(&fileInfo);
 
 }

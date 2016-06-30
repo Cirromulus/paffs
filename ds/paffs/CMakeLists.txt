@@ -4,6 +4,7 @@ ${CMAKE_CURRENT_SOURCE_DIR}
 
 set(SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/paffs.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/paffs_flash.c
     ${CMAKE_CURRENT_SOURCE_DIR}/btree.c
 )
 

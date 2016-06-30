@@ -23,13 +23,13 @@ static c_flashCell* c_fc[2];
 p_dev* paffs_FC_install_drv(const char *name, c_flashCell* fc);
 
 //See paffs.h struct p_drv
-PAFFS_RESULT p_FC_WritePage(struct p_dev *dev, unsigned int page_no,
+PAFFS_RESULT p_FC_WritePage(struct p_dev *dev, unsigned long long page_no,
 								void* data, unsigned int data_len);
-PAFFS_RESULT p_FC_ReadPage(struct p_dev *dev, unsigned int page_no,
+PAFFS_RESULT p_FC_ReadPage(struct p_dev *dev, unsigned long long page_no,
 								void* data, unsigned int data_len);
-PAFFS_RESULT p_FC_EraseBlock(struct p_dev *dev, unsigned int block_no);
-PAFFS_RESULT p_FC_MarkBad(struct p_dev *dev, unsigned int block_no);
-PAFFS_RESULT p_FC_CheckBad(struct p_dev *dev, unsigned int block_no);
+PAFFS_RESULT p_FC_EraseBlock(struct p_dev *dev, unsigned long block_no);
+PAFFS_RESULT p_FC_MarkBad(struct p_dev *dev, unsigned long block_no);
+PAFFS_RESULT p_FC_CheckBad(struct p_dev *dev, unsigned long block_no);
 PAFFS_RESULT p_FC_Initialize(struct p_dev *dev);
 PAFFS_RESULT p_FC_Deinitialize(struct p_dev *dev);
 
