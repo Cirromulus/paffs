@@ -51,19 +51,19 @@ int main( int argc, char ** argv ) {
 	paffs_permission p = 0;
 	r = paffs_mkdir("/a", p);
 	if(r != PAFFS_OK)
-		printf("%s\n", paffs_err_msg(paffs_getLastErr()));
+		printf("%s\n", paffs_err_msg(r));
 
 	r = paffs_mkdir("/b", p);
 	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(paffs_getLastErr()));
+			printf("%s\n", paffs_err_msg(r));
 
 	r = paffs_mkdir("/b/c", p);
 	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(paffs_getLastErr()));
+			printf("%s\n", paffs_err_msg(r));
 
 	r = paffs_touch ("/b/file");
 	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(paffs_getLastErr()));
+			printf("%s\n", paffs_err_msg(r));
 
 
 	listDir("/");
@@ -77,12 +77,12 @@ int main( int argc, char ** argv ) {
 	//paffs_obj* file = paffs_open("/b/file", PAFFS_FW);
 	r = paffs_touch("/b/file");
 	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(paffs_getLastErr()));
+			printf("%s\n", paffs_err_msg(r));
 
 	paffs_objInfo fileInfo = {0};
 	r = paffs_getObjInfo("/b/file", &fileInfo);
 	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(paffs_getLastErr()));
+			printf("%s\n", paffs_err_msg(r));
 	printInfo(&fileInfo);
 
 }

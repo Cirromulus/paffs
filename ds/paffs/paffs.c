@@ -159,8 +159,7 @@ PAFFS_RESULT paffs_getParentDir(const char* fullPath, pInode* *parDir, unsigned 
 	free(pathC);
 
 	if(*parDir == NULL){
-		paffs_lasterr = PAFFS_NF;
-		return PAFFS_NF;
+		return paffs_lasterr = PAFFS_NF;
 	}
 	return PAFFS_OK;
 }
@@ -173,7 +172,7 @@ pInode* paffs_getInodeInDir(pInode* folder, const char* name){
         }
         
         char* buf = malloc(folder->size);
-        PAFFS_RESULT r = readInodeData(folder, 0, folder->size, &buf, device);
+        PAFFS_RESULT r = readInodeData(folder, 0, folder->size, buf, device);
         if(r != PAFFS_OK){
         	free(buf);
         	paffs_lasterr = r;
@@ -451,6 +450,8 @@ PAFFS_RESULT paffs_touch(const char* path){
 		if(paffs_createFile(path, PAFFS_R | PAFFS_W) == NULL){
 			return paffs_lasterr;
 		}
+		//To Overwrite the PAFFS_NF in paffs_getInodeOfElem(path)
+		paffs_lasterr = PAFFS_OK;
 	}else{
 		file->mod = time(0);
 	}

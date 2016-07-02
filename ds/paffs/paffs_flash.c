@@ -17,9 +17,6 @@ unsigned int  findWritableArea(p_dev* dev){
 				if(dev->areaMap[area].type != DATAAREA){
 					continue;
 				}
-				if(dev->areaMap[area].type != DATAAREA){
-					continue;
-				}
 				if(try == 1){
 					if(dev->areaMap[area].status == UNCLOSED){	//unclosed oder closed first?
 						activeArea = area;
@@ -103,14 +100,18 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 		}
 		unsigned long long phyPageNumber =
 					dev->param.blocks_per_area * activeArea
-					* dev->param.pages_per_block * firstFreePage;
+					* dev->param.pages_per_block
+					+ firstFreePage;
 
 		dev->areaMap[activeArea].areaSummary[firstFreePage] = USED;
 		inode->direct[page] = phyPageNumber;
-		void* buf = data+page*dev->param.total_bytes_per_page;
-		unsigned int btw = (page+1)*dev->param.total_bytes_per_page < bytes?
-				dev->param.total_bytes_per_page :
-				page*dev->param.total_bytes_per_page;
+		void* buf = &data[page*dev->param.total_bytes_per_page];
+		unsigned int btw = bytes;
+		if(bytes > dev->param.total_bytes_per_page){
+			btw = bytes > (page+1)*dev->param.total_bytes_per_page ?
+						dev->param.total_bytes_per_page :
+						(page+1)*dev->param.total_bytes_per_page - bytes;
+		}
 		dev->drv.drv_write_page_fn(dev, phyPageNumber, buf, btw);
 	}
 
@@ -136,9 +137,12 @@ PAFFS_RESULT readInodeData(pInode* inode,
 
 	for(int page = 0; page < 1 + pageTo - pageFrom; page++){
 		char* wrap = &data[page*dev->param.data_bytes_per_page];
-		unsigned int btr = (page+1)*dev->param.total_bytes_per_page < bytes?
-				dev->param.total_bytes_per_page :
-				page*dev->param.total_bytes_per_page;
+		unsigned int btr = bytes;
+		if(bytes > dev->param.total_bytes_per_page){
+			btr = bytes > (page+1)*dev->param.total_bytes_per_page ?
+						dev->param.total_bytes_per_page :
+						(page+1)*dev->param.total_bytes_per_page - bytes;
+		}
 		PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, inode->direct[page], wrap, btr);
 		if(r != PAFFS_OK){
 			return paffs_lasterr = r;
