@@ -248,6 +248,7 @@ pInode* paffs_getInodeOfElem(const char* fullPath){
         pInode *tmp = paffs_getInodeInDir(curr, fnP);
         if(tmp == NULL){
         	paffs_lasterr = PAFFS_NF;
+        	free(fullPathC);
             return NULL;
         }
         curr = tmp;
@@ -301,6 +302,7 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 
 	r = writeInodeData(contDir, 0, contDir->size, dirData, device);
 
+	free(dirData);
 	free(buf);
 	return r;
 
@@ -364,9 +366,20 @@ paffs_dir* paffs_opendir(const char* path){
 		p += dirnamel;
 	}
 
-
+	free(dirData);
 
 	return dir;
+}
+
+PAFFS_RESULT paffs_closedir(paffs_dir* dir){
+    for(int i = 0; i < dir->no_entrys; i++){
+        free(dir->dirents[i]->name);
+        free(dir->dirents[i]);
+    }
+    free(dir->dirents);
+    free(dir->dentry);
+    free(dir);
+    return PAFFS_OK;
 }
 
 paffs_dirent* paffs_readdir(paffs_dir* dir){
@@ -385,15 +398,6 @@ paffs_dirent* paffs_readdir(paffs_dir* dir){
             dir->dirents[dir->pos]->name[namel+1] = 0;
         }
 	return dir->dirents[dir->pos++];
-}
-
-PAFFS_RESULT paffs_closedir(paffs_dir* dir){
-    for(int i = 0; i < dir->no_entrys; i++){
-        free(dir->dirents[i]->name);
-        free(dir->dirents[i]);
-    }
-    free(dir);
-    return PAFFS_OK;
 }
 
 void paffs_rewinddir(paffs_dir* dir){

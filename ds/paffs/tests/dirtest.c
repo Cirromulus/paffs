@@ -25,6 +25,7 @@ void listDir(const char* path){
 	while((dir = paffs_readdir(rewt)) != NULL){
 			printf("\tFound item: \"%s\"\n", dir->name);
 	}
+	paffs_closedir(rewt);
 }
 
 void printInfo(paffs_objInfo* obj){
