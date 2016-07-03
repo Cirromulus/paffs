@@ -71,6 +71,7 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 			return paffs_lasterr;
 		}
 		if(dev->areaMap[activeArea].status == EMPTY){
+			PAFFS_DBG("Info: Found new Area %d.", activeArea);
 			//We'll have to use a fresh area,
 			//so generate the areaSummary in Memory
 			dev->areaMap[activeArea].status = UNCLOSED;
@@ -85,6 +86,7 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 		}
 		unsigned int firstFreePage = 0;
 		if(findFirstFreePage(&firstFreePage, dev, activeArea) == PAFFS_NOSP){
+			PAFFS_DBG("Info: Area %d full.", activeArea);
 			//Area is full!
 			//TODO: Check if dirty Pages are inside and
 			//garbage collect this instead of just closing it...
@@ -104,6 +106,15 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 					+ firstFreePage;
 
 		dev->areaMap[activeArea].areaSummary[firstFreePage] = USED;
+		if(inode->direct[page] != 0){
+			//We are overriding existing data
+			unsigned long oldArea = inode->direct[page] / (dev->param.pages_per_block
+									* dev->param.blocks_per_area);
+			unsigned long oldPage = inode->direct[page] % (dev->param.pages_per_block
+									* dev->param.blocks_per_area);
+			dev->areaMap[oldArea].areaSummary[oldPage] = DIRTY;
+			dev->areaMap[oldArea].dirtyPages ++;
+		}
 		inode->direct[page] = phyPageNumber;
 		void* buf = &data[page*dev->param.total_bytes_per_page];
 		unsigned int btw = bytes;

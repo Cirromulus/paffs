@@ -5,8 +5,14 @@
 
 #ifndef __PAFFS_H__
 #define __PAFFS_H__
-
 #include <stdbool.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+#define PAFFS_DBG(msg, ...) do {\
+		fprintf(stderr, "paffs: " msg "\n\t-line %d, file %s\n", ##__VA_ARGS__,__LINE__, __FILE__);\
+	} while(0)
+
 
 #define PAFFS_MAX_FILENAME 32
 

@@ -6,7 +6,6 @@
 #include "paffs.h"
 #include "paffs_flash.h"
 #include "btree.h"
-#include <stdlib.h>
 #include <linux/string.h>
 #include <time.h>
 
