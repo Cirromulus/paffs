@@ -30,7 +30,7 @@ unsigned int extractArea(p_addr addr){
 }
 
 unsigned int extractPage(p_addr addr){
-	return addr & 0xFFFFFFFF;
+	return addr & 0xFFFFFFFF
 }*/
 
 const char* paffs_err_msg(PAFFS_RESULT pr){
