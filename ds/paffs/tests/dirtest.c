@@ -9,8 +9,8 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <time.h>
+#include <unistd.h>
 #include "paffs.h"
-#include "driver/driver.h"
 
 void listDir(const char* path){
 	printf("Opening Dir '%s'.\n", path);
@@ -36,9 +36,11 @@ void printInfo(paffs_objInfo* obj){
 	char buff[20];
 	printf("Listing Info:\n");
 	printf("\t size: %d\n", obj->size);
-	strftime(buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&obj->created));
+	time_t rawtime = obj->created;
+	strftime(buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&rawtime));
 	printf("\t created: %s\n", buff);
-	strftime(buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&obj->modified));
+	rawtime = obj->modified;
+	strftime(buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&rawtime));
 	printf("\t modified: %s\n", buff);
 	printf("\t Permission rwx: %d%d%d\n", (obj->perm & PAFFS_R) != 0, (obj->perm & PAFFS_W) != 0, (obj->perm & PAFFS_X) != 0);
 }
@@ -73,14 +75,38 @@ int main( int argc, char ** argv ) {
 
 	listDir("/a");
 	
-	sleep(1);
+	paffs_obj *fil = paffs_open("/b/file/", PAFFS_FW);
+	char t[] = "Pimmelmann";
+	if(fil == NULL)
+		printf("%s\n", paffs_err_msg(paffs_lasterr));
 
-	//paffs_obj* file = paffs_open("/b/file", PAFFS_FW);
+	unsigned int bytes = 0;
+	r = paffs_write(fil, t, strlen(t)+1, &bytes);
+	if(r != PAFFS_OK)
+			printf("%s\n", paffs_err_msg(r));
+	printf("Wrote content '%s' to file\n", t);
+
+
+	r = paffs_seek(fil, 0, PAFFS_SEEK_SET);
+
+	paffs_objInfo fileInfo = {0};
+	r = paffs_getObjInfo("/b/file", &fileInfo);
+	if(r != PAFFS_OK)
+			printf("%s\n", paffs_err_msg(r));
+	printInfo(&fileInfo);
+
+	char *out = malloc(fileInfo.size );
+
+	paffs_read(fil, out, fileInfo.size, &bytes);
+
+	printf("Read Contents: %s\n", out);
+
+	free(out);
+
 	r = paffs_touch("/b/file");
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
 
-	paffs_objInfo fileInfo = {0};
 	r = paffs_getObjInfo("/b/file", &fileInfo);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));

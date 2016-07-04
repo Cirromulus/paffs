@@ -126,6 +126,7 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 		dev->drv.drv_write_page_fn(dev, phyPageNumber, buf, btw);
 	}
 
+	//TODO: Only if write was bigger than filecontent!
 	inode->reservedSize = pageTo * dev->param.total_bytes_per_page;
 	return PAFFS_OK;
 }
@@ -135,7 +136,7 @@ PAFFS_RESULT readInodeData(pInode* inode,
 
 	unsigned int pageFrom = offs/dev->param.data_bytes_per_page;
 	unsigned int pageTo = (offs + bytes) / dev->param.data_bytes_per_page;
-
+	//TODO: Check if read is bigger than filecontent!
 	if(offs != 0){
 		//todo: check misaligned reads
 		return paffs_lasterr = PAFFS_NIMPL;

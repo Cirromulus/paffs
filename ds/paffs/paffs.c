@@ -475,18 +475,52 @@ PAFFS_RESULT paffs_getObjInfo(const char *fullPath, paffs_objInfo* nfo){
 }
 
 PAFFS_RESULT paffs_read(paffs_obj* obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read){
+	if(obj == NULL)
+		return paffs_lasterr = PAFFS_EINVAL;
+
 	if(obj->dentry->iNode->type == PINODE_DIR){
-		paffs_lasterr = PAFFS_EINVAL;
-		return PAFFS_EINVAL;
+		return paffs_lasterr = PAFFS_EINVAL;
 	}
-	return PAFFS_NIMPL;
+	if(obj->dentry->iNode->type == PINODE_LNK){
+		return paffs_lasterr = PAFFS_NIMPL;
+	}
+	PAFFS_RESULT r = readInodeData(obj->dentry->iNode, obj->fp, bytes_to_read, buf, device);
+	if(r != PAFFS_OK){
+		return paffs_lasterr = r;
+	}
+	//TODO: Check if actually read that much!
+	*bytes_read = bytes_to_read;
+	obj->fp += *bytes_read;
+	return PAFFS_OK;
 }
 
-PAFFS_RESULT paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written);
+PAFFS_RESULT paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written){
+	if(obj == NULL)
+		return paffs_lasterr = PAFFS_EINVAL;
 
-PAFFS_RESULT paffs_seek(paffs_obj* obj, unsigned int m, paffs_seekmode mode){
+	if(obj->dentry->iNode->type == PINODE_DIR){
+		return paffs_lasterr = PAFFS_EINVAL;
+	}
+	if(obj->dentry->iNode->type == PINODE_LNK){
+		return paffs_lasterr = PAFFS_NIMPL;
+	}
+	PAFFS_RESULT r = writeInodeData(obj->dentry->iNode, obj->fp, bytes_to_write, buf, device);
+	if(r != PAFFS_OK){
+		return paffs_lasterr = r;
+	}
+	//TODO: Check if actually wrote that much!
+	*bytes_written = bytes_to_write;
+	obj->fp += *bytes_written;
+	if(obj->fp > obj->dentry->iNode->size)
+		obj->dentry->iNode->size = obj->fp;
+	return PAFFS_OK;
+}
+
+PAFFS_RESULT paffs_seek(paffs_obj* obj, int m, paffs_seekmode mode){
 	switch(mode){
 	case PAFFS_SEEK_SET:
+		if(m < 0)
+			return paffs_lasterr = PAFFS_EINVAL;
 		obj->fp = m;
 		break;
 	case PAFFS_SEEK_END:

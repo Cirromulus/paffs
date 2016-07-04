@@ -56,7 +56,7 @@ static const fileopenmask PAFFS_FW = 0x4;	//file write
 static const fileopenmask PAFFS_FA = 0x8;	//file append
 
 PAFFS_RESULT paffs_start_up();
-PAFFS_RESULT paffs_custom_start_up();
+PAFFS_RESULT paffs_custom_start_up(void* fc);
 
 typedef enum paffs_seekmode{
 	PAFFS_SEEK_SET = 0,
@@ -221,7 +221,7 @@ PAFFS_RESULT paffs_touch(const char* path);
 PAFFS_RESULT paffs_getObjInfo(const char *fullPath, paffs_objInfo* nfo);
 PAFFS_RESULT paffs_read(paffs_obj* obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read);
 PAFFS_RESULT paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written);
-PAFFS_RESULT paffs_seek(paffs_obj* obj, unsigned int m, paffs_seekmode mode);
+PAFFS_RESULT paffs_seek(paffs_obj* obj, int m, paffs_seekmode mode);
 PAFFS_RESULT paffs_flush(paffs_obj* obj);
 PAFFS_RESULT paffs_close(paffs_obj* obj);
 

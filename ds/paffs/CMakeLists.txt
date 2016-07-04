@@ -15,7 +15,7 @@ add_subdirectory(driver)
 add_library(paffs ${SOURCES})
 
 #add_executable(btree_test ${SOURCES} tests/tree.c)
-add_executable(dir_test ${SOURCES} tests/dirtest.cpp)
+add_executable(dir_test ${SOURCES} tests/dirtest.c)
 
 target_link_libraries(dir_test simu)
 
