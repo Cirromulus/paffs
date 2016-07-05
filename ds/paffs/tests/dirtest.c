@@ -45,8 +45,7 @@ void printInfo(paffs_objInfo* obj){
 	printf("\t Permission rwx: %d%d%d\n", (obj->perm & PAFFS_R) != 0, (obj->perm & PAFFS_W) != 0, (obj->perm & PAFFS_X) != 0);
 }
 
-int main( int argc, char ** argv ) {
-
+void dirTest(){
 	paffs_start_up();
 
 	PAFFS_RESULT r = paffs_mnt("1");
@@ -111,5 +110,8 @@ int main( int argc, char ** argv ) {
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
 	printInfo(&fileInfo);
+}
 
+int main( int argc, char ** argv ) {
+	dirTest();
 }
