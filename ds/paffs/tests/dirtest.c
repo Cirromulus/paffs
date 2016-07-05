@@ -50,6 +50,8 @@ void dirTest(){
 
 	PAFFS_RESULT r = paffs_mnt("1");
 
+	while(getchar() == EOF);
+
 	paffs_permission p = 0;
 	r = paffs_mkdir("/a", p);
 	if(r != PAFFS_OK)
@@ -74,6 +76,8 @@ void dirTest(){
 
 	listDir("/a");
 	
+	while(getchar() == EOF);
+
 	paffs_obj *fil = paffs_open("/b/file/", PAFFS_FW);
 	char t[] = "Pimmelmann";
 	if(fil == NULL)
@@ -85,6 +89,7 @@ void dirTest(){
 			printf("%s\n", paffs_err_msg(r));
 	printf("Wrote content '%s' to file\n", t);
 
+	while(getchar() == EOF);
 
 	r = paffs_seek(fil, 0, PAFFS_SEEK_SET);
 
@@ -101,6 +106,8 @@ void dirTest(){
 	printf("Read Contents: %s\n", out);
 
 	free(out);
+
+	while(getchar() == EOF);
 
 	r = paffs_touch("/b/file");
 	if(r != PAFFS_OK)
