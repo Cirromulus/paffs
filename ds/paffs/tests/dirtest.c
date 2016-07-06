@@ -79,7 +79,7 @@ void dirTest(){
 	while(getchar() == EOF);
 
 	paffs_obj *fil = paffs_open("/b/file/", PAFFS_FW);
-	char t[] = "Pimmelmann";
+	char t[] = "Dies ist ein sehr langer Text";
 	if(fil == NULL)
 		printf("%s\n", paffs_err_msg(paffs_lasterr));
 
