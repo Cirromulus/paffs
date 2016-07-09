@@ -463,14 +463,15 @@ PAFFS_RESULT paffs_touch(const char* path){
 
 
 PAFFS_RESULT paffs_getObjInfo(const char *fullPath, paffs_objInfo* nfo){
-	pInode* file;
-	if((file = paffs_getInodeOfElem(fullPath)) == NULL){
+	pInode* object;
+	if((object = paffs_getInodeOfElem(fullPath)) == NULL){
 		return paffs_lasterr;
 	}
-	nfo->created = file->crea;
-	nfo->modified = file->mod;
-	nfo->perm = file->perm;
-	nfo->size = file->size;
+	nfo->created = object->crea;
+	nfo->modified = object->mod;
+	nfo->perm = object->perm;
+	nfo->size = object->size;
+	nfo->isDir = object->type == PINODE_DIR;
 	return PAFFS_OK;
 }
 

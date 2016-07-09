@@ -5,6 +5,10 @@
 
 #ifndef __PAFFS_H__
 #define __PAFFS_H__
+
+#if defined (__cplusplus)
+extern "C" {
+#endif
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -50,10 +54,11 @@ static const paffs_permission PAFFS_W = 0x2;
 static const paffs_permission PAFFS_X = 0x4;
 
 typedef char fileopenmask;
-static const fileopenmask PAFFS_FC = 0x1;	//file create
-static const fileopenmask PAFFS_FR = 0x2;	//file read
-static const fileopenmask PAFFS_FW = 0x4;	//file write
-static const fileopenmask PAFFS_FA = 0x8;	//file append
+static const fileopenmask PAFFS_FC = 0x01;	//file create
+static const fileopenmask PAFFS_FR = 0x02;	//file read
+static const fileopenmask PAFFS_FW = 0x04;	//file write
+static const fileopenmask PAFFS_FA = 0x08;	//file append
+static const fileopenmask PAFFS_FE = 0x10;	//file open only existing
 
 PAFFS_RESULT paffs_start_up();
 PAFFS_RESULT paffs_custom_start_up(void* fc);
@@ -132,6 +137,7 @@ typedef struct paffs_objInfo{
 	unsigned int size;
 	p_date created;
 	p_date modified;
+	bool isDir;
 	paffs_permission perm;
 } paffs_objInfo;
 
@@ -225,5 +231,9 @@ PAFFS_RESULT paffs_seek(paffs_obj* obj, int m, paffs_seekmode mode);
 PAFFS_RESULT paffs_flush(paffs_obj* obj);
 PAFFS_RESULT paffs_close(paffs_obj* obj);
 
+#if defined (__cplusplus)
+}
+#endif
 
 #endif /*__PAFFS_H__*/
+
