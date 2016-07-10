@@ -1,0 +1,52 @@
+/*
+ * paffs_trace.h
+ *
+ *  Created on: 10.07.2016
+ *      Author: urinator
+ */
+
+#ifndef DS_PAFFS_PAFFS_TRACE_H_
+#define DS_PAFFS_PAFFS_TRACE_H_
+
+
+extern unsigned int paffs_trace_mask;
+
+#define PAFFS_DBG(mask, msg, ...) do {\
+		if(mask & paffs_trace_mask || paffs_trace_mask & PAFFS_TRACE_ALWAYS){\
+			fprintf(stderr, "paffs: " msg "\n\t-line %d, file %s\n", ##__VA_ARGS__,__LINE__, __FILE__);\
+		}\
+	} while(0)
+
+#define PAFFS_TRACE_OS			0x00000002
+#define PAFFS_TRACE_ALLOCATE	0x00000004
+#define PAFFS_TRACE_SCAN		0x00000008
+#define PAFFS_TRACE_BAD_BLOCKS	0x00000010
+#define PAFFS_TRACE_ERASE		0x00000020
+#define PAFFS_TRACE_GC			0x00000040
+#define PAFFS_TRACE_WRITE		0x00000080
+#define PAFFS_TRACE_TRACING		0x00000100
+#define PAFFS_TRACE_DELETION	0x00000200
+#define PAFFS_TRACE_BUFFERS		0x00000400
+#define PAFFS_TRACE_NANDACCESS	0x00000800
+#define PAFFS_TRACE_GC_DETAIL	0x00001000
+#define PAFFS_TRACE_SCAN_DEBUG	0x00002000
+#define PAFFS_TRACE_AREA		0x00004000
+#define PAFFS_TRACE_CHECKPOINT	0x00008000
+
+#define PAFFS_TRACE_VERIFY		0x00010000
+#define PAFFS_TRACE_VERIFY_NAND	0x00020000
+#define PAFFS_TRACE_VERIFY_FULL	0x00040000
+#define PAFFS_TRACE_VERIFY_ALL	0x000f0000
+
+#define PAFFS_TRACE_SYNC		0x00100000
+#define PAFFS_TRACE_BACKGROUND	0x00200000
+#define PAFFS_TRACE_LOCK		0x00400000
+#define PAFFS_TRACE_MOUNT		0x00800000
+
+#define PAFFS_TRACE_ERROR		0x40000000
+#define PAFFS_TRACE_BUG			0x80000000
+#define PAFFS_TRACE_ALWAYS		0xf0000000
+
+
+
+#endif /* DS_PAFFS_PAFFS_TRACE_H_ */

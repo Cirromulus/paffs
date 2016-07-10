@@ -7,9 +7,10 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <time.h>
-#include <unistd.h>
 #include "paffs.h"
 
 void listDir(const char* path){

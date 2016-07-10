@@ -6,19 +6,15 @@
 #ifndef __PAFFS_H__
 #define __PAFFS_H__
 
-#if defined (__cplusplus)
+#if defined (__cplusplus) && !defined (__CDT_PARSER__)	//BUG: CDT is unable to look into extern c.
 extern "C" {
 #endif
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 
-#define PAFFS_DBG(msg, ...) do {\
-		fprintf(stderr, "paffs: " msg "\n\t-line %d, file %s\n", ##__VA_ARGS__,__LINE__, __FILE__);\
-	} while(0)
-
-
-#define PAFFS_MAX_FILENAME 32
+#include "paffs_trace.h"
 
 
 typedef enum PAFFS_RESULT{
@@ -231,7 +227,7 @@ PAFFS_RESULT paffs_seek(paffs_obj* obj, int m, paffs_seekmode mode);
 PAFFS_RESULT paffs_flush(paffs_obj* obj);
 PAFFS_RESULT paffs_close(paffs_obj* obj);
 
-#if defined (__cplusplus)
+#if defined (__cplusplus) && !defined (__CDT_PARSER__)
 }
 #endif
 

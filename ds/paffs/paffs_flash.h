@@ -22,4 +22,6 @@ PAFFS_RESULT readInodeData(pInode* inode,
 					void* data, p_dev* dev);
 PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev);
 
+void initArea(p_dev* dev, unsigned long int area);
+
 #endif /* PAFFS_FLASH_H_ */

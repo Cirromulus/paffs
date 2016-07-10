@@ -7,6 +7,7 @@
 
 #include "paffs_flash.h"
 #include <stdlib.h>
+#include <string.h>
 
 static unsigned int activeArea = 0;
 
@@ -54,8 +55,10 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 					void* data, p_dev* dev){
 	unsigned int pageFrom = offs/dev->param.data_bytes_per_page;
 	unsigned int pageTo = (offs + bytes) / dev->param.data_bytes_per_page;
+	pageTo = pageTo == 0 ? 1 : pageTo;
+
 	if(pageTo - pageFrom > 11){
-		//Would use first indirection Layer also
+		//Would also use first indirection Layer
 		return paffs_lasterr = PAFFS_NIMPL;
 	}
 
@@ -64,29 +67,20 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 		return paffs_lasterr = PAFFS_NIMPL;
 	}
 
-	for(int page = 0; page < 1 + pageTo - pageFrom; page++){
+	for(int page = 0; page < pageTo - pageFrom; page++){
 
 		activeArea = findWritableArea(dev);
 		if(paffs_lasterr != PAFFS_OK){
 			return paffs_lasterr;
 		}
 		if(dev->areaMap[activeArea].status == EMPTY){
-			PAFFS_DBG("Info: Found new Area %d.", activeArea);
 			//We'll have to use a fresh area,
 			//so generate the areaSummary in Memory
-			dev->areaMap[activeArea].status = UNCLOSED;
-			dev->areaMap[activeArea].areaSummary = malloc(
-					sizeof(p_summaryEntry)
-					* dev->param.blocks_per_area
-					* dev->param.pages_per_block);
-			memset(dev->areaMap[activeArea].areaSummary, 0,
-					sizeof(p_summaryEntry)
-					* dev->param.blocks_per_area
-					* dev->param.pages_per_block);
+			initArea(dev, activeArea);
 		}
 		unsigned int firstFreePage = 0;
 		if(findFirstFreePage(&firstFreePage, dev, activeArea) == PAFFS_NOSP){
-			PAFFS_DBG("Info: Area %d full.", activeArea);
+			PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Area %d full.", activeArea);
 			//Area is full!
 			//TODO: Check if dirty Pages are inside and
 			//garbage collect this instead of just closing it...
@@ -94,6 +88,10 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 			//Second try. Normally there would be more, because
 			//areas could be full without being closed
 			activeArea = findWritableArea(dev);
+			if(paffs_lasterr != PAFFS_OK){
+				return paffs_lasterr;
+			}
+			initArea(dev, activeArea);
 			if(paffs_lasterr != PAFFS_OK){
 				return paffs_lasterr;
 			}
@@ -116,14 +114,21 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 			dev->areaMap[oldArea].dirtyPages ++;
 		}
 		inode->direct[page] = phyPageNumber;
-		void* buf = &data[page*dev->param.total_bytes_per_page];
+		char* buf = &((char*)data)[page*dev->param.data_bytes_per_page];
 		unsigned int btw = bytes;
-		if(bytes > dev->param.total_bytes_per_page){
-			btw = bytes > (page+1)*dev->param.total_bytes_per_page ?
-						dev->param.total_bytes_per_page :
-						(page+1)*dev->param.total_bytes_per_page - bytes;
+		if(bytes > dev->param.data_bytes_per_page){
+			btw = bytes > (page+1)*dev->param.data_bytes_per_page ?
+						dev->param.data_bytes_per_page :
+						bytes - page*dev->param.data_bytes_per_page;
 		}
-		dev->drv.drv_write_page_fn(dev, phyPageNumber, buf, btw);
+		PAFFS_RESULT res = dev->drv.drv_write_page_fn(dev, phyPageNumber, buf, btw);
+		PAFFS_DBG(PAFFS_TRACE_WRITE, "DBG: r.P: %d/%d, phy.P: %llu", page+1, pageTo, phyPageNumber);
+		//while(getchar() == EOF);
+		if(res != PAFFS_OK){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "ERR: write returned FAIL at phy.P: %llu", phyPageNumber);
+			return PAFFS_FAIL;
+		}
+
 	}
 
 	//TODO: Only if write was bigger than filecontent!
@@ -148,12 +153,12 @@ PAFFS_RESULT readInodeData(pInode* inode,
 	}
 
 	for(int page = 0; page < 1 + pageTo - pageFrom; page++){
-		char* wrap = &data[page*dev->param.data_bytes_per_page];
+		char* wrap = &((char*)data)[page*dev->param.data_bytes_per_page];
 		unsigned int btr = bytes;
-		if(bytes > dev->param.total_bytes_per_page){
-			btr = bytes > (page+1)*dev->param.total_bytes_per_page ?
-						dev->param.total_bytes_per_page :
-						(page+1)*dev->param.total_bytes_per_page - bytes;
+		if(bytes > dev->param.data_bytes_per_page){
+			btr = bytes > (page+1)*dev->param.data_bytes_per_page ?
+						dev->param.data_bytes_per_page :
+						bytes - page*dev->param.data_bytes_per_page;
 		}
 		PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, inode->direct[page], wrap, btr);
 		if(r != PAFFS_OK){
@@ -168,4 +173,18 @@ PAFFS_RESULT readInodeData(pInode* inode,
 PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev){
 
 	return PAFFS_NIMPL;
+}
+
+void initArea(p_dev* dev, unsigned long int area){
+	PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Init new Area %d.", activeArea);
+	//generate the areaSummary in Memory
+	dev->areaMap[activeArea].status = UNCLOSED;
+	dev->areaMap[activeArea].areaSummary = malloc(
+			sizeof(p_summaryEntry)
+			* dev->param.blocks_per_area
+			* dev->param.pages_per_block);
+	memset(dev->areaMap[activeArea].areaSummary, 0,
+			sizeof(p_summaryEntry)
+			* dev->param.blocks_per_area
+			* dev->param.pages_per_block);
 }

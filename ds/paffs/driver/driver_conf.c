@@ -8,6 +8,10 @@
 #include "fc_driver.h"
 #include "../paffs.h"
 
+ unsigned int paffs_trace_mask =
+		 PAFFS_TRACE_AREA |
+		 0;
+
 PAFFS_RESULT paffs_start_up(){
 	return paffs_custom_start_up(NULL);
 }
