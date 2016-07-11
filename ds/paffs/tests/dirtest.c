@@ -51,8 +51,6 @@ void dirTest(){
 
 	PAFFS_RESULT r = paffs_mnt("1");
 
-	while(getchar() == EOF);
-
 	paffs_permission p = 0;
 	r = paffs_mkdir("/a", p);
 	if(r != PAFFS_OK)
@@ -101,6 +99,13 @@ void dirTest(){
 	printInfo(&fileInfo);
 
 	char *out = malloc(fileInfo.size );
+
+	paffs_read(fil, out, fileInfo.size, &bytes);
+
+	printf("Read Contents: %s\n", out);
+
+
+	r = paffs_seek(fil, 9, PAFFS_SEEK_SET);
 
 	paffs_read(fil, out, fileInfo.size, &bytes);
 

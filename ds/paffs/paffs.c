@@ -297,9 +297,8 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 	directoryEntryCount ++;
 	memcpy (dirData, &directoryEntryCount, sizeof(unsigned int));
 
-	contDir->size += direntryl;
-
 	r = writeInodeData(contDir, 0, contDir->size, dirData, device);
+	contDir->size += direntryl;
 
 	free(dirData);
 	free(buf);

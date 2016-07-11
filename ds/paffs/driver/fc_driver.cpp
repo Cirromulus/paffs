@@ -67,7 +67,7 @@ PAFFS_RESULT p_FC_WritePage(struct p_dev *dev, unsigned long long page_no,
 	void* buf = malloc(dev->param.total_bytes_per_page );
 
 	if(dev->param.total_bytes_per_page != data_len){
-		memset(buf, 0, dev->param.total_bytes_per_page);
+		memset(buf, 0xFF, dev->param.total_bytes_per_page);
 	}
 	memcpy(buf, data, data_len);
 
