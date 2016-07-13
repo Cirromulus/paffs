@@ -212,8 +212,6 @@ void dirTest(){
 	printInfo(&fileInfo);
 
 
-
-
 	while(getchar() == EOF);
 	free (tl);
 	paffs_close(fil);
