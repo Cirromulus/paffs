@@ -191,6 +191,21 @@ void dirTest(){
 
 	printWholeFile("/b/file");
 
+
+	//write misaligned - write over boundarys ----
+	r = paffs_seek(fil, 508, PAFFS_SEEK_SET);
+	if(r != PAFFS_OK)
+			printf("%s\n", paffs_err_msg(r));
+
+	r = paffs_write(fil, testlauf, strlen(testlauf), &bytes);
+	if(r != PAFFS_OK)
+			printf("%s\n", paffs_err_msg(r));
+	// ---- write misaligned 2
+
+
+
+	printWholeFile("/b/file");
+
 	r = paffs_getObjInfo("/b/file", &fileInfo);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
