@@ -52,20 +52,18 @@ PAFFS_RESULT findFirstFreePage(unsigned int* p_out, p_dev* dev, unsigned int are
 
 PAFFS_RESULT writeInodeData(pInode* inode,
 					unsigned int offs, unsigned int bytes,
-					void* data, p_dev* dev){
+					const char* data, p_dev* dev){
 	unsigned int pageFrom = offs/dev->param.data_bytes_per_page;
 	unsigned int pageTo = (offs + bytes) / dev->param.data_bytes_per_page;
 	pageTo = pageTo == 0 ? 1 : pageTo;
 
 	if(pageTo - pageFrom > 11){
 		//Would use first indirection Layer
+		PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Write would use first indirection layer, too big!");
 		return paffs_lasterr = PAFFS_NIMPL;
 	}
 
-	if(offs > 0){
-		//now, offset just points to start at particular page
-		offs = offs % dev->param.data_bytes_per_page;
-	}
+	unsigned int pageOffs = offs % dev->param.data_bytes_per_page;
 
 	for(int page = 0; page < pageTo - pageFrom; page++){
 		bool misaligned = false;
@@ -95,6 +93,7 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 			if(paffs_lasterr != PAFFS_OK){
 				return paffs_lasterr;
 			}
+			//find fresh Page in new selected Area
 			if(findFirstFreePage(&firstFreePage, dev, activeArea) == PAFFS_NOSP)
 				return PAFFS_BUG;
 		}
@@ -108,10 +107,10 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 		//Prepare buffer and calculate bytes to write
 		char* buf = &((char*)data)[page*dev->param.data_bytes_per_page];
 		unsigned int btw = bytes;
-		if((bytes+offs) > dev->param.data_bytes_per_page){
-			btw = (bytes+offs) > (page+1)*dev->param.data_bytes_per_page ?
+		if((bytes+pageOffs) > dev->param.data_bytes_per_page){
+			btw = (bytes+pageOffs) > (page+1)*dev->param.data_bytes_per_page ?
 						dev->param.data_bytes_per_page :
-						(bytes+offs) - page*dev->param.data_bytes_per_page;
+						(bytes+pageOffs) - page*dev->param.data_bytes_per_page;
 		}
 
 		if(inode->direct[page+pageFrom] != 0){
@@ -125,35 +124,36 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 			dev->areaMap[oldArea].dirtyPages ++;
 
 			if((btw < dev->param.data_bytes_per_page &&
-				page*dev->param.data_bytes_per_page + btw + offs > inode->size) ||  //End Misaligned
-				(offs > 0 && page == 0)){				//Start Misaligned
+				page*dev->param.data_bytes_per_page + btw + offs < inode->size) ||  //End Misaligned
+				(pageOffs > 0 && page == 0)){				//Start Misaligned
 
 				//fill write buffer with valid Data
 				misaligned = true;
 				buf = (char*)malloc(dev->param.data_bytes_per_page);
 				memset(buf, 0xFF, dev->param.data_bytes_per_page);
 
-				unsigned int btr = btw;
-				//handle misaligned writes bigger than actual filesize
-				if(page*dev->param.data_bytes_per_page + btw + offs > inode->size){
-					btr = inode->size - page*dev->param.data_bytes_per_page;
+				unsigned int btr = dev->param.data_bytes_per_page;
+
+				if((pageTo+page)*dev->param.data_bytes_per_page > inode->size){
+					btr = inode->size - (pageTo+page-1)*dev->param.data_bytes_per_page;
 				}
 
-
 				if(page == 0){
-					//Handle offset on first page (could also be last page)
-					if(readInodeData(inode, page*dev->param.data_bytes_per_page, btr + offs, buf, dev) != PAFFS_OK){
+					//Handle pageOffset on first page (could also be last page)
+					if(readInodeData(inode, page*dev->param.data_bytes_per_page, btr, buf, dev) != PAFFS_OK){
 						free(buf);
 						return PAFFS_FAIL;
 					}
-					memcpy(&((char*)buf)[offs], data, btw);
+					memcpy(&((char*)buf)[pageOffs], data, btw);
+
+					btw = btr > (offs + btw) ? btr : offs + btw;
 				}else{
 					//last Page is misaligned
 					if(readInodeData(inode, page*dev->param.data_bytes_per_page, btr, buf, dev) != PAFFS_OK){
 						free(buf);
 						return PAFFS_FAIL;
 					}
-					memcpy(buf, data, btr);
+					memcpy(buf, data, btw);
 					btw = dev->param.data_bytes_per_page;
 				}
 
@@ -177,13 +177,15 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 
 	}
 
-	//TODO: Only if write was bigger than filecontent!
-	inode->reservedSize = pageTo * dev->param.total_bytes_per_page;
+	if(pageTo*dev->param.data_bytes_per_page + bytes + offs > inode->size){
+		//filesize increased
+		inode->reservedSize = pageTo * dev->param.total_bytes_per_page;
+	}
 	return PAFFS_OK;
 }
 PAFFS_RESULT readInodeData(pInode* inode,
 					unsigned int offs, unsigned int bytes,
-					void* data, p_dev* dev){
+					char* data, p_dev* dev){
 
 	unsigned int pageFrom = offs/dev->param.data_bytes_per_page;
 	unsigned int pageTo = (offs + bytes) / dev->param.data_bytes_per_page;
@@ -191,7 +193,8 @@ PAFFS_RESULT readInodeData(pInode* inode,
 
 	if(offs + bytes > inode->size){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read bigger than size of object! (was: %d, max: %llu)", offs+bytes, inode->size);
-		return paffs_lasterr = PAFFS_EINVAL;
+		//TODO: return less bytes_read
+		return paffs_lasterr = PAFFS_NIMPL;
 	}
 
 	if(pageTo > 11){
@@ -206,11 +209,10 @@ PAFFS_RESULT readInodeData(pInode* inode,
 		wrap = malloc(bytes + offs);
 	}
 
-
 	for(int page = 0; page <= pageTo - pageFrom; page++){
 		char* buf = &((char*)wrap)[page*dev->param.data_bytes_per_page];
-		unsigned int btr = bytes;
-		if((bytes + offs) > dev->param.data_bytes_per_page){
+		unsigned int btr = bytes + offs;
+		if(btr > dev->param.data_bytes_per_page){
 			btr = (bytes + offs) > (page+1)*dev->param.data_bytes_per_page ?
 						dev->param.data_bytes_per_page :
 						(bytes + offs) - page*dev->param.data_bytes_per_page;

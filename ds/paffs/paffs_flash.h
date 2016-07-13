@@ -16,10 +16,10 @@ PAFFS_RESULT findFirstFreePage(unsigned int* p_out, p_dev* dev, unsigned int are
 
 PAFFS_RESULT writeInodeData(pInode* inode,
 					unsigned int offs, unsigned int bytes,
-					void* data, p_dev* dev);
+					const char* data, p_dev* dev);
 PAFFS_RESULT readInodeData(pInode* inode,
 					unsigned int offs, unsigned int bytes,
-					void* data, p_dev* dev);
+					char* data, p_dev* dev);
 PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev);
 
 void initArea(p_dev* dev, unsigned long int area);

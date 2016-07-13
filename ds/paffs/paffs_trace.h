@@ -12,7 +12,7 @@
 extern unsigned int paffs_trace_mask;
 
 #define PAFFS_DBG(mask, msg, ...) do {\
-		if(mask & paffs_trace_mask || paffs_trace_mask & PAFFS_TRACE_ALWAYS){\
+		if(mask & paffs_trace_mask || mask & PAFFS_TRACE_ALWAYS){\
 			fprintf(stderr, "paffs: " msg "\n\t-line %d, file %s\n", ##__VA_ARGS__,__LINE__, __FILE__);\
 		}\
 	} while(0)

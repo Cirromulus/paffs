@@ -20,6 +20,7 @@ static pDentry* dentry_buf[DENTRY_BUFSIZE];
 static unsigned char dentrys_buf_used = 0;
 */
 
+//Address-wrapper für einfacheren Garbagecollector
 /*p_addr combineAddress(unsigned int area, unsigned int page){
 	unsigned long long ar = area;
 	return  ar << 8 * 4;// << (sizeof(unsigned long) * 8) | page;
@@ -297,7 +298,7 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 	directoryEntryCount ++;
 	memcpy (dirData, &directoryEntryCount, sizeof(unsigned int));
 
-	r = writeInodeData(contDir, 0, contDir->size, dirData, device);
+	r = writeInodeData(contDir, 0, contDir->size + direntryl, dirData, device);
 	contDir->size += direntryl;
 
 	free(dirData);
@@ -508,11 +509,20 @@ PAFFS_RESULT paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_
 	if(r != PAFFS_OK){
 		return paffs_lasterr = r;
 	}
+
+	obj->dentry->iNode->mod = time(0);
+
 	//TODO: Check if actually wrote that much!
 	*bytes_written = bytes_to_write;
 	obj->fp += *bytes_written;
-	if(obj->fp > obj->dentry->iNode->size)
+	if(obj->fp > obj->dentry->iNode->size){
+		//size was increased
+		if(obj->dentry->iNode->reservedSize < obj->fp){
+			PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Reserved size is smaller than actual size?!");
+			return PAFFS_BUG;
+		}
 		obj->dentry->iNode->size = obj->fp;
+	}
 	return PAFFS_OK;
 }
 

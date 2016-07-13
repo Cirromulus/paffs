@@ -96,7 +96,7 @@ typedef struct pInode{
 	p_date crea;
 	p_date mod;
 	unsigned long long reservedSize;
-	unsigned long long size;    //~1,8 * 10^19 Byte
+	unsigned long long size;    //~1int yaffsfs_GetLastError(,8 * 10^19 Byte
 	p_addr direct[11];
 	p_addr indir;
 	p_addr d_indir;
@@ -210,7 +210,7 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 pInode* paffs_createFile(const char* fullPath, paffs_permission mask);
 
 
-//Direcory
+//Directory
 PAFFS_RESULT paffs_mkdir(const char* fullPath, paffs_permission mask);
 paffs_dir* paffs_opendir(const char* path);
 paffs_dirent* paffs_readdir(paffs_dir* dir);
