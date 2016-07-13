@@ -446,6 +446,14 @@ paffs_obj* paffs_open(const char* path, fileopenmask mask){
 	return obj;
 }
 
+PAFFS_RESULT paffs_close(paffs_obj* obj){
+	paffs_flush(obj);
+	free(obj->dentry);
+	free(obj);
+
+	return PAFFS_OK;
+}
+
 PAFFS_RESULT paffs_touch(const char* path){
 	pInode* file;
 	if((file = paffs_getInodeOfElem(path)) == NULL){
@@ -549,12 +557,5 @@ PAFFS_RESULT paffs_flush(paffs_obj* obj){
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT paffs_close(paffs_obj* obj){
-	paffs_flush(obj);
-	free(obj->dentry);
-	free(obj);
-
-	return PAFFS_OK;
-}
 
 

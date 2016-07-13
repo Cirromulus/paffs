@@ -7,6 +7,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -51,6 +52,7 @@ void printFile(unsigned int offs, unsigned int bytes, const char* path){
 
 	unsigned int bytesread = 0;
 	char* out = malloc (bytes + 1);
+	memset(out, 0, bytes + 1);
 
 	PAFFS_RESULT r = paffs_seek(fil, offs, PAFFS_SEEK_SET);
 	if(r != PAFFS_OK){
@@ -67,7 +69,7 @@ void printFile(unsigned int offs, unsigned int bytes, const char* path){
 	paffs_close(fil);
 
 	out[bytesread] = 0;
-	printf("Read Contents: %s\n", out);
+	printf("Read '%s': %s\n", path, out);
 	free (out);
 }
 
@@ -114,15 +116,26 @@ void dirTest(){
 	paffs_obj *fil = paffs_open("/b/file", PAFFS_FW);
 
 	//first write ----
-	char t[] = "Dies ist ein sehr langer Text";
+	char t[] = "Dies ist ein sehr langer Text";	//29 chars
+	char* tl = (char*) malloc(25*strlen(t)+2);
+
+	for(int i = 0; i < 25; i++){
+		memcpy(&tl[i * strlen(t)], t, strlen(t));
+	}
+	tl[25*strlen(t)] = '+';
+	tl[25*strlen(t) + 1] = 0;
+	tl[511] = '!';
+	tl[512] = '#';
+
+
 	if(fil == NULL)
 		printf("%s\n", paffs_err_msg(paffs_lasterr));
 
 	unsigned int bytes = 0;
-	r = paffs_write(fil, t, strlen(t), &bytes);
+	r = paffs_write(fil, tl, strlen(tl), &bytes);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
-	printf("Wrote content '%s' to file\n", t);
+	printf("Wrote content '%s' 25 times to file\n", t);
 	// ----- first write
 
 
@@ -136,31 +149,35 @@ void dirTest(){
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
 
-	char* out = malloc(fileInfo.size - 9);
+	char* out = malloc(fileInfo.size - 8);
 	r = paffs_read(fil, out, fileInfo.size - 9, &bytes);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
 
-	printf("Read Contents (+9): %s\n", out);
+	out[fileInfo.size - 9] = 0;
+	printf("Read Contents (+9):      %s\n", out);
 	free(out);
 	//--- read misaligned
 
-	//write misaligned - only beginning misaligned ----
-	r = paffs_seek(fil, 25, PAFFS_SEEK_SET);
+	//while(getchar() == EOF);
+
+	//write misaligned - over boundarys ----
+	r = paffs_seek(fil, -5, PAFFS_SEEK_END);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
 
-	char testlauf[] = "Testlauf";
+	char testlauf[] = "---Testlauf---";
 	r = paffs_write(fil, testlauf, strlen(testlauf), &bytes);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
 	// ---- write misaligned 1
 
 	printWholeFile("/b/file");
+	//while(getchar() == EOF);
 
 
-	//write misaligned - start and end misaligned ----
-	r = paffs_seek(fil, 18, PAFFS_SEEK_SET);
+	//write misaligned - end misaligned ----
+	r = paffs_seek(fil, -11, PAFFS_SEEK_END);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
 
@@ -168,12 +185,11 @@ void dirTest(){
 	r = paffs_write(fil, kurz, strlen(kurz), &bytes);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
-	// ---- write misaligned 1
+	// ---- write misaligned 2
 
 
 
 	printWholeFile("/b/file");
-
 
 	r = paffs_getObjInfo("/b/file", &fileInfo);
 	if(r != PAFFS_OK)
@@ -184,6 +200,8 @@ void dirTest(){
 
 
 	while(getchar() == EOF);
+	free (tl);
+	paffs_close(fil);
 }
 
 int main( int argc, char ** argv ) {
