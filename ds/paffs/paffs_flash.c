@@ -69,6 +69,7 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 	}
 
 	unsigned int pageOffs = offs % dev->param.data_bytes_per_page;
+	unsigned int bytes_written = 0;
 
 	for(int page = 0; page <= pageTo - pageFrom; page++){
 		bool misaligned = false;
@@ -111,12 +112,14 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 
 		//Prepare buffer and calculate bytes to write
 		char* buf = &((char*)data)[page*dev->param.data_bytes_per_page];
-		unsigned int btw = bytes;
+		unsigned int btw = bytes - bytes_written;
 		if((bytes+pageOffs) > dev->param.data_bytes_per_page){
 			btw = (bytes+pageOffs) > (page+1)*dev->param.data_bytes_per_page ?
-						dev->param.data_bytes_per_page :
-						(bytes+pageOffs) - page*dev->param.data_bytes_per_page;
+						dev->param.data_bytes_per_page - pageOffs :
+						bytes - page*dev->param.data_bytes_per_page;
 		}
+
+
 
 		if(inode->direct[page+pageFrom] != 0){
 			//We are overriding existing data
@@ -128,8 +131,8 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 			dev->areaMap[oldArea].areaSummary[oldPage] = DIRTY;
 			dev->areaMap[oldArea].dirtyPages ++;
 
-			if((btw < dev->param.data_bytes_per_page &&
-				page*dev->param.data_bytes_per_page + btw + offs < inode->size) ||  //End Misaligned
+			if((btw + pageOffs < dev->param.data_bytes_per_page &&
+				page*dev->param.data_bytes_per_page + btw < inode->size) ||  //End Misaligned
 				(pageOffs > 0 && page == 0)){				//Start Misaligned
 
 				//fill write buffer with valid Data
@@ -139,27 +142,30 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 
 				unsigned int btr = dev->param.data_bytes_per_page;
 
-				if((pageTo+1+page)*dev->param.data_bytes_per_page > inode->size){
-					btr = inode->size - dev->param.data_bytes_per_page;
+				if((pageFrom+1+page)*dev->param.data_bytes_per_page > inode->size){
+					btr = inode->size - (pageFrom+page) * dev->param.data_bytes_per_page;
 				}
 
 				if(readInodeData(inode, (pageFrom+page)*dev->param.data_bytes_per_page, btr, buf, dev) != PAFFS_OK){
 					free(buf);
 					return PAFFS_FAIL;
 				}
-				if(page == 0){
-					//Handle pageOffset on first page (could also be last page)
-					memcpy(&buf[pageOffs], data, btw);
 
-					btw = btr > (pageOffs + btw) ? btr : pageOffs + btw;
-				}else{
-					//last Page is misaligned
-					memcpy(buf, data, btw);
-					btw = dev->param.data_bytes_per_page;
-				}
+				//Handle pageOffset
+				memcpy(&buf[pageOffs], &data[bytes_written], btw);
 
+				//this is here, because btw will be modified
+				bytes_written += btw;
+
+				//increase btw to whole page to write existing data back
+				btw = btr > (pageOffs + btw) ? btr : pageOffs + btw;
+
+				//pageoffset is only at applied to first page
+				pageOffs = 0;
 			}
 
+		}else{
+			bytes_written += btw;
 		}
 		inode->direct[page+pageFrom] = phyPageNumber;
 

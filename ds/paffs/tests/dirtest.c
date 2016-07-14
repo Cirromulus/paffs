@@ -93,19 +93,19 @@ void dirTest(){
 	r = paffs_mkdir("/a", p);
 	if(r != PAFFS_OK)
 		printf("%s\n", paffs_err_msg(r));
-
+	while(getchar() == EOF);
 	r = paffs_mkdir("/b", p);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
-
+	while(getchar() == EOF);
 	r = paffs_mkdir("/b/c", p);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
-
+	while(getchar() == EOF);
 	r = paffs_touch ("/b/file");
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
-
+	while(getchar() == EOF);
 
 	listDir("/");
 
@@ -116,7 +116,7 @@ void dirTest(){
 	paffs_obj *fil = paffs_open("/b/file", PAFFS_FW);
 
 	//first write ----
-	char t[] = "Dies ist ein sehr langer Text";	//29 chars
+	char t[] = ".                        Text";	//29 chars
 	char* tl = (char*) malloc(25*strlen(t)+2);
 
 	for(int i = 0; i < 25; i++){
@@ -140,7 +140,7 @@ void dirTest(){
 
 
 	printWholeFile("/b/file");
-
+	while(getchar() == EOF);
 
 	//read misaligned ---
 	paffs_objInfo fileInfo = {0};
@@ -159,9 +159,8 @@ void dirTest(){
 	free(out);
 	//--- read misaligned
 
-	//while(getchar() == EOF);
 
-	//write misaligned - over boundarys ----
+	//write misaligned - over Size----
 	r = paffs_seek(fil, -5, PAFFS_SEEK_END);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
@@ -173,8 +172,7 @@ void dirTest(){
 	// ---- write misaligned 1
 
 	printWholeFile("/b/file");
-	//while(getchar() == EOF);
-
+	while(getchar() == EOF);
 
 	//write misaligned - end misaligned ----
 	r = paffs_seek(fil, -11, PAFFS_SEEK_END);
@@ -187,12 +185,10 @@ void dirTest(){
 			printf("%s\n", paffs_err_msg(r));
 	// ---- write misaligned 2
 
-
-
 	printWholeFile("/b/file");
+	while(getchar() == EOF);
 
-
-	//write misaligned - write over boundarys ----
+	//write misaligned - write over page boundarys ----
 	r = paffs_seek(fil, 508, PAFFS_SEEK_SET);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
@@ -202,7 +198,7 @@ void dirTest(){
 			printf("%s\n", paffs_err_msg(r));
 	// ---- write misaligned 2
 
-
+	while(getchar() == EOF);
 
 	printWholeFile("/b/file");
 
