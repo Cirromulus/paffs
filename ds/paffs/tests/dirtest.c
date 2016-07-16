@@ -93,19 +93,15 @@ void dirTest(){
 	r = paffs_mkdir("/a", p);
 	if(r != PAFFS_OK)
 		printf("%s\n", paffs_err_msg(r));
-	while(getchar() == EOF);
 	r = paffs_mkdir("/b", p);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
-	while(getchar() == EOF);
 	r = paffs_mkdir("/b/c", p);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
-	while(getchar() == EOF);
 	r = paffs_touch ("/b/file");
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
-	while(getchar() == EOF);
 
 	listDir("/");
 
@@ -116,16 +112,18 @@ void dirTest(){
 	paffs_obj *fil = paffs_open("/b/file", PAFFS_FW);
 
 	//first write ----
-	char t[] = ".                        Text";	//29 chars
-	char* tl = (char*) malloc(25*strlen(t)+2);
+	char t[] = ".                         Text";	//30 chars
+	char* tl = (char*) malloc(36*strlen(t)+2);
 
-	for(int i = 0; i < 25; i++){
+	for(int i = 0; i < 36; i++){
 		memcpy(&tl[i * strlen(t)], t, strlen(t));
 	}
-	tl[25*strlen(t)] = '+';
-	tl[25*strlen(t) + 1] = 0;
+	tl[36*strlen(t)] = '+';
+	tl[36*strlen(t) + 1] = 0;
 	tl[511] = '!';
 	tl[512] = '#';
+	tl[1023] = '!';
+	tl[1024] = '#';
 
 
 	if(fil == NULL)
@@ -135,7 +133,7 @@ void dirTest(){
 	r = paffs_write(fil, tl, strlen(tl), &bytes);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
-	printf("Wrote content '%s' 25 times to file\n", t);
+	printf("Wrote content  '%s' 25 times to file\n", t);
 	// ----- first write
 
 
@@ -161,6 +159,7 @@ void dirTest(){
 
 
 	//write misaligned - over Size----
+	printf("write misaligned - over Size\n");
 	r = paffs_seek(fil, -5, PAFFS_SEEK_END);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
@@ -175,6 +174,7 @@ void dirTest(){
 	while(getchar() == EOF);
 
 	//write misaligned - end misaligned ----
+	printf("write misaligned - last page misaligned\n");
 	r = paffs_seek(fil, -11, PAFFS_SEEK_END);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
@@ -188,7 +188,8 @@ void dirTest(){
 	printWholeFile("/b/file");
 	while(getchar() == EOF);
 
-	//write misaligned - write over page boundarys ----
+	//write misaligned - write over page boundaries ----
+	printf("write misaligned - over page boundaries\n");
 	r = paffs_seek(fil, 508, PAFFS_SEEK_SET);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
@@ -197,6 +198,21 @@ void dirTest(){
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
 	// ---- write misaligned 2
+
+	printWholeFile("/b/file");
+
+
+	//write misaligned - write inside not start/end page ----
+	printf("write misaligned - write inside non start/end page\n");
+	r = paffs_seek(fil, 530, PAFFS_SEEK_SET);
+
+	if(r != PAFFS_OK)
+			printf("%s\n", paffs_err_msg(r));
+
+	r = paffs_write(fil, testlauf, strlen(testlauf), &bytes);
+	if(r != PAFFS_OK)
+			printf("%s\n", paffs_err_msg(r));
+	// ---- write misaligned 3
 
 	while(getchar() == EOF);
 
