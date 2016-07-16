@@ -292,7 +292,7 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 	contDir->size += direntryl;
 	free(dirData);
 	free(buf);
-	if(bytes != contDir->size + direntryl)
+	if(bytes != contDir->size)
 		r = r == PAFFS_OK ? PAFFS_BUG : r;
 	return r;
 
