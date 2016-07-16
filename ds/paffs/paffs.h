@@ -12,6 +12,7 @@ extern "C" {
 
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #include "paffs_trace.h"
@@ -80,11 +81,7 @@ typedef struct p_param{
 
 typedef unsigned long p_date;
 
-typedef unsigned long long p_addr;
-
-/*p_addr combineAddress(unsigned int area, unsigned int page);
-unsigned int extractArea(p_addr addr);
-unsigned int extractPage(p_addr addr);*/
+typedef uint64_t p_addr;
 
 typedef unsigned int pInode_no;
 
@@ -96,7 +93,7 @@ typedef struct pInode{
 	p_date crea;
 	p_date mod;
 	unsigned long long reservedSize;
-	unsigned long long size;    //~1int yaffsfs_GetLastError(,8 * 10^19 Byte
+	unsigned long long size;    //~1,8 * 10^19 Byte
 	p_addr direct[11];
 	p_addr indir;
 	p_addr d_indir;
@@ -208,6 +205,10 @@ pInode* paffs_getInodeInDir(pInode* folder, const char* name);
 pInode* paffs_getInodeOfElem(const char* fullPath);
 PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* newElem);
 pInode* paffs_createFile(const char* fullPath, paffs_permission mask);
+p_addr combineAddress(uint32_t logical_area, uint32_t page);
+unsigned int extractLogicalArea(p_addr addr);			//Address-wrapper für einfacheren Garbagecollector
+unsigned int extractPage(p_addr addr);
+unsigned long long getPageNumber(p_addr addr, p_dev *dev);	//Translates p_addr to physical page number in respect to the Area mapping
 
 
 //Directory

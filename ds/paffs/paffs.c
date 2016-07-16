@@ -20,20 +20,6 @@ static pDentry* dentry_buf[DENTRY_BUFSIZE];
 static unsigned char dentrys_buf_used = 0;
 */
 
-//Address-wrapper für einfacheren Garbagecollector
-/*p_addr combineAddress(unsigned int area, unsigned int page){
-	unsigned long long ar = area;
-	return  ar << 8 * 4;// << (sizeof(unsigned long) * 8) | page;
-}
-
-unsigned int extractArea(p_addr addr){
-	return addr >> (sizeof(unsigned long) * 8);	//Whut?
-}
-
-unsigned int extractPage(p_addr addr){
-	return addr & 0xFFFFFFFF;
-}*/
-
 const char* paffs_err_msg(PAFFS_RESULT pr){
 	return PAFFS_RESULT_MSG[pr];
 }
@@ -423,6 +409,33 @@ pInode* paffs_createFile(const char* fullPath, paffs_permission mask){
 	if(res != PAFFS_OK)
 		return NULL;
 	return newFil;
+}
+
+
+p_addr combineAddress(uint32_t logical_area, uint32_t page){
+	p_addr addr = 0;
+	memcpy(&addr, &logical_area, sizeof(uint32_t));
+	memcpy(&((char*)&addr)[sizeof(uint32_t)], &page, sizeof(uint32_t));
+
+	return addr;
+}
+
+unsigned int extractLogicalArea(p_addr addr){
+	unsigned int area = 0;
+	memcpy(&area, &addr, sizeof(uint32_t));
+	return area;
+}
+unsigned int extractPage(p_addr addr){
+	unsigned int page = 0;
+	memcpy(&page, &((char*)&addr)[sizeof(uint32_t)], sizeof(uint32_t));
+	return page;
+}
+
+unsigned long long getPageNumber(p_addr addr, p_dev *dev){
+	unsigned long long page = dev->areaMap[extractLogicalArea(addr)].position *
+								dev->param.blocks_per_area * dev->param.pages_per_block;
+	page += extractPage(addr);
+	return page;
 }
 
 paffs_obj* paffs_open(const char* path, fileopenmask mask){

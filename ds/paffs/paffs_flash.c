@@ -105,10 +105,7 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 			if(findFirstFreePage(&firstFreePage, dev, activeArea) == PAFFS_NOSP)
 				return PAFFS_BUG;
 		}
-		unsigned long long phyPageNumber =
-					dev->param.blocks_per_area * activeArea
-					* dev->param.pages_per_block
-					+ firstFreePage;
+		p_addr pageAddress = combineAddress(dev->areaMap[activeArea].position, firstFreePage);
 
 		dev->areaMap[activeArea].areaSummary[firstFreePage] = USED;
 
@@ -126,10 +123,8 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 		if(inode->direct[page+pageFrom] != 0){
 			//We are overriding existing data
 			//mark old Page in Areamap
-			unsigned long oldArea = inode->direct[page+pageFrom] / (dev->param.pages_per_block
-									* dev->param.blocks_per_area);
-			unsigned long oldPage = inode->direct[page+pageFrom] % (dev->param.pages_per_block
-									* dev->param.blocks_per_area);
+			unsigned long oldArea = extractLogicalArea(inode->direct[page+pageFrom]);
+			unsigned long oldPage = extractPage(inode->direct[page+pageFrom]);
 			dev->areaMap[oldArea].areaSummary[oldPage] = DIRTY;
 			dev->areaMap[oldArea].dirtyPages ++;
 
@@ -166,21 +161,23 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 
 				//pageoffset is only at applied to first page
 				pageOffs = 0;
+			}else{
+				*bytes_written += btw;
 			}
 
 		}else{
 			*bytes_written += btw;
 		}
-		inode->direct[page+pageFrom] = phyPageNumber;
+		inode->direct[page+pageFrom] = pageAddress;
 
-		PAFFS_RESULT res = dev->drv.drv_write_page_fn(dev, phyPageNumber, buf, btw);
+		PAFFS_RESULT res = dev->drv.drv_write_page_fn(dev, getPageNumber(pageAddress, dev), buf, btw);
 
 		if(misaligned)
 			free(buf);
 
-		PAFFS_DBG(PAFFS_TRACE_WRITE, "DBG: write r.P: %d/%d, phy.P: %llu", page+1, pageTo+1, phyPageNumber);
+		PAFFS_DBG(PAFFS_TRACE_WRITE, "DBG: write r.P: %d/%d, phy.P: %llu", page+1, pageTo+1, getPageNumber(pageAddress, dev));
 		if(res != PAFFS_OK){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "ERR: write returned FAIL at phy.P: %llu", phyPageNumber);
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "ERR: write returned FAIL at phy.P: %llu", getPageNumber(pageAddress, dev));
 			return PAFFS_FAIL;
 		}
 
@@ -234,7 +231,7 @@ PAFFS_RESULT readInodeData(pInode* inode,
 						dev->param.data_bytes_per_page :
 						(bytes + pageOffs) - page*dev->param.data_bytes_per_page;
 		}
-		PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, inode->direct[page + pageFrom], buf, btr);
+		PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, getPageNumber(inode->direct[page + pageFrom], dev), buf, btr);
 		if(r != PAFFS_OK){
 			if(misaligned)
 				free (wrap);
