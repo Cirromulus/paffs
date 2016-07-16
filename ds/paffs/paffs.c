@@ -116,8 +116,9 @@ pInode* paffs_createDirInode(paffs_permission mask){
 	newFolder->size = sizeof(unsigned int);		//For directoryentrycount
 
 	unsigned int buf = 0;
-	PAFFS_RESULT r = writeInodeData(newFolder, 0, sizeof(unsigned int), &buf, device);
-	if(r != PAFFS_OK){
+	unsigned int bytes_written = 0;
+	PAFFS_RESULT r = writeInodeData(newFolder, 0, sizeof(unsigned int), &bytes_written, &buf, device);
+	if(r != PAFFS_OK || bytes_written != sizeof(unsigned int)){
 		paffs_lasterr = r;
 		return NULL;
 	}
@@ -171,16 +172,18 @@ pInode* paffs_getInodeInDir(pInode* folder, const char* name){
             return NULL;
         }
         
-        char* buf = malloc(folder->size);
-        PAFFS_RESULT r = readInodeData(folder, 0, folder->size, buf, device);
-        if(r != PAFFS_OK){
-        	free(buf);
-        	paffs_lasterr = r;
+        if(folder->size <= sizeof(unsigned int)){
+        	//Just contains a zero for "No entrys"
+        	paffs_lasterr = PAFFS_NF;
         	return NULL;
         }
 
-        if(buf == NULL){
-        	paffs_lasterr = PAFFS_NF;
+        char* buf = malloc(folder->size);
+        unsigned int bytes_read = 0;
+        PAFFS_RESULT r = readInodeData(folder, 0, folder->size, &bytes_read, buf, device);
+        if(r != PAFFS_OK || bytes_read != folder->size){
+        	free(buf);
+        	paffs_lasterr = r == PAFFS_OK ? PAFFS_BUG : r;
         	return NULL;
         }
 
@@ -282,11 +285,12 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 	memcpy(&buf[sizeof(unsigned int) + sizeof(pInode_no)], name, dirnamel);
 
 	char* dirData = malloc(contDir->size +  direntryl);
-
-	PAFFS_RESULT r = readInodeData(contDir, 0, contDir->size, dirData, device);
-	if(r != PAFFS_OK){
+	unsigned int bytes = 0;
+	PAFFS_RESULT r = readInodeData(contDir, 0, contDir->size, &bytes, dirData, device);
+	if(r != PAFFS_OK || bytes != contDir->size){
 		paffs_lasterr = r;
 		free(dirData);
+		free(buf);
 		return r;
 	}
 
@@ -298,11 +302,12 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 	directoryEntryCount ++;
 	memcpy (dirData, &directoryEntryCount, sizeof(unsigned int));
 
-	r = writeInodeData(contDir, 0, contDir->size + direntryl, dirData, device);
+	r = writeInodeData(contDir, 0, contDir->size + direntryl, &bytes, dirData, device);
 	contDir->size += direntryl;
-
 	free(dirData);
 	free(buf);
+	if(bytes != contDir->size + direntryl)
+		r = r == PAFFS_OK ? PAFFS_BUG : r;
 	return r;
 
 }
@@ -332,8 +337,9 @@ paffs_dir* paffs_opendir(const char* path){
 	}
 
 	char* dirData = malloc(dirPinode->size);
-	PAFFS_RESULT r = readInodeData(dirPinode, 0, dirPinode->size, dirData, device);
-	if(r != PAFFS_OK){
+	unsigned int br = 0;
+	PAFFS_RESULT r = readInodeData(dirPinode, 0, dirPinode->size, &br, dirData, device);
+	if(r != PAFFS_OK || br != dirPinode->size){
 		paffs_lasterr = r;
 		return NULL;
 	}
@@ -493,7 +499,7 @@ PAFFS_RESULT paffs_read(paffs_obj* obj, char* buf, unsigned int bytes_to_read, u
 	if(obj->dentry->iNode->type == PINODE_LNK){
 		return paffs_lasterr = PAFFS_NIMPL;
 	}
-	PAFFS_RESULT r = readInodeData(obj->dentry->iNode, obj->fp, bytes_to_read, buf, device);
+	PAFFS_RESULT r = readInodeData(obj->dentry->iNode, obj->fp, bytes_to_read, bytes_read, buf, device);
 	if(r != PAFFS_OK){
 		return paffs_lasterr = r;
 	}
@@ -513,15 +519,13 @@ PAFFS_RESULT paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_
 	if(obj->dentry->iNode->type == PINODE_LNK){
 		return paffs_lasterr = PAFFS_NIMPL;
 	}
-	PAFFS_RESULT r = writeInodeData(obj->dentry->iNode, obj->fp, bytes_to_write, buf, device);
+	PAFFS_RESULT r = writeInodeData(obj->dentry->iNode, obj->fp, bytes_to_write, bytes_written, buf, device);
 	if(r != PAFFS_OK){
 		return paffs_lasterr = r;
 	}
 
 	obj->dentry->iNode->mod = time(0);
 
-	//TODO: Check if actually wrote that much!
-	*bytes_written = bytes_to_write;
 	obj->fp += *bytes_written;
 	if(obj->fp > obj->dentry->iNode->size){
 		//size was increased
