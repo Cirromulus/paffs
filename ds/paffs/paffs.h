@@ -3,6 +3,8 @@
  * Author: Pascal Pieper
  */
 
+//todo: Types definiert definieren (unsigned int -> uint32_t)
+
 #ifndef __PAFFS_H__
 #define __PAFFS_H__
 
