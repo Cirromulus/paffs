@@ -12,7 +12,7 @@
 /* First message to the user.
  */
 void usage_1( void ) {
-        printf("B+ Tree of Order %d.\n", order);
+        printf("B+ Tree of Order %d.\n", btree_order);
         printf("To build a B+ tree of a different order, start again and enter the order\n");
         printf("as an integer argument:  bpt <order>  ");
         printf("(%d <= order <= %d).\n", MIN_ORDER, MAX_ORDER);
@@ -60,9 +60,9 @@ int main( int argc, char ** argv ) {
         root = NULL;
 
         if (argc > 1) {
-                order = atoi(argv[1]);
-                if (order < MIN_ORDER || order > MAX_ORDER) {
-                        fprintf(stderr, "Invalid order: %d .\n\n", order);
+                btree_order = atoi(argv[1]);
+                if (btree_order < MIN_ORDER || btree_order > MAX_ORDER) {
+                        fprintf(stderr, "Invalid order: %d .\n\n", btree_order);
                         exit(EXIT_FAILURE);
                 }
         }

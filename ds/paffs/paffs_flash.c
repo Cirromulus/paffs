@@ -9,18 +9,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-static unsigned int activeArea = 0;
-
-unsigned int  findWritableArea(p_dev* dev){
-	if(activeArea == 0 || dev->areaMap[activeArea].status == CLOSED){
+unsigned int findWritableArea(p_areaType areaType, p_dev* dev){
+	if(activeArea[areaType] == 0 || dev->areaMap[activeArea[areaType]].status == CLOSED){
 		for(int try = 1; try <= 2; try++){
 			for(int area = 0; area < dev->param.areas_no; area++){
-				if(dev->areaMap[area].type != DATAAREA){
+				if(dev->areaMap[area].type != areaType){
 					continue;
 				}
 				if(try == 1){
 					if(dev->areaMap[area].status == UNCLOSED){	//unclosed oder closed first?
-						activeArea = area;
+						return area;
 					}
 				}else{
 					//Now look for "new", empty one. Ideal would be to pick the one with less erases
@@ -33,7 +31,7 @@ unsigned int  findWritableArea(p_dev* dev){
 		}
 	}else{
 		//current Area has still space left
-		return activeArea;
+		return activeArea[areaType];
 	}
 	paffs_lasterr = PAFFS_NOSP;
 	return 0;
@@ -73,41 +71,41 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 
 	for(int page = 0; page <= pageTo - pageFrom; page++){
 		bool misaligned = false;
-		activeArea = findWritableArea(dev);
+		activeArea[DATAAREA] = findWritableArea(DATAAREA, dev);
 		if(paffs_lasterr != PAFFS_OK){
 			return paffs_lasterr;
 		}
 
 		//Handle Areas
-		if(dev->areaMap[activeArea].status == EMPTY){
+		if(dev->areaMap[activeArea[DATAAREA]].status == EMPTY){
 			//We'll have to use a fresh area,
 			//so generate the areaSummary in Memory
-			initArea(dev, activeArea);
+			initArea(dev, activeArea[DATAAREA]);
 		}
 		unsigned int firstFreePage = 0;
-		if(findFirstFreePage(&firstFreePage, dev, activeArea) == PAFFS_NOSP){
-			PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Area %d full.", activeArea);
+		if(findFirstFreePage(&firstFreePage, dev, activeArea[DATAAREA]) == PAFFS_NOSP){
+			PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Area %d full.", activeArea[DATAAREA]);
 			//Area is full!
 			//TODO: Check if dirty Pages are inside and
 			//garbage collect this instead of just closing it...
-			dev->areaMap[activeArea].status = CLOSED;
+			dev->areaMap[activeArea[DATAAREA]].status = CLOSED;
 			//Second try. Normally there would be more, because
 			//areas could be full without being closed
-			activeArea = findWritableArea(dev);
+			activeArea[DATAAREA] = findWritableArea(DATAAREA, dev);
 			if(paffs_lasterr != PAFFS_OK){
 				return paffs_lasterr;
 			}
-			initArea(dev, activeArea);
+			initArea(dev, activeArea[DATAAREA]);
 			if(paffs_lasterr != PAFFS_OK){
 				return paffs_lasterr;
 			}
 			//find fresh Page in new selected Area
-			if(findFirstFreePage(&firstFreePage, dev, activeArea) == PAFFS_NOSP)
+			if(findFirstFreePage(&firstFreePage, dev, activeArea[DATAAREA]) == PAFFS_NOSP)
 				return PAFFS_BUG;
 		}
-		p_addr pageAddress = combineAddress(dev->areaMap[activeArea].position, firstFreePage);
+		p_addr pageAddress = combineAddress(dev->areaMap[activeArea[DATAAREA]].position, firstFreePage);
 
-		dev->areaMap[activeArea].areaSummary[firstFreePage] = USED;
+		dev->areaMap[activeArea[DATAAREA]].areaSummary[firstFreePage] = USED;
 
 		//Prepare buffer and calculate bytes to write
 		char* buf = &((char*)data)[page*dev->param.data_bytes_per_page];
@@ -256,15 +254,26 @@ PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev){
 }
 
 void initArea(p_dev* dev, unsigned long int area){
-	PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Init new Area %d.", activeArea);
+	PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Init new Area %lu.", area);
 	//generate the areaSummary in Memory
-	dev->areaMap[activeArea].status = UNCLOSED;
-	dev->areaMap[activeArea].areaSummary = malloc(
+	dev->areaMap[area].status = UNCLOSED;
+	dev->areaMap[area].areaSummary = malloc(
 			sizeof(p_summaryEntry)
 			* dev->param.blocks_per_area
 			* dev->param.pages_per_block);
-	memset(dev->areaMap[activeArea].areaSummary, 0,
+	memset(dev->areaMap[area].areaSummary, 0,
 			sizeof(p_summaryEntry)
 			* dev->param.blocks_per_area
 			* dev->param.pages_per_block);
+}
+
+//TODO: Save Rootnode's Address in Flash (Superblockarea)
+static p_addr rootnode_addr;
+
+void registerRootnode(p_addr addr){
+	rootnode_addr = addr;
+}
+
+p_addr getRootnode(){
+	return addr;
 }

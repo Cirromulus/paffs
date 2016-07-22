@@ -154,7 +154,8 @@ typedef enum p_areaType{
 	SUPERBLOCKAREA,
 	INDEXAREA,
 	JOURNALAREA,
-	DATAAREA
+	DATAAREA,
+	area_types_no
 } p_areaType;
 
 typedef enum p_areaStatus{
@@ -168,6 +169,8 @@ typedef enum p_summaryEntry{
 	USED,
 	DIRTY
 }p_summaryEntry;
+
+static unsigned int activeArea[area_types_no];
 
 typedef struct p_area{
 	p_areaType type;

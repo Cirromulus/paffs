@@ -9,9 +9,6 @@
 #include <linux/string.h>
 #include <time.h>
 
-//Eigentlich auf dem Speicher
-static node* paffs_root = NULL;
-
 static p_dev* device = NULL;
 
 //Dentrys zur schnelleren verfügung
@@ -36,6 +33,13 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 	param->data_bytes_per_page = param->total_bytes_per_page - param->oob_bytes_per_page;
 	device->areaMap = malloc(sizeof(p_area) * device->param.areas_no);
 	device->drv.drv_initialise_fn(dev);
+
+	activeArea[SUPERBLOCKAREA] = 0;
+	activeArea[INDEXAREA] = 0;
+	activeArea[JOURNALAREA] = 0;
+	activeArea[DATAAREA] = 0;
+
+
 	return PAFFS_OK;
 }
 
@@ -60,26 +64,39 @@ PAFFS_RESULT paffs_mnt(const char* devicename){
 			if(!had_superblock){
 				device->areaMap[area].type = SUPERBLOCKAREA;
 				had_superblock = true;
+				activeArea[SUPERBLOCKAREA] = area;
+				initArea(dev, area);
 				continue;
 			}
 			if(!had_index){
 				device->areaMap[area].type = INDEXAREA;
 				had_index = true;
+				activeArea[INDEXAREA] = area;
+				initArea(dev, area);
 				continue;
 			}
 			if(!had_journal){
 				device->areaMap[area].type = JOURNALAREA;
 				had_journal = true;
+				activeArea[JOURNALAREA] = area;
+				initArea(dev, area);
 				continue;
 			}
 			device->areaMap[area].type = DATAAREA;
 
 		}
+
+		p_addr rootnode = combineAddress(activeArea, 0);
+		registerRootnode(rootnode);
+
+
 	}else{
 		//Todo: Scan NAND-Flash
 	}
 	pInode* rootDir = paffs_createDirInode(PAFFS_R | PAFFS_W | PAFFS_X);
-	paffs_root = insert_direct(paffs_root, rootDir);
+	if(insert_direct(rootDir) != PAFFS_OK){
+		return paffs_lasterr;
+	}
 	return PAFFS_OK;
 }
 

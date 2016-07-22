@@ -10,25 +10,19 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include "paffs.h"
+#include "paffs_flash.h"
 
-// Default order is 4.
-#define DEFAULT_ORDER 4
-
-// Minimum order is necessarily 3.  We set the maximum
-// order arbitrarily.  You may change the maximum order.
-#define MIN_ORDER 3
-#define MAX_ORDER 20
-
+#define MAX_ORDER (512 / (sizeof(p_addr) + sizeof(pInode_no) + sizeof(p_addr)\
+		+ sizeof(unsigned int) + sizeof(p_addr)))	//todo: '512' Dynamisch machen
 
 typedef struct node {
-        void ** pointers;
-        pInode_no * keys;
-        struct node * parent;
-        bool is_leaf;
-        int num_keys;
-        struct node * next; // Used for queue.
+        p_addr pointers[MAX_ORDER];
+        pInode_no keys[MAX_ORDER];
+        p_addr parent;
+        bool is_leaf:1;
+        unsigned int num_keys:31;
+        p_addr next;
 } node;
-
 
 
 
@@ -45,7 +39,7 @@ typedef struct node {
  * default value.
  */
 
-static int order = DEFAULT_ORDER;
+static int btree_order = MAX_ORDER;
 
 
 // FUNCTION PROTOTYPES.
@@ -81,8 +75,7 @@ node * insert_into_node_after_splitting(node * root, node * parent, int left_ind
 node * insert_into_parent(node * root, node * left, pInode_no key, node * right);
 node * insert_into_new_root(node * left, pInode_no key, node * right);
 node * start_new_tree(pInode_no key, pInode * pointer);
-node * insert( node * root, pInode_no key, pInode value);
-node * insert_direct( node * root, pInode* inode);
+PAFFS_RESULT insertInode( pInode* inode);
 
 // Deletion.
 

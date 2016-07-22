@@ -10,7 +10,7 @@
 
 #include "paffs.h"
 
-unsigned int findWritableArea(p_dev* dev);
+unsigned int findWritableArea(p_areaType areaType, p_dev* dev);
 
 PAFFS_RESULT findFirstFreePage(unsigned int* p_out, p_dev* dev, unsigned int area);
 
@@ -23,5 +23,11 @@ PAFFS_RESULT readInodeData(pInode* inode,
 PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev);
 
 void initArea(p_dev* dev, unsigned long int area);
+
+void registerRootnode(p_addr addr);
+
+p_addr getRootnode();
+
+PAFFS_RESULT writeTreeNode(p_addr addr, pInode _UND_ node);
 
 #endif /* PAFFS_FLASH_H_ */
