@@ -4,6 +4,7 @@
  */
 
 #include "btree.h"
+#include "paffs_flash.h"
 #include <stdio.h>
 #include <stdlib.h> 
 

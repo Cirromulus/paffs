@@ -180,7 +180,8 @@ typedef struct p_area{
 	unsigned int position;	//physical position, not logical
 	p_summaryEntry* areaSummary; //May be invalid if status == closed;
 	unsigned int dirtyPages; 	//redundant to contents of areaSummary
-	unsigned int usedPages;		//redundant to contents of areaSummary, just for quick lookup
+	unsigned int usedPages;		//redundant to contents of areaSummary, just for quick lookup.
+	//--Not to be mistaken with the areaSummary-status "used", this means used _and_ dirty pages.
 } p_area;
 
 

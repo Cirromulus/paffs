@@ -8,9 +8,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdlib.h>
 #include "paffs.h"
-#include "paffs_flash.h"
 
 //Calculates how many pointers a node can hold in one page
 #define MAX_ORDER ((512 - sizeof(p_addr)\

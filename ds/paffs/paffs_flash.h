@@ -9,11 +9,16 @@
 #define PAFFS_FLASH_H_
 
 #include "paffs.h"
+#include "btree.h"
 
 //Returns same area if there is still writable Space left
 unsigned int findWritableArea(p_areaType areaType, p_dev* dev);
 
 PAFFS_RESULT findFirstFreePage(unsigned int* p_out, p_dev* dev, unsigned int area);
+
+PAFFS_RESULT checkActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType areaType);
+
+void initArea(p_dev* dev, unsigned long int area);
 
 PAFFS_RESULT writeInodeData(pInode* inode,
 					unsigned int offs, unsigned int bytes,unsigned int *bytes_written,
@@ -23,7 +28,7 @@ PAFFS_RESULT readInodeData(pInode* inode,
 					char* data, p_dev* dev);
 PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev);
 
-void initArea(p_dev* dev, unsigned long int area);
+
 
 
 // TreeNode related
@@ -31,8 +36,11 @@ void registerRootnode(p_addr addr);
 
 p_addr getRootnode();
 
+
+PAFFS_RESULT updateTreeNode(p_dev* dev, p_addr old_addr, p_addr *new_addr, treeNode* node);
 /**
  * @param addr: Location where node has been written to
+ * Former address of treeNode has to be invalidated before.
  */
 PAFFS_RESULT writeTreeNode(p_dev* dev, p_addr *addr, treeNode* node);
 

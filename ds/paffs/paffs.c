@@ -31,6 +31,7 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 	param->areas_no = param->blocks / 2;	//For now: 16 b -> 8 Areas
 	param->blocks_per_area = param->blocks / param->areas_no;
 	param->data_bytes_per_page = param->total_bytes_per_page - param->oob_bytes_per_page;
+	param->pages_per_area = param->pages_per_block * param->blocks_per_area;
 	device->areaMap = malloc(sizeof(p_area) * device->param.areas_no);
 	device->drv.drv_initialise_fn(dev);
 
@@ -120,7 +121,7 @@ pInode* paffs_createDirInode(paffs_permission mask){
 
 	unsigned int buf = 0;
 	unsigned int bytes_written = 0;
-	PAFFS_RESULT r = writeInodeData(newFolder, 0, sizeof(unsigned int), &bytes_written, &buf, device);
+	PAFFS_RESULT r = writeInodeData(newFolder, 0, sizeof(unsigned int), &bytes_written, (char*)&buf, device);
 	if(r != PAFFS_OK || bytes_written != sizeof(unsigned int)){
 		paffs_lasterr = r;
 		return NULL;
