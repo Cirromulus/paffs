@@ -7,6 +7,27 @@
 #include <stdio.h>
 #include <stdlib.h> 
 
+//Out-of-bounds check has to be made from outside
+p_addr getPointerAsAddr(char* pointers, unsigned int pos){
+	p_addr addr;
+	memcpy(&addr, &pointers[pos * sizeof(p_addr)], sizeof(p_addr));
+	return addr;
+}
+//Out-of-bounds check has to be made from outside
+pInode getPointerAsInode(char* pointers, unsigned int pos){
+	pInode inode;
+	memcpy(&inode, &pointers[pos * sizeof(pInode)], sizeof(pInode));
+	return inode;
+}
+
+void insertAddrInPointer(char* pointers, p_addr* addr, unsigned int pos){
+	memcpy(&pointers[pos * sizeof(p_addr)], addr, sizeof(p_addr));
+}
+
+void insertInodeInPointer(char* pointers, pInode* inode, unsigned int pos){
+	memcpy(&pointers[pos * sizeof(pInode)], inode, sizeof(pInode ));
+}
+
 
 PAFFS_RESULT insertInode( pInode* inode){
 	p_addr rootnode = getRootnode();
@@ -14,8 +35,8 @@ PAFFS_RESULT insertInode( pInode* inode){
 }
 
 
-void enqueue(node* queue, node * new_node ) {
-        node * c;
+void enqueue(treeNode* queue, treeNode * new_node ) {
+        treeNode * c;
         if (queue == NULL) {
                 queue = new_node;
                 queue->next = NULL;
@@ -34,8 +55,8 @@ void enqueue(node* queue, node * new_node ) {
 /* Helper function for printing the
  * tree out.  See print_tree.
  */
-node * dequeue( node* queue ) {
-        node * n = queue;
+treeNode * dequeue( treeNode* queue ) {
+        treeNode * n = queue;
         queue = queue->next;
         n->next = NULL;
         return n;
@@ -46,9 +67,9 @@ node * dequeue( node* queue ) {
  * of the tree (with their respective
  * pointers, if the verbose_output flag is set.
  */
-void print_leaves( node * root, bool verbose_output) {
+void print_leaves( treeNode * root, bool verbose_output) {
         int i;
-        node * c = root;
+        treeNode * c = root;
         if (root == NULL) {
                 printf("Empty tree.\n");
                 return;
@@ -78,9 +99,9 @@ void print_leaves( node * root, bool verbose_output) {
  * of the tree, which length in number of edges
  * of the path from the root to any leaf.
  */
-int height( node * root ) {
+int height( treeNode * root ) {
         int h = 0;
-        node * c = root;
+        treeNode * c = root;
         while (!c->is_leaf) {
                 c = c->pointers[0];
                 h++;
@@ -90,11 +111,11 @@ int height( node * root ) {
 
 
 /* Utility function to give the length in edges
- * of the path from any node to the root.
+ * of the path from any treeNode to the root.
  */
-int path_to_root( node * root, node * child ) {
+int path_to_root( treeNode * root, treeNode * child ) {
         int length = 0;
-        node * c = child;
+        treeNode * c = child;
         while (c != root) {
                 c = c->parent;
                 length++;
@@ -105,16 +126,16 @@ int path_to_root( node * root, node * child ) {
 
 /* Prints the B+ tree in the command
  * line in level (rank) order, with the 
- * keys in each node and the '|' symbol
+ * keys in each treeNode and the '|' symbol
  * to separate nodes.
  * With the verbose_output flag set.
  * the values of the pointers corresponding
  * to the keys also appear next to their respective
  * keys, in hexadecimal notation.
  */
-void print_tree( node * root, bool verbose_output) {
+void print_tree( treeNode * root, bool verbose_output) {
 
-        node * n = NULL;
+        treeNode * n = NULL;
         int i = 0;
         int rank = 0;
         int new_rank = 0;
@@ -123,7 +144,7 @@ void print_tree( node * root, bool verbose_output) {
                 printf("Empty tree.\n");
                 return;
         }
-        node *queue = NULL;
+        treeNode *queue = NULL;
         enqueue(queue, root);
         while( queue != NULL ) {
                 n = dequeue(queue);
@@ -159,7 +180,7 @@ void print_tree( node * root, bool verbose_output) {
 /* Finds the pinode under a given key and prints an
  * appropriate message to stdout.
  */
-void find_and_print(node * root, pInode_no key, bool verbose) {
+void find_and_print(treeNode * root, pInode_no key, bool verbose) {
         pInode * r = find_v(root, key, verbose);
         if (r == NULL)
                 printf("pinode not found under key %d.\n", key);
@@ -172,7 +193,7 @@ void find_and_print(node * root, pInode_no key, bool verbose) {
 /* Finds and prints the keys, pointers, and values within a range
  * of keys between key_start and key_end, including both bounds.
  */
-void find_and_print_range( node * root, pInode_no key_start, pInode_no key_end,
+void find_and_print_range( treeNode * root, pInode_no key_start, pInode_no key_end,
                 bool verbose ) {
         int i;
         int array_size = key_end - key_start + 1;
@@ -198,11 +219,11 @@ void find_and_print_range( node * root, pInode_no key_start, pInode_no key_end,
  * returned_keys and returned_pointers, and returns the number of
  * entries found.
  */
-int find_range( node * root, pInode_no key_start, pInode_no key_end, bool verbose,
+int find_range( treeNode * root, pInode_no key_start, pInode_no key_end, bool verbose,
                 int returned_keys[], void * returned_pointers[]) {
         int i, num_found;
         num_found = 0;
-        node * n = find_leaf( root, key_start, verbose );
+        treeNode * n = find_leaf( root, key_start, verbose );
         if (n == NULL) return 0;
         for (i = 0; i < n->num_keys && n->keys[i] < key_start; i++) ;
         if (i == n->num_keys) return 0;
@@ -224,9 +245,9 @@ int find_range( node * root, pInode_no key_start, pInode_no key_end, bool verbos
  * if the verbose flag is set.
  * Returns the leaf containing the given key.
  */
-node * find_leaf( node * root, pInode_no key, bool verbose ) {
+treeNode * find_leaf( treeNode * root, pInode_no key, bool verbose ) {
         int i = 0;
-        node * c = root;
+        treeNode * c = root;
         if (c == NULL) {
                 if (verbose) 
                         printf("Empty tree.\n");
@@ -246,7 +267,7 @@ node * find_leaf( node * root, pInode_no key, bool verbose ) {
                 }
                 if (verbose)
                         printf("%d ->\n", i);
-                c = (node *)c->pointers[i];
+                c = (treeNode *)c->pointers[i];
         }
         if (verbose) {
                 printf("Leaf [");
@@ -261,9 +282,9 @@ node * find_leaf( node * root, pInode_no key, bool verbose ) {
 /* Finds and returns the pinode to which
  * a key refers.
  */
-pInode * find_v( node * root, pInode_no key, bool verbose ) {
+pInode * find_v( treeNode * root, pInode_no key, bool verbose ) {
         int i = 0;
-        node * c = find_leaf( root, key, verbose );
+        treeNode * c = find_leaf( root, key, verbose );
         if (c == NULL) return NULL;
         for (i = 0; i < c->num_keys; i++)
                 if (c->keys[i] == key) break;
@@ -273,16 +294,16 @@ pInode * find_v( node * root, pInode_no key, bool verbose ) {
                 return (pInode *)c->pointers[i];
 }
 
-pInode * find( node * root, pInode_no key){
+pInode * find( treeNode * root, pInode_no key){
 	return find_v(root, key, false);
 }
 
-pInode_no find_first_free_key( node * root ){
-	node * c = root;
+pInode_no find_first_free_key( treeNode * root ){
+	treeNode * c = root;
 	pInode_no free_no = 0;
 	while(c != NULL){
 		if(!c->is_leaf){
-			c = (node *)c->pointers[0];	//leftmost child
+			c = (treeNode *)c->pointers[0];	//leftmost child
 			continue;
 		}
 		for(unsigned int k = 0; k < c->num_keys; k ++){
@@ -290,13 +311,13 @@ pInode_no find_first_free_key( node * root ){
 				return free_no;
 			free_no ++;
 		}
-		c = (node *)c->pointers[btree_order-1];
+		c = (treeNode *)c->pointers[btree_order-1];
 	}
 	return free_no;
 }
 
 /* Finds the appropriate place to
- * split a node that is too big into two.
+ * split a treeNode that is too big into two.
  */
 int cut( int length ) {
         if (length % 2 == 0)
@@ -324,24 +345,24 @@ pInode * make_pinode(pInode pn) {
 }
 
 
-/* Creates a new general node, which can be adapted
- * to serve as either a leaf or an internal node.
+/* Creates a new general treeNode, which can be adapted
+ * to serve as either a leaf or an internal treeNode.
  */
-node * make_node( void ) {
-        node * new_node;
-        new_node = malloc(sizeof(node));
+treeNode * make_node( void ) {
+        treeNode * new_node;
+        new_node = malloc(sizeof(treeNode));
         if (new_node == NULL) {
-                perror("Node creation.");
+                perror("treeNode creation.");
                 return NULL;
         }
         new_node->keys = malloc( (btree_order - 1) * sizeof(int) );
         if (new_node->keys == NULL) {
-                perror("New node keys array.");
+                perror("New treeNode keys array.");
                 return NULL;
         }
         new_node->pointers = malloc( btree_order * sizeof(void *) );
         if (new_node->pointers == NULL) {
-                perror("New node pointers array.");
+                perror("New treeNode pointers array.");
                 return NULL;
         }
         new_node->is_leaf = false;
@@ -351,11 +372,11 @@ node * make_node( void ) {
         return new_node;
 }
 
-/* Creates a new leaf by creating a node
+/* Creates a new leaf by creating a treeNode
  * and then adapting it appropriately.
  */
-node * make_leaf( void ) {
-        node * leaf = make_node();
+treeNode * make_leaf( void ) {
+        treeNode * leaf = make_node();
         leaf->is_leaf = true;
         return leaf;
 }
@@ -363,9 +384,9 @@ node * make_leaf( void ) {
 
 /* Helper function used in insert_into_parent
  * to find the index of the parent's pointer to 
- * the node to the left of the key to be inserted.
+ * the treeNode to the left of the key to be inserted.
  */
-int get_left_index(node * parent, node * left) {
+int get_left_index(treeNode * parent, treeNode * left) {
 
         int left_index = 0;
         while (left_index <= parent->num_keys && 
@@ -378,7 +399,7 @@ int get_left_index(node * parent, node * left) {
  * key into a leaf.
  * Returns the altered leaf.
  */
-node * insert_into_leaf( node * leaf, pInode_no key, pInode * pointer ) {
+treeNode * insert_into_leaf( treeNode * leaf, pInode_no key, pInode * pointer ) {
 
         int i, insertion_point;
 
@@ -402,9 +423,9 @@ node * insert_into_leaf( node * leaf, pInode_no key, pInode * pointer ) {
  * the tree's order, causing the leaf to be split
  * in half.
  */
-node * insert_into_leaf_after_splitting(node * root, node * leaf, pInode_no key, pInode * pointer) {
+treeNode * insert_into_leaf_after_splitting(treeNode * root, treeNode * leaf, pInode_no key, pInode * pointer) {
 
-        node * new_leaf;
+        treeNode * new_leaf;
         int * temp_keys;
         void ** temp_pointers;
         int insertion_index, split, new_key, i, j;
@@ -470,12 +491,12 @@ node * insert_into_leaf_after_splitting(node * root, node * leaf, pInode_no key,
 }
 
 
-/* Inserts a new key and pointer to a node
- * into a node into which these can fit
+/* Inserts a new key and pointer to a treeNode
+ * into a treeNode into which these can fit
  * without violating the B+ tree properties.
  */
-node * insert_into_node(node * root, node * n, 
-                int left_index, pInode_no key, node * right) {
+treeNode * insert_into_node(treeNode * root, treeNode * n,
+                int left_index, pInode_no key, treeNode * right) {
         int i;
 
         for (i = n->num_keys; i > left_index; i--) {
@@ -489,28 +510,28 @@ node * insert_into_node(node * root, node * n,
 }
 
 
-/* Inserts a new key and pointer to a node
- * into a node, causing the node's size to exceed
- * the order, and causing the node to split into two.
+/* Inserts a new key and pointer to a treeNode
+ * into a treeNode, causing the treeNode's size to exceed
+ * the order, and causing the treeNode to split into two.
  */
-node * insert_into_node_after_splitting(node * root, node * old_node, int left_index, 
-                pInode_no key, node * right) {
+treeNode * insert_into_node_after_splitting(treeNode * root, treeNode * old_node, int left_index,
+                pInode_no key, treeNode * right) {
 
         int i, j, split, k_prime;
-        node * new_node, * child;
+        treeNode * new_node, * child;
         int * temp_keys;
-        node ** temp_pointers;
+        treeNode ** temp_pointers;
 
         /* First create a temporary set of keys and pointers
          * to hold everything in order, including
          * the new key and pointer, inserted in their
          * correct places. 
-         * Then create a new node and copy half of the 
-         * keys and pointers to the old node and
+         * Then create a new treeNode and copy half of the
+         * keys and pointers to the old treeNode and
          * the other half to the new.
          */
 
-        temp_pointers = malloc( (btree_order + 1) * sizeof(node *) );
+        temp_pointers = malloc( (btree_order + 1) * sizeof(treeNode *) );
         if (temp_pointers == NULL) {
                 perror("Temporary pointers array for splitting nodes.");
                 return NULL;
@@ -534,7 +555,7 @@ node * insert_into_node_after_splitting(node * root, node * old_node, int left_i
         temp_pointers[left_index + 1] = right;
         temp_keys[left_index] = key;
 
-        /* Create the new node and copy
+        /* Create the new treeNode and copy
          * half the keys and pointers to the
          * old and half to the new.
          */  
@@ -564,7 +585,7 @@ node * insert_into_node_after_splitting(node * root, node * old_node, int left_i
 
         /* Insert a new key into the parent of the two
          * nodes resulting from the split, with
-         * the old node to the left and the new to the right.
+         * the old treeNode to the left and the new to the right.
          */
 
         return insert_into_parent(root, old_node, k_prime, new_node);
@@ -572,13 +593,13 @@ node * insert_into_node_after_splitting(node * root, node * old_node, int left_i
 
 
 
-/* Inserts a new node (leaf or internal node) into the B+ tree.
+/* Inserts a new treeNode (leaf or internal treeNode) into the B+ tree.
  * Returns the root of the tree after insertion.
  */
-node * insert_into_parent(node * root, node * left, pInode_no key, node * right) {
+treeNode * insert_into_parent(treeNode * root, treeNode * left, pInode_no key, treeNode * right) {
 
         int left_index;
-        node * parent;
+        treeNode * parent;
 
         parent = left->parent;
 
@@ -587,24 +608,24 @@ node * insert_into_parent(node * root, node * left, pInode_no key, node * right)
         if (parent == NULL)
                 return insert_into_new_root(left, key, right);
 
-        /* Case: leaf or node. (Remainder of
+        /* Case: leaf or treeNode. (Remainder of
          * function body.)  
          */
 
         /* Find the parent's pointer to the left 
-         * node.
+         * treeNode.
          */
 
         left_index = get_left_index(parent, left);
 
 
-        /* Simple case: the new key fits into the node. 
+        /* Simple case: the new key fits into the treeNode.
          */
 
         if (parent->num_keys < btree_order - 1)
                 return insert_into_node(root, parent, left_index, key, right);
 
-        /* Harder case:  split a node in order 
+        /* Harder case:  split a treeNode in order
          * to preserve the B+ tree properties.
          */
 
@@ -616,9 +637,9 @@ node * insert_into_parent(node * root, node * left, pInode_no key, node * right)
  * and inserts the appropriate key into
  * the new root.
  */
-node * insert_into_new_root(node * left, pInode_no key, node * right) {
+treeNode * insert_into_new_root(treeNode * left, pInode_no key, treeNode * right) {
 
-        node * root = make_node();
+        treeNode * root = make_node();
         root->keys[0] = key;
         root->pointers[0] = left;
         root->pointers[1] = right;
@@ -634,9 +655,9 @@ node * insert_into_new_root(node * left, pInode_no key, node * right) {
 /* First insertion:
  * start a new tree.
  */
-node * start_new_tree(pInode_no key, pInode * pointer) {
+treeNode * start_new_tree(pInode_no key, pInode * pointer) {
 
-        node * root = make_leaf();
+        treeNode * root = make_leaf();
         root->keys[0] = key;
         root->pointers[0] = pointer;
         root->pointers[btree_order - 1] = NULL;
@@ -653,10 +674,10 @@ node * start_new_tree(pInode_no key, pInode * pointer) {
  * however necessary to maintain the B+ tree
  * properties.
  */
-node * insert( node * root, pInode_no key, pInode value) {
+treeNode * insert( treeNode * root, pInode_no key, pInode value) {
 
         pInode * pointer;
-        node * leaf;
+        treeNode * leaf;
 
         /* The current implementation ignores
          * duplicates.
@@ -707,9 +728,9 @@ node * insert( node * root, pInode_no key, pInode value) {
  * however necessary to maintain the B+ tree
  * properties.
  */
-node * insert_direct( node * root, pInode* inode) {
+treeNode * insert_direct( treeNode * root, pInode* inode) {
 
-        node * leaf;
+        treeNode * leaf;
 
         /* The current implementation ignores
          * duplicates.
@@ -754,12 +775,12 @@ node * insert_direct( node * root, pInode* inode) {
 // DELETION.
 
 /* Utility function for deletion.  Retrieves
- * the index of a node's nearest neighbor (sibling)
- * to the left if one exists.  If not (the node
+ * the index of a treeNode's nearest neighbor (sibling)
+ * to the left if one exists.  If not (the treeNode
  * is the leftmost child), returns -1 to signify
  * this special case.
  */
-int get_neighbor_index( node * n ) {
+int get_neighbor_index( treeNode * n ) {
 
         int i;
 
@@ -774,13 +795,13 @@ int get_neighbor_index( node * n ) {
                         return i - 1;
 
         // Error state.
-        printf("Search for nonexistent pointer to node in parent.\n");
-        printf("Node:  %#lx\n", (unsigned long)n);
+        printf("Search for nonexistent pointer to treeNode in parent.\n");
+        printf("treeNode:  %#lx\n", (unsigned long)n);
         return -1;
 }
 
 
-node * remove_entry_from_node(node * n, pInode_no key, node * pointer) {
+treeNode * remove_entry_from_node(treeNode * n, pInode_no key, treeNode * pointer) {
 
         int i, num_pointers;
 
@@ -817,9 +838,9 @@ node * remove_entry_from_node(node * n, pInode_no key, node * pointer) {
 }
 
 
-node * adjust_root(node * root) {
+treeNode * adjust_root(treeNode * root) {
 
-        node * new_root;
+        treeNode * new_root;
 
         /* Case: nonempty root.
          * Key and pointer have already been deleted,
@@ -855,18 +876,18 @@ node * adjust_root(node * root) {
 }
 
 
-/* Coalesces a node that has become
+/* Coalesces a treeNode that has become
  * too small after deletion
- * with a neighboring node that
+ * with a neighboring treeNode that
  * can accept the additional entries
  * without exceeding the maximum.
  */
-node * coalesce_nodes(node * root, node * n, node * neighbor, int neighbor_index, int k_prime) {
+treeNode * coalesce_nodes(treeNode * root, treeNode * n, treeNode * neighbor, int neighbor_index, int k_prime) {
 
         int i, j, neighbor_insertion_index, n_end;
-        node * tmp;
+        treeNode * tmp;
 
-        /* Swap neighbor with node if node is on the
+        /* Swap neighbor with treeNode if treeNode is on the
          * extreme left and neighbor is to its right.
          */
 
@@ -884,7 +905,7 @@ node * coalesce_nodes(node * root, node * n, node * neighbor, int neighbor_index
 
         neighbor_insertion_index = neighbor->num_keys;
 
-        /* Case:  nonleaf node.
+        /* Case:  nonleaf treeNode.
          * Append k_prime and the following pointer.
          * Append all pointers and keys from the neighbor.
          */
@@ -917,7 +938,7 @@ node * coalesce_nodes(node * root, node * n, node * neighbor, int neighbor_index
                  */
 
                 for (i = 0; i < neighbor->num_keys + 1; i++) {
-                        tmp = (node *)neighbor->pointers[i];
+                        tmp = (treeNode *)neighbor->pointers[i];
                         tmp->parent = neighbor;
                 }
         }
@@ -948,14 +969,14 @@ node * coalesce_nodes(node * root, node * n, node * neighbor, int neighbor_index
 /* Redistributes entries between two nodes when
  * one has become too small after deletion
  * but its neighbor is too big to append the
- * small node's entries without exceeding the
+ * small treeNode's entries without exceeding the
  * maximum
  */
-node * redistribute_nodes(node * root, node * n, node * neighbor, int neighbor_index, 
+treeNode * redistribute_nodes(treeNode * root, treeNode * n, treeNode * neighbor, int neighbor_index,
                 int k_prime_index, int k_prime) {  
 
         int i;
-        node * tmp;
+        treeNode * tmp;
 
         /* Case: n has a neighbor to the left. 
          * Pull the neighbor's last key-pointer pair over
@@ -971,7 +992,7 @@ node * redistribute_nodes(node * root, node * n, node * neighbor, int neighbor_i
                 }
                 if (!n->is_leaf) {
                         n->pointers[0] = neighbor->pointers[neighbor->num_keys];
-                        tmp = (node *)n->pointers[0];
+                        tmp = (treeNode *)n->pointers[0];
                         tmp->parent = n;
                         neighbor->pointers[neighbor->num_keys] = NULL;
                         n->keys[0] = k_prime;
@@ -1000,7 +1021,7 @@ node * redistribute_nodes(node * root, node * n, node * neighbor, int neighbor_i
                 else {
                         n->keys[n->num_keys] = k_prime;
                         n->pointers[n->num_keys + 1] = neighbor->pointers[0];
-                        tmp = (node *)n->pointers[n->num_keys + 1];
+                        tmp = (treeNode *)n->pointers[n->num_keys + 1];
                         tmp->parent = n;
                         n->parent->keys[k_prime_index] = neighbor->keys[0];
                 }
@@ -1028,15 +1049,15 @@ node * redistribute_nodes(node * root, node * n, node * neighbor, int neighbor_i
  * from the leaf, and then makes all appropriate
  * changes to preserve the B+ tree properties.
  */
-node * delete_entry( node * root, node * n, pInode_no key, void * pointer ) {
+treeNode * delete_entry( treeNode * root, treeNode * n, pInode_no key, void * pointer ) {
 
         int min_keys;
-        node * neighbor;
+        treeNode * neighbor;
         int neighbor_index;
         int k_prime_index, k_prime;
         int capacity;
 
-        // Remove key and pointer from node.
+        // Remove key and pointer from treeNode.
 
         n = remove_entry_from_node(n, key, pointer);
 
@@ -1047,32 +1068,32 @@ node * delete_entry( node * root, node * n, pInode_no key, void * pointer ) {
                 return adjust_root(root);
 
 
-        /* Case:  deletion from a node below the root.
+        /* Case:  deletion from a treeNode below the root.
          * (Rest of function body.)
          */
 
-        /* Determine minimum allowable size of node,
+        /* Determine minimum allowable size of treeNode,
          * to be preserved after deletion.
          */
 
         min_keys = n->is_leaf ? cut(btree_order - 1) : cut(btree_order) - 1;
 
-        /* Case:  node stays at or above minimum.
+        /* Case:  treeNode stays at or above minimum.
          * (The simple case.)
          */
 
         if (n->num_keys >= min_keys)
                 return root;
 
-        /* Case:  node falls below minimum.
+        /* Case:  treeNode falls below minimum.
          * Either coalescence or redistribution
          * is needed.
          */
 
-        /* Find the appropriate neighbor node with which
+        /* Find the appropriate neighbor treeNode with which
          * to coalesce.
          * Also find the key (k_prime) in the parent
-         * between the pointer to node n and the pointer
+         * between the pointer to treeNode n and the pointer
          * to the neighbor.
          */
 
@@ -1099,9 +1120,9 @@ node * delete_entry( node * root, node * n, pInode_no key, void * pointer ) {
 
 /* Master deletion function.
  */
-node * delete(node * root, pInode_no key) {
+treeNode * delete(treeNode * root, pInode_no key) {
 
-        node * key_leaf;
+        treeNode * key_leaf;
         pInode * key_pinode;
 
         key_pinode = find(root, key);
@@ -1114,7 +1135,7 @@ node * delete(node * root, pInode_no key) {
 }
 
 
-void destroy_tree_nodes(node * root) {
+void destroy_tree_nodes(treeNode * root) {
         int i;
         if (root->is_leaf)
                 for (i = 0; i < root->num_keys; i++)
@@ -1128,7 +1149,7 @@ void destroy_tree_nodes(node * root) {
 }
 
 
-node * destroy_tree(node * root) {
+treeNode * destroy_tree(treeNode * root) {
         destroy_tree_nodes(root);
         return NULL;
 }

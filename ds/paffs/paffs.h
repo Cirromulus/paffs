@@ -78,6 +78,7 @@ typedef struct p_param{
 	unsigned int data_bytes_per_page;
 	unsigned long areas_no;
 	unsigned int blocks_per_area;
+	unsigned int pages_per_area;
 } p_param;
 
 
@@ -179,6 +180,7 @@ typedef struct p_area{
 	unsigned int position;	//physical position, not logical
 	p_summaryEntry* areaSummary; //May be invalid if status == closed;
 	unsigned int dirtyPages; 	//redundant to contents of areaSummary
+	unsigned int usedPages;		//redundant to contents of areaSummary, just for quick lookup
 } p_area;
 
 

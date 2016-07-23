@@ -84,28 +84,14 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 		}
 		unsigned int firstFreePage = 0;
 		if(findFirstFreePage(&firstFreePage, dev, activeArea[DATAAREA]) == PAFFS_NOSP){
-			PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Area %d full.", activeArea[DATAAREA]);
-			//Area is full!
-			//TODO: Check if dirty Pages are inside and
-			//garbage collect this instead of just closing it...
-			dev->areaMap[activeArea[DATAAREA]].status = CLOSED;
-			//Second try. Normally there would be more, because
-			//areas could be full without being closed
-			activeArea[DATAAREA] = findWritableArea(DATAAREA, dev);
-			if(paffs_lasterr != PAFFS_OK){
-				return paffs_lasterr;
-			}
-			initArea(dev, activeArea[DATAAREA]);
-			if(paffs_lasterr != PAFFS_OK){
-				return paffs_lasterr;
-			}
-			//find fresh Page in new selected Area
-			if(findFirstFreePage(&firstFreePage, dev, activeArea[DATAAREA]) == PAFFS_NOSP)
-				return PAFFS_BUG;
+			PAFFS_DBG(PAFFS_BUG, "BUG: findWritableArea returned full area (%d).", activeArea[DATAAREA]);
+			return paffs_lasterr = PAFFS_BUG;
 		}
 		p_addr pageAddress = combineAddress(dev->areaMap[activeArea[DATAAREA]].position, firstFreePage);
 
 		dev->areaMap[activeArea[DATAAREA]].areaSummary[firstFreePage] = USED;
+		dev->areaMap[activeArea[DATAAREA]].usedPages++;
+
 
 		//Prepare buffer and calculate bytes to write
 		char* buf = &((char*)data)[page*dev->param.data_bytes_per_page];
@@ -172,6 +158,24 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 
 		if(misaligned)
 			free(buf);
+
+		if(dev->areaMap[activeArea[DATAAREA]].areaSummary){
+			PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Area %d full.", activeArea[DATAAREA]);
+			//Area is full!
+			//TODO: Check if dirty Pages are inside and
+			//garbage collect this instead of just closing it...
+			dev->areaMap[activeArea[DATAAREA]].status = CLOSED;
+			//Second try. Normally there would be more, because
+			//areas could be full without being closed
+			activeArea[DATAAREA] = findWritableArea(DATAAREA, dev);
+			if(paffs_lasterr != PAFFS_OK){
+				return paffs_lasterr;
+			}
+			initArea(dev, activeArea[DATAAREA]);
+			if(paffs_lasterr != PAFFS_OK){
+				return paffs_lasterr;
+		}
+		}
 
 		PAFFS_DBG(PAFFS_TRACE_WRITE, "DBG: write r.P: %d/%d, phy.P: %llu", page+1, pageTo+1, getPageNumber(pageAddress, dev));
 		if(res != PAFFS_OK){
@@ -257,6 +261,8 @@ void initArea(p_dev* dev, unsigned long int area){
 	PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Init new Area %lu.", area);
 	//generate the areaSummary in Memory
 	dev->areaMap[area].status = UNCLOSED;
+	dev->areaMap[area].dirtyPages = 0;
+	dev->areaMap[area].usedPages = 0;
 	dev->areaMap[area].areaSummary = malloc(
 			sizeof(p_summaryEntry)
 			* dev->param.blocks_per_area
@@ -277,3 +283,33 @@ void registerRootnode(p_addr addr){
 p_addr getRootnode(){
 	return addr;
 }
+
+PAFFS_RESULT writeTreeNode(p_dev* dev, p_addr *addr, treeNode* node){
+	if(node == NULL){
+		PAFFS_DBG(PAFFS_BUG, "BUG: treeNode NULL");
+				return paffs_lasterr = PAFFS_BUG;
+	}
+	if(sizeof(treeNode) > dev->param.data_bytes_per_page){
+		PAFFS_DBG(PAFFS_BUG, "BUG: treeNode bigger than Page (Was %d, should %d)", sizeof(treeNode), dev->param.data_bytes_per_page);
+		return paffs_lasterr = PAFFS_BUG;
+	}
+
+	addr = 0;
+}
+
+PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node){
+	if(node == NULL){
+		PAFFS_DBG(PAFFS_BUG, "BUG: treeNode NULL");
+				return paffs_lasterr = PAFFS_BUG;
+	}
+	if(sizeof(treeNode) > dev->param.data_bytes_per_page){
+		PAFFS_DBG(PAFFS_BUG, "BUG: treeNode bigger than Page (Was %d, should %d)", sizeof(treeNode), dev->param.data_bytes_per_page);
+		return paffs_lasterr = PAFFS_BUG;
+	}
+
+	PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), node, sizeof(treeNode));
+	if(r != PAFFS_OK)
+		return paffs_lasterr = r;
+	return PAFFS_OK;
+}
+

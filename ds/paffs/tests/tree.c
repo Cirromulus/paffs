@@ -53,7 +53,7 @@ int main( int argc, char ** argv ) {
 
         char * input_file;
         FILE * fp;
-        node * root;
+        treeNode * root;
         int input, range2;
         char instruction, license_part;
         bool verbose_output = false;
