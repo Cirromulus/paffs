@@ -30,9 +30,21 @@ void insertInodeInPointer(char* pointers, pInode* inode, unsigned int pos){
 }
 
 
-PAFFS_RESULT insertInode( pInode* inode){
-	p_addr rootnode = getRootnode();
-	...
+PAFFS_RESULT insertInode( p_dev* dev, pInode* inode){
+	p_addr rootnode = getRootnode(dev);
+	return PAFFS_NIMPL;
+}
+
+PAFFS_RESULT getInode( p_dev* dev, pInode_no number, pInode* outInode){
+	return PAFFS_NIMPL;
+}
+
+PAFFS_RESULT modifyInode( p_dev* dev, pInode_no number, pInode* inode){
+	return PAFFS_NIMPL;
+}
+
+PAFFS_RESULT deleteInode( p_dev* dev, pInode_no number){
+	return PAFFS_NIMPL;
 }
 
 
@@ -300,7 +312,7 @@ pInode * find( treeNode * root, pInode_no key){
 }
 
 pInode_no find_first_free_key( treeNode * root ){
-	treeNode * c = root;
+	treeNode * c = root
 	pInode_no free_no = 0;
 	while(c != NULL){
 		if(!c->is_leaf){

@@ -289,12 +289,12 @@ PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev){
 //TODO: Save Rootnode's Address in Flash (Superblockarea)
 static p_addr rootnode_addr;
 
-void registerRootnode(p_addr addr){
+void registerRootnode(p_dev* dev, p_addr addr){
 	rootnode_addr = addr;
 }
 
-p_addr getRootnode(){
-	return addr;
+p_addr getRootnode(p_dev* dev){
+	return rootnode_addr;
 }
 
 PAFFS_RESULT updateTreeNode(p_dev* dev, p_addr old_addr, p_addr *new_addr, treeNode* node){
@@ -303,7 +303,7 @@ PAFFS_RESULT updateTreeNode(p_dev* dev, p_addr old_addr, p_addr *new_addr, treeN
 				return paffs_lasterr = PAFFS_BUG;
 	}
 	if(sizeof(treeNode) > dev->param.data_bytes_per_page){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode bigger than Page (Was %d, should %d)", sizeof(treeNode), dev->param.data_bytes_per_page);
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode bigger than Page (Was %lu, should %u)", sizeof(treeNode), dev->param.data_bytes_per_page);
 		return paffs_lasterr = PAFFS_BUG;
 	}
 	if(old_addr == 0){
@@ -316,13 +316,13 @@ PAFFS_RESULT updateTreeNode(p_dev* dev, p_addr old_addr, p_addr *new_addr, treeN
 	return writeTreeNode(dev, new_addr, node);
 }
 
-PAFFS_RESULT writeTreeNode(p_dev* dev, p_addr *addr, treeNode* node){
+PAFFS_RESULT writeTreeNode(p_dev* dev, p_addr *outAddr, treeNode* node){
 	if(node == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode NULL");
 				return paffs_lasterr = PAFFS_BUG;
 	}
 	if(sizeof(treeNode) > dev->param.data_bytes_per_page){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode bigger than Page (Was %d, should %d)", sizeof(treeNode), dev->param.data_bytes_per_page);
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode bigger than Page (Was %lu, should %u)", sizeof(treeNode), dev->param.data_bytes_per_page);
 		return paffs_lasterr = PAFFS_BUG;
 	}
 
@@ -331,16 +331,16 @@ PAFFS_RESULT writeTreeNode(p_dev* dev, p_addr *addr, treeNode* node){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", activeArea[INDEXAREA]);
 		return paffs_lasterr = PAFFS_BUG;
 	}
-	*addr = combineAddress(dev->areaMap[activeArea[INDEXAREA]].position, firstFreePage);
+	*outAddr = combineAddress(dev->areaMap[activeArea[INDEXAREA]].position, firstFreePage);
 
 	dev->areaMap[activeArea[INDEXAREA]].usedPages++;
 	dev->areaMap[activeArea[INDEXAREA]].areaSummary[firstFreePage] = USED;
 
-	PAFFS_RESULT r = dev->drv->drv_write_page_fn(dev, getPageNumber(addr, dev), node, sizeof(treeNode));
+	PAFFS_RESULT r = dev->drv.drv_write_page_fn(dev, getPageNumber(*outAddr, dev), node, sizeof(treeNode));
 	if(r != PAFFS_OK)
 		return paffs_lasterr = r;
 
-	r = checkActiveAreaFull(dev, activeArea[INDEXAREA], INDEXAREA);
+	r = checkActiveAreaFull(dev, &activeArea[INDEXAREA], INDEXAREA);
 	if(r != PAFFS_OK)
 			return paffs_lasterr = r;
 
@@ -353,7 +353,7 @@ PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node){
 				return paffs_lasterr = PAFFS_BUG;
 	}
 	if(sizeof(treeNode) > dev->param.data_bytes_per_page){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode bigger than Page (Was %d, should %d)", sizeof(treeNode), dev->param.data_bytes_per_page);
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode bigger than Page (Was %lu, should %u)", sizeof(treeNode), dev->param.data_bytes_per_page);
 		return paffs_lasterr = PAFFS_BUG;
 	}
 

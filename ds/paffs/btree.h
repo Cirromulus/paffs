@@ -32,7 +32,12 @@ pInode getPointerAsInode(char* pointers, unsigned int pos);
 void insertAddrInPointer(char* pointers, p_addr* addr, unsigned int pos);
 void insertInodeInPointer(char* pointers, pInode* inode, unsigned int pos);
 
-// FUNCTION PROTOTYPES.
+
+PAFFS_RESULT insertInode( p_dev* dev, pInode* inode);
+PAFFS_RESULT getInode( p_dev* dev, pInode_no number, pInode* outInode);
+PAFFS_RESULT modifyInode( p_dev* dev, pInode_no number, pInode* inode);
+PAFFS_RESULT deleteInode( p_dev* dev, pInode_no number);
+pInode_no findFirstFreeNo(p_dev* dev);
 
 void enqueue(treeNode* queue, treeNode * new_node );
 treeNode * dequeue( treeNode* queue  );
@@ -65,7 +70,6 @@ treeNode * insert_into_node_after_splitting(treeNode * root, treeNode * parent, 
 treeNode * insert_into_parent(treeNode * root, treeNode * left, pInode_no key, treeNode * right);
 treeNode * insert_into_new_root(treeNode * left, pInode_no key, treeNode * right);
 treeNode * start_new_tree(pInode_no key, pInode * pointer);
-PAFFS_RESULT insertInode( pInode* inode);
 
 // Deletion.
 
@@ -75,7 +79,7 @@ treeNode * coalesce_nodes(treeNode * root, treeNode * n, treeNode * neighbor, in
 treeNode * redistribute_nodes(treeNode * root, treeNode * n, treeNode * neighbor, int neighbor_index, 
                 int k_prime_index, int k_prime);
 treeNode * delete_entry( treeNode * root, treeNode * n, pInode_no key, void * pointer );
-treeNode * delete( treeNode * root, pInode_no key );
+treeNode * delete_node( treeNode * root, pInode_no key );
 treeNode * destroy_tree(treeNode * root);
 
 #endif

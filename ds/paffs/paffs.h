@@ -204,15 +204,15 @@ const char* paffs_err_msg(PAFFS_RESULT pr);
 PAFFS_RESULT paffs_getLastErr();
 
 //Private(ish)
-pInode* paffs_createInode(paffs_permission mask);
-pInode* paffs_createDirInode(paffs_permission mask);
-pInode* paffs_createFilInode(paffs_permission mask);
+PAFFS_RESULT paffs_createInode(pInode* outInode, paffs_permission mask);
+PAFFS_RESULT paffs_createDirInode(pInode* outInode, paffs_permission mask);
+PAFFS_RESULT paffs_createFilInode(pInode* outInode, paffs_permission mask);
 void paffs_destroyInode(pInode* node);
-PAFFS_RESULT paffs_getParentDir(const char* fullPath, pInode* *parDir, unsigned int *lastSlash);
-pInode* paffs_getInodeInDir(pInode* folder, const char* name);
-pInode* paffs_getInodeOfElem(const char* fullPath);
+PAFFS_RESULT paffs_getParentDir(const char* fullPath, pInode* parDir, unsigned int *lastSlash);
+PAFFS_RESULT paffs_getInodeInDir( pInode* outInode, pInode* folder, const char* name);
+PAFFS_RESULT paffs_getInodeOfElem( pInode* outInode, const char* fullPath);
 PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* newElem);
-pInode* paffs_createFile(const char* fullPath, paffs_permission mask);
+PAFFS_RESULT paffs_createFile(pInode* outFile, const char* fullPath, paffs_permission mask);
 p_addr combineAddress(uint32_t logical_area, uint32_t page);
 unsigned int extractLogicalArea(p_addr addr);			//Address-wrapper für einfacheren Garbagecollector
 unsigned int extractPage(p_addr addr);
