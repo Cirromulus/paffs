@@ -7,18 +7,15 @@
 #include "paffs_flash.h"
 #include <stdio.h>
 #include <stdlib.h> 
+#include <string.h>
 
 //Out-of-bounds check has to be made from outside
-p_addr getPointerAsAddr(char* pointers, unsigned int pos){
-	p_addr addr;
-	memcpy(&addr, &pointers[pos * sizeof(p_addr)], sizeof(p_addr));
-	return addr;
+p_addr* getPointerAsAddr(char* pointers, unsigned int pos){
+	return (p_addr*)&pointers[pos * sizeof(p_addr)];
 }
 //Out-of-bounds check has to be made from outside
-pInode getPointerAsInode(char* pointers, unsigned int pos){
-	pInode inode;
-	memcpy(&inode, &pointers[pos * sizeof(pInode)], sizeof(pInode));
-	return inode;
+pInode* getPointerAsInode(char* pointers, unsigned int pos){
+	return (pInode*)&pointers[pos * sizeof(pInode)];
 }
 
 void insertAddrInPointer(char* pointers, p_addr* addr, unsigned int pos){
@@ -31,7 +28,12 @@ void insertInodeInPointer(char* pointers, pInode* inode, unsigned int pos){
 
 
 PAFFS_RESULT insertInode( p_dev* dev, pInode* inode){
-	p_addr rootnode = getRootnode(dev);
+	p_addr rootnode_addr = getRootnode(dev);
+	treeNode root;
+	PAFFS_RESULT r = readTreeNode(dev, rootnode_addr, &root);
+	if(r != PAFFS_OK)
+		return r;
+
 	return PAFFS_NIMPL;
 }
 
@@ -39,7 +41,7 @@ PAFFS_RESULT getInode( p_dev* dev, pInode_no number, pInode* outInode){
 	return PAFFS_NIMPL;
 }
 
-PAFFS_RESULT modifyInode( p_dev* dev, pInode_no number, pInode* inode){
+PAFFS_RESULT modifyInode( p_dev* dev, pInode* inode){
 	return PAFFS_NIMPL;
 }
 
@@ -48,40 +50,12 @@ PAFFS_RESULT deleteInode( p_dev* dev, pInode_no number){
 }
 
 
-void enqueue(treeNode* queue, treeNode * new_node ) {
-        treeNode * c;
-        if (queue == NULL) {
-                queue = new_node;
-                queue->next = NULL;
-        }
-        else {
-                c = queue;
-                while(c->next != NULL) {
-                        c = c->next;
-                }
-                c->next = new_node;
-                new_node->next = NULL;
-        }
-}
-
-
-/* Helper function for printing the
- * tree out.  See print_tree.
- */
-treeNode * dequeue( treeNode* queue ) {
-        treeNode * n = queue;
-        queue = queue->next;
-        n->next = NULL;
-        return n;
-}
-
-
 /* Prints the bottom row of keys
  * of the tree (with their respective
  * pointers, if the verbose_output flag is set.
  */
-void print_leaves( treeNode * root, bool verbose_output) {
-        int i;
+void print_leaves(p_dev* dev, treeNode * root) {
+/*        int i;
         treeNode * c = root;
         if (root == NULL) {
                 printf("Empty tree.\n");
@@ -104,7 +78,8 @@ void print_leaves( treeNode * root, bool verbose_output) {
                 else
                         break;
         }
-        printf("\n");
+        printf("\n");*/
+	printf("Not Implemented");
 }
 
 
@@ -112,11 +87,16 @@ void print_leaves( treeNode * root, bool verbose_output) {
  * of the tree, which length in number of edges
  * of the path from the root to any leaf.
  */
-int height( treeNode * root ) {
+int height( p_dev* dev, treeNode * root ) {
         int h = 0;
-        treeNode * c = root;
-        while (!c->is_leaf) {
-                c = c->pointers[0];
+        treeNode curr = *root;
+        while (!curr.is_leaf) {
+        		p_addr* addr = getPointerAsAddr(curr.pointers, 0);
+                PAFFS_RESULT r = readTreeNode(dev, *addr, &curr);
+                if(r != PAFFS_OK){
+                	paffs_lasterr = r;
+                	return -1;
+                }
                 h++;
         }
         return h;
@@ -126,11 +106,15 @@ int height( treeNode * root ) {
 /* Utility function to give the length in edges
  * of the path from any treeNode to the root.
  */
-int path_to_root( treeNode * root, treeNode * child ) {
+int path_to_root( p_dev* dev, treeNode * root, treeNode * child ) {
         int length = 0;
-        treeNode * c = child;
-        while (c != root) {
-                c = c->parent;
+        treeNode c = *child;
+        while (c.parent != 0) {
+                PAFFS_RESULT r = readTreeNode(dev, c.parent, &c);
+                if(r != PAFFS_OK){
+                	paffs_lasterr = r;
+                	return -1;
+                }
                 length++;
         }
         return length;
@@ -146,9 +130,9 @@ int path_to_root( treeNode * root, treeNode * child ) {
  * to the keys also appear next to their respective
  * keys, in hexadecimal notation.
  */
-void print_tree( treeNode * root, bool verbose_output) {
+void print_tree( p_dev* dev, treeNode * root) {
 
-        treeNode * n = NULL;
+/*        treeNode * n = NULL;
         int i = 0;
         int rank = 0;
         int new_rank = 0;
@@ -168,11 +152,9 @@ void print_tree( treeNode * root, bool verbose_output) {
                                 printf("\n");
                         }
                 }
-                if (verbose_output) 
-                        printf("(%lx)", (unsigned long)n);
+                //printf("(%lx)", (unsigned long)n);
                 for (i = 0; i < n->num_keys; i++) {
-                        if (verbose_output)
-                                printf("%lx ", (unsigned long)n->pointers[i]);
+                	    //printf("%lx ", (unsigned long)n->pointers[i]);
                         printf("%d ", n->keys[i]);
                 }
                 if (!n->is_leaf)
@@ -186,29 +168,32 @@ void print_tree( treeNode * root, bool verbose_output) {
                 }
                 printf("| ");
         }
-        printf("\n");
+        printf("\n");*/
+	printf("Not Implemented");
 }
 
 
 /* Finds the pinode under a given key and prints an
  * appropriate message to stdout.
  */
-void find_and_print(treeNode * root, pInode_no key, bool verbose) {
-        pInode * r = find_v(root, key, verbose);
-        if (r == NULL)
-                printf("pinode not found under key %d.\n", key);
-        else 
-                printf("pinode at %lx -- key %d, value %d.\n",
-                                (unsigned long)r, key, r->no);
+void find_and_print(p_dev* dev, treeNode * root, pInode_no key) {
+		pInode val;
+        PAFFS_RESULT r = find(dev, root, key, &val);
+        if (r == PAFFS_NF)
+			printf("pinode not found under key %d.\n", key);
+        else if( r != PAFFS_OK)
+        	printf("Error: %s\n", paffs_err_msg(r));
+        else
+			printf("pinode at --unknown-- key %d, value %d.\n",
+                                key, val.type);
 }
 
 
 /* Finds and prints the keys, pointers, and values within a range
  * of keys between key_start and key_end, including both bounds.
  */
-void find_and_print_range( treeNode * root, pInode_no key_start, pInode_no key_end,
-                bool verbose ) {
-        int i;
+void find_and_print_range( p_dev* dev, treeNode * root, pInode_no key_start, pInode_no key_end) {
+/*        int i;
         int array_size = key_end - key_start + 1;
         int returned_keys[array_size];
         void * returned_pointers[array_size];
@@ -223,7 +208,8 @@ void find_and_print_range( treeNode * root, pInode_no key_start, pInode_no key_e
                                         (unsigned long)returned_pointers[i],
                                         ((pInode *)
                                          returned_pointers[i])->no);
-        }
+        }*/
+	printf("Not Implemented\n");
 }
 
 
@@ -232,9 +218,9 @@ void find_and_print_range( treeNode * root, pInode_no key_start, pInode_no key_e
  * returned_keys and returned_pointers, and returns the number of
  * entries found.
  */
-int find_range( treeNode * root, pInode_no key_start, pInode_no key_end, bool verbose,
-                int returned_keys[], void * returned_pointers[]) {
-        int i, num_found;
+int find_range( p_dev* dev, treeNode * root, pInode_no key_start, pInode_no key_end,
+        int returned_keys[], void * returned_pointers[]) {
+/*        int i, num_found;
         num_found = 0;
         treeNode * n = find_leaf( root, key_start, verbose );
         if (n == NULL) return 0;
@@ -249,7 +235,9 @@ int find_range( treeNode * root, pInode_no key_start, pInode_no key_end, bool ve
                 n = n->pointers[btree_order - 1];
                 i = 0;
         }
-        return num_found;
+        return num_found;*/
+	printf("Not implemented\n");
+	return -1;
 }
 
 
@@ -258,73 +246,81 @@ int find_range( treeNode * root, pInode_no key_start, pInode_no key_end, bool ve
  * if the verbose flag is set.
  * Returns the leaf containing the given key.
  */
-treeNode * find_leaf( treeNode * root, pInode_no key, bool verbose ) {
+PAFFS_RESULT find_leaf( p_dev* dev, treeNode * root, pInode_no key, treeNode* outTreenode) {
         int i = 0;
-        treeNode * c = root;
-        if (c == NULL) {
-                if (verbose) 
-                        printf("Empty tree.\n");
-                return c;
+        treeNode c = *root;
+        if (c.pointers[0] == 0) {
+                PAFFS_DBG(PAFFS_TRACE_TREE, "Empty tree.");
+                return PAFFS_NF;
         }
-        while (!c->is_leaf) {
-                if (verbose) {
+        while (!c.is_leaf) {
+/*                if (verbose) {
                         printf("[");
                         for (i = 0; i < c->num_keys - 1; i++)
                                 printf("%d ", c->keys[i]);
                         printf("%d] ", c->keys[i]);
-                }
+                }*/
                 i = 0;
-                while (i < c->num_keys) {
-                        if (key >= c->keys[i]) i++;
+                while (i < c.num_keys) {
+                        if (key >= c.keys[i]) i++;
                         else break;
                 }
-                if (verbose)
-                        printf("%d ->\n", i);
-                c = (treeNode *)c->pointers[i];
+                //printf("%d ->\n", i);
+                p_addr *addr = getPointerAsAddr(c.pointers, i);
+                PAFFS_RESULT r = readTreeNode(dev, *addr, &c);
+                if(r != PAFFS_OK)
+                	return r;
         }
-        if (verbose) {
-                printf("Leaf [");
-                for (i = 0; i < c->num_keys - 1; i++)
-                        printf("%d ", c->keys[i]);
-                printf("%d] ->\n", c->keys[i]);
-        }
-        return c;
+		/*printf("Leaf [");
+		for (i = 0; i < c->num_keys - 1; i++)
+				printf("%d ", c->keys[i]);
+		printf("%d] ->\n", c->keys[i]);*/
+        * outTreenode = c;
+        return PAFFS_OK;
 }
 
+PAFFS_RESULT find_in_leaf (treeNode* leaf, pInode_no key, pInode* outInode){
+	int i;
+    for (i = 0; i < leaf->num_keys; i++)
+            if (leaf->keys[i] == key) break;
+    if (i == leaf->num_keys)
+            return PAFFS_NF;
+	*outInode = *getPointerAsInode(leaf->pointers, i);
+	return PAFFS_OK;
+}
 
 /* Finds and returns the pinode to which
  * a key refers.
  */
-pInode * find_v( treeNode * root, pInode_no key, bool verbose ) {
-        int i = 0;
-        treeNode * c = find_leaf( root, key, verbose );
-        if (c == NULL) return NULL;
-        for (i = 0; i < c->num_keys; i++)
-                if (c->keys[i] == key) break;
-        if (i == c->num_keys) 
-                return NULL;
-        else
-                return (pInode *)c->pointers[i];
+PAFFS_RESULT find( p_dev* dev, treeNode * root, pInode_no key, pInode* outInode){
+    treeNode c;
+    PAFFS_RESULT r = find_leaf( dev, root, key, &c);
+    if(r != PAFFS_OK)
+    	return r;
+    return find_in_leaf(&c, key, outInode);
 }
 
-pInode * find( treeNode * root, pInode_no key){
-	return find_v(root, key, false);
-}
-
-pInode_no find_first_free_key( treeNode * root ){
-	treeNode * c = root
+PAFFS_RESULT find_first_free_key( p_dev* dev, treeNode * root, pInode_no* outNumber){
+	treeNode c;
+	c = *root;
 	pInode_no free_no = 0;
-	while(c != NULL){
-		if(!c->is_leaf){
-			c = (treeNode *)c->pointers[0];	//leftmost child
+	while(c.pointers[0] != 0){
+		if(!c.is_leaf){
+			p_addr* addr = getPointerAsAddr(c.pointers, 0); //leftmost child
+			PAFFS_RESULT r = readTreeNode(dev, *addr, &c);
+			if(r != PAFFS_OK)
+				return r;
 			continue;
 		}
-		for(unsigned int k = 0; k < c->num_keys; k ++){
-			if(c->keys[k] > free_no)
+		for(unsigned int k = 0; k < c.num_keys; k ++){
+			if(c.keys[k] > free_no)
 				return free_no;
 			free_no ++;
 		}
-		c = (treeNode *)c->pointers[btree_order-1];
+		p_addr* addr = getPointerAsAddr(c.pointers, btree_order-1); //Next leaf ("cousin")
+		PAFFS_RESULT r = readTreeNode(dev, *addr, &c);
+		if(r != PAFFS_OK)
+			return r;
 	}
 	return free_no;
 }
@@ -360,7 +356,7 @@ pInode * make_pinode(pInode pn) {
 
 /* Creates a new general treeNode, which can be adapted
  * to serve as either a leaf or an internal treeNode.
- */
+ *
 treeNode * make_node( void ) {
         treeNode * new_node;
         new_node = malloc(sizeof(treeNode));
@@ -383,15 +379,41 @@ treeNode * make_node( void ) {
         new_node->parent = NULL;
         new_node->next = NULL;
         return new_node;
-}
+}*/
 
 /* Creates a new leaf by creating a treeNode
  * and then adapting it appropriately.
- */
+ *
 treeNode * make_leaf( void ) {
         treeNode * leaf = make_node();
         leaf->is_leaf = true;
         return leaf;
+}*/
+
+
+PAFFS_RESULT updateTreeNode( p_dev* dev, treeNode* node){
+	if(node == NULL)
+		return PAFFS_EINVAL;
+
+	p_addr old_addr = node->self;
+	PAFFS_RESULT r = writeTreeNode(dev, node);
+	if(r != PAFFS_OK)
+		return r;
+
+	if(node->parent != 0){	//We are non-root
+		treeNode parent;
+		r = readTreeNode(dev, node->parent, &parent);
+		int i;
+	    for (i = 0; i < parent.num_keys; i++)
+	            if (*getPointerAsAddr(parent.pointers, i) == old_addr) break;
+	    if (i == parent.num_keys){
+	    	PAFFS_DBG(PAFFS_TRACE_ERROR, "ERROR (BUG?): Detached Treenode");
+			return PAFFS_FAIL;
+	    }
+	    insertAddrInPointer(parent.pointers, &node->self, i);
+		return updateTreeNode(dev, &parent);
+	}
+	return PAFFS_OK;
 }
 
 
@@ -403,16 +425,15 @@ int get_left_index(treeNode * parent, treeNode * left) {
 
         int left_index = 0;
         while (left_index <= parent->num_keys && 
-                        parent->pointers[left_index] != left)
+                        *getPointerAsAddr(parent->pointers, left_index) != left->self)
                 left_index++;
         return left_index;
 }
 
 /* Inserts a new pointer to a pinode and its corresponding
- * key into a leaf.
- * Returns the altered leaf.
+ * key into a leaf when it has enough space free.
  */
-treeNode * insert_into_leaf( treeNode * leaf, pInode_no key, pInode * pointer ) {
+PAFFS_RESULT insert_into_leaf( p_dev* dev, treeNode * leaf, pInode_no key, pInode * pointer ) {
 
         int i, insertion_point;
 
@@ -425,9 +446,10 @@ treeNode * insert_into_leaf( treeNode * leaf, pInode_no key, pInode * pointer ) 
                 leaf->pointers[i] = leaf->pointers[i - 1];
         }
         leaf->keys[insertion_point] = key;
-        leaf->pointers[insertion_point] = pointer;
         leaf->num_keys++;
-        return leaf;
+        insertInodeInPointer(leaf->pointers, pointer, insertion_point);
+
+        return updateTreeNode(dev, leaf);
 }
 
 
@@ -438,12 +460,12 @@ treeNode * insert_into_leaf( treeNode * leaf, pInode_no key, pInode * pointer ) 
  */
 treeNode * insert_into_leaf_after_splitting(treeNode * root, treeNode * leaf, pInode_no key, pInode * pointer) {
 
-        treeNode * new_leaf;
+        treeNode new_leaf = {0};
         int * temp_keys;
         void ** temp_pointers;
         int insertion_index, split, new_key, i, j;
 
-        new_leaf = make_leaf();
+        new_leaf.is_leaf = true;
 
         temp_keys = malloc( btree_order * sizeof(int) );
         if (temp_keys == NULL) {
@@ -508,18 +530,20 @@ treeNode * insert_into_leaf_after_splitting(treeNode * root, treeNode * leaf, pI
  * into a treeNode into which these can fit
  * without violating the B+ tree properties.
  */
-treeNode * insert_into_node(treeNode * root, treeNode * n,
+//FIXME: SOLLTE JETZT SCHON DER GANZE BAUM AKTUALISIERT WERDEN
+//ODER IST DAS NUR EIN ZWISCHENSCHRITT? DANN SOLLTEN DIE SCHREIBVORGÄNGE VERZÖGERT WERDEN
+PAFFS_RESULT insert_into_node(p_dev *dev, treeNode * node,
                 int left_index, pInode_no key, treeNode * right) {
         int i;
 
-        for (i = n->num_keys; i > left_index; i--) {
-                n->pointers[i + 1] = n->pointers[i];
-                n->keys[i] = n->keys[i - 1];
+        for (i = node->num_keys; i > left_index; i--) {
+                node->pointers[i + 1] = node->pointers[i];
+                node->keys[i] = node->keys[i - 1];
         }
-        n->pointers[left_index + 1] = right;
-        n->keys[left_index] = key;
-        n->num_keys++;
-        return root;
+        insertAddrInPointer(node->pointers, &right->self, left_index + 1);
+        node->keys[left_index] = key;
+        node->num_keys++;
+        return updateTreeNode(dev, node);
 }
 
 

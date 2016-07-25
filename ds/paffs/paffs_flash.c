@@ -297,7 +297,8 @@ p_addr getRootnode(p_dev* dev){
 	return rootnode_addr;
 }
 
-PAFFS_RESULT updateTreeNode(p_dev* dev, p_addr old_addr, p_addr *new_addr, treeNode* node){
+//Does not change addresses in parent Nodes
+PAFFS_RESULT writeTreeNode(p_dev* dev, treeNode* node){
 	if(node == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode NULL");
 				return paffs_lasterr = PAFFS_BUG;
@@ -306,24 +307,11 @@ PAFFS_RESULT updateTreeNode(p_dev* dev, p_addr old_addr, p_addr *new_addr, treeN
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode bigger than Page (Was %lu, should %u)", sizeof(treeNode), dev->param.data_bytes_per_page);
 		return paffs_lasterr = PAFFS_BUG;
 	}
-	if(old_addr == 0){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "ERR: old_addr == 0");
-		return paffs_lasterr = PAFFS_EINVAL;
-	}
-	dev->areaMap[extractLogicalArea(old_addr)].areaSummary[extractPage(old_addr)] = DIRTY;
-	dev->areaMap[extractLogicalArea(old_addr)].dirtyPages ++;
 
-	return writeTreeNode(dev, new_addr, node);
-}
-
-PAFFS_RESULT writeTreeNode(p_dev* dev, p_addr *outAddr, treeNode* node){
-	if(node == NULL){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode NULL");
-				return paffs_lasterr = PAFFS_BUG;
-	}
-	if(sizeof(treeNode) > dev->param.data_bytes_per_page){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode bigger than Page (Was %lu, should %u)", sizeof(treeNode), dev->param.data_bytes_per_page);
-		return paffs_lasterr = PAFFS_BUG;
+	if(node->self != 0){
+		//We have to invalidate former posistion first
+		dev->areaMap[extractLogicalArea(node->self)].areaSummary[extractPage(node->self)] = DIRTY;
+		dev->areaMap[extractLogicalArea(node->self)].dirtyPages ++;
 	}
 
 	unsigned int firstFreePage = 0;
@@ -331,12 +319,13 @@ PAFFS_RESULT writeTreeNode(p_dev* dev, p_addr *outAddr, treeNode* node){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", activeArea[INDEXAREA]);
 		return paffs_lasterr = PAFFS_BUG;
 	}
-	*outAddr = combineAddress(dev->areaMap[activeArea[INDEXAREA]].position, firstFreePage);
+	p_addr addr = combineAddress(dev->areaMap[activeArea[INDEXAREA]].position, firstFreePage);
+	node->self = addr;
 
 	dev->areaMap[activeArea[INDEXAREA]].usedPages++;
 	dev->areaMap[activeArea[INDEXAREA]].areaSummary[firstFreePage] = USED;
 
-	PAFFS_RESULT r = dev->drv.drv_write_page_fn(dev, getPageNumber(*outAddr, dev), node, sizeof(treeNode));
+	PAFFS_RESULT r = dev->drv.drv_write_page_fn(dev, getPageNumber(node->self, dev), node, sizeof(treeNode));
 	if(r != PAFFS_OK)
 		return paffs_lasterr = r;
 
@@ -360,6 +349,11 @@ PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node){
 	PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), node, sizeof(treeNode));
 	if(r != PAFFS_OK)
 		return paffs_lasterr = r;
+
+	if(node->self != addr){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Found Treenode at %X, but its content stated that it was on %X", addr, node->self);
+		return PAFFS_BUG;
+	}
 	return PAFFS_OK;
 }
 

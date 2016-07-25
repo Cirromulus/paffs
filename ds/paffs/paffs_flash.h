@@ -36,13 +36,7 @@ void registerRootnode(p_dev* dev, p_addr addr);
 
 p_addr getRootnode(p_dev* dev);
 
-
-PAFFS_RESULT updateTreeNode(p_dev* dev, p_addr old_addr, p_addr *new_addr, treeNode* node);
-/**
- * @param addr: Location where node has been written to
- * Former address of treeNode has to be invalidated before.
- */
-PAFFS_RESULT writeTreeNode(p_dev* dev, p_addr *addr, treeNode* node);
+PAFFS_RESULT writeTreeNode(p_dev* dev, treeNode* node);
 
 PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node);
 
