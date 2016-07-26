@@ -43,13 +43,11 @@ int height( p_dev* dev, treeNode * root );
 int path_to_root( p_dev* dev, treeNode * root, treeNode * child );
 void print_leaves( p_dev* dev, treeNode * root);
 void print_tree( p_dev* dev, treeNode * root);
-void find_and_print(p_dev* dev, treeNode * root, pInode_no key);
-void find_and_print_range(p_dev* dev, treeNode * root, pInode_no key_start, pInode_no key_end);
 int find_range( p_dev* dev, treeNode * root, pInode_no key_start, pInode_no key_end,
                 int returned_keys[], void * returned_pointers[]); 
-PAFFS_RESULT find_leaf( p_dev* dev, treeNode * root, pInode_no key, treeNode* outTreenode);
+PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeNode* outTreenode);
 PAFFS_RESULT find_in_leaf (treeNode* leaf, pInode_no key, pInode* outInode);
-PAFFS_RESULT find( p_dev* dev, treeNode * root, pInode_no key, pInode* outInode);
+PAFFS_RESULT find( p_dev* dev, pInode_no key, pInode* outInode);
 PAFFS_RESULT find_first_free_key( p_dev* dev, treeNode * root, pInode_no* outNumber);
 int cut( int length );
 PAFFS_RESULT updateTreeNode( p_dev* dev, treeNode* node);
@@ -58,7 +56,7 @@ PAFFS_RESULT updateTreeNode( p_dev* dev, treeNode* node);
 // Insertion.
 
 int get_left_index(treeNode * parent, treeNode * left);
-PAFFS_RESULT insert_into_leaf( p_dev* dev, treeNode * leaf, pInode_no key, pInode * pointer );
+PAFFS_RESULT insert_into_leaf( p_dev* dev, treeNode * leaf, pInode * pointer );
 PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeNode * root, treeNode * leaf, pInode_no key, pInode * pointer);
 PAFFS_RESULT insert_into_node(p_dev *dev, treeNode * newNode,
         int left_index, pInode_no key, treeNode * right);
@@ -66,7 +64,9 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeNode * root, treeN
                 pInode_no key, treeNode * right);
 PAFFS_RESULT insert_into_parent(p_dev* dev, treeNode * root, treeNode * left, pInode_no key, treeNode * right);
 PAFFS_RESULT insert_into_new_root(p_dev* dev, treeNode * left, pInode_no key, treeNode * right);
-PAFFS_RESULT start_new_tree(p_dev* dev, pInode_no key, pInode * pointer);
+PAFFS_RESULT insert( p_dev* dev, pInode* value);
+PAFFS_RESULT insert_into_new_root(p_dev* dev, treeNode * left, pInode_no key, treeNode * right);
+PAFFS_RESULT start_new_tree(p_dev* dev);
 
 // Deletion.
 

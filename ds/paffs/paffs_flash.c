@@ -293,7 +293,7 @@ void registerRootnode(p_dev* dev, p_addr addr){
 	rootnode_addr = addr;
 }
 
-p_addr getRootnode(p_dev* dev){
+p_addr getRootnodeAddr(p_dev* dev){
 	return rootnode_addr;
 }
 
@@ -309,11 +309,15 @@ PAFFS_RESULT writeTreeNode(p_dev* dev, treeNode* node){
 	}
 
 	if(node->self != 0){
-		//We have to invalidate former posistion first
+		//We have to invalidate former position first
 		dev->areaMap[extractLogicalArea(node->self)].areaSummary[extractPage(node->self)] = DIRTY;
 		dev->areaMap[extractLogicalArea(node->self)].dirtyPages ++;
 	}
 
+	activeArea[INDEXAREA] = findWritableArea(INDEXAREA, dev);
+	if(paffs_lasterr != PAFFS_OK){
+		return paffs_lasterr;
+	}
 	unsigned int firstFreePage = 0;
 	if(findFirstFreePage(&firstFreePage, dev, activeArea[INDEXAREA]) == PAFFS_NOSP){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", activeArea[INDEXAREA]);

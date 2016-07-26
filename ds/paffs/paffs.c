@@ -89,7 +89,7 @@ PAFFS_RESULT paffs_mnt(const char* devicename){
 
 		p_addr rootnode = combineAddress(activeArea[INDEXAREA], 0);
 		registerRootnode(device, rootnode);
-
+		start_new_tree(device);
 
 	}else{
 		//Todo: Scan NAND-Flash

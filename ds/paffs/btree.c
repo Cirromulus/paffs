@@ -28,7 +28,7 @@ void insertInodeInPointer(char* pointers, pInode* inode, unsigned int pos){
 
 
 PAFFS_RESULT insertInode( p_dev* dev, pInode* inode){
-	p_addr rootnode_addr = getRootnode(dev);
+	p_addr rootnode_addr = getRootnodeAddr(dev);
 	treeNode root;
 	PAFFS_RESULT r = readTreeNode(dev, rootnode_addr, &root);
 	if(r != PAFFS_OK)
@@ -173,46 +173,6 @@ void print_tree( p_dev* dev, treeNode * root) {
 }
 
 
-/* Finds the pinode under a given key and prints an
- * appropriate message to stdout.
- */
-void find_and_print(p_dev* dev, treeNode * root, pInode_no key) {
-		pInode val;
-        PAFFS_RESULT r = find(dev, root, key, &val);
-        if (r == PAFFS_NF)
-			printf("pinode not found under key %d.\n", key);
-        else if( r != PAFFS_OK)
-        	printf("Error: %s\n", paffs_err_msg(r));
-        else
-			printf("pinode at --unknown-- key %d, value %d.\n",
-                                key, val.type);
-}
-
-
-/* Finds and prints the keys, pointers, and values within a range
- * of keys between key_start and key_end, including both bounds.
- */
-void find_and_print_range( p_dev* dev, treeNode * root, pInode_no key_start, pInode_no key_end) {
-/*        int i;
-        int array_size = key_end - key_start + 1;
-        int returned_keys[array_size];
-        void * returned_pointers[array_size];
-        int num_found = find_range( root, key_start, key_end, verbose,
-                        returned_keys, returned_pointers );
-        if (!num_found)
-                printf("None found.\n");
-        else {
-                for (i = 0; i < num_found; i++)
-                        printf("Key: %d   Location: %lx  Value: %d\n",
-                                        returned_keys[i],
-                                        (unsigned long)returned_pointers[i],
-                                        ((pInode *)
-                                         returned_pointers[i])->no);
-        }*/
-	printf("Not Implemented\n");
-}
-
-
 /* Finds keys and their pointers, if present, in the range specified
  * by key_start and key_end, inclusive.  Places these in the arrays
  * returned_keys and returned_pointers, and returns the number of
@@ -246,9 +206,14 @@ int find_range( p_dev* dev, treeNode * root, pInode_no key_start, pInode_no key_
  * if the verbose flag is set.
  * Returns the leaf containing the given key.
  */
-PAFFS_RESULT find_leaf( p_dev* dev, treeNode * root, pInode_no key, treeNode* outTreenode) {
+PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeNode* outTreenode) {
         int i = 0;
-        treeNode c = *root;
+        treeNode c;
+        PAFFS_RESULT r = readTreeNode(dev, getRootnodeAddr(dev), &c);
+        if(r != PAFFS_OK)
+        	return r;
+
+
         if (c.pointers[0] == 0) {
                 PAFFS_DBG(PAFFS_TRACE_TREE, "Empty tree.");
                 return PAFFS_NF;
@@ -292,9 +257,9 @@ PAFFS_RESULT find_in_leaf (treeNode* leaf, pInode_no key, pInode* outInode){
 /* Finds and returns the pinode to which
  * a key refers.
  */
-PAFFS_RESULT find( p_dev* dev, treeNode * root, pInode_no key, pInode* outInode){
+PAFFS_RESULT find( p_dev* dev, pInode_no key, pInode* outInode){
     treeNode c;
-    PAFFS_RESULT r = find_leaf( dev, root, key, &c);
+    PAFFS_RESULT r = find_leaf( dev, key, &c);
     if(r != PAFFS_OK)
     	return r;
     return find_in_leaf(&c, key, outInode);
@@ -411,6 +376,8 @@ PAFFS_RESULT updateTreeNode( p_dev* dev, treeNode* node){
 			return PAFFS_FAIL;
 	    }
 	    insertAddrInPointer(parent.pointers, &node->self, i);
+	    +#ÖÖ
+		//What about siblings pointing to parent?!
 		return updateTreeNode(dev, &parent);
 	}
 	return PAFFS_OK;
@@ -432,22 +399,23 @@ int get_left_index(treeNode * parent, treeNode * left) {
 
 /* Inserts a new pointer to a pinode and its corresponding
  * key into a leaf when it has enough space free.
+ * (No further Tree-action Required)
  */
-PAFFS_RESULT insert_into_leaf( p_dev* dev, treeNode * leaf, pInode_no key, pInode * pointer ) {
+PAFFS_RESULT insert_into_leaf( p_dev* dev, treeNode * leaf, pInode * newInode ) {
 
         int i, insertion_point;
 
         insertion_point = 0;
-        while (insertion_point < leaf->num_keys && leaf->keys[insertion_point] < key)
+        while (insertion_point < leaf->num_keys && leaf->keys[insertion_point] < newInode->no)
                 insertion_point++;
 
         for (i = leaf->num_keys; i > insertion_point; i--) {
                 leaf->keys[i] = leaf->keys[i - 1];
                 leaf->pointers[i] = leaf->pointers[i - 1];
         }
-        leaf->keys[insertion_point] = key;
+        leaf->keys[insertion_point] = newInode->no;
         leaf->num_keys++;
-        insertInodeInPointer(leaf->pointers, pointer, insertion_point);
+        insertInodeInPointer(leaf->pointers, newInode, insertion_point);
 
         return updateTreeNode(dev, leaf);
 }
@@ -457,6 +425,7 @@ PAFFS_RESULT insert_into_leaf( p_dev* dev, treeNode * leaf, pInode_no key, pInod
  * to a new pinode into a leaf so as to exceed
  * the tree's order, causing the leaf to be split
  * in half.
+ * ***further Tree-action required ***
  */
 treeNode * insert_into_leaf_after_splitting(treeNode * root, treeNode * leaf, pInode_no key, pInode * pointer) {
 
@@ -529,9 +498,8 @@ treeNode * insert_into_leaf_after_splitting(treeNode * root, treeNode * leaf, pI
 /* Inserts a new key and pointer to a treeNode
  * into a treeNode into which these can fit
  * without violating the B+ tree properties.
+ * (No further Tree-action Required)
  */
-//FIXME: SOLLTE JETZT SCHON DER GANZE BAUM AKTUALISIERT WERDEN
-//ODER IST DAS NUR EIN ZWISCHENSCHRITT? DANN SOLLTEN DIE SCHREIBVORGÄNGE VERZÖGERT WERDEN
 PAFFS_RESULT insert_into_node(p_dev *dev, treeNode * node,
                 int left_index, pInode_no key, treeNode * right) {
         int i;
@@ -550,6 +518,7 @@ PAFFS_RESULT insert_into_node(p_dev *dev, treeNode * node,
 /* Inserts a new key and pointer to a treeNode
  * into a treeNode, causing the treeNode's size to exceed
  * the order, and causing the treeNode to split into two.
+ * *** further Tree-action pending ***
  */
 treeNode * insert_into_node_after_splitting(treeNode * root, treeNode * old_node, int left_index,
                 pInode_no key, treeNode * right) {
@@ -632,6 +601,7 @@ treeNode * insert_into_node_after_splitting(treeNode * root, treeNode * old_node
 
 /* Inserts a new treeNode (leaf or internal treeNode) into the B+ tree.
  * Returns the root of the tree after insertion.
+ * *** further Tree-action pending ***
  */
 treeNode * insert_into_parent(treeNode * root, treeNode * left, pInode_no key, treeNode * right) {
 
@@ -674,33 +644,47 @@ treeNode * insert_into_parent(treeNode * root, treeNode * left, pInode_no key, t
  * and inserts the appropriate key into
  * the new root.
  */
-treeNode * insert_into_new_root(treeNode * left, pInode_no key, treeNode * right) {
+PAFFS_RESULT insert_into_new_root(p_dev* dev, treeNode * left, pInode_no key, treeNode * right) {
 
-        treeNode * root = make_node();
-        root->keys[0] = key;
-        root->pointers[0] = left;
-        root->pointers[1] = right;
-        root->num_keys++;
-        root->parent = NULL;
-        left->parent = root;
-        right->parent = root;
-        return root;
+        treeNode root;
+        PAFFS_RESULT r;
+        root.keys[0] = key;
+        insertAddrInPointer(root.pointers, &left->self, 0);
+        insertAddrInPointer(root.pointers, &right->self, 1);
+        root.num_keys++;
+        root.parent = 0;
+        p_addr future_root_addr = 0;
+        r = getNextUsedAddr(dev, INDEXAREA, &future_root_addr);
+		if(r != PAFFS_OK){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "ERROR: Not handled exception, next Address indeterminable");
+			return r;
+		}
+        left->parent = future_root_addr;
+        right->parent = future_root_addr;
+        r = writeTreeNode(dev, left);
+		if(r != PAFFS_OK)
+			return r;
+		r = writeTreeNode(dev, right);
+		if(r != PAFFS_OK)
+			return r;
+
+        r = writeTreeNode(dev, &root);
+        if(r != PAFFS_OK)
+        	return r;
+
+        return PAFFS_OK;
 }
 
 
 
-/* First insertion:
- * start a new tree.
+/* start a new tree.
+ * So init rootnode
  */
-treeNode * start_new_tree(pInode_no key, pInode * pointer) {
+PAFFS_RESULT start_new_tree(p_dev* dev) {
 
-        treeNode * root = make_leaf();
-        root->keys[0] = key;
-        root->pointers[0] = pointer;
-        root->pointers[btree_order - 1] = NULL;
-        root->parent = NULL;
-        root->num_keys++;
-        return root;
+        treeNode root;
+        memset(&root, 0, sizeof(treeNode));
+        return writeTreeNode(dev, &root);
 }
 
 
@@ -711,101 +695,57 @@ treeNode * start_new_tree(pInode_no key, pInode * pointer) {
  * however necessary to maintain the B+ tree
  * properties.
  */
-treeNode * insert( treeNode * root, pInode_no key, pInode value) {
+PAFFS_RESULT insert( p_dev* dev, pInode* value) {
 
-        pInode * pointer;
-        treeNode * leaf;
+        treeNode node;
+        PAFFS_RESULT r;
 
         /* The current implementation ignores
          * duplicates.
          */
 
-        if (find_v(root, key, false) != NULL)
-                return root;
 
-        /* Create a new pinode for the
-         * value.
-         */
-        pointer = make_pinode(value);
-
-
+        r = find(dev, value->no, value);
+        if(r == PAFFS_OK){
+        	PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Pinode already existing with n° %d", value->no);
+			return PAFFS_BUG;
+        }else if(r != PAFFS_NF){
+        	return r;
+        }
         /* Case: the tree does not exist yet.
          * Start a new tree.
          */
+        r = readTreeNode(dev, getRootnodeAddr(dev), &node);
+        if (r != PAFFS_OK)
+        	return r;
 
-        if (root == NULL)
-                return start_new_tree(key, pointer);
+        if(extractLogicalArea(node.self) > dev->param.areas_no){	//Rootnode not initialized
+        	PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Rootnode not initialized");
+			return PAFFS_BUG;
+        }
 
 
         /* Case: the tree already exists.
          * (Rest of function body.)
          */
 
-        leaf = find_leaf(root, key, false);
+        r = find_leaf(dev, value->no, &node);
+        if(r != PAFFS_OK)
+        	return r;
 
         /* Case: leaf has room for key and pointer.
          */
 
-        if (leaf->num_keys < btree_order - 1) {
-                leaf = insert_into_leaf(leaf, key, pointer);
-                return root;
+        if (node.num_keys < btree_order - 1) {
+                return insert_into_leaf(dev, &node, value);
         }
 
 
         /* Case:  leaf must be split.
          */
 
-        return insert_into_leaf_after_splitting(root, leaf, key, pointer);
+        return insert_into_leaf_after_splitting(root, leaf, key, new);
 }
-
-
-/* Master insertion function without copying.
- * Inserts a key and an associated value into
- * the B+ tree, causing the tree to be adjusted
- * however necessary to maintain the B+ tree
- * properties.
- */
-treeNode * insert_direct( treeNode * root, pInode* inode) {
-
-        treeNode * leaf;
-
-        /* The current implementation ignores
-         * duplicates.
-         */
-
-        if (find_v(root, inode->no, false) != NULL)
-                return root;
-
-
-        /* Case: the tree does not exist yet.
-         * Start a new tree.
-         */
-
-        if (root == NULL) 
-                return start_new_tree(inode->no, inode);
-
-
-        /* Case: the tree already exists.
-         * (Rest of function body.)
-         */
-
-        leaf = find_leaf(root, inode->no, false);
-
-        /* Case: leaf has room for key and pointer.
-         */
-
-        if (leaf->num_keys < btree_order - 1) {
-                leaf = insert_into_leaf(leaf, inode->no, inode);
-                return root;
-        }
-
-
-        /* Case:  leaf must be split.
-         */
-
-        return insert_into_leaf_after_splitting(root, leaf, inode->no, inode);
-}
-
 
 
 

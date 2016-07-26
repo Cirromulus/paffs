@@ -11,6 +11,8 @@
  unsigned int paffs_trace_mask =
 		 //PAFFS_TRACE_AREA |
 		 PAFFS_TRACE_ERROR |
+		 PAFFS_TRACE_BUG |
+		 PAFFS_TRACE_TREE |
 		 0;
 
 PAFFS_RESULT paffs_start_up(){
