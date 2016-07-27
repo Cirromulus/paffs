@@ -28,21 +28,40 @@ void insertInodeInPointer(char* pointers, pInode* inode, unsigned int pos){
 
 
 PAFFS_RESULT insertInode( p_dev* dev, pInode* inode){
-	p_addr rootnode_addr = getRootnodeAddr(dev);
-	treeNode root;
-	PAFFS_RESULT r = readTreeNode(dev, rootnode_addr, &root);
-	if(r != PAFFS_OK)
-		return r;
-
-	return PAFFS_NIMPL;
+	return insert(dev, inode);
 }
 
 PAFFS_RESULT getInode( p_dev* dev, pInode_no number, pInode* outInode){
-	return PAFFS_NIMPL;
+	return find(dev, number, outInode);
 }
 
 PAFFS_RESULT modifyInode( p_dev* dev, pInode* inode){
-	return PAFFS_NIMPL;
+	treeNode node;
+	PAFFS_RESULT r = find_leaf(dev, inode->no, &node);
+	if(r != PAFFS_OK)
+		return r;
+
+	int pos;
+	for(pos = 0; pos < node.num_keys; pos++){
+		if(getPointerAsInode(node.pointers, pos)->no == inode->no)
+			break;
+	}
+	*getPointerAsInode(node.pointers, pos) = *inode;
+	return updateTreeNode(dev, &node);	//Anmerkung... Muss der vorher geschrieben werden?`weiß ich gerade nicht mehr
+}
+
+PAFFS_RESULT deleteInode( p_dev* dev, pInode_no number){
+
+	//pInode key;
+	treeNode key_leaf;
+
+	PAFFS_RESULT r = find_leaf(dev, number, &key_leaf);
+	if(r != PAFFS_OK)
+		return r;
+	/*r = find_in_leaf (&key_leaf, number, &key);
+	if(r != PAFFS_OK)
+		return r;*/
+	return delete_entry(dev, &key_leaf, number);
 }
 
 PAFFS_RESULT findFirstFreeNo(p_dev* dev, pInode_no* outNumber){
@@ -1167,20 +1186,3 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeNode * n, pInode_no key){
 		return redistribute_nodes(dev, n, &neighbor, neighbor_index, k_prime_index, k_prime);
 }
 
-
-
-/* Master deletion function.
- */
-PAFFS_RESULT deleteInode( p_dev* dev, pInode_no number){
-
-	//pInode key;
-	treeNode key_leaf;
-
-	PAFFS_RESULT r = find_leaf(dev, number, &key_leaf);
-	if(r != PAFFS_OK)
-		return r;
-	/*r = find_in_leaf (&key_leaf, number, &key);
-	if(r != PAFFS_OK)
-		return r;*/
-	return delete_entry(dev, &key_leaf, number);
-}
