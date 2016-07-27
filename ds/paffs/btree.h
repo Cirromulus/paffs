@@ -39,7 +39,7 @@ void insertInodeInPointer(char* pointers, pInode* inode, unsigned int pos);
 
 PAFFS_RESULT insertInode( p_dev* dev, pInode* inode);
 PAFFS_RESULT getInode( p_dev* dev, pInode_no number, pInode* outInode);
-PAFFS_RESULT modifyInode( p_dev* dev, pInode* inode);
+PAFFS_RESULT updateInode( p_dev* dev, pInode* inode);
 PAFFS_RESULT deleteInode( p_dev* dev, pInode_no number);
 PAFFS_RESULT findFirstFreeNo(p_dev* dev, pInode_no* outNumber);
 

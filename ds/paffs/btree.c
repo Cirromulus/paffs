@@ -35,7 +35,7 @@ PAFFS_RESULT getInode( p_dev* dev, pInode_no number, pInode* outInode){
 	return find(dev, number, outInode);
 }
 
-PAFFS_RESULT modifyInode( p_dev* dev, pInode* inode){
+PAFFS_RESULT updateInode( p_dev* dev, pInode* inode){
 	treeNode node;
 	PAFFS_RESULT r = find_leaf(dev, inode->no, &node);
 	if(r != PAFFS_OK)
@@ -47,7 +47,7 @@ PAFFS_RESULT modifyInode( p_dev* dev, pInode* inode){
 			break;
 	}
 	*getPointerAsInode(node.pointers, pos) = *inode;
-	return updateTreeNode(dev, &node);	//Anmerkung... Muss der vorher geschrieben werden?`weiß ich gerade nicht mehr
+	return updateTreeNode(dev, &node);
 }
 
 PAFFS_RESULT deleteInode( p_dev* dev, pInode_no number){
@@ -579,14 +579,9 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeNode * leaf, pInod
 	for (i = new_leaf.num_keys; i < btree_leaf_order; i++)
 		memset(getPointerAsInode(leaf->pointers, i), 0, sizeof(pInode));
 
-	p_addr old_addr = leaf->self;
 	PAFFS_RESULT r = writeTreeNode(dev, leaf);
 	if(r != PAFFS_OK)
 		return r;
-	if(old_addr == getRootnodeAddr(dev)){
-		//we changed rootnode
-		registerRootnode(dev, leaf->self);
-	}
 
 	r = writeTreeNode(dev, &new_leaf);
 	if(r != PAFFS_OK)
@@ -595,6 +590,8 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeNode * leaf, pInod
 
 	new_key = new_leaf.keys[0];
 
+	//BUG: Parent cannot be found in current treestate.
+	//Parent has to be determined before
 	return insert_into_parent(dev, leaf, new_key, &new_leaf);
 }
 
@@ -745,7 +742,11 @@ PAFFS_RESULT insert_into_new_root(p_dev* dev, treeNode * left, pInode_no key, tr
         insertAddrInPointer(root.pointers, &left->self, 0);
         insertAddrInPointer(root.pointers, &right->self, 1);
         root.num_keys = 2;
-        return writeTreeNode(dev, &root);
+        PAFFS_RESULT r = writeTreeNode(dev, &root);
+        if(r != PAFFS_OK)
+        	return r;
+        registerRootnode(dev, root.self);
+        return PAFFS_OK;
 }
 
 

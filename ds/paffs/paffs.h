@@ -215,6 +215,7 @@ void paffs_destroyInode(pInode* node);
 PAFFS_RESULT paffs_getParentDir(const char* fullPath, pInode* parDir, unsigned int *lastSlash);
 PAFFS_RESULT paffs_getInodeInDir( pInode* outInode, pInode* folder, const char* name);
 PAFFS_RESULT paffs_getInodeOfElem( pInode* outInode, const char* fullPath);
+//newElem should be already inserted in Tree
 PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* newElem);
 PAFFS_RESULT paffs_createFile(pInode* outFile, const char* fullPath, paffs_permission mask);
 p_addr combineAddress(uint32_t logical_area, uint32_t page);

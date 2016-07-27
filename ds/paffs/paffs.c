@@ -133,9 +133,9 @@ PAFFS_RESULT paffs_createDirInode(pInode* outInode, paffs_permission mask){
 	unsigned int bytes_written = 0;
 	PAFFS_RESULT r = writeInodeData(outInode, 0, sizeof(unsigned int), &bytes_written, (char*)&buf, device);
 	if(r != PAFFS_OK || bytes_written != sizeof(unsigned int)){
-		return paffs_lasterr = r;
+		return r;
 	}
-	return PAFFS_OK;
+	return updateInode(device, outInode);
 }
 
 PAFFS_RESULT paffs_createFilInode(pInode* outInode, paffs_permission mask){
@@ -192,7 +192,7 @@ PAFFS_RESULT paffs_getInodeInDir( pInode* outInode, pInode* folder, const char* 
         PAFFS_RESULT r = readInodeData(folder, 0, folder->size, &bytes_read, buf, device);
         if(r != PAFFS_OK || bytes_read != folder->size){
         	free(buf);
-        	return paffs_lasterr = r == PAFFS_OK ? PAFFS_BUG : r;
+        	return r == PAFFS_OK ? PAFFS_BUG : r;
         }
 
         unsigned int p = sizeof(unsigned int);		//skip directory entry count
@@ -268,6 +268,7 @@ PAFFS_RESULT paffs_getInodeOfElem(pInode* outInode, const char* fullPath){
     return PAFFS_OK;
 }
 
+
 PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* newElem){
 	if(contDir == NULL){
 		paffs_lasterr = PAFFS_BUG;
@@ -281,10 +282,6 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 
 	unsigned int direntryl = sizeof(unsigned int) + sizeof(pInode_no) + dirnamel;	//Size of one directory entry in main memory
 
-	PAFFS_RESULT r = insertInode(device, newElem);
-	if(r != PAFFS_OK)
-		return r;
-
 	unsigned char *buf = (unsigned char*) malloc(direntryl);
 	buf[0] = direntryl;
 	memcpy(&buf[sizeof(unsigned int)], &newElem->no, sizeof(pInode_no));
@@ -293,7 +290,7 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 
 	char* dirData = malloc(contDir->size +  direntryl);
 	unsigned int bytes = 0;
-	r = readInodeData(contDir, 0, contDir->size, &bytes, dirData, device);
+	PAFFS_RESULT r = readInodeData(contDir, 0, contDir->size, &bytes, dirData, device);
 	if(r != PAFFS_OK || bytes != contDir->size){
 		paffs_lasterr = r;
 		free(dirData);
@@ -315,7 +312,9 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 	free(buf);
 	if(bytes != contDir->size)
 		r = r == PAFFS_OK ? PAFFS_BUG : r;
-	return r;
+	if(r != PAFFS_OK)
+		return r;
+	return updateInode(device, contDir);
 
 }
 
@@ -328,8 +327,12 @@ PAFFS_RESULT paffs_mkdir(const char* fullPath, paffs_permission mask){
 		return res;
 
 	pInode newDir;
-	if(paffs_createDirInode(&newDir, mask) != PAFFS_OK)
-		return paffs_lasterr;
+	PAFFS_RESULT r = paffs_createDirInode(&newDir, mask);
+	if(r != PAFFS_OK)
+		return r;
+	r = insertInode(device, &newDir);
+	if(r != PAFFS_OK)
+		return r;
 
 	return paffs_insertInodeInDir(&fullPath[lastSlash], &parDir, &newDir);
 }
@@ -524,14 +527,14 @@ PAFFS_RESULT paffs_touch(const char* path){
 		if(r2 != PAFFS_OK){
 			return r2;
 		}
-		//To Overwrite the PAFFS_NF in paffs_getInodeOfElem(path)
-		paffs_lasterr = PAFFS_OK;
+		return PAFFS_OK;
 	}else{
 		if(r != PAFFS_OK)
 			return r;
 		file.mod = time(0);
+		return updateInode(device, &file);
 	}
-	return PAFFS_OK;
+
 }
 
 
@@ -561,7 +564,7 @@ PAFFS_RESULT paffs_read(paffs_obj* obj, char* buf, unsigned int bytes_to_read, u
 	}
 	PAFFS_RESULT r = readInodeData(obj->dentry->iNode, obj->fp, bytes_to_read, bytes_read, buf, device);
 	if(r != PAFFS_OK){
-		return paffs_lasterr = r;
+		return r;
 	}
 	//TODO: Check if actually read that much!
 	*bytes_read = bytes_to_read;
@@ -579,9 +582,10 @@ PAFFS_RESULT paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_
 	if(obj->dentry->iNode->type == PINODE_LNK){
 		return paffs_lasterr = PAFFS_NIMPL;
 	}
+
 	PAFFS_RESULT r = writeInodeData(obj->dentry->iNode, obj->fp, bytes_to_write, bytes_written, buf, device);
 	if(r != PAFFS_OK){
-		return paffs_lasterr = r;
+		return r;
 	}
 
 	obj->dentry->iNode->mod = time(0);
@@ -595,7 +599,7 @@ PAFFS_RESULT paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_
 		}
 		obj->dentry->iNode->size = obj->fp;
 	}
-	return PAFFS_OK;
+	return updateInode(device, obj->dentry->iNode);
 }
 
 PAFFS_RESULT paffs_seek(paffs_obj* obj, int m, paffs_seekmode mode){
