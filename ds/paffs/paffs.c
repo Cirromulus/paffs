@@ -106,7 +106,12 @@ PAFFS_RESULT paffs_mnt(const char* devicename){
 
 PAFFS_RESULT paffs_createInode(pInode* outInode, paffs_permission mask){
 	memset(outInode, 0, sizeof(pInode));
-	outInode->no = findFirstFreeNo(device);		//TODO: is this the best way to find a new number?
+
+	//FIXME: is this the best way to find a new number?
+	PAFFS_RESULT r = findFirstFreeNo(device, &outInode->no);
+	if(r != PAFFS_OK)
+		return r;
+
 	outInode->perm = mask;
 	outInode->size = 0;
 	outInode->reservedSize = 0;

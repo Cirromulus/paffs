@@ -27,7 +27,9 @@ typedef enum PAFFS_RESULT{
 	PAFFS_EINVAL,
 	PAFFS_NIMPL,
 	PAFFS_BUG,
-	PAFFS_NOSP
+	PAFFS_NOPARENT,
+	PAFFS_NOSP,
+	num_PAFFS_RESULT
 } PAFFS_RESULT;
 
 static const char* PAFFS_RESULT_MSG[] = {
@@ -37,7 +39,9 @@ static const char* PAFFS_RESULT_MSG[] = {
 		"Input values malformed",
 		"Operation not yet supported",
 		"Gratulations, you found a Bug",
-		"No (usable) space left on device"
+		"Node is already root, no Parent",
+		"No (usable) space left on device",
+		"You should not be seeing this..."
 };
 
 typedef enum pinode_type{

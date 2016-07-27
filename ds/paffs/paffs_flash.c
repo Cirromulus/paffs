@@ -361,3 +361,9 @@ PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node){
 	return PAFFS_OK;
 }
 
+PAFFS_RESULT deleteTreeNode(p_dev* dev, treeNode* node){
+	dev->areaMap[extractLogicalArea(node->self)].areaSummary[extractPage(node->self)] = DIRTY;
+	dev->areaMap[extractLogicalArea(node->self)].dirtyPages ++;
+	return PAFFS_OK;
+}
+

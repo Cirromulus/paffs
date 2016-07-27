@@ -18,8 +18,6 @@ PAFFS_RESULT findFirstFreePage(unsigned int* p_out, p_dev* dev, unsigned int are
 
 PAFFS_RESULT checkActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType areaType);
 
-PAFFS_RESULT getNextUsedAddr(p_dev *dev, p_areaType areaType, p_addr* addr);
-
 void initArea(p_dev* dev, unsigned long int area);
 
 PAFFS_RESULT writeInodeData(pInode* inode,
@@ -41,5 +39,8 @@ p_addr getRootnodeAddr(p_dev* dev);
 PAFFS_RESULT writeTreeNode(p_dev* dev, treeNode* node);
 
 PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node);
+
+PAFFS_RESULT deleteTreeNode(p_dev* dev, treeNode* node);
+
 
 #endif /* PAFFS_FLASH_H_ */
