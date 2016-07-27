@@ -325,10 +325,11 @@ PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeNode* outTreenode) {
         	return r;
 
 
-        if (c.pointers[0] == 0) {
+        /*if (c.pointers[0] == 0) {
                 PAFFS_DBG(PAFFS_TRACE_TREE, "Empty tree.");
-                return PAFFS_NF;
-        }
+                *outTreenode = c;
+                return PAFFS_OK;
+        }*/
         while (!c.is_leaf) {
 /*                if (verbose) {
                         printf("[");
@@ -351,7 +352,7 @@ PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeNode* outTreenode) {
 		for (i = 0; i < c->num_keys - 1; i++)
 				printf("%d ", c->keys[i]);
 		printf("%d] ->\n", c->keys[i]);*/
-        * outTreenode = c;
+        *outTreenode = c;
         return PAFFS_OK;
 }
 
@@ -513,11 +514,11 @@ PAFFS_RESULT insert_into_leaf( p_dev* dev, treeNode * leaf, pInode * newInode ) 
 
         for (i = leaf->num_keys; i > insertion_point; i--) {
                 leaf->keys[i] = leaf->keys[i - 1];
-                leaf->pointers[i] = leaf->pointers[i - 1];
+                *getPointerAsInode(leaf->pointers, i) = *getPointerAsInode(leaf->pointers, i - 1) ;
         }
         leaf->keys[insertion_point] = newInode->no;
         leaf->num_keys++;
-        insertInodeInPointer(leaf->pointers, newInode, insertion_point);
+        *getPointerAsInode(leaf->pointers, insertion_point) = *newInode;
 
         return updateTreeNode(dev, leaf);
 }
@@ -534,11 +535,13 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeNode * leaf, pInod
 	pInode_no temp_keys[btree_leaf_order+1];
 	pInode temp_pInodes[btree_leaf_order+1];
 	int insertion_index, split, new_key, i, j;
+	memset(temp_keys, 0, btree_leaf_order+1 * sizeof(pInode_no));
+	memset(temp_pInodes, 0, btree_leaf_order+1 * sizeof(pInode));
 
 	new_leaf.is_leaf = true;
 
 	insertion_index = 0;
-	while (insertion_index < btree_branch_order - 1 && leaf->keys[insertion_index] < newInode->no)
+	while (insertion_index < btree_leaf_order - 1 && leaf->keys[insertion_index] < newInode->no)
 		insertion_index++;
 
 	for (i = 0, j = 0; i < leaf->num_keys; i++, j++) {
@@ -560,7 +563,7 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeNode * leaf, pInod
 		leaf->num_keys++;
 	}
 
-	for (i = split, j = 0; i < btree_branch_order; i++, j++) {
+	for (i = split, j = 0; i < btree_leaf_order; i++, j++) {
 		*getPointerAsInode(new_leaf.pointers, j) = temp_pInodes[i];
 		new_leaf.keys[j] = temp_keys[i];
 		new_leaf.num_keys++;
@@ -576,9 +579,15 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeNode * leaf, pInod
 	for (i = new_leaf.num_keys; i < btree_leaf_order; i++)
 		memset(getPointerAsInode(leaf->pointers, i), 0, sizeof(pInode));
 
+	p_addr old_addr = leaf->self;
 	PAFFS_RESULT r = writeTreeNode(dev, leaf);
 	if(r != PAFFS_OK)
 		return r;
+	if(old_addr == getRootnodeAddr(dev)){
+		//we changed rootnode
+		registerRootnode(dev, leaf->self);
+	}
+
 	r = writeTreeNode(dev, &new_leaf);
 	if(r != PAFFS_OK)
 		return r;
@@ -687,7 +696,7 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeNode * old_node, i
 PAFFS_RESULT insert_into_parent(p_dev* dev, treeNode * left, pInode_no key, treeNode * right) {
 
         int left_index;
-        treeNode parent;
+        treeNode parent = {{0}};
 
         PAFFS_RESULT r = getParent(dev, left, &parent);
         /* Case: new root. */
@@ -747,6 +756,7 @@ PAFFS_RESULT insert_into_new_root(p_dev* dev, treeNode * left, pInode_no key, tr
 PAFFS_RESULT start_new_tree(p_dev* dev) {
 
         treeNode root = {{0}};
+        root.is_leaf = true;
         PAFFS_RESULT r = writeTreeNode(dev, &root);
         if(r != PAFFS_OK)
         	return r;
@@ -780,6 +790,7 @@ PAFFS_RESULT insert( p_dev* dev, pInode* value) {
         	return r;
         }
 
+        /* Not really necessary */
         r = readTreeNode(dev, getRootnodeAddr(dev), &node);
         if (r != PAFFS_OK)
         	return r;
@@ -788,6 +799,7 @@ PAFFS_RESULT insert( p_dev* dev, pInode* value) {
         	PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Rootnode not initialized");
 			return PAFFS_BUG;
         }
+        /**       *             **/
 
 
         /* Case: the tree already exists.

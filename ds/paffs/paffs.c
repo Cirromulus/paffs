@@ -89,12 +89,14 @@ PAFFS_RESULT paffs_mnt(const char* devicename){
 
 		p_addr rootnode = combineAddress(activeArea[INDEXAREA], 0);
 		registerRootnode(device, rootnode);
-		start_new_tree(device);
+		PAFFS_RESULT r = start_new_tree(device);
+		if(r != PAFFS_OK)
+			return r;
 
 	}else{
 		//Todo: Scan NAND-Flash
 	}
-	pInode rootDir;
+	pInode rootDir = {0};
 	if(paffs_createDirInode(&rootDir, PAFFS_R | PAFFS_W | PAFFS_X) != PAFFS_OK){
 		return paffs_lasterr;
 	}
@@ -620,4 +622,9 @@ PAFFS_RESULT paffs_flush(paffs_obj* obj){
 }
 
 
+
+//ONLY FOR DEBUG
+p_dev* getDevice(){
+	return device;
+}
 

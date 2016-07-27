@@ -90,13 +90,13 @@ typedef unsigned long p_date;
 
 typedef uint64_t p_addr;
 
-typedef unsigned int pInode_no;
+typedef uint32_t pInode_no;
 
 typedef struct pInode{
 	pInode_no no;
-	unsigned int seq_no;
-	pinode_type type;
-	paffs_permission perm;
+	unsigned int seq_no;	//not used yet
+	pinode_type type:3;
+	paffs_permission perm:3;
 	p_date crea;
 	p_date mod;
 	unsigned long long reservedSize;
@@ -239,6 +239,9 @@ PAFFS_RESULT paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_
 PAFFS_RESULT paffs_seek(paffs_obj* obj, int m, paffs_seekmode mode);
 PAFFS_RESULT paffs_flush(paffs_obj* obj);
 PAFFS_RESULT paffs_close(paffs_obj* obj);
+
+//ONLY FOR DEBUG
+p_dev* getDevice();
 
 #if defined (__cplusplus) && !defined (__CDT_PARSER__)
 }
