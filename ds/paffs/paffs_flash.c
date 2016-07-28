@@ -295,6 +295,8 @@ PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev){
 static p_addr rootnode_addr;
 
 void registerRootnode(p_dev* dev, p_addr addr){
+	if(addr == 0)
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Tried to set Rootnode to 0");
 	rootnode_addr = addr;
 }
 
@@ -364,8 +366,8 @@ PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node){
 		return PAFFS_BUG;
 	}
 	if(dev->areaMap[extractLogicalArea(node->self)].areaSummary[extractPage(node->self)] == DIRTY){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "READ operation of invalid data at %X:%X", extractLogicalArea(addr), extractPage(addr));
-		return PAFFS_BUG;
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ operation of obsoleted data at %X:%X", extractLogicalArea(addr), extractPage(addr));
+		//return PAFFS_BUG;
 	}
 	return PAFFS_OK;
 }

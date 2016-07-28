@@ -28,13 +28,14 @@ typedef struct treeNode {
         unsigned char num_keys;
 } treeNode;
 
-static int btree_branch_order = BRANCH_ORDER;
+static int btree_branch_order = BRANCH_ORDER - 1;
 static int btree_leaf_order = LEAF_ORDER - 1;	//FIxme: Erm... better calculation?
 
 p_addr* getPointerAsAddr(char* pointers, unsigned int pos);
 pInode* getPointerAsInode(char* pointers, unsigned int pos);
 void insertAddrInPointer(char* pointers, p_addr* addr, unsigned int pos);
 void insertInodeInPointer(char* pointers, pInode* inode, unsigned int pos);
+PAFFS_RESULT updateAddrInTreenode(treeNode* node, p_addr* old, p_addr* newAddress);
 
 
 PAFFS_RESULT insertInode( p_dev* dev, pInode* inode);

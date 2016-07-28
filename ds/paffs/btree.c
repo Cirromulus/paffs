@@ -26,6 +26,19 @@ void insertInodeInPointer(char* pointers, pInode* inode, unsigned int pos){
 	memcpy(&pointers[pos * sizeof(pInode)], inode, sizeof(pInode ));
 }
 
+PAFFS_RESULT updateAddrInTreenode(treeNode* node, p_addr* old, p_addr* newAddress){
+	int pos = 0;
+	while(*getPointerAsAddr(node->pointers, pos) != *old){
+		if(pos > node->num_keys){
+			PAFFS_DBG( PAFFS_TRACE_BUG, "BUG: Did not find old address");
+			return PAFFS_BUG;
+		}
+		pos++;
+	}
+	*getPointerAsAddr(node->pointers, pos) = *newAddress;
+	return PAFFS_OK;
+}
+
 
 PAFFS_RESULT insertInode( p_dev* dev, pInode* inode){
 	return insert(dev, inode);
@@ -185,10 +198,9 @@ PAFFS_RESULT getParent(p_dev* dev, treeNode * node, treeNode* parentOut){
 			return PAFFS_BUG;
 		}
 		unsigned int next = 0;
-		while(next < c.num_keys){
-			if(c.keys[next] >= node->keys[0])
-				break;
-			next++;
+		while(next < (c.num_keys-1)){
+			if(node->keys[0] >= c.keys[next]) next++;
+			else break;
 		}
 		r = readTreeNode(dev, *getPointerAsAddr(c.pointers, next), &c);
 		if(r != PAFFS_OK){
@@ -463,7 +475,7 @@ PAFFS_RESULT updateTreeNode( p_dev* dev, treeNode* node){
 int get_left_index(treeNode * parent, treeNode * left) {
 
         int left_index = 0;
-        while (left_index <= parent->num_keys && 
+        while (left_index < (parent->num_keys - 1) &&
                         *getPointerAsAddr(parent->pointers, left_index) != left->self)
                 left_index++;
         return left_index;
@@ -518,7 +530,7 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeNode * leaf, pInod
 	new_leaf.is_leaf = true;
 
 	insertion_index = 0;
-	while (insertion_index < btree_leaf_order - 1 && leaf->keys[insertion_index] < newInode->no)
+	while (insertion_index < btree_leaf_order && leaf->keys[insertion_index] < newInode->no)
 		insertion_index++;
 
 	for (i = 0, j = 0; i < leaf->num_keys; i++, j++) {
@@ -540,7 +552,7 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeNode * leaf, pInod
 		leaf->num_keys++;
 	}
 
-	for (i = split, j = 0; i < btree_leaf_order; i++, j++) {
+	for (i = split, j = 0; i <= btree_leaf_order; i++, j++) {
 		*getPointerAsInode(new_leaf.pointers, j) = temp_pInodes[i];
 		new_leaf.keys[j] = temp_keys[i];
 		new_leaf.num_keys++;
@@ -551,14 +563,24 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeNode * leaf, pInod
 	leaf->pointers[btree_branch_order - 1] = new_leaf;
 	*/
 
-	for (i = leaf->num_keys; i < btree_leaf_order; i++)
+	for (i = leaf->num_keys; i < btree_leaf_order; i++){
 		memset(getPointerAsInode(leaf->pointers, i), 0, sizeof(pInode));
-	for (i = new_leaf.num_keys; i < btree_leaf_order; i++)
+		leaf->keys[i] = 0;
+	}
+	for (i = new_leaf.num_keys; i < btree_leaf_order; i++){
 		memset(getPointerAsInode(leaf->pointers, i), 0, sizeof(pInode));
+		new_leaf.keys[i] = 0;
+	}
 
+	p_addr oldAddr = leaf->self;
 	PAFFS_RESULT r = writeTreeNode(dev, leaf);
 	if(r != PAFFS_OK)
 		return r;
+
+	//These changes on parent dont have to be commited just now
+	//because insert_into_former_parent will do this
+	if(pr != PAFFS_NOPARENT && updateAddrInTreenode(&parent, &oldAddr, &leaf->self) != PAFFS_OK)
+		return PAFFS_BUG;
 
 	r = writeTreeNode(dev, &new_leaf);
 	if(r != PAFFS_OK)
@@ -738,7 +760,7 @@ PAFFS_RESULT insert_into_former_parent(p_dev* dev, treeNode* formerParent, treeN
          */
 
         /* Find the parent's pointer to the left
-         * treeNode.
+         * treeNode. (is done before changes were made)
          */
 
         left_index = get_left_index(formerParent, left);

@@ -25,7 +25,8 @@ int main( int argc, char ** argv ) {
 
 	print_tree(device);
 	for(int i = 1; i <= 5; i++){
-		printf("Insert nr. %d:\n", i);
+		printf("Insert nr. %d:", i);
+		fflush(stdout);
 		pInode test;
 		memset(&test, values[i-1], sizeof(pInode));
 		test.no = i;
@@ -41,7 +42,8 @@ int main( int argc, char ** argv ) {
 	for(int i = 1; i <= 5; i++){
 		pInode test = {0};
 
-		printf("Get nr. %d:\n", i);
+		printf("Get nr. %d: ", i);
+		fflush(stdout);
 		r = getInode(device, i, &test);
 		if(r != PAFFS_OK)
 			printf("\t%s!\n", paffs_err_msg(r));
