@@ -262,7 +262,12 @@ PAFFS_RESULT readInodeData(pInode* inode,
 						dev->param.data_bytes_per_page :
 						(bytes + pageOffs) - page*dev->param.data_bytes_per_page;
 		}
-		PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, getPageNumber(inode->direct[page + pageFrom], dev), buf, btr);
+		p_addr addr = getPageNumber(inode->direct[page + pageFrom], dev);
+		if(dev->areaMap[extractLogicalArea(addr)].areaSummary[extractPage(addr)] == DIRTY){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "READ operation of invalid data at %d", addr);
+			return PAFFS_BUG;
+		}
+		PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, addr, buf, btr);
 		if(r != PAFFS_OK){
 			if(misaligned)
 				free (wrap);
@@ -355,7 +360,11 @@ PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node){
 		return paffs_lasterr = r;
 
 	if(node->self != addr){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Found Treenode at %X, but its content stated that it was on %X", addr, node->self);
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Read Treenode at %X:%X, but its content stated that it was on %X:%X", extractLogicalArea(addr), extractPage(addr), extractLogicalArea(node->self), extractPage(node->self));
+		return PAFFS_BUG;
+	}
+	if(dev->areaMap[extractLogicalArea(node->self)].areaSummary[extractPage(node->self)] == DIRTY){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "READ operation of invalid data at %X:%X", extractLogicalArea(addr), extractPage(addr));
 		return PAFFS_BUG;
 	}
 	return PAFFS_OK;

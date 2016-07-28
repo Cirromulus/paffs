@@ -72,6 +72,7 @@ PAFFS_RESULT insert_into_node(p_dev *dev, treeNode * newNode,
 PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeNode * old_node, int left_index,
                 pInode_no key, treeNode * right);
 PAFFS_RESULT insert_into_parent(p_dev* dev, treeNode * left, pInode_no key, treeNode * right);
+PAFFS_RESULT insert_into_former_parent(p_dev* dev, treeNode * formerParent, treeNode * left, pInode_no key, treeNode * right);
 PAFFS_RESULT insert_into_new_root(p_dev* dev, treeNode * left, pInode_no key, treeNode * right);
 PAFFS_RESULT insert( p_dev* dev, pInode* value);
 PAFFS_RESULT insert_into_new_root(p_dev* dev, treeNode * left, pInode_no key, treeNode * right);

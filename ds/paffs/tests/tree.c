@@ -25,22 +25,26 @@ int main( int argc, char ** argv ) {
 
 
 	for(int i = 1; i <= 5; i++){
+		printf("Insert nr. %d:\n", i);
 		pInode test;
 		memset(&test, values[i-1], sizeof(pInode));
 		test.no = i;
 
 		r = insertInode(device, &test);
 		if(r != PAFFS_OK)
-			printf("%s!\n", paffs_err_msg(r));
+			printf("\t%s!\n", paffs_err_msg(r));
+		else
+			printf("\tOK\n");
 	}
 //	while(getchar() == EOF);
 	for(int i = 1; i <= 5; i++){
 		pInode test;
 
+		printf("Get nr. %d:\n", i);
 		r = getInode(device, i, &test);
 		if(r != PAFFS_OK)
-			printf("%s!\n", paffs_err_msg(r));
-		printf("Found Inode %d\n", test.no);
+			printf("\t%s!\n", paffs_err_msg(r));
+		printf("\tFound Inode %d\n", test.no);
 	}
 
 

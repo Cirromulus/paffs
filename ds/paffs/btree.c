@@ -318,42 +318,42 @@ int find_range( p_dev* dev, treeNode * root, pInode_no key_start, pInode_no key_
  * Returns the leaf containing the given key.
  */
 PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeNode* outTreenode) {
-        int i = 0;
-        treeNode c;
-        PAFFS_RESULT r = readTreeNode(dev, getRootnodeAddr(dev), &c);
-        if(r != PAFFS_OK)
-        	return r;
+	int i = 0;
+	treeNode c;
+	PAFFS_RESULT r = readTreeNode(dev, getRootnodeAddr(dev), &c);
+	if(r != PAFFS_OK)
+		return r;
 
 
-        /*if (c.pointers[0] == 0) {
-                PAFFS_DBG(PAFFS_TRACE_TREE, "Empty tree.");
-                *outTreenode = c;
-                return PAFFS_OK;
-        }*/
-        while (!c.is_leaf) {
-/*                if (verbose) {
-                        printf("[");
-                        for (i = 0; i < c->num_keys - 1; i++)
-                                printf("%d ", c->keys[i]);
-                        printf("%d] ", c->keys[i]);
-                }*/
-                i = 0;
-                while (i < c.num_keys) {
-                        if (key >= c.keys[i]) i++;
-                        else break;
-                }
-                //printf("%d ->\n", i);
-                p_addr *addr = getPointerAsAddr(c.pointers, i);
-                PAFFS_RESULT r = readTreeNode(dev, *addr, &c);
-                if(r != PAFFS_OK)
-                	return r;
-        }
-		/*printf("Leaf [");
-		for (i = 0; i < c->num_keys - 1; i++)
-				printf("%d ", c->keys[i]);
-		printf("%d] ->\n", c->keys[i]);*/
-        *outTreenode = c;
-        return PAFFS_OK;
+	/*if (c.pointers[0] == 0) {
+			PAFFS_DBG(PAFFS_TRACE_TREE, "Empty tree.");
+			*outTreenode = c;
+			return PAFFS_OK;
+	}*/
+	while (!c.is_leaf) {
+		/*if (verbose) {
+				printf("[");
+				for (i = 0; i < c->num_keys - 1; i++)
+						printf("%d ", c->keys[i]);
+				printf("%d] ", c->keys[i]);
+		}*/
+		i = 0;
+		while (i < (c.num_keys-1)) {
+				if (key >= c.keys[i]) i++;
+				else break;
+		}
+		//printf("%d ->\n", i);
+		p_addr *addr = getPointerAsAddr(c.pointers, i);
+		PAFFS_RESULT r = readTreeNode(dev, *addr, &c);
+		if(r != PAFFS_OK)
+			return r;
+	}
+	/*printf("Leaf [");
+	for (i = 0; i < c->num_keys - 1; i++)
+			printf("%d ", c->keys[i]);
+	printf("%d] ->\n", c->keys[i]);*/
+	*outTreenode = c;
+	return PAFFS_OK;
 }
 
 PAFFS_RESULT find_in_leaf (treeNode* leaf, pInode_no key, pInode* outInode){
@@ -538,6 +538,14 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeNode * leaf, pInod
 	memset(temp_keys, 0, btree_leaf_order+1 * sizeof(pInode_no));
 	memset(temp_pInodes, 0, btree_leaf_order+1 * sizeof(pInode));
 
+	//Because Tree will be invalidated after write,
+	//and parent is no longer determinable,
+	//it is extracted now.
+	treeNode parent = {{0}};
+	PAFFS_RESULT pr = getParent(dev, leaf, &parent);
+	if(pr != PAFFS_OK && pr != PAFFS_NOPARENT)
+		return pr;
+
 	new_leaf.is_leaf = true;
 
 	insertion_index = 0;
@@ -590,9 +598,9 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeNode * leaf, pInod
 
 	new_key = new_leaf.keys[0];
 
-	//BUG: Parent cannot be found in current treestate.
-	//Parent has to be determined before
-	return insert_into_parent(dev, leaf, new_key, &new_leaf);
+	return pr == PAFFS_NOPARENT ?
+			insert_into_former_parent(dev, NULL, leaf, new_key, &new_leaf) :
+			insert_into_former_parent(dev, &parent, leaf, new_key, &new_leaf) ;
 }
 
 
@@ -627,6 +635,14 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeNode * old_node, i
 	treeNode new_node = {{0}};
 	pInode_no temp_keys[btree_branch_order+1];
 	p_addr temp_addresses[btree_branch_order+1];
+
+	//Because Tree will be invalidated after write,
+	//and parent is no longer determinable,
+	//it is extracted now.
+	treeNode parent = {{0}};
+	PAFFS_RESULT pr = getParent(dev, old_node, &parent);
+	if(pr != PAFFS_OK && pr != PAFFS_NOPARENT)
+		return pr;
 
 	/* First create a temporary set of keys and pointers
 	 * to hold everything in order, including
@@ -671,6 +687,7 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeNode * old_node, i
 	}
 	new_node.pointers[j] = temp_addresses[i];
 
+
 	PAFFS_RESULT r = writeTreeNode(dev, old_node);
 	if(r != PAFFS_OK)
 		return r;
@@ -681,7 +698,9 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeNode * old_node, i
 	 * the old treeNode to the left and the new to the right.
 	 */
 
-	return insert_into_parent(dev, old_node, k_prime, &new_node);
+	return pr == PAFFS_NOPARENT ?
+			insert_into_former_parent(dev, NULL, old_node, k_prime, &new_node) :
+			insert_into_former_parent(dev, &parent, old_node, k_prime, &new_node);
 }
 
 
@@ -727,6 +746,46 @@ PAFFS_RESULT insert_into_parent(p_dev* dev, treeNode * left, pInode_no key, tree
          */
 
         return insert_into_node_after_splitting(dev, &parent, left_index, key, right);
+}
+/* Due to the removed parent-member, parent has to be determined before changes to Child-Nodes are done
+ * if formerParent == NULL, NOPARENT is assumed
+ * Inserts a new treeNode (leaf or internal treeNode) into the B+ tree.
+ * Returns the root of the tree after insertion.
+ * *** further Tree-action pending ***
+ */
+PAFFS_RESULT insert_into_former_parent(p_dev* dev, treeNode* formerParent, treeNode* left, pInode_no key, treeNode* right) {
+
+        int left_index;
+
+
+        /* Case: new root. */
+        if (formerParent == NULL)
+                return insert_into_new_root(dev, left, key, right);
+
+
+
+        /* Case: leaf or treeNode. (Remainder of
+         * function body.)
+         */
+
+        /* Find the parent's pointer to the left
+         * treeNode.
+         */
+
+        left_index = get_left_index(formerParent, left);
+
+
+        /* Simple case: the new key fits into the treeNode.
+         */
+
+        if (formerParent->num_keys < btree_branch_order)
+                return insert_into_node(dev, formerParent, left_index, key, right);
+
+        /* Harder case:  split a treeNode in order
+         * to preserve the B+ tree properties.
+         */
+
+        return insert_into_node_after_splitting(dev, formerParent, left_index, key, right);
 }
 
 
