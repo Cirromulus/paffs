@@ -51,8 +51,6 @@ int length_to_root( p_dev* dev, treeNode * child );
 PAFFS_RESULT path_from_root( p_dev* dev, treeNode * child, p_addr* path, unsigned int* lengthOut);
 //ParentOut is NULL when there is no Parent (= root)
 PAFFS_RESULT getParent(p_dev* dev, treeNode * node, treeNode* parentOut);
-void print_leaves( p_dev* dev, treeNode * root);
-void print_tree( p_dev* dev, treeNode * root);
 int find_range( p_dev* dev, treeNode * root, pInode_no key_start, pInode_no key_end,
                 int returned_keys[], void * returned_pointers[]); 
 PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeNode* outTreenode);
@@ -88,5 +86,10 @@ PAFFS_RESULT redistribute_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, i
 PAFFS_RESULT delete_entry( p_dev* dev, treeNode * n, pInode_no key);
 PAFFS_RESULT remove_entry_from_node(p_dev* dev, treeNode * n, pInode_no key);
 PAFFS_RESULT delete_node( p_dev* dev, pInode_no key );
+
+void print_tree( p_dev* dev);
+void print_node(p_dev* dev, treeNode* c);
+//DEBUG
+
 
 #endif

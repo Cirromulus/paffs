@@ -80,44 +80,11 @@ PAFFS_RESULT findFirstFreeNo(p_dev* dev, pInode_no* outNumber){
 	}
 	return PAFFS_OK;
 }
-/* Prints the bottom row of keys
- * of the tree (with their respective
- * pointers, if the verbose_output flag is set.
- */
-void print_leaves(p_dev* dev, treeNode * root) {
-/*        int i;
-        treeNode * c = root;
-        if (root == NULL) {
-                printf("Empty tree.\n");
-                return;
-        }
-        while (!c->is_leaf)
-                c = c->pointers[0];
-        while (true) {
-                for (i = 0; i < c->num_keys; i++) {
-                        if (verbose_output)
-                                printf("%lx ", (unsigned long)c->pointers[i]);
-                        printf("%d ", c->keys[i]);
-                }
-                if (verbose_output)
-                        printf("%lx ", (unsigned long)c->pointers[btree_branch_order - 1]);
-                if (c->pointers[btree_branch_order - 1] != NULL) {
-                        printf(" | ");
-                        c = c->pointers[btree_branch_order - 1];
-                }
-                else
-                        break;
-        }
-        printf("\n");*/
-	printf("Not Implemented");
-}
 
 /**
  * Compares addresses
  */
 bool isEqual(treeNode* left, treeNode* right){
-	if(left->num_keys != right->num_keys)
-		return false;
 	return left->self == right->self;
 }
 
@@ -178,10 +145,9 @@ PAFFS_RESULT path_from_root( p_dev* dev, treeNode * child, p_addr* path, unsigne
 			return PAFFS_BUG;
 		}
 		unsigned int next = 0;
-		while(next < c.num_keys){
-			if(c.keys[next] >= child->keys[0])
-				break;
-			next++;
+		while(next < (c.num_keys-1)){
+			if(child->keys[0] >= c.keys[next]) next++;
+			else break;
 		}
 		r = readTreeNode(dev, *getPointerAsAddr(c.pointers, next), &c);
 		if(r != PAFFS_OK){
@@ -241,47 +207,39 @@ PAFFS_RESULT getParent(p_dev* dev, treeNode * node, treeNode* parentOut){
  * to the keys also appear next to their respective
  * keys, in hexadecimal notation.
  */
-void print_tree( p_dev* dev, treeNode * root) {
-
-/*        treeNode * n = NULL;
-        int i = 0;
-        int rank = 0;
-        int new_rank = 0;
-
-        if (root == NULL) {
-                printf("Empty tree.\n");
-                return;
-        }
-        treeNode *queue = NULL;
-        enqueue(queue, root);
-        while( queue != NULL ) {
-                n = dequeue(queue);
-                if (n->parent != NULL && n == n->parent->pointers[0]) {
-                        new_rank = path_to_root( root, n );
-                        if (new_rank != rank) {
-                                rank = new_rank;
-                                printf("\n");
-                        }
-                }
-                //printf("(%lx)", (unsigned long)n);
-                for (i = 0; i < n->num_keys; i++) {
-                	    //printf("%lx ", (unsigned long)n->pointers[i]);
-                        printf("%d ", n->keys[i]);
-                }
-                if (!n->is_leaf)
-                        for (i = 0; i <= n->num_keys; i++)
-                                enqueue(queue, n->pointers[i]);
-                if (verbose_output) {
-                        if (n->is_leaf) 
-                                printf("%lx ", (unsigned long)n->pointers[btree_branch_order - 1]);
-                        else
-                                printf("%lx ", (unsigned long)n->pointers[n->num_keys]);
-                }
-                printf("| ");
-        }
-        printf("\n");*/
-	printf("Not Implemented");
+void print_tree( p_dev* dev) {
+	treeNode n = {{0}};
+	PAFFS_RESULT r = readTreeNode(dev, getRootnodeAddr(dev), &n);
+	if(r != PAFFS_OK){
+		printf("%s!\n", paffs_err_msg(r));
+		return;
+	}
+	print_node(dev, &n);
+	printf("|\n");
 }
+
+/* Prints the bottom row of keys
+ * of the tree (with their respective
+ * pointers, if the verbose_output flag is set.
+ */
+void print_node(p_dev* dev, treeNode* c) {
+	if(c->is_leaf){
+		printf("| ");
+		for(int i = 0; i < c->num_keys; i++)
+			printf("%lu ", getPointerAsInode(c->pointers, i)->no);
+	}else{
+		for(int i = 0; i < c->num_keys; i++){
+			treeNode n = {{0}};
+			PAFFS_RESULT r = readTreeNode(dev, *getPointerAsAddr(c->pointers, i), &n);
+			if(r != PAFFS_OK){
+				printf("%s!\n", paffs_err_msg(r));
+				return;
+			}
+			print_node(dev, &n);
+		}
+	}
+}
+
 
 
 /* Finds keys and their pointers, if present, in the range specified
@@ -319,7 +277,7 @@ int find_range( p_dev* dev, treeNode * root, pInode_no key_start, pInode_no key_
  */
 PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeNode* outTreenode) {
 	int i = 0;
-	treeNode c;
+	treeNode c = {{0}};
 	PAFFS_RESULT r = readTreeNode(dev, getRootnodeAddr(dev), &c);
 	if(r != PAFFS_OK)
 		return r;
@@ -339,8 +297,8 @@ PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeNode* outTreenode) {
 		}*/
 		i = 0;
 		while (i < (c.num_keys-1)) {
-				if (key >= c.keys[i]) i++;
-				else break;
+			if (key >= c.keys[i]) i++;
+			else break;
 		}
 		//printf("%d ->\n", i);
 		p_addr *addr = getPointerAsAddr(c.pointers, i);
@@ -370,7 +328,7 @@ PAFFS_RESULT find_in_leaf (treeNode* leaf, pInode_no key, pInode* outInode){
  * a key refers.
  */
 PAFFS_RESULT find( p_dev* dev, pInode_no key, pInode* outInode){
-    treeNode c;
+    treeNode c = {{0}};
     PAFFS_RESULT r = find_leaf( dev, key, &c);
     if(r != PAFFS_OK)
     	return r;
@@ -444,15 +402,8 @@ treeNode * make_leaf( void ) {
 
 
 PAFFS_RESULT updateTreeNode( p_dev* dev, treeNode* node){
-	if(node == NULL)
-		return PAFFS_EINVAL;
 
-	p_addr old_addr = node->self;
-	PAFFS_RESULT r = writeTreeNode(dev, node);
-	if(r != PAFFS_OK)
-		return r;
-	registerRootnode(dev, node->self);
-
+	PAFFS_RESULT r;
 	if(node->self != getRootnodeAddr(dev)){	//We are non-root
 		unsigned int length = length_to_root(dev, node) + 1;
 		p_addr *nodes = (p_addr*) malloc(length * sizeof(p_addr));
@@ -460,28 +411,46 @@ PAFFS_RESULT updateTreeNode( p_dev* dev, treeNode* node){
 		if(r != PAFFS_OK)
 			return r;
 		treeNode prev = *node;
-		for(int i = length -1; i >= 0; i++){	//Skip first entry, is own node
-			treeNode c;
+		treeNode c = {{0}};
+		for(int i = length -1; i >= 0; i--){	//Skip first entry, is own node
 			r = readTreeNode(dev, nodes[i], &c);
+			if(r != PAFFS_OK)
+				return r;
+
 			//find outdated entry
-			int pos;
-			while(*getPointerAsAddr(c.pointers, pos) != old_addr){
+			int pos = 0;
+			while(*getPointerAsAddr(c.pointers, pos) != prev.self){
 				if(pos > c.num_keys){
 					PAFFS_DBG( PAFFS_TRACE_BUG, "BUG: Did not find old address");
 					return PAFFS_BUG;
 				}
 				pos++;
 			}
-			*getPointerAsAddr(c.pointers, pos) = prev.self;
-			old_addr = c.self;
-			prev = c;
-			r = writeTreeNode(dev, &c);
+
+			//Write previous node and register its new address in current node
+			r = writeTreeNode(dev, &prev);
 			if(r != PAFFS_OK)
 				return r;
-			//if rootnode changed
-			if(old_addr == getRootnodeAddr(dev))
-				registerRootnode(dev, c.self);
+			*getPointerAsAddr(c.pointers, pos) = prev.self;
+
+			prev = c;
 		}
+		if(c.self != getRootnodeAddr(dev)){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "Last Element in path_from_root is not actually root.");
+			return PAFFS_BUG;
+		}
+		r = writeTreeNode(dev, &c);
+		if(r != PAFFS_OK)
+			return r;
+		registerRootnode(dev, c.self);
+
+	}else{
+		//Other Path would do it as well, but
+		//this is more efficient in this case
+		r = writeTreeNode(dev, node);
+		if(r != PAFFS_OK)
+			return r;
+		registerRootnode(dev, node->self);
 	}
 	return PAFFS_OK;
 }

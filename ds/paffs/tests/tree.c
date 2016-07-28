@@ -23,7 +23,7 @@ int main( int argc, char ** argv ) {
 
 	unsigned char values[] = {0xAA, 0x88, 0x03, 0x70, 0xF0};
 
-
+	print_tree(device);
 	for(int i = 1; i <= 5; i++){
 		printf("Insert nr. %d:\n", i);
 		pInode test;
@@ -35,16 +35,18 @@ int main( int argc, char ** argv ) {
 			printf("\t%s!\n", paffs_err_msg(r));
 		else
 			printf("\tOK\n");
+		print_tree(device);
 	}
 //	while(getchar() == EOF);
 	for(int i = 1; i <= 5; i++){
-		pInode test;
+		pInode test = {0};
 
 		printf("Get nr. %d:\n", i);
 		r = getInode(device, i, &test);
 		if(r != PAFFS_OK)
 			printf("\t%s!\n", paffs_err_msg(r));
-		printf("\tFound Inode %d\n", test.no);
+		else
+			printf("\tFound Inode %d\n", test.no);
 	}
 
 
