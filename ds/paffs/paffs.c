@@ -87,8 +87,6 @@ PAFFS_RESULT paffs_mnt(const char* devicename){
 
 		}
 
-		p_addr rootnode = combineAddress(activeArea[INDEXAREA], 0);
-		registerRootnode(device, rootnode);
 		PAFFS_RESULT r = start_new_tree(device);
 		if(r != PAFFS_OK)
 			return r;
@@ -122,7 +120,9 @@ PAFFS_RESULT paffs_createInode(pInode* outInode, paffs_permission mask){
 	return PAFFS_OK;
 }
 
-
+/**
+ * creates DirInode ONLY IN RAM
+ */
 PAFFS_RESULT paffs_createDirInode(pInode* outInode, paffs_permission mask){
 	if(paffs_createInode(outInode, mask) != PAFFS_OK)
 		return PAFFS_BUG;
@@ -131,13 +131,12 @@ PAFFS_RESULT paffs_createDirInode(pInode* outInode, paffs_permission mask){
 
 	unsigned int buf = 0;
 	unsigned int bytes_written = 0;
-	PAFFS_RESULT r = writeInodeData(outInode, 0, sizeof(unsigned int), &bytes_written, (char*)&buf, device);
-	if(r != PAFFS_OK || bytes_written != sizeof(unsigned int)){
-		return r;
-	}
-	return updateInode(device, outInode);
+	return PAFFS_OK;
 }
 
+/**
+ * creates FilInode ONLY IN RAM
+ */
 PAFFS_RESULT paffs_createFilInode(pInode* outInode, paffs_permission mask){
 	if(paffs_createInode(outInode, mask) != PAFFS_OK){
 		return PAFFS_BUG;
@@ -314,7 +313,7 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 		r = r == PAFFS_OK ? PAFFS_BUG : r;
 	if(r != PAFFS_OK)
 		return r;
-	return updateInode(device, contDir);
+	return updateExistingInode(device, contDir);
 
 }
 
@@ -532,7 +531,7 @@ PAFFS_RESULT paffs_touch(const char* path){
 		if(r != PAFFS_OK)
 			return r;
 		file.mod = time(0);
-		return updateInode(device, &file);
+		return updateExistingInode(device, &file);
 	}
 
 }
@@ -599,7 +598,7 @@ PAFFS_RESULT paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_
 		}
 		obj->dentry->iNode->size = obj->fp;
 	}
-	return updateInode(device, obj->dentry->iNode);
+	return updateExistingInode(device, obj->dentry->iNode);
 }
 
 PAFFS_RESULT paffs_seek(paffs_obj* obj, int m, paffs_seekmode mode){

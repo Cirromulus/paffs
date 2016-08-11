@@ -50,7 +50,7 @@ PAFFS_RESULT findFirstFreePage(unsigned int* p_out, p_dev* dev, unsigned int are
 
 PAFFS_RESULT checkActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType areaType){
 	if(dev->areaMap[*area].usedPages == dev->param.pages_per_area){
-		PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Area %d full.", *area);
+		PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Area %u (Type %d) full.", *area, areaType);
 		//Area is full!
 		//TODO: Check if dirty Pages are inside and
 		//garbage collect this instead of just closing it...
@@ -319,12 +319,19 @@ PAFFS_RESULT writeTreeNode(p_dev* dev, treeNode* node){
 		//We have to invalidate former position first
 		dev->areaMap[extractLogicalArea(node->self)].areaSummary[extractPage(node->self)] = DIRTY;
 		dev->areaMap[extractLogicalArea(node->self)].dirtyPages ++;
+
 	}
 
 	activeArea[INDEXAREA] = findWritableArea(INDEXAREA, dev);
 	if(paffs_lasterr != PAFFS_OK){
 		return paffs_lasterr;
 	}
+
+	if(activeArea[INDEXAREA] == 0){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "WRITE TREE NODE findWritableArea returned 0");
+		return PAFFS_BUG;
+	}
+
 	unsigned int firstFreePage = 0;
 	if(findFirstFreePage(&firstFreePage, dev, activeArea[INDEXAREA]) == PAFFS_NOSP){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", activeArea[INDEXAREA]);
@@ -357,6 +364,16 @@ PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node){
 		return paffs_lasterr = PAFFS_BUG;
 	}
 
+	if(dev->areaMap[extractLogicalArea(addr)].areaSummary[extractPage(addr)] == DIRTY){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ operation of obsoleted data at %X:%X", extractLogicalArea(addr), extractPage(addr));
+		return PAFFS_BUG;
+	}
+
+	if(extractLogicalArea(addr) == 0){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ TREE NODE operation on (log.) first Area at %X:%X", extractLogicalArea(addr), extractPage(addr));
+		return PAFFS_BUG;
+	}
+
 	PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), node, sizeof(treeNode));
 	if(r != PAFFS_OK)
 		return paffs_lasterr = r;
@@ -365,10 +382,7 @@ PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Read Treenode at %X:%X, but its content stated that it was on %X:%X", extractLogicalArea(addr), extractPage(addr), extractLogicalArea(node->self), extractPage(node->self));
 		return PAFFS_BUG;
 	}
-	if(dev->areaMap[extractLogicalArea(node->self)].areaSummary[extractPage(node->self)] == DIRTY){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ operation of obsoleted data at %X:%X", extractLogicalArea(addr), extractPage(addr));
-		//return PAFFS_BUG;
-	}
+
 	return PAFFS_OK;
 }
 

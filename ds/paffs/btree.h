@@ -15,21 +15,19 @@
 		- sizeof(unsigned char) - sizeof(bool))\
 		/ (sizeof(p_addr) + sizeof(pInode_no)) ) //todo: '512' Dynamisch machen
 
-#define LEAF_ORDER ((512 - sizeof(p_addr)\
-		- sizeof(unsigned char) - sizeof(bool))\
-		/ (sizeof(pInode) + sizeof(pInode_no)) ) //todo: '512' Dynamisch machen
+#define LEAF_ORDER (BRANCH_ORDER * sizeof(p_addr) / sizeof(pInode))	 //todo: '512' Dynamisch machen
 
 
 typedef struct treeNode {
         char pointers[BRANCH_ORDER * sizeof(p_addr)];
-        pInode_no keys[BRANCH_ORDER];
+        pInode_no keys[BRANCH_ORDER];	//Fixme: Unused space as leaf, useful for another pInode
         p_addr self;
         bool is_leaf:1;
-        unsigned char num_keys;
+        unsigned char num_keys;		//If Branch: count of addresses - 1, if leaf: count of pInodes
 } treeNode;
 
-static int btree_branch_order = BRANCH_ORDER - 1;
-static int btree_leaf_order = LEAF_ORDER - 1;	//FIxme: Erm... better calculation?
+static int btree_branch_order = BRANCH_ORDER;
+static int btree_leaf_order = LEAF_ORDER;	//FIxme: Erm... better calculation?
 
 p_addr* getPointerAsAddr(char* pointers, unsigned int pos);
 pInode* getPointerAsInode(char* pointers, unsigned int pos);
@@ -40,7 +38,7 @@ PAFFS_RESULT updateAddrInTreenode(treeNode* node, p_addr* old, p_addr* newAddres
 
 PAFFS_RESULT insertInode( p_dev* dev, pInode* inode);
 PAFFS_RESULT getInode( p_dev* dev, pInode_no number, pInode* outInode);
-PAFFS_RESULT updateInode( p_dev* dev, pInode* inode);
+PAFFS_RESULT updateExistingInode( p_dev* dev, pInode* inode);
 PAFFS_RESULT deleteInode( p_dev* dev, pInode_no number);
 PAFFS_RESULT findFirstFreeNo(p_dev* dev, pInode_no* outNumber);
 
@@ -70,7 +68,6 @@ PAFFS_RESULT insert_into_node(p_dev *dev, treeNode * newNode,
         int left_index, pInode_no key, treeNode * right);
 PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeNode * old_node, int left_index,
                 pInode_no key, treeNode * right);
-PAFFS_RESULT insert_into_parent(p_dev* dev, treeNode * left, pInode_no key, treeNode * right);
 PAFFS_RESULT insert_into_former_parent(p_dev* dev, treeNode * formerParent, treeNode * left, pInode_no key, treeNode * right);
 PAFFS_RESULT insert_into_new_root(p_dev* dev, treeNode * left, pInode_no key, treeNode * right);
 PAFFS_RESULT insert( p_dev* dev, pInode* value);
@@ -89,7 +86,7 @@ PAFFS_RESULT remove_entry_from_node(p_dev* dev, treeNode * n, pInode_no key);
 PAFFS_RESULT delete_node( p_dev* dev, pInode_no key );
 
 void print_tree( p_dev* dev);
-void print_node(p_dev* dev, treeNode* c);
+void print_leaves(p_dev* dev, treeNode* c);
 //DEBUG
 
 
