@@ -264,12 +264,12 @@ PAFFS_RESULT readInodeData(pInode* inode,
 		}
 
 		if(dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])].type != DATAAREA){
-			PAFFS_DBG(PAFFS_TRACE_BUG, "READ operation of invalid area at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
+			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid area at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
 			return PAFFS_BUG;
 		}
 
 		if(dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])].areaSummary[extractPage(inode->direct[page + pageFrom])] == DIRTY){
-			PAFFS_DBG(PAFFS_TRACE_BUG, "READ operation of invalid data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
+			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
 			return PAFFS_BUG;
 		}
 

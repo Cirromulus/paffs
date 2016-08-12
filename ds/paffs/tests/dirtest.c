@@ -26,6 +26,8 @@ void listDir(const char* path){
 	while((dir = paffs_readdir(rewt)) != NULL){
 			printf("\tFound item: \"%s\"\n", dir->name);
 	}
+	if(paffs_getLastErr() != PAFFS_OK)
+		//printf("Error reading Dir: %s\n", paffs_err_msg(paffs_getLastErr()));
 	paffs_closedir(rewt);
 }
 
@@ -116,6 +118,11 @@ void dirTest(){
 	
 	paffs_obj *fil = paffs_open("/b/file", PAFFS_FW);
 
+	if(fil == NULL){
+		printf("Open err: %s\n", paffs_err_msg(paffs_getLastErr()));
+		return;
+	}
+
 	//first write ----
 	char t[] = ".                         Text";	//30 chars
 	char* tl = (char*) malloc(36*strlen(t)+2);
@@ -131,13 +138,12 @@ void dirTest(){
 	tl[1024] = '#';
 
 
-	if(fil == NULL)
-		printf("%s\n", paffs_err_msg(paffs_lasterr));
+
 
 	unsigned int bytes = 0;
 	r = paffs_write(fil, tl, strlen(tl), &bytes);
 	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(r));
+			printf("Write: %s\n", paffs_err_msg(r));
 	printf("Wrote content  '%s' 25 times to file\n", t);
 	// ----- first write
 

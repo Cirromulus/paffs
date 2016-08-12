@@ -92,6 +92,9 @@ typedef uint64_t p_addr;
 
 typedef uint32_t pInode_no;
 
+typedef uint32_t dirEntryCount;
+typedef uint32_t dirEntryLength;
+
 typedef struct pInode{
 	pInode_no no;
 	unsigned int seq_no;	//not used yet
@@ -129,7 +132,7 @@ typedef struct paffs_dirent{
 typedef struct paffs_dir{
 	pDentry* dentry;
 	paffs_dirent** dirents;
-	unsigned int no_entrys;
+	dirEntryCount no_entrys;
 	unsigned int pos;
 }paffs_dir;
 
