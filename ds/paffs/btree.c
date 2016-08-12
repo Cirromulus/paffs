@@ -597,17 +597,17 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeNode * leaf, pInod
  * (No further Tree-action Required)
  */
 PAFFS_RESULT insert_into_node(p_dev *dev, treeNode * node,
-                int left_index, pInode_no key, treeNode * right) {
-        int i;
+	int left_index, pInode_no key, treeNode * right) {
+	int i;
 
-        for (i = node->num_keys; i > left_index; i--) {
-        		*getPointerAsAddr(node->pointers, i + 1) = *getPointerAsAddr(node->pointers, i);
-                node->keys[i] = node->keys[i - 1];
-        }
-        insertAddrInPointer(node->pointers, &right->self, left_index + 1);
-        node->keys[left_index] = key;
-        node->num_keys++;
-        return updateTreeNode(dev, node);
+	for (i = node->num_keys; i > left_index; i--) {
+			*getPointerAsAddr(node->pointers, i + 1) = *getPointerAsAddr(node->pointers, i);
+			node->keys[i] = node->keys[i - 1];
+	}
+	insertAddrInPointer(node->pointers, &right->self, left_index + 1);
+	node->keys[left_index] = key;
+	node->num_keys++;
+	return updateTreeNode(dev, node);
 }
 
 

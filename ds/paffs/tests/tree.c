@@ -25,7 +25,7 @@ int main( int argc, char ** argv ) {
 	unsigned char values[] = {0xAA, 0x88, 0x03, 0x70, 0xF0};
 
 	print_tree(device);
-	for(int i = 1; i <= 5; i++){
+	for(int i = 5; i > 0; i--){
 		printf("Insert nr. %d:", i);
 		fflush(stdout);
 		pInode test;
@@ -38,8 +38,8 @@ int main( int argc, char ** argv ) {
 		else
 			printf("\tOK\n");
 		print_tree(device);
+		while(getchar() == EOF);
 	}
-//	while(getchar() == EOF);
 	for(int i = 1; i <= 5; i++){
 		pInode test = {0};
 

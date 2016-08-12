@@ -27,7 +27,7 @@ typedef struct treeNode {
 } treeNode;
 
 static int btree_branch_order = BRANCH_ORDER;
-static int btree_leaf_order = LEAF_ORDER;	//FIxme: Erm... better calculation?
+static int btree_leaf_order = LEAF_ORDER;
 
 p_addr* getPointerAsAddr(char* pointers, unsigned int pos);
 pInode* getPointerAsInode(char* pointers, unsigned int pos);

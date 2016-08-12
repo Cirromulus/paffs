@@ -13,12 +13,11 @@
 #include <stdio.h>
 #include <time.h>
 #include "paffs.h"
+#include "btree.h"
 
 void listDir(const char* path){
 	printf("Opening Dir '%s'.\n", path);
 	paffs_dir* rewt = paffs_opendir(path);
-	if(paffs_getLastErr() != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(paffs_getLastErr()));
 	if(rewt == NULL){
 		printf("Opendir: Result %s\n", paffs_err_msg(paffs_getLastErr()));
 		return;
@@ -86,26 +85,29 @@ void printWholeFile(const char* path){
 
 void dirTest(){
 	paffs_start_up();
-
 	PAFFS_RESULT r = paffs_mnt("1");
-
+	print_tree(getDevice());
 	paffs_permission p = 0;
 	r = paffs_mkdir("/a", p);
-	while(getchar() == EOF);
 	if(r != PAFFS_OK)
 		printf("%s\n", paffs_err_msg(r));
+	print_tree(getDevice());
+	//while(getchar() == EOF);
 	r = paffs_mkdir("/b", p);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
-	while(getchar() == EOF);
+	print_tree(getDevice());
+	//while(getchar() == EOF);
 	r = paffs_mkdir("/b/c", p);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
-	while(getchar() == EOF);
+	print_tree(getDevice());
+	//while(getchar() == EOF);
 	r = paffs_touch ("/b/file");
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
-	while(getchar() == EOF);
+	print_tree(getDevice());
+	//while(getchar() == EOF);
 	listDir("/");
 
 	listDir("/b/");
@@ -228,6 +230,7 @@ void dirTest(){
 
 
 	while(getchar() == EOF);
+
 	free (tl);
 	paffs_close(fil);
 }

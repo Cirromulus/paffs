@@ -262,11 +262,18 @@ PAFFS_RESULT readInodeData(pInode* inode,
 						dev->param.data_bytes_per_page :
 						(bytes + pageOffs) - page*dev->param.data_bytes_per_page;
 		}
-		p_addr addr = getPageNumber(inode->direct[page + pageFrom], dev);
-		if(dev->areaMap[extractLogicalArea(addr)].areaSummary[extractPage(addr)] == DIRTY){
-			PAFFS_DBG(PAFFS_TRACE_BUG, "READ operation of invalid data at %d", addr);
+
+		if(dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])].type != DATAAREA){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "READ operation of invalid area at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
 			return PAFFS_BUG;
 		}
+
+		if(dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])].areaSummary[extractPage(inode->direct[page + pageFrom])] == DIRTY){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "READ operation of invalid data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
+			return PAFFS_BUG;
+		}
+
+		unsigned long long addr = getPageNumber(inode->direct[page + pageFrom], dev);
 		PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, addr, buf, btr);
 		if(r != PAFFS_OK){
 			if(misaligned)
