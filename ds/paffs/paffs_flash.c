@@ -152,8 +152,7 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 			//mark old Page in Areamap
 			unsigned long oldArea = extractLogicalArea(inode->direct[page+pageFrom]);
 			unsigned long oldPage = extractPage(inode->direct[page+pageFrom]);
-			dev->areaMap[oldArea].areaSummary[oldPage] = DIRTY;
-			dev->areaMap[oldArea].dirtyPages ++;
+
 
 			if((btw + pageOffs < dev->param.data_bytes_per_page &&
 				page*dev->param.data_bytes_per_page + btw < inode->size) ||  //End Misaligned
@@ -191,6 +190,10 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 			}else{
 				*bytes_written += btw;
 			}
+
+			//Mark old pages dirty
+			dev->areaMap[oldArea].areaSummary[oldPage] = DIRTY;
+			dev->areaMap[oldArea].dirtyPages ++;
 
 		}else{
 			*bytes_written += btw;
@@ -269,7 +272,7 @@ PAFFS_RESULT readInodeData(pInode* inode,
 		}
 
 		if(dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])].areaSummary[extractPage(inode->direct[page + pageFrom])] == DIRTY){
-			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
+			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of outdated (dirty) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
 			return PAFFS_BUG;
 		}
 

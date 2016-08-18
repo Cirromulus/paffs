@@ -482,6 +482,9 @@ PAFFS_RESULT paffs_createFile(pInode* outFile, const char* fullPath, paffs_permi
 	if(paffs_createFilInode(outFile, mask) != PAFFS_OK){
 		return PAFFS_BUG;
 	}
+	res = insertInode(device, outFile);
+	if(res != PAFFS_OK)
+		return res;
 
 	return paffs_insertInodeInDir(&fullPath[lastSlash], &parDir, outFile);
 }
