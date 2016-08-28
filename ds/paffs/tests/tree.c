@@ -38,7 +38,7 @@ int main( int argc, char ** argv ) {
 		else
 			printf("\tOK\n");
 		print_tree(device);
-		while(getchar() == EOF);
+		//while(getchar() == EOF);
 	}
 	for(int i = 1; i <= 5; i++){
 		pInode test = {0};
@@ -52,5 +52,24 @@ int main( int argc, char ** argv ) {
 			printf("\tFound Inode %d\n", test.no);
 	}
 
+	printf("Delete Node 3: ");
+	fflush(stdout);
+	r = deleteInode(device, 3);
+	if(r != PAFFS_OK){
+		printf("\t %s\n", paffs_err_msg(r));
+		return -1;
+	}
+	printf("ok\n");
+	print_tree(device);
+	printf("Delete Node 2:");
+	fflush(stdout);
+	r = deleteInode(device, 2);
+	if(r != PAFFS_OK){
+		printf("\t %s\n", paffs_err_msg(r));
+		print_tree(device);
+		return -1;
+	}
+	printf("ok\n");
+	print_tree(device);
 
 }

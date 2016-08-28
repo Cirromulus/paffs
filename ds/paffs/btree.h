@@ -56,7 +56,7 @@ PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeNode* outTreenode);
 PAFFS_RESULT find_in_leaf (treeNode* leaf, pInode_no key, pInode* outInode);
 PAFFS_RESULT find( p_dev* dev, pInode_no key, pInode* outInode);
 int cut( int length );
-PAFFS_RESULT updateTreeNode( p_dev* dev, treeNode* node);
+PAFFS_RESULT updateTreeNodePath( p_dev* dev, treeNode* node);
 
 
 // Insertion.
@@ -81,9 +81,9 @@ PAFFS_RESULT adjust_root(p_dev* dev, treeNode * root);
 PAFFS_RESULT coalesce_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, int neighbor_index, int k_prime);
 PAFFS_RESULT redistribute_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, int neighbor_index,
                 int k_prime_index, int k_prime);
+PAFFS_RESULT removeTreeNodePath( p_dev* dev, treeNode* node, pInode_no key);
 PAFFS_RESULT delete_entry( p_dev* dev, treeNode * n, pInode_no key);
 PAFFS_RESULT remove_entry_from_node(p_dev* dev, treeNode * n, pInode_no key);
-PAFFS_RESULT delete_node( p_dev* dev, pInode_no key );
 
 void print_tree( p_dev* dev);
 void print_leaves(p_dev* dev, treeNode* c);

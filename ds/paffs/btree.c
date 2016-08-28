@@ -67,20 +67,21 @@ PAFFS_RESULT updateExistingInode( p_dev* dev, pInode* inode){
 
 
 
-	return updateTreeNode(dev, &node);
+	return updateTreeNodePath(dev, &node);
 }
 
 PAFFS_RESULT deleteInode( p_dev* dev, pInode_no number){
 
-	//pInode key;
+	pInode key;
 	treeNode key_leaf;
 
+	//Safety or Speed ? Search is not really necessary
 	PAFFS_RESULT r = find_leaf(dev, number, &key_leaf);
 	if(r != PAFFS_OK)
 		return r;
-	/*r = find_in_leaf (&key_leaf, number, &key);
+	r = find_in_leaf (&key_leaf, number, &key);
 	if(r != PAFFS_OK)
-		return r;*/
+		return r;
 	return delete_entry(dev, &key_leaf, number);
 }
 
@@ -409,7 +410,7 @@ treeNode * make_leaf( void ) {
 }*/
 
 
-PAFFS_RESULT updateTreeNode( p_dev* dev, treeNode* node){
+PAFFS_RESULT updateTreeNodePath( p_dev* dev, treeNode* node){
 
 	PAFFS_RESULT r;
 	if(node->self != getRootnodeAddr(dev)){	//We are non-root
@@ -497,7 +498,7 @@ PAFFS_RESULT insert_into_leaf( p_dev* dev, treeNode * leaf, pInode * newInode ) 
         leaf->num_keys++;
         *getPointerAsInode(leaf->pointers, insertion_point) = *newInode;
 
-        return updateTreeNode(dev, leaf);
+        return updateTreeNodePath(dev, leaf);
 }
 
 
@@ -607,7 +608,7 @@ PAFFS_RESULT insert_into_node(p_dev *dev, treeNode * node,
 	insertAddrInPointer(node->pointers, &right->self, left_index + 1);
 	node->keys[left_index] = key;
 	node->num_keys++;
-	return updateTreeNode(dev, node);
+	return updateTreeNodePath(dev, node);
 }
 
 
@@ -887,13 +888,12 @@ int get_neighbor_index( p_dev* dev, treeNode * n ){
                         return i - 1;
 
         // Error state.
-        printf("Search for nonexistent pointer to treeNode in parent.\n");
-        printf("treeNode:  %lu\n", (unsigned long)n);
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Search for nonexistent pointer to treeNode (%d) in parent (%d).\n", n->self, parent.self);
         return -1;
 }
 
 /**
- * Tree safe
+ * Does not actually commit changes to filesystem
  */
 PAFFS_RESULT remove_entry_from_node(p_dev* dev, treeNode * n, pInode_no key) {
 
@@ -913,7 +913,10 @@ PAFFS_RESULT remove_entry_from_node(p_dev* dev, treeNode * n, pInode_no key) {
 	while (n->keys[i] != key)
 		i++;
 	for (++i; i < num_pointers; i++)
-		*getPointerAsAddr(n->pointers, i - 1) = *getPointerAsAddr(n->pointers, i);
+		if (n->is_leaf)
+			*getPointerAsInode(n->pointers, i - 1) = *getPointerAsInode(n->pointers, i);
+		else
+			*getPointerAsAddr(n->pointers, i - 1) = *getPointerAsAddr(n->pointers, i);
 
 
 	// One key fewer.
@@ -927,7 +930,7 @@ PAFFS_RESULT remove_entry_from_node(p_dev* dev, treeNode * n, pInode_no key) {
 		for (i = n->num_keys + 1; i < btree_branch_order; i++)
 				*getPointerAsAddr(n->pointers, i) = 0;
 
-	return updateTreeNode(dev, n);
+	return PAFFS_OK;
 }
 
 
@@ -935,11 +938,11 @@ PAFFS_RESULT adjust_root(p_dev* dev, treeNode * root) {
 
         /* Case: nonempty root.
          * Key and pointer have already been deleted,
-         * so nothing to be done.
+         * so just commit dirty changes.
          */
 
         if (root->num_keys > 0)
-                return PAFFS_OK;
+                return updateTreeNodePath(dev, root);
 
         /* Case: empty root. 
          */
@@ -956,7 +959,7 @@ PAFFS_RESULT adjust_root(p_dev* dev, treeNode * root) {
         // If it is a leaf (has no children),
         // then the whole tree is empty.
 
-        return PAFFS_OK;
+        return updateTreeNodePath(dev, root);
 }
 
 
@@ -1137,19 +1140,25 @@ PAFFS_RESULT redistribute_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, i
 	neighbor->num_keys--;
 
 	//TODO: Wrap three (expensive) uses of updateTreeNode to one
-	r = updateTreeNode(dev, n);
+	r = updateTreeNodePath(dev, n);
 	if(r != PAFFS_OK)
 		return r;
-	r = updateTreeNode(dev, neighbor);
+	r = updateTreeNodePath(dev, neighbor);
 	if(r != PAFFS_OK)
 		return r;
-	r = updateTreeNode(dev, &parent);
+	r = updateTreeNodePath(dev, &parent);
 	if(r != PAFFS_OK)
 		return r;
 
 	return PAFFS_OK;
 }
 
+
+PAFFS_RESULT removeTreeNodePath( p_dev* dev, treeNode* node, pInode_no key){
+	//Intention is to remove whole path to deleted entry,
+	//but is not needed (?) when tree is conform with rules
+	return PAFFS_NIMPL;
+}
 
 /* Deletes an entry from the B+ tree.
  * Removes the pinode and its key and pointer
@@ -1164,17 +1173,28 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeNode * n, pInode_no key){
 	int k_prime_index, k_prime;
 	int capacity;
 
+	/* Find the appropriate neighbor treeNode with which
+	 * to coalesce.
+	 * Also find the key (k_prime) in the parent
+	 * between the pointer to treeNode n and the pointer
+	 * to the neighbor.
+	 */
+	treeNode nParent = {{0}};
+	PAFFS_RESULT parent_r = getParent(dev, n, &nParent);
+	if(parent_r != PAFFS_OK && parent_r != PAFFS_NOPARENT)
+		return parent_r;
+
 	// Remove key and pointer from treeNode.
 
 	PAFFS_RESULT r = remove_entry_from_node(dev, n, key);
 	if(r != PAFFS_OK)
 		return r;
 
-	/* Case:  deletion from the root.
+	/* Case:  deletion from root.
 	 */
 
-	if (n->self == getRootnodeAddr(dev))
-			return adjust_root(dev, n);
+	if (parent_r == PAFFS_NOPARENT)
+		return adjust_root(dev, n);
 
 
 	/* Case:  deletion from a treeNode below the root.
@@ -1185,31 +1205,21 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeNode * n, pInode_no key){
 	 * to be preserved after deletion.
 	 */
 
-	//cut(btree_leaf_order) - 1 oder ohne -1?
-	min_keys = n->is_leaf ? cut(btree_leaf_order) : cut(btree_branch_order) - 1;
+	//cut(btree_leaf/branch_order) - 1 oder ohne -1?
+	min_keys = n->is_leaf ? cut(btree_leaf_order) : cut(btree_branch_order);
 
 	/* Case:  treeNode stays at or above minimum.
 	 * (The simple case.)
 	 */
 
 	if (n->num_keys >= min_keys)
-			return PAFFS_OK;
+			return updateTreeNodePath(dev, n);
+
 
 	/* Case:  treeNode falls below minimum.
 	 * Either coalescence or redistribution
 	 * is needed.
 	 */
-
-	/* Find the appropriate neighbor treeNode with which
-	 * to coalesce.
-	 * Also find the key (k_prime) in the parent
-	 * between the pointer to treeNode n and the pointer
-	 * to the neighbor.
-	 */
-	treeNode nParent = {{0}};
-	r = getParent(dev, n, &nParent);
-	if(r != PAFFS_OK)	//NOPARENT would be a B-U-G
-		return r;
 
 	neighbor_index = get_neighbor_index( dev, n );
 	k_prime_index = neighbor_index == -1 ? 0 : neighbor_index;
@@ -1220,7 +1230,7 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeNode * n, pInode_no key){
 	if(r != PAFFS_OK)
 		return r;
 
-	capacity = n->is_leaf ? btree_leaf_order : btree_branch_order - 1;
+	capacity = neighbor.is_leaf ? btree_leaf_order : btree_branch_order;	//-1?
 
 	/* Coalescence. */
 
