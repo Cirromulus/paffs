@@ -87,6 +87,7 @@ PAFFS_RESULT remove_entry_from_node(p_dev* dev, treeNode * n, pInode_no key);
 
 void print_tree( p_dev* dev);
 void print_leaves(p_dev* dev, treeNode* c);
+void print_keys(p_dev* dev, treeNode* c);
 //DEBUG
 
 

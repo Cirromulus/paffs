@@ -5,6 +5,7 @@
 
 #include "btree.h"
 #include "paffs_flash.h"
+#include "treequeue.h"
 #include <stdio.h>
 #include <stdlib.h> 
 #include <string.h>
@@ -217,51 +218,6 @@ PAFFS_RESULT getParent(p_dev* dev, treeNode * node, treeNode* parentOut){
 	}
 	return PAFFS_OK;
 }
-
-/* Prints the B+ tree in the command
- * line in level (rank) order, with the 
- * keys in each treeNode and the '|' symbol
- * to separate nodes.
- * With the verbose_output flag set.
- * the values of the pointers corresponding
- * to the keys also appear next to their respective
- * keys, in hexadecimal notation.
- */
-void print_tree( p_dev* dev) {
-	treeNode n = {{0}};
-	PAFFS_RESULT r = readTreeNode(dev, getRootnodeAddr(dev), &n);
-	if(r != PAFFS_OK){
-		printf("%s!\n", paffs_err_msg(r));
-		return;
-	}
-	print_leaves(dev, &n);
-	printf("|\n");
-}
-
-/* Prints the bottom row of keys
- * of the tree (with their respective
- * pointers, if the verbose_output flag is set.
- */
-void print_leaves(p_dev* dev, treeNode* c) {
-	if(c->is_leaf){
-		printf("| ");
-		for(int i = 0; i < c->num_keys; i++)
-			printf("%lu ", getPointerAsInode(c->pointers, i)->no);
-	}else{
-		for(int i = 0; i <= c->num_keys; i++){
-			treeNode n = {{0}};
-			PAFFS_RESULT r = readTreeNode(dev, *getPointerAsAddr(c->pointers, i), &n);
-			if(r != PAFFS_OK){
-				printf("%s!\n", paffs_err_msg(r));
-				return;
-			}
-			print_leaves(dev, &n);
-			fflush(stdout);
-		}
-	}
-}
-
-
 
 /* Finds keys and their pointers, if present, in the range specified
  * by key_start and key_end, inclusive.  Places these in the arrays
@@ -1242,5 +1198,81 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeNode * n, pInode_no key){
 
 	else
 		return redistribute_nodes(dev, n, &neighbor, neighbor_index, k_prime_index, k_prime);
+}
+
+
+/* Prints the B+ tree in the command
+ * line in level (rank) order, with the
+ * keys in each treeNode and the '|' symbol
+ * to separate nodes.
+ * With the verbose_output flag set.
+ * the values of the pointers corresponding
+ * to the keys also appear next to their respective
+ * keys, in hexadecimal notation.
+ */
+void print_tree( p_dev* dev) {
+	treeNode n = {{0}};
+	PAFFS_RESULT r = readTreeNode(dev, getRootnodeAddr(dev), &n);
+	if(r != PAFFS_OK){
+		printf("%s!\n", paffs_err_msg(r));
+		return;
+	}
+	print_keys(dev, &n);
+	print_leaves(dev, &n);
+	printf("|\n");
+}
+
+/* Prints the bottom row of keys
+ * of the tree (with their respective
+ * pointers, if the verbose_output flag is set.
+ */
+void print_leaves(p_dev* dev, treeNode* c) {
+	if(c->is_leaf){
+		printf("| ");
+		for(int i = 0; i < c->num_keys; i++)
+			printf("%lu ", getPointerAsInode(c->pointers, i)->no);
+	}else{
+		for(int i = 0; i <= c->num_keys; i++){
+			treeNode n = {{0}};
+			PAFFS_RESULT r = readTreeNode(dev, *getPointerAsAddr(c->pointers, i), &n);
+			if(r != PAFFS_OK){
+				printf("%s!\n", paffs_err_msg(r));
+				return;
+			}
+			print_leaves(dev, &n);
+			fflush(stdout);
+		}
+	}
+}
+
+void print_queued_keys_r(p_dev* dev, queue_s* q){
+	queue_s* new_q = queue_new();
+	printf("|.");
+	while(!queue_empty(q)){
+		treeNode *n = queue_dequeue(q);
+		for(int i = 0; i <= n->num_keys; i++){
+			if(i < n->num_keys) printf("%lu.", n->keys[i]);
+			if(!n->is_leaf){
+				treeNode *nn = (treeNode*) malloc(sizeof(treeNode));
+				PAFFS_RESULT r = readTreeNode(dev, *getPointerAsAddr(n->pointers, i), nn);
+				if(r != PAFFS_OK){
+					printf("%s!\n", paffs_err_msg(r));
+					return;
+				}
+				queue_enqueue(new_q, nn);
+			}
+		}
+		printf("| ");
+	}
+	printf("\n");
+	queue_destroy(q);
+	if(!queue_empty(new_q))
+		print_queued_keys_r(dev, new_q);
+}
+
+void print_keys(p_dev* dev, treeNode* c){
+	queue_s* q = queue_new();
+	queue_enqueue(q, c);
+	print_queued_keys_r(dev, q);
 }
 

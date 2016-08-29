@@ -90,6 +90,7 @@ void dirTest(){
 	PAFFS_RESULT r = paffs_mnt("1");
 	print_tree(getDevice());
 	paffs_permission p = 0;
+	while(getchar() == EOF);
 	r = paffs_mkdir("/a", p);
 	if(r != PAFFS_OK)
 		printf("%s\n", paffs_err_msg(r));
@@ -99,17 +100,17 @@ void dirTest(){
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
 	print_tree(getDevice());
-	//while(getchar() == EOF);
+	while(getchar() == EOF);
 	r = paffs_mkdir("/b/c", p);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
 	print_tree(getDevice());
-	//while(getchar() == EOF);
+	while(getchar() == EOF);
 	r = paffs_touch ("/b/file");
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
 	print_tree(getDevice());
-	//while(getchar() == EOF);
+	while(getchar() == EOF);
 	listDir("/");
 
 	listDir("/b/");
@@ -168,6 +169,7 @@ void dirTest(){
 	free(out);
 	//--- read misaligned
 
+	while(getchar() == EOF);
 
 	//write misaligned - over Size----
 	printf("write misaligned - over Size\n");
@@ -211,7 +213,7 @@ void dirTest(){
 	// ---- write misaligned 2
 
 	printWholeFile("/b/file");
-
+	while(getchar() == EOF);
 
 	//write misaligned - write inside not start/end page ----
 	printf("write misaligned - write inside non start/end page\n");
@@ -225,9 +227,9 @@ void dirTest(){
 			printf("%s\n", paffs_err_msg(r));
 	// ---- write misaligned 3
 
-	while(getchar() == EOF);
 
 	printWholeFile("/b/file");
+	while(getchar() == EOF);
 
 	r = paffs_getObjInfo("/b/file", &fileInfo);
 	if(r != PAFFS_OK)
