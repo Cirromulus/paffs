@@ -1,0 +1,62 @@
+
+% For the titlepage
+\newcommand{\documentProject}{Avionics Systems}
+
+% Heading on every page
+\newcommand{\documentHeading}{Avionics Systems}
+
+% Document title. Must match the value given in the document tree.
+\newcommand{\documentTitle}{PAFFS Documentation}
+
+% The document name must match the title apart from whitespace which is
+% replaced by underscores. When changing the document name or identifier here
+% make sure to also change the `RESULT` variable in the Makefile to match the
+% name (see \documentFilename below).
+\newcommand{\documentName}{PAFFS_Documentation}
+\newcommand{\documentIdentifier}{AVS-DOC-TN-0000}
+
+% New issues are used for bigger changes. Increased review numbers indicate
+% small changes. When changing something make sure to add the changes
+% also to the change record (`content/change_record.tex`). The date given
+% here should always match the latest change in the change record.
+\newcommand{\documentIssue}{1}
+\newcommand{\documentRevision}{1}
+\newcommand{\documentDate}{2016-08-31}
+
+% Author of document
+%
+% Compose text for document, guarantee its correctness, keep content updated 
+\newcommand{\documentAuthor}            {Pascal Pieper}
+
+% Consultant for subsystem/workpackage. May be the same as the author.
+% 
+% Read text superficially, verify and scrutinize content of text
+\newcommand{\documentWorkpackageLeader} {Pascal Pieper}
+
+% Projekt leader/project manager by help of system engineer
+% 
+% Be aware of document content, accept and agree content of text, release for official usage, 
+\newcommand{\documentProjectLeader}     {Pascal Pieper}
+
+% The name generated here must match the name of the document given in
+% `RESULT` variable in the Makefile.
+\newcommand{\documentFilename}{\documentIdentifier\_\documentName.pdf}
+
+% Enable/disable the structural elements of the template. Use
+%  \togglefalse{} to disable something and
+%  \toggletrue{}  to enable it.
+
+% Can be activated/deactivated AND edited in "content/misc/" by separate files
+\togglefalse{optionDistributionList}
+\toggletrue{optionGlossary}
+\toggletrue{optionBibliography}
+\togglefalse{optionDocumentChangeRecord}
+\toggletrue{optionAppendix}
+
+% Can only be activated/deactivated
+\togglefalse{optionDocumentApproval}
+\toggletrue{optionTableOfContent}
+\togglefalse{optionEndOfDocument}
+\toggletrue{optionListOfFiguresAndTables}
+
+

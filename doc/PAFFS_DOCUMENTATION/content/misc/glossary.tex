@@ -1,0 +1,35 @@
+
+% Add new abbrevations:
+%
+%   \newacronym{label}{short}{long}
+%
+% Usage:
+%
+%   \ac{label}   % normal form (first "long (short)" then only short)
+%   \acf{label}  % full form ("long (short)")
+%   \acs{label}  % short form
+%   \acl{label}  % long form
+%
+% Only acronyms which are used in the text are included in the glossary.
+% This behavior can be modified by the following two methods:
+%
+% Print all acronyms defined here, independent of their usage in the text:
+%
+%   \glsaddall
+%
+% Add single acronyms to the glossary without referencing them in the text:
+%
+%   \glsadd{tbd}
+%   \glsadd{tbc}
+
+\newacronym{dlr}{DLR}{Deutsches Zentrum für Luft- und Raumfahrt e.V.}
+\newacronym{obc}{OBC}{On-Board Computer}
+\newacronym{cobc}{COBC}{Compact On-Board Computer}
+
+\newacronym{tm}{TM}{Telemetry}
+\newacronym{tc}{TC}{Telecommand}
+
+\newacronym{tbd}{TBD}{To be defined}
+\newacronym{tbc}{TBC}{To be confirmed}
+\newacronym{tbw}{TBW}{To be written}
+
