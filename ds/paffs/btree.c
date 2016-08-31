@@ -925,7 +925,7 @@ PAFFS_RESULT adjust_root(p_dev* dev, treeNode * root) {
  * can accept the additional entries
  * without exceeding the maximum.
  */
-PAFFS_RESULT coalesce_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, int neighbor_index, int k_prime) {
+PAFFS_RESULT coalesce_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, treeNode* parent, int neighbor_index, int k_prime) {
 
 	int i, j, neighbor_insertion_index, n_end;
 	treeNode tmp;
@@ -989,15 +989,23 @@ PAFFS_RESULT coalesce_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, int n
 			neighbor->num_keys++;
 		}
 	}
-	PAFFS_RESULT r = writeTreeNode(dev, neighbor);
+
+	PAFFS_RESULT r = deleteTreeNode(dev, n);
 	if(r != PAFFS_OK)
-		return r;
-	treeNode parent = {{0}};
-	r = getParent(dev, n, &parent);
-	if(r != PAFFS_OK)
-		return r;
+			return r;
+
+	//If changes were made...
+	if(n->num_keys > 0 || true){	//TODO: true is only for debugging
+		r = updateTreeNodePath(dev, neighbor);
+		if(r != PAFFS_OK)
+				return r;
+		//FIXME: Get Parent fails, because neighbor now has additional key
+		//			And can't be found, because parent has still old key (is not changed yet)
+		r = getParent(dev, neighbor, parent);
+	}
+
 	//lets hope, n->key is k_prime
-	return delete_entry(dev, &parent, k_prime);
+	return delete_entry(dev, parent, k_prime);
 
 }
 
@@ -1187,7 +1195,7 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeNode * n, pInode_no key){
 
 	if (neighbor.num_keys + n->num_keys < capacity)
 		//Write of Nodes happens in coalesce_nodes
-		return coalesce_nodes(dev, n, &neighbor, neighbor_index, k_prime);
+		return coalesce_nodes(dev, n, &neighbor, &nParent, neighbor_index, k_prime);
 
 	/* Redistribution. */
 
@@ -1200,10 +1208,6 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeNode * n, pInode_no key){
  * line in level (rank) order, with the
  * keys in each treeNode and the '|' symbol
  * to separate nodes.
- * With the verbose_output flag set.
- * the values of the pointers corresponding
- * to the keys also appear next to their respective
- * keys, in hexadecimal notation.
  */
 void print_tree( p_dev* dev) {
 	treeNode n = {{0}};

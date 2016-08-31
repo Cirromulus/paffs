@@ -71,4 +71,16 @@ int main( int argc, char ** argv ) {
 	printf("ok\n");
 	print_tree(device);
 
+	printf("Delete Node 1:");
+	fflush(stdout);
+	r = deleteInode(device, 1);
+	if(r != PAFFS_OK){
+		printf("\t %s\n", paffs_err_msg(r));
+		print_tree(device);
+		return -1;
+	}
+	printf("ok\n");
+	print_tree(device);
+
+
 }
