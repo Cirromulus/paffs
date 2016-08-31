@@ -3,11 +3,11 @@
  */
 #include "stddef.h"
 
-#define QUEUE_GROW_SIZE 20
+#define QUEUE_GROW_SIZE 10
     //Anzahl von Speicherplätzen, um die die Warteschlange bei Größenänderung wachsen soll. Die Implementation ist so angelegt, dass beim Verkleinern der Warteschlange die Anzahl der verfügbaren Speicherplätze ein ganzzahliges Vielfaches dieser Größe ist.
 #define QUEUE_INIT_SIZE 10
     //Initiale Anzahl von Speicherplätzen.
-#define QUEUE_SHRINK_AT 5
+#define QUEUE_SHRINK_AT 10
 	//Die Anzahl freier Speicherplätze, die mindestens vorhanden sein müssen, um die Warteschlange zu verkleinern.
 
 

@@ -97,7 +97,7 @@ typedef uint32_t dirEntryLength;
 
 typedef struct pInode{
 	pInode_no no;
-	unsigned int seq_no;	//not used yet
+	//unsigned int seq_no;	//not used yet
 	pinode_type type:3;
 	paffs_permission perm:3;
 	p_date crea;
@@ -105,9 +105,9 @@ typedef struct pInode{
 	unsigned long long reservedSize;
 	unsigned long long size;    //~1,8 * 10^19 Byte
 	p_addr direct[11];
-	p_addr indir;
-	p_addr d_indir;
-	p_addr t_indir;
+	//p_addr indir;
+	//p_addr d_indir;
+	///p_addr t_indir;
 } pInode;
 
 

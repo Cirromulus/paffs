@@ -14,8 +14,7 @@
 
 
 int main( int argc, char ** argv ) {
-	printf("Branch-Order: %d, Leaf-Order: %d\nSpace in Pointers: %lu, Sizeof pInode: %lu, "
-			"Sizeof p_addr: %lu\n", BRANCH_ORDER, LEAF_ORDER, BRANCH_ORDER * sizeof(p_addr), sizeof(pInode), sizeof(p_addr));
+	printf("Branch-Order: %d, Leaf-Order: %d\nSpace in Pointers: %lu, Sizeof pInode: %lu\n", BRANCH_ORDER, LEAF_ORDER, BRANCH_ORDER * sizeof(p_addr), sizeof(pInode));
 	printf("Size of TreeNode: %d\n", sizeof(treeNode));
 	paffs_start_up();
 

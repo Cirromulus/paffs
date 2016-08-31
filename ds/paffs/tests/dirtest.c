@@ -121,7 +121,12 @@ void dirTest(){
 
 	if(fil == NULL){
 		printf("Open err: %s\n", paffs_err_msg(paffs_getLastErr()));
-		return;
+		return;	/* Find the appropriate neighbor treeNode with which
+		 * to coalesce.
+		 * Also find the key (k_prime) in the parent
+		 * between the pointer to treeNode n and the pointer
+		 * to the neighbor.
+		 */
 	}
 
 	//first write ----

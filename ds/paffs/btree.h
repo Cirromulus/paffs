@@ -79,9 +79,8 @@ PAFFS_RESULT start_new_tree(p_dev* dev);
 int get_neighbor_index( p_dev* dev, treeNode * n );
 PAFFS_RESULT adjust_root(p_dev* dev, treeNode * root);
 PAFFS_RESULT coalesce_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, int neighbor_index, int k_prime);
-PAFFS_RESULT redistribute_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, int neighbor_index,
+PAFFS_RESULT redistribute_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, treeNode* parent, int neighbor_index,
                 int k_prime_index, int k_prime);
-PAFFS_RESULT removeTreeNodePath( p_dev* dev, treeNode* node, pInode_no key);
 PAFFS_RESULT delete_entry( p_dev* dev, treeNode * n, pInode_no key);
 PAFFS_RESULT remove_entry_from_node(p_dev* dev, treeNode * n, pInode_no key);
 

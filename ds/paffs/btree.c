@@ -844,7 +844,7 @@ int get_neighbor_index( p_dev* dev, treeNode * n ){
                         return i - 1;
 
         // Error state.
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Search for nonexistent pointer to treeNode (%d) in parent (%d).\n", n->self, parent.self);
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Search for nonexistent pointer to treeNode (%lu) in parent (%lu).\n", n->self, parent.self);
         return -1;
 }
 
@@ -1008,16 +1008,13 @@ PAFFS_RESULT coalesce_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, int n
  * small treeNode's entries without exceeding the
  * maximum
  */
-PAFFS_RESULT redistribute_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, int neighbor_index,
+PAFFS_RESULT redistribute_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, treeNode* parent, int neighbor_index,
                 int k_prime_index, int k_prime) {  
 
 	int i;
-	treeNode tmp, parent;
 	PAFFS_RESULT r;
 
-	r = getParent(dev, n, &parent);
-	if(r != PAFFS_OK)
-		return r;
+
 	/* Case: n has a neighbor to the left.
 	 * Pull the neighbor's last key-pointer pair over
 	 * from the neighbor's right end to n's left end.
@@ -1038,18 +1035,15 @@ PAFFS_RESULT redistribute_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, i
 			}
 			if (!n->is_leaf) {
 					*getPointerAsAddr(n->pointers, 0) = *getPointerAsAddr(neighbor->pointers, neighbor->num_keys);
-					r = readTreeNode(dev, *getPointerAsAddr(n->pointers, 0), &tmp);
-					if(r != PAFFS_OK)
-						return r;
 					*getPointerAsAddr(neighbor->pointers, neighbor->num_keys) = 0;
 					n->keys[0] = k_prime;
-					parent.keys[k_prime_index] = neighbor->keys[neighbor->num_keys - 1];
+					parent->keys[k_prime_index] = neighbor->keys[neighbor->num_keys - 1];
 			}
 			else {
 					*getPointerAsInode(n->pointers, 0) = *getPointerAsInode(neighbor->pointers, neighbor->num_keys - 1);
 					memset(getPointerAsInode(neighbor->pointers, neighbor->num_keys - 1), 0, sizeof(pInode));
 					n->keys[0] = neighbor->keys[neighbor->num_keys - 1];
-					parent.keys[k_prime_index] = n->keys[0];
+					parent->keys[k_prime_index] = n->keys[0];
 			}
 
 	}
@@ -1064,7 +1058,7 @@ PAFFS_RESULT redistribute_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, i
 		if (n->is_leaf) {
 			n->keys[n->num_keys] = neighbor->keys[0];
 			*getPointerAsInode(n->pointers, n->num_keys) = *getPointerAsInode(neighbor->pointers, 0);
-			parent.keys[k_prime_index] = neighbor->keys[1];
+			parent->keys[k_prime_index] = neighbor->keys[1];
 			for (i = 0; i < neighbor->num_keys - 1; i++) {
 				neighbor->keys[i] = neighbor->keys[i + 1];
 				*getPointerAsInode(neighbor->pointers, i) = *getPointerAsInode(neighbor->pointers, i + 1);
@@ -1073,11 +1067,7 @@ PAFFS_RESULT redistribute_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, i
 		else {
 			n->keys[n->num_keys] = k_prime;
 			n->pointers[n->num_keys + 1] = neighbor->pointers[0];
-			r = readTreeNode(dev, *getPointerAsAddr(n->pointers, n->num_keys + 1), &tmp);
-			if(r != PAFFS_OK)
-				return r;
-			//tmp->parent = n; Das lassen wir mal aus...
-			parent.keys[k_prime_index] = neighbor->keys[0];
+			parent->keys[k_prime_index] = neighbor->keys[0];
 			for (i = 0; i < neighbor->num_keys - 1; i++) {
 				neighbor->keys[i] = neighbor->keys[i + 1];
 				*getPointerAsAddr(neighbor->pointers, i) = *getPointerAsAddr(neighbor->pointers, i + 1);
@@ -1095,26 +1085,30 @@ PAFFS_RESULT redistribute_nodes(p_dev* dev, treeNode * n, treeNode * neighbor, i
 	n->num_keys++;
 	neighbor->num_keys--;
 
-	//TODO: Wrap three (expensive) uses of updateTreeNode to one
-	r = updateTreeNodePath(dev, n);
+
+	p_addr oldAddrNode = n->self;
+	r = writeTreeNode(dev, n);
 	if(r != PAFFS_OK)
 		return r;
-	r = updateTreeNodePath(dev, neighbor);
+	p_addr oldAddrNeigh = neighbor->self;
+	r = writeTreeNode(dev, neighbor);
 	if(r != PAFFS_OK)
 		return r;
-	r = updateTreeNodePath(dev, &parent);
+
+	for(int i = 0; i <= parent->num_keys; i++){
+		if(*getPointerAsAddr(parent->pointers, i) == oldAddrNode)
+				*getPointerAsAddr(parent->pointers, i) = n->self;
+		if(*getPointerAsAddr(parent->pointers, i) == oldAddrNeigh)
+				*getPointerAsAddr(parent->pointers, i) = neighbor->self;
+	}
+
+	r = updateTreeNodePath(dev, parent);
 	if(r != PAFFS_OK)
 		return r;
 
 	return PAFFS_OK;
 }
 
-
-PAFFS_RESULT removeTreeNodePath( p_dev* dev, treeNode* node, pInode_no key){
-	//Intention is to remove whole path to deleted entry,
-	//but is not needed (?) when tree is conform with rules
-	return PAFFS_NIMPL;
-}
 
 /* Deletes an entry from the B+ tree.
  * Removes the pinode and its key and pointer
@@ -1129,12 +1123,6 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeNode * n, pInode_no key){
 	int k_prime_index, k_prime;
 	int capacity;
 
-	/* Find the appropriate neighbor treeNode with which
-	 * to coalesce.
-	 * Also find the key (k_prime) in the parent
-	 * between the pointer to treeNode n and the pointer
-	 * to the neighbor.
-	 */
 	treeNode nParent = {{0}};
 	PAFFS_RESULT parent_r = getParent(dev, n, &nParent);
 	if(parent_r != PAFFS_OK && parent_r != PAFFS_NOPARENT)
@@ -1177,6 +1165,13 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeNode * n, pInode_no key){
 	 * is needed.
 	 */
 
+	/* Find the appropriate neighbor treeNode with which
+	 * to coalesce.
+	 * Also find the key (k_prime) in the parent
+	 * between the pointer to treeNode n and the pointer
+	 * to the neighbor.
+	 */
+
 	neighbor_index = get_neighbor_index( dev, n );
 	k_prime_index = neighbor_index == -1 ? 0 : neighbor_index;
 	k_prime = nParent.keys[k_prime_index];
@@ -1197,7 +1192,7 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeNode * n, pInode_no key){
 	/* Redistribution. */
 
 	else
-		return redistribute_nodes(dev, n, &neighbor, neighbor_index, k_prime_index, k_prime);
+		return redistribute_nodes(dev, n, &neighbor, &nParent, neighbor_index, k_prime_index, k_prime);
 }
 
 
@@ -1218,8 +1213,7 @@ void print_tree( p_dev* dev) {
 		return;
 	}
 	print_keys(dev, &n);
-	print_leaves(dev, &n);
-	printf("|\n");
+	//print_leaves(dev, &n);
 }
 
 /* Prints the bottom row of keys
@@ -1247,11 +1241,10 @@ void print_leaves(p_dev* dev, treeNode* c) {
 
 void print_queued_keys_r(p_dev* dev, queue_s* q){
 	queue_s* new_q = queue_new();
-	printf("|.");
+	printf("|");
 	while(!queue_empty(q)){
 		treeNode *n = queue_dequeue(q);
 		for(int i = 0; i <= n->num_keys; i++){
-			if(i < n->num_keys) printf("%lu.", n->keys[i]);
 			if(!n->is_leaf){
 				treeNode *nn = (treeNode*) malloc(sizeof(treeNode));
 				PAFFS_RESULT r = readTreeNode(dev, *getPointerAsAddr(n->pointers, i), nn);
@@ -1260,9 +1253,12 @@ void print_queued_keys_r(p_dev* dev, queue_s* q){
 					return;
 				}
 				queue_enqueue(new_q, nn);
+				if(i < n->num_keys) printf(".%lu.", n->keys[i]);
+			}else{
+				if(i < n->num_keys) printf(" %lu ", n->keys[i]);
 			}
 		}
-		printf("| ");
+		printf("|");
 	}
 	printf("\n");
 	queue_destroy(q);
