@@ -2,42 +2,84 @@
 \chapter{Introduction}
 \label{cha:introduction}
 
-\texttt{PAFFS} stands for "Protective Aeronautics Flash FS" and aims to use a minimum RAM footprint with the ability to manage multiple flashes. Most of the design ideas are inspired by the file system \texttt{JFFS3} \referenceDocument{JFFS3}, which was later extended (\referenceDocument{JFFS3ex}) and discontinued as predecessor of \texttt{UBIFS}.\\
-The main differences to usual disk file systems are \texttt{out-of-place-writing} and high deletion costs in terms of durability and speed. Keeping track of the files data chunks has to be different than just maintaining a big table on a disk, because the high frequented lookup table would be worn out earlier while other parts of flash will be nearly untouched. The standard approach of flash aware file systems (such as \texttt{YAFFS}) is to maintain a table-like structure in RAM and committing every chunk of new data to flash with an unique, increasing number, just like a list. This adds far more complexity to the file system as it has to scan the whole flash when mounting, but increases lifetime of the flash enormously. However, this RAM table grows linear with flash size, and thus does not scale for modern (> 2GB) flash chips. To solve this, the information has to be on flash. B+-Tree -> Section \ref{b+tree}.
+\texttt{PAFFS} stands for "Protective Aeronautics Flash FS" and aims to use a minimum RAM footprint with the ability to manage multiple flashes. Most of the design ideas are inspired by the file system \texttt{JFFS3} \referenceDocument{JFFS3}, which was later extended \referenceDocument{JFFS3ex} and discontinued as predecessor of \texttt{UBIFS}.\\
+The main differences to usual disk file systems are \texttt{out-of-place-writing}, a higher bit error rate and high deletion costs in terms of durability and speed. Keeping track of the files data chunks has to be different than just maintaining a big table on a disk, because the high frequented lookup table would be worn out earlier while other parts of flash will be nearly untouched. The standard approach of flash aware file systems (such as \texttt{YAFFS}) is to maintain a table-like structure in RAM and committing every chunk of new data to flash with an unique, increasing number, just like a list. This adds far more complexity to the file system as it has to scan the whole flash when mounting, but increases lifetime of the flash enormously. However, this RAM table grows linear with flash size, and thus does not scale for modern (> 2GB) flash chips. To solve this, the information has to be on flash. B+-Tree -> Section \ref{b+tree}.
 Another big challenge is to reduce wear. Every change to data has to be written to another place and the old location has to be invalidated somehow. This is because the smallest unit of deletion is bigger (usually around 512 - 4086 times) than the smallest unit of a write operation. The common approach is to give every logical chunk an increasing version number. Because of the disadvantages pointed out earlier, this is not applicable to \texttt{PAFFS}. Areas and address mapping -> Section \ref{areas}
 
 \section{Fundamental structures}
 \label{sec:funst}
 
-\subsection{Chained superblock}
-\label{chainedSB}
-\paragraph{Overview}
-See \referenceDocument{JFFS3} chapter 4. Here will be a small overview.
-
 
 \subsection{Areas}
 \label{areas}
 \paragraph{Overview}
+To separate between different Types of Data. Is the logical combination of two or more erase blocks.
 \begin{itemize}
-	\item To separate between different Types of Data
-	\item \texttt{AreaType} can be one of Superblock, Index, Data, (Journaling)
+	\item \texttt{AreaType} can be one of Superblock, Index, Data, (Journal). See table \ref{tab:areatypes}.
 	\item Address split in \texttt{logical area n°} and \texttt{page n°}, to give way for an easy garbage collector (see  fig. \ref{fig:area_address})
-	\item \texttt{AreaMap} held in FLASH (but cached in RAM) translates between \texttt{logical area n°} and \texttt{physical area n°}
+	\item \texttt{AreaMap} held in flash (but cached in RAM) translates between \texttt{logical area n°} and \texttt{physical area n°}
 	\item \texttt{AreaMap} also keeps record of corresponding types and usage statistics for garbage collection
 \end{itemize}
 
-\paragraph{AreaTypes}
-\begin{itemize}
-	\item[Superblock] Superblock areas is automatically first\footnote{\texttt{\textbf{or first two, just to be sure?}}} area of flash. It contains the anchor area as well as jump pads and the superblock itself. See Chapter \ref{chainedSB}
-	\item[Index] The index areas will contain only treenodes (including inodes). See Chapter \ref{b+tree}.
-	\item[Data] Data areas contain data chunks of files, directories and softlinks referenced by the index.
-	\item[Journal] The single Journal area (somewhen) will contain uncommited changes to the index.
-\end{itemize}
+\paragraph{Area types}
+\begin{table}[htbp]
+\caption{Area types}
+\label{tab:areatypes}
+\begin{tabularx}{\textwidth}{lp{11cm}p{2.5cm}}
+\toprule
+Type & Description\\
+\midrule
+Superblock & One superblock area is automatically on the first area of flash, the rest is dynamically allocated. It contains the anchor blocks as well as jump pads and a superpage. See Chapter \ref{chainedSB} \\
+Index & The index areas will contain only tree nodes (including inodes). See Chapter \ref{b+tree}.\\
+Data & Data areas contain data chunks of files, directories and softlinks referenced by the index.\\
+Journal & The single journal area (some when) will contain uncommitted changes to the index.\\
+\bottomrule
+\end{tabularx}
+\end{table} 
+
+\subsection{Chained superblock}
+\label{chainedSB}
+\paragraph{Overview}
+Along with some static information, keeping an index requires having some sort of start point to find the first address of a table or the first position of a root node. The naive approach is having the first block contain this dynamic information. However this is bad practice, as it wears off the first (or first $n$) enormously in contrast to other places being barely used. Another approach is to scan the whole flash for something with an unique sequential number, which is unacceptable as mount time scales linear with flash size.
+The following structure of a chained superblock provides wear levelling of the first blocks and enables logarithmic mount time.
+For a more detailed explanation see \referenceDocument{JFFS3} Chapter 4.
+
+\paragraph{Functionality}
+The first area of a flash contains two consecutive anchor blocks. The one page with the highest (i.e newest) number inside the anchor blocks is considered valid. This anchor page holds static information like file system version, number of blocks and the like as well as the address to the first jump pad located somewhere in a superblock area. these jump pads reference either a next pad or the superpage which is a page within a superblock area. This page holds frequently changed values like the address to the root node of the index tree and the area map.\\
+
+When a change of the index tree has been committed to flash, the new address of the root node has to be written to a new superpage. The address of the new superpage is then appended to the last jump pad block. If this block is full, it will be erased and the new address is written to a new jump pad block. This requires the next higher-level jump pad to append the address of the new jump pad block, and so on. When one of the anchor blocks is full, first the anchor page is written to the other block, and then the first block is deleted.\\
+
+
 
 \subsection{Tree Indexing}
 \label{b+tree}
 \paragraph{Overview}
-B+Tree, minimum height. Is convenient when having to update whole path to root after a single node was changed. RAM Cache with parent pointers. Variable size, minimum Treeheight + 1\footnote{Check if true.}.
+B+Tree is a variation of the standard binary search tree with more keys per node. Another difference is having all actual data only in leaves. This increases space for keys and therefore the fanout. Variable size, minimum tree height + 1\footnote{Check if true.}. Tree height is $log(n)$, and so is search, insert and delete $\mathcal{O}log(n)$. Because of \texttt{out-of-place-write}, with every change to a single inode, the whole path up to the root node has to be updated (see figure \ref{fig:btreewandering}). To heavily decrease flash wear, a caching strategy is used. Any modification to the tree is held back in RAM as long as possible, until main memory space is running low. Only now all nodes marked as dirty are committed to flash and freed in main memory. This caching can save 98\% of flash operations and speeds up access as well (see \referenceDocument{b+Tree}).
+
+\subsection{Inodes}
+\label{inode}
+\paragraph{Overview}
+Can be file, directory and softlink. Points to data chunks in a way like e.g. \texttt{EXT3} does. See Table \ref{tab:pinode}.
+\begin{table}[htbp]
+\caption{Inode contents}
+\label{tab:pinode}
+\begin{tabularx}{\textwidth}{lp{11cm}p{2.5cm}}
+\toprule
+Value & Description\\
+\midrule
+\texttt{pInode\_no} & Unique number of inode. \\
+\texttt{pInode\_type} & One of \texttt{file}, \texttt{directory} or \texttt{link}.\\
+\texttt{permission} & Global read, write and execute permissions. Changeable via \texttt{chmod}.\\
+\texttt{created} & Unix time stamp of file creation.\\
+\texttt{modified} & Unix time stamp of last file write access.\\
+\texttt{size} & Size of user data in bytes. \\
+\texttt{reserved size} & Space user data is actually occupying in bytes (multiple of chunk size).\\
+\texttt{direct pointer} & 11 direct pointers to user data chunks.\\
+\texttt{indirect pointers} & One of each first, second and third layer indirection pointers pointing to data chunks with more pointers.\\
+\bottomrule
+\end{tabularx}
+\end{table} 
+
 
 \section{Images}
 
@@ -46,22 +88,20 @@ B+Tree, minimum height. Is convenient when having to update whole path to root a
   \caption{Basic process of garbage collection with areas}
   \label{fig:area_address}
 \end{figure}
-%
-%\begin{figure}[htp]
-%	\centering
-%	\begin{subfigure}[t]{.49\textwidth}
-%		\centering\includegraphics[width=7cm]{graphics_example}
-%		\label{fig:graphics_example}
-%		\subcaption{Example}
-%	\end{subfigure}
-%	\begin{subfigure}[t]{.49\textwidth}
-%		\centering\includegraphics[width=7cm]{protocol_description_example}
-%		\label{fig:protocol_example}
-%		\subcaption{Protocol}
-%	\end{subfigure}
-%	\label{fig:images}
-%	\caption{Two images side by side}
-%\end{figure}
+
+\begin{figure}[htp]
+	\centering
+	\begin{subfigure}[t]{.49\textwidth}
+		\centering\includegraphics[width=7cm]{btree.png}
+		\subcaption{Before}
+	\end{subfigure}
+	\begin{subfigure}[t]{.49\textwidth}
+		\centering\includegraphics[width=7cm]{btree_2.png}
+		\subcaption{After}
+	\end{subfigure}
+	\label{fig:btreewandering}
+	\caption{B+-Tree after updating a single inode. The whole path has to be rewritten.}
+\end{figure}
 
 
 %\begin{lstlisting}[caption={Example C++ Code Listing},language=c++]
