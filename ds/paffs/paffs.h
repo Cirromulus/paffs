@@ -168,7 +168,7 @@ typedef enum p_areaType{
 
 typedef enum p_areaStatus{
 	CLOSED,
-	UNCLOSED,
+	ACTIVE,
 	EMPTY
 } p_areaStatus;
 
@@ -181,13 +181,13 @@ typedef enum p_summaryEntry{
 static unsigned int activeArea[area_types_no];
 
 typedef struct p_area{
-	p_areaType type;
-	p_areaStatus status;
-	unsigned int erasecount;
-	unsigned int position;	//physical position, not logical
-	p_summaryEntry* areaSummary; //May be invalid if status == closed;
-	unsigned int dirtyPages; 	//redundant to contents of areaSummary
-	unsigned int usedPages;		//redundant to contents of areaSummary, just for quick lookup.
+	p_areaType type:3;
+	p_areaStatus status:2;
+	uint32_t erasecount:17;	//Overflow at 132.000 is acceptable
+	uint32_t position;	//physical position, not logical
+	p_summaryEntry* areaSummary; //May be invalid if status == closed; Optimizable bitusage
+	uint32_t dirtyPages; 	//redundant to contents of areaSummary
+	uint32_t usedPages;	//redundant to contents of areaSummary, just for quick lookup.
 	//--Not to be mistaken with the areaSummary-status "used", this means used _and_ dirty pages.
 } p_area;
 
