@@ -89,10 +89,10 @@ int get_left_index(treeCacheNode * parent, treeCacheNode * left);
 PAFFS_RESULT insert_into_leaf( p_dev* dev, treeCacheNode * leaf, pInode * pointer );
 PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, pInode * newInode);
 PAFFS_RESULT insert_into_node(p_dev *dev, treeCacheNode * newNode,
-        int left_index, pInode_no key, treeCacheNode * right);
+        	int left_index, pInode_no key, treeCacheNode * right);
 PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_node, int left_index,
                 pInode_no key, treeCacheNode * right);
-PAFFS_RESULT insert_into_former_parent(p_dev* dev, treeCacheNode * formerParent, treeCacheNode * left, pInode_no key, treeCacheNode * right);
+PAFFS_RESULT insert_into_parent(p_dev* dev, treeCacheNode * left, pInode_no key, treeCacheNode * right);
 PAFFS_RESULT insert_into_new_root(p_dev* dev, treeCacheNode * left, pInode_no key, treeCacheNode * right);
 PAFFS_RESULT insert( p_dev* dev, pInode* value);
 PAFFS_RESULT insert_into_new_root(p_dev* dev, treeCacheNode * left, pInode_no key, treeCacheNode * right);

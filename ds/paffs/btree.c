@@ -381,7 +381,7 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, 
 
 	new_key = new_leaf->raw.as_leaf.keys[0];
 
-	return insert_into_parent(dev, leaf->parent, leaf, new_key, &new_leaf) ;
+	return insert_into_parent(dev, leaf, new_key, new_leaf);
 }
 
 
@@ -392,6 +392,7 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, 
  */
 PAFFS_RESULT insert_into_node(p_dev *dev, treeCacheNode * node,
 	int left_index, pInode_no key, treeCacheNode * right) {
+	//TODO: insert node->pointers as well, and set parent of right to node
 	int i;
 
 	for (i = node->raw.num_keys; i > left_index; i--) {
@@ -415,9 +416,12 @@ PAFFS_RESULT insert_into_node(p_dev *dev, treeCacheNode * node,
 PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_node, int left_index,
                 pInode_no key, treeCacheNode * right) {
 
+	//TODO: insert node->pointers as well, and set parent of right to node
+
 	int i, j, split, k_prime;
 	treeCacheNode *new_node;
 	pInode_no temp_keys[btree_branch_order+1];
+	treeCacheNode* temp_RAMaddresses[btree_branch_order+1];
 	p_addr temp_addresses[btree_branch_order+1];
 
 
@@ -437,14 +441,16 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 	for (i = 0, j = 0; i < old_node->raw.num_keys + 1; i++, j++) {
 			if (j == left_index + 1) j++;
 			temp_addresses[j] = old_node->raw.as_branch.pointers[i];
+			temp_RAMaddresses[j] = old_node->pointers[i];
 	}
 
 	for (i = 0, j = 0; i < old_node->raw.num_keys; i++, j++) {
 			if (j == left_index) j++;
-			temp_keys[j] = old_node->keys[i];
+			temp_keys[j] = old_node->raw.as_branch.keys[i];
 	}
 
-	temp_addresses[left_index + 1] = right->self;
+	temp_addresses[left_index + 1] = right->raw.self;
+	temp_RAMaddresses[left_index + 1] = right;
 	temp_keys[left_index] = key;
 
 	/* Create the new treeCacheNode and copy
@@ -453,68 +459,62 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 	 */
 	split = cut(btree_branch_order);
 
-	old_node->num_keys = 0;
+	old_node->raw.num_keys = 0;
 	for (i = 0; i < split - 1; i++) {
-		*getPointerAsAddr(old_node->pointers, i) = temp_addresses[i];
-		old_node->keys[i] = temp_keys[i];
-		old_node->num_keys++;
+		old_node->raw.as_branch.pointers[i] = temp_addresses[i];
+		old_node->pointers[i] = temp_RAMaddresses[i];
+		old_node->raw.as_branch.keys[i] = temp_keys[i];
+		old_node->raw.num_keys++;
 	}
-	*getPointerAsAddr(old_node->pointers, i) = temp_addresses[i];
+	old_node->raw.as_branch.pointers[i] = temp_addresses[i];
+	old_node->pointers[i] = temp_RAMaddresses[i];
 	k_prime = temp_keys[split - 1];
 	for (++i, j = 0; i < btree_branch_order; i++, j++) {
-			*getPointerAsAddr(new_node.pointers, j) = temp_addresses[i];
-			new_node.keys[j] = temp_keys[i];
-			new_node.num_keys++;
+			new_node->pointers[j] = temp_RAMaddresses[i];
+			new_node->raw.as_branch.pointers[j] = temp_addresses[i];
+			new_node->raw.as_branch.keys[j] = temp_keys[i];
+			new_node->raw.num_keys++;
 	}
-	new_node.pointers[j] = temp_addresses[i];
+	new_node->pointers[j] = temp_RAMaddresses[i];
+	new_node->raw.as_branch.pointers[j] = temp_addresses[i];
 
+	new_node->parent = old_node->parent;
 
-	PAFFS_RESULT r = writetreeCacheNode(dev, old_node);
-	if(r != PAFFS_OK)
-		return r;
-	r = writetreeCacheNode(dev, &new_node);
+	old_node->dirty = true;
+	new_node->dirty = true;
 
 	/* Insert a new key into the parent of the two
 	 * nodes resulting from the split, with
 	 * the old treeCacheNode to the left and the new to the right.
 	 */
 
-	return pr == PAFFS_NOPARENT ?
-			insert_into_former_parent(dev, NULL, old_node, k_prime, &new_node) :
-			insert_into_former_parent(dev, &parent, old_node, k_prime, &new_node);
+	return insert_into_parent(dev, old_node, k_prime, &new_node);
 }
 
 
 
 /* Inserts a new treeCacheNode (leaf or internal treeCacheNode) into the B+ tree.
  * Returns the root of the tree after insertion.
- * *** obsoleted ***
  */
-/*PAFFS_RESULT insert_into_parent(p_dev* dev, treeCacheNode * left, pInode_no key, treeCacheNode * right) {
+PAFFS_RESULT insert_into_parent(p_dev* dev, treeCacheNode * left, pInode_no key, treeCacheNode * right) {
 
-        int left_index;
-        treeCacheNode parent = {{0}};
+	int left_index;
+	treeCacheNode *parent = left->parent;	//Fixme: left or right parent?
 
-        PAFFS_RESULT r = getParent(dev, left, &parent);
-
-        if (r == PAFFS_NOPARENT)
-                return insert_into_new_root(dev, left, key, right);
-
-        if(r != PAFFS_OK)
-        	return r;
+	if (parent->parent == parent)
+		return insert_into_new_root(dev, left, key, right);
 
 
-
-        left_index = get_left_index(&parent, left);
-
-
-        if (parent.num_keys < btree_branch_order)
-                return insert_into_node(dev, &parent, left_index, key, right);
+	left_index = get_left_index(parent, left);
 
 
-        return insert_into_node_after_splitting(dev, &parent, left_index, key, right);
+	if (parent->raw.num_keys < btree_branch_order)
+			return insert_into_node(dev, parent, left_index, key, right);
+
+
+	return insert_into_node_after_splitting(dev, parent, left_index, key, right);
 }
-*/
+
 
 
 /* Due to the removed parent-member, parent has to be determined before changes to Child-Nodes are done
@@ -523,40 +523,40 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
  * Returns the root of the tree after insertion.
  * *** further Tree-action pending ***
  */
-PAFFS_RESULT insert_into_former_parent(p_dev* dev, treeCacheNode* formerParent, treeCacheNode* left, pInode_no key, treeCacheNode* right) {
-
-        int left_index;
-
-
-        /* Case: new root. */
-        if (formerParent == NULL)
-                return insert_into_new_root(dev, left, key, right);
-
-
-
-        /* Case: leaf or treeCacheNode. (Remainder of
-         * function body.)
-         */
-
-        /* Find the parent's pointer to the left
-         * treeCacheNode. (is done before changes were made)
-         */
-
-        left_index = get_left_index(formerParent, left);
-
-
-        /* Simple case: the new key fits into the treeCacheNode.
-         */
-
-        if (formerParent->num_keys < btree_branch_order)
-                return insert_into_node(dev, formerParent, left_index, key, right);
-
-        /* Harder case:  split a treeCacheNode in order
-         * to preserve the B+ tree properties.
-         */
-
-        return insert_into_node_after_splitting(dev, formerParent, left_index, key, right);
-}
+//PAFFS_RESULT insert_into_former_parent(p_dev* dev, treeCacheNode* formerParent, treeCacheNode* left, pInode_no key, treeCacheNode* right) {
+//
+//        int left_index;
+//
+//
+//        /* Case: new root. */
+//        if (formerParent == NULL)
+//                return insert_into_new_root(dev, left, key, right);
+//
+//
+//
+//        /* Case: leaf or treeCacheNode. (Remainder of
+//         * function body.)
+//         */
+//
+//        /* Find the parent's pointer to the left
+//         * treeCacheNode. (is done before changes were made)
+//         */
+//
+//        left_index = get_left_index(formerParent, left);
+//
+//
+//        /* Simple case: the new key fits into the treeCacheNode.
+//         */
+//
+//        if (formerParent->num_keys < btree_branch_order)
+//                return insert_into_node(dev, formerParent, left_index, key, right);
+//
+//        /* Harder case:  split a treeCacheNode in order
+//         * to preserve the B+ tree properties.
+//         */
+//
+//        return insert_into_node_after_splitting(dev, formerParent, left_index, key, right);
+//}
 
 
 /* Creates a new root for two subtrees
@@ -565,6 +565,7 @@ PAFFS_RESULT insert_into_former_parent(p_dev* dev, treeCacheNode* formerParent, 
  */
 PAFFS_RESULT insert_into_new_root(p_dev* dev, treeCacheNode * left, pInode_no key, treeCacheNode * right) {
 
+	//Todo: destroy one of nodes
 	treeCacheNode root = {{0}};
 	root.is_leaf = false;
 	root.keys[0] = key;
