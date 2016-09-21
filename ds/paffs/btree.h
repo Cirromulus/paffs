@@ -19,15 +19,15 @@
 		- sizeof(unsigned char))\
 		/ (sizeof(pInode) + sizeof(pInode_no)) ) //todo: '512' Dynamisch machen
 
-typedef struct treeNode {
-        char pointers[BRANCH_ORDER * sizeof(p_addr)];
-        pInode_no keys[BRANCH_ORDER];	//Fixme: Unused space as leaf, useful for another pInode
-        p_addr self;
-        bool is_leaf:1;
-        unsigned char num_keys;		//If Branch: count of addresses - 1, if leaf: count of pInodes
-} treeNode;
+//typedef struct treeNode {
+//        char pointers[BRANCH_ORDER * sizeof(p_addr)];
+//        pInode_no keys[BRANCH_ORDER];
+//        p_addr self;
+//        bool is_leaf:1;
+//        unsigned char num_keys;
+//} treeNode;
 
-typedef struct treeNode2{
+typedef struct treeNode{
 	union {
 		struct as_branch {
 			pInode_no keys[BRANCH_ORDER];
@@ -35,21 +35,23 @@ typedef struct treeNode2{
 		} as_branch;
 		struct as_leaf {
 			pInode_no keys[LEAF_ORDER];
-			pInode iNodes[LEAF_ORDER];
+			pInode pInodes[LEAF_ORDER];
 		} as_leaf;
 	};
 	p_addr self;
 	bool is_leaf:1;
-	unsigned char num_keys:7;
-} treeNode2;
+	unsigned char num_keys:7; //If leaf: Number of pInodes
+							//If Branch: Number of addresses - 1
+} treeNode;
 
 typedef struct treeCacheNode{
-	treeNode2 raw;
+	treeNode raw;
 	struct treeCacheNode* parent;
+	struct treeCacheNode* pointers[BRANCH_ORDER];
+	bool dirty;
 } treeCacheNode;
 
-static int btree_branch_order = BRANCH_ORDER;
-static int btree_leaf_order = LEAF_ORDER-1;
+
 
 p_addr* getPointerAsAddr(char* pointers, unsigned int pos);
 pInode* getPointerAsInode(char* pointers, unsigned int pos);
@@ -74,8 +76,8 @@ PAFFS_RESULT path_from_root( p_dev* dev, treeNode * child, p_addr* path, unsigne
 PAFFS_RESULT getParent(p_dev* dev, treeNode * node, treeNode* parentOut);
 int find_range( p_dev* dev, treeNode * root, pInode_no key_start, pInode_no key_end,
                 int returned_keys[], void * returned_pointers[]); 
-PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeNode* outTreenode);
-PAFFS_RESULT find_in_leaf (treeNode* leaf, pInode_no key, pInode* outInode);
+PAFFS_RESULT find_leaf(  p_dev* dev, pInode_no key, treeCacheNode* outTreenode);
+PAFFS_RESULT find_in_leaf (treeCacheNode* leaf, pInode_no key, pInode* outInode);
 PAFFS_RESULT find( p_dev* dev, pInode_no key, pInode* outInode);
 int cut( int length );
 PAFFS_RESULT updateTreeNodePath( p_dev* dev, treeNode* node);
