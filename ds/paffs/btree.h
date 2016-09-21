@@ -12,11 +12,12 @@
 
 //Calculates how many pointers a node can hold in one page
 #define BRANCH_ORDER ((512 - sizeof(p_addr)\
-		- sizeof(unsigned char) - sizeof(bool))\
+		- sizeof(unsigned char))\
 		/ (sizeof(p_addr) + sizeof(pInode_no)) ) //todo: '512' Dynamisch machen
 
-#define LEAF_ORDER (BRANCH_ORDER * sizeof(p_addr) / sizeof(pInode))	 //todo: '512' Dynamisch machen
-
+#define LEAF_ORDER ((512 - sizeof(p_addr)\
+		- sizeof(unsigned char))\
+		/ (sizeof(pInode) + sizeof(pInode_no)) ) //todo: '512' Dynamisch machen
 
 typedef struct treeNode {
         char pointers[BRANCH_ORDER * sizeof(p_addr)];
@@ -26,8 +27,29 @@ typedef struct treeNode {
         unsigned char num_keys;		//If Branch: count of addresses - 1, if leaf: count of pInodes
 } treeNode;
 
+typedef struct treeNode2{
+	union {
+		struct as_branch {
+			pInode_no keys[BRANCH_ORDER];
+			p_addr pointers[BRANCH_ORDER];
+		} as_branch;
+		struct as_leaf {
+			pInode_no keys[LEAF_ORDER];
+			pInode iNodes[LEAF_ORDER];
+		} as_leaf;
+	};
+	p_addr self;
+	bool is_leaf:1;
+	unsigned char num_keys:7;
+} treeNode2;
+
+typedef struct treeCacheNode{
+	treeNode2 raw;
+	struct treeCacheNode* parent;
+} treeCacheNode;
+
 static int btree_branch_order = BRANCH_ORDER;
-static int btree_leaf_order = LEAF_ORDER;
+static int btree_leaf_order = LEAF_ORDER-1;
 
 p_addr* getPointerAsAddr(char* pointers, unsigned int pos);
 pInode* getPointerAsInode(char* pointers, unsigned int pos);

@@ -17,7 +17,7 @@ unsigned int findWritableArea(p_areaType areaType, p_dev* dev){
 					continue;
 				}
 				if(try == 1){
-					if(dev->areaMap[area].status == UNCLOSED){	//unclosed oder closed first?
+					if(dev->areaMap[area].status == ACTIVE){	//ACTIVE oder closed first?
 						return area;
 					}
 				}else{
@@ -77,7 +77,7 @@ PAFFS_RESULT checkActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType area
 void initArea(p_dev* dev, unsigned long int area){
 	PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Init new Area %lu.", area);
 	//generate the areaSummary in Memory
-	dev->areaMap[area].status = UNCLOSED;
+	dev->areaMap[area].status = ACTIVE;
 	dev->areaMap[area].dirtyPages = 0;
 	dev->areaMap[area].usedPages = 0;
 	dev->areaMap[area].areaSummary = malloc(

@@ -44,11 +44,6 @@ static const char* PAFFS_RESULT_MSG[] = {
 		"You should not be seeing this..."
 };
 
-typedef enum pInode_type{
-    PINODE_FILE,
-    PINODE_DIR,
-    PINODE_LNK
-}pinode_type;
 
 typedef char paffs_permission;
 
@@ -90,20 +85,25 @@ typedef unsigned long p_date;
 
 typedef uint64_t p_addr;
 
+typedef uint32_t fileSize_t; //~ 4 GB per file. Enough!
 typedef uint32_t pInode_no;
-
 typedef uint32_t dirEntryCount;
 typedef uint32_t dirEntryLength;
 
+typedef enum pInode_type{
+    PINODE_FILE,
+    PINODE_DIR,
+    PINODE_LNK
+} pInode_type;
+
 typedef struct pInode{
 	pInode_no no;
-	//unsigned int seq_no;	//not used yet
 	pInode_type type:3;
 	paffs_permission perm:3;
 	p_date crea;
 	p_date mod;
-	unsigned long long reservedSize;
-	unsigned long long size;    //~1,8 * 10^19 Byte
+	fileSize_t reservedSize;
+	fileSize_t size;
 	p_addr direct[11];
 	p_addr indir;
 	p_addr d_indir;
