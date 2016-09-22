@@ -19,13 +19,9 @@
 		- sizeof(unsigned char))\
 		/ (sizeof(pInode) + sizeof(pInode_no)) ) //todo: '512' Dynamisch machen
 
-//typedef struct treeCacheNode {
-//        char pointers[BRANCH_ORDER * sizeof(p_addr)];
-//        pInode_no keys[BRANCH_ORDER];
-//        p_addr self;
-//        bool is_leaf:1;
-//        unsigned char num_keys;
-//} treeCacheNode;
+
+static int btree_branch_order = BRANCH_ORDER;
+static int btree_leaf_order = LEAF_ORDER;
 
 typedef struct treeNode{
 	union {

@@ -29,6 +29,7 @@ typedef enum PAFFS_RESULT{
 	PAFFS_BUG,
 	PAFFS_NOPARENT,
 	PAFFS_NOSP,
+	PAFFS_LOWMEM,
 	num_PAFFS_RESULT
 } PAFFS_RESULT;
 
@@ -41,6 +42,7 @@ static const char* PAFFS_RESULT_MSG[] = {
 		"Gratulations, you found a Bug",
 		"Node is already root, no Parent",
 		"No (usable) space left on device",
+		"Not enough RAM for cache",
 		"You should not be seeing this..."
 };
 

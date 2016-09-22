@@ -23,4 +23,6 @@ PAFFS_RESULT removeCacheNode(p_dev* dev, treeCacheNode* tcn);
 
 PAFFS_RESULT setCacheRoot(p_dev* dev, treeCacheNode* rootTcn);
 
+PAFFS_RESULT flushTreeCache(p_dev* dev);
+
 #endif /* TREECACHE_H_ */

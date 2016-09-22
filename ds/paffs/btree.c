@@ -13,11 +13,6 @@
 #include <inttypes.h>
 
 
-static int btree_branch_order = BRANCH_ORDER;
-static int btree_leaf_order = LEAF_ORDER-1;
-
-
-
 PAFFS_RESULT insertInode( p_dev* dev, pInode* inode){
 	return insert(dev, inode);
 }
@@ -27,21 +22,22 @@ PAFFS_RESULT getInode( p_dev* dev, pInode_no number, pInode* outInode){
 }
 
 PAFFS_RESULT updateExistingInode( p_dev* dev, pInode* inode){
-	treeCacheNode node;
-	PAFFS_RESULT r = find_leaf(dev, inode->no, &node);
+	treeCacheNode *node = NULL;
+	PAFFS_RESULT r = find_leaf(dev, inode->no, node);
 	if(r != PAFFS_OK)
 		return r;
 
 	int pos;
-	for(pos = 0; pos < node.raw.num_keys; pos++){
-		if(node.raw.as_leaf.keys[pos] == inode->no)
+	for(pos = 0; pos < node->raw.num_keys; pos++){
+		if(node->raw.as_leaf.keys[pos] == inode->no)
 			break;
 	}
 
-	if(pos == node.raw.num_keys)
+	if(pos == node->raw.num_keys)
 		return PAFFS_BUG;	//This Key did not exist
 
-	//todo: update node
+	node->raw.as_leaf.pInodes[pos] = *inode;
+	node->dirty = true;
 
 	//todo: check cache memory consumption, possibly flush
 	return PAFFS_NIMPL;
@@ -124,8 +120,7 @@ int length_to_root( p_dev* dev, treeCacheNode * child ){
  */
 PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeCacheNode* outtreeCacheNode) {
 	int i = 0;
-	treeCacheNode *c;
-	memset(&c, 0, sizeof(treeCacheNode));
+	treeCacheNode *c = NULL;
 
 	PAFFS_RESULT r = getRootNodeFromCache(dev, c);
 	if(r != PAFFS_OK)
@@ -241,7 +236,7 @@ treeCacheNode * make_leaf( void ) {
 			int pos = 0;
 			while(*getPointerAsAddr(c.pointers, pos) != prev.self){
 				if(pos > c.num_keys){
-					PAFFS_DBG( PAFFS_TRACE_BUG, "BUG: Did not find old address");
+					PAFFS_DBG( PAFFS_TRACE_BUG, "BU G: Did not find old address");
 					return PAFFS_BUG;
 				}
 				pos++;
@@ -565,8 +560,6 @@ PAFFS_RESULT insert_into_parent(p_dev* dev, treeCacheNode * left, pInode_no key,
  * the new root.
  */
 PAFFS_RESULT insert_into_new_root(p_dev* dev, treeCacheNode * left, pInode_no key, treeCacheNode * right) {
-
-	//Todo: destroy one of nodes
 	treeCacheNode *new_root = NULL;
 	PAFFS_RESULT r = addNewCacheNode(dev, new_root);
 	if(r != PAFFS_OK)

@@ -16,6 +16,7 @@
 int main( int argc, char ** argv ) {
 	printf("Branch-Order: %d, Leaf-Order: %d\nSpace in Pointers: %lu Byte, Sizeof pInode: %lu Byte\n", BRANCH_ORDER, LEAF_ORDER, BRANCH_ORDER * sizeof(p_addr), sizeof(pInode));
 	printf("Size of TreeNode: %lu\n", sizeof(treeNode));
+	printf("Size of TreeCacheNode: %lu\n", sizeof(treeCacheNode));
 
 	treeNode a;
 	a.as_branch.keys[0] = 1;
@@ -27,7 +28,6 @@ int main( int argc, char ** argv ) {
 
 	printf("Size of TreeNode.as_branch.keys: %lu\n", sizeof(a.as_branch.keys) / sizeof(pInode_no));
 	printf("Size of TreeNode.as_leaf.keys: %lu\n", sizeof(a.as_leaf.keys) / sizeof(pInode_no));
-	return -1;
 
 	paffs_start_up();
 

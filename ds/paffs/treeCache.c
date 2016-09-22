@@ -6,27 +6,73 @@
  */
 
 #include "treeCache.h"
+#include "paffs_flash.h"
+#include <string.h>
+#include "btree.h"
+
+static treeCacheNode* cache_root = NULL;
 
 PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode* tcn){
-	//parent to self
-	return PAFFS_NIMPL;
+	if(cache_root != NULL){
+		tcn = cache_root;
+		return PAFFS_OK;
+	}
+
+	p_addr addr = getRootnodeAddr(dev);
+	if(addr == 0)
+		PAFFS_DBG(PAFFS_TRACE_TREE, "get Rootnode, but does not exist!");
+
+	PAFFS_RESULT r = addNewCacheNode(dev, cache_root);
+	if(r != PAFFS_OK)
+		return r;
+	tcn = cache_root;
+	cache_root->parent = cache_root;
+	return readTreeNode(dev, addr, &cache_root->raw);
 }
 
 PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
 									treeCacheNode* parent, treeCacheNode* child){
-	return PAFFS_NIMPL;
+	if(index > btree_branch_order){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access index greater than branch size!");
+		return PAFFS_BUG;
+	}
+
+	child = parent->pointers[index];
+	if(parent->raw.is_leaf){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Node from leaf!");
+		return PAFFS_BUG;
+	}
+	if(child != NULL)
+		return PAFFS_OK;	//cache hit
+
+	PAFFS_RESULT r = addNewCacheNode(dev, child);
+	if(r != PAFFS_OK)
+		return r;	//TODO: this could actually be solved by a cache flush
+
+	child->parent = parent;
+
+	return readTreeNode(dev, parent->raw.as_branch.pointers[index], child);
 }
 
 PAFFS_RESULT addNewCacheNode(p_dev* dev, treeCacheNode* newTcn){
-	return PAFFS_NIMPL;
+	newTcn = (treeCacheNode*) malloc(sizeof(treeCacheNode));
+	memset(newTcn, 0, sizeof(treeCacheNode));
+	newTcn->dirty = true;
+	if(newTcn == NULL){
+		PAFFS_DBG(PAFFS_TRACE_ALLOCATE, "RAN OUT OF RAM!");
+		return PAFFS_LOWMEM;
+	}
+	return PAFFS_OK;
 }
 
 PAFFS_RESULT removeCacheNode(p_dev* dev, treeCacheNode* tcn){
-	return PAFFS_NIMPL;
+	free(tcn);
+	return PAFFS_OK;
 }
 
 PAFFS_RESULT setCacheRoot(p_dev* dev, treeCacheNode* rootTcn){
-	return PAFFS_NIMPL;
+	cache_root = rootTcn;
+	return PAFFS_OK;
 }
 
 
