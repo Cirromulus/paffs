@@ -13,8 +13,13 @@
 
 PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode* tcn);	//parent to self
 
-PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index, treeCacheNode* parent, treeCacheNode* child);
+PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
+									treeCacheNode* parent, treeCacheNode* child);
 
 PAFFS_RESULT addNewCacheNode(p_dev* dev, treeCacheNode* newTcn);
+
+PAFFS_RESULT removeCacheNode(p_dev* dev, treeCacheNode* tcn);
+
+PAFFS_RESULT setCacheRoot(p_dev* dev, treeCacheNode* rootTcn);
 
 #endif /* TREECACHE_H_ */

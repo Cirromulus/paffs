@@ -38,7 +38,7 @@ typedef struct treeNode{
 			pInode pInodes[LEAF_ORDER];
 		} as_leaf;
 	};
-	p_addr self;
+	p_addr self;	//If '0', it is not committed yet
 	bool is_leaf:1;
 	unsigned char num_keys:7; //If leaf: Number of pInodes
 							//If Branch: Number of addresses - 1
@@ -47,7 +47,7 @@ typedef struct treeNode{
 typedef struct treeCacheNode{
 	treeNode raw;
 	struct treeCacheNode* parent;
-	struct treeCacheNode* pointers[BRANCH_ORDER];
+	struct treeCacheNode* pointers[BRANCH_ORDER];	//pointer can be NULL if not cached yet
 	bool dirty;
 } treeCacheNode;
 
@@ -72,15 +72,12 @@ int height( p_dev* dev, treeCacheNode * root );
 int length_to_root( p_dev* dev, treeCacheNode * child );
 //Path is root first, child last
 PAFFS_RESULT path_from_root( p_dev* dev, treeCacheNode * child, p_addr* path, unsigned int* lengthOut);
-//ParentOut is NULL when there is no Parent (= root)
-PAFFS_RESULT getParent(p_dev* dev, treeCacheNode * node, treeCacheNode* parentOut);
 int find_range( p_dev* dev, treeCacheNode * root, pInode_no key_start, pInode_no key_end,
                 int returned_keys[], void * returned_pointers[]); 
 PAFFS_RESULT find_leaf(  p_dev* dev, pInode_no key, treeCacheNode* outtreeCacheNode);
 PAFFS_RESULT find_in_leaf (treeCacheNode* leaf, pInode_no key, pInode* outInode);
 PAFFS_RESULT find( p_dev* dev, pInode_no key, pInode* outInode);
 int cut( int length );
-PAFFS_RESULT updatetreeCacheNodePath( p_dev* dev, treeCacheNode* node);
 
 
 // Insertion.
@@ -102,8 +99,8 @@ PAFFS_RESULT start_new_tree(p_dev* dev);
 
 int get_neighbor_index( p_dev* dev, treeCacheNode * n );
 PAFFS_RESULT adjust_root(p_dev* dev, treeCacheNode * root);
-PAFFS_RESULT coalesce_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * neighbor, treeCacheNode* parent, int neighbor_index, int k_prime);
-PAFFS_RESULT redistribute_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * neighbor, treeCacheNode* parent, int neighbor_index,
+PAFFS_RESULT coalesce_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * neighbor, int neighbor_index, int k_prime);
+PAFFS_RESULT redistribute_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * neighbor, int neighbor_index,
                 int k_prime_index, int k_prime);
 PAFFS_RESULT delete_entry( p_dev* dev, treeCacheNode * n, pInode_no key);
 PAFFS_RESULT remove_entry_from_node(p_dev* dev, treeCacheNode * n, pInode_no key);
