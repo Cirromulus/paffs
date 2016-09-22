@@ -9,9 +9,10 @@
 #define TREECACHE_H_
 
 #include "paffs.h"
+#include "btree.h"
 
 
-PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode* tcn);	//parent to self
+PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode* tcn);
 
 PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
 									treeCacheNode* parent, treeCacheNode* child);

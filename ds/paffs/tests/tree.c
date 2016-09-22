@@ -16,9 +16,8 @@
 int main( int argc, char ** argv ) {
 	printf("Branch-Order: %d, Leaf-Order: %d\nSpace in Pointers: %lu Byte, Sizeof pInode: %lu Byte\n", BRANCH_ORDER, LEAF_ORDER, BRANCH_ORDER * sizeof(p_addr), sizeof(pInode));
 	printf("Size of TreeNode: %lu\n", sizeof(treeNode));
-	printf("Size of TreeNode2: %lu\n", sizeof(treeNode2));
 
-	treeNode2 a;
+	treeNode a;
 	a.as_branch.keys[0] = 1;
 	printf("a.as_leaf.keys[0] = %d\n", a.as_leaf.keys[0]);
 
