@@ -48,7 +48,6 @@ PAFFS_RESULT deleteInode( p_dev* dev, pInode_no number){
 	pInode key;
 	treeCacheNode* key_leaf;
 
-	//Safety or Speed ? Search is not really necessary
 	PAFFS_RESULT r = find_leaf(dev, number, &key_leaf);
 	if(r != PAFFS_OK)
 		return r;
@@ -688,16 +687,19 @@ PAFFS_RESULT remove_entry_from_node(p_dev* dev, treeCacheNode * n, pInode_no key
 
 	// Remove the key and shift other keys accordingly.
 	i = 0;
-	while (n->raw.as_branch.keys[i] != key)
+	while (n->raw.as_branch.keys[i] != key)		//as_branch is OK, because it is same memory as as_leaf
 		i++;
 	for (++i; i < n->raw.num_keys; i++)
 		n->raw.as_branch.keys[i - 1] = n->raw.as_branch.keys[i];
 
-	// Remove the pointer and shift other pointers accordingly.
+
 	// First determine number of pointers.
 	num_pointers = n->raw.is_leaf ? n->raw.num_keys : n->raw.num_keys + 1;
+
+	// Remove the pointer and shift other pointers accordingly.
 	i = 0;
-	while (n->pointers[i] != n && i < n->raw.num_keys)	//boundary only of something is wrong, other pointers may be NULL
+	//FIXME: Ddetermine if leaf entry or branch entry is deleted!
+	while (n->pointers[i] != n && i < n->raw.num_keys)
 		i++;
 	for (++i; i < num_pointers; i++){
 		if (n->raw.is_leaf)
@@ -1091,9 +1093,13 @@ void print_queued_keys_r(p_dev* dev, queue_s* q){
 					return;
 				}
 				queue_enqueue(new_q, nn);
-				if(i < n->raw.num_keys) printf(".%" PRIu32 ".", (uint32_t) n->raw.as_branch.keys[i]);
+				if(i == 0)
+					printf(".");
+				if(i < n->raw.num_keys) printf("%" PRIu32 ".", (uint32_t) n->raw.as_branch.keys[i]);
 			}else{
-				if(i < n->raw.num_keys) printf(" %" PRIu32 " ", (uint32_t) n->raw.as_leaf.keys[i]);
+				if(i == 0)
+					printf(" ");
+				if(i < n->raw.num_keys) printf("%" PRIu32 " ", (uint32_t) n->raw.as_leaf.keys[i]);
 			}
 		}
 		printf("|");
