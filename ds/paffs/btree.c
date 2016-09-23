@@ -370,7 +370,7 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, 
 		leaf->raw.as_leaf.keys[i] = 0;
 	}
 	for (i = new_leaf->raw.num_keys; i < btree_leaf_order; i++){
-		memset(&new_leaf->raw.as_leaf.pInodes[i], 0, sizeof(pInode));	//fixme: new_leaf or just leaf?
+		memset(&new_leaf->raw.as_leaf.pInodes[i], 0, sizeof(pInode));
 		new_leaf->raw.as_leaf.keys[i] = 0;
 	}
 
@@ -485,7 +485,7 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 	 * the old treeCacheNode to the left and the new to the right.
 	 */
 
-	return insert_into_parent(dev, old_node, k_prime, &new_node);
+	return insert_into_parent(dev, old_node, k_prime, new_node);
 }
 
 
@@ -496,7 +496,7 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 PAFFS_RESULT insert_into_parent(p_dev* dev, treeCacheNode * left, pInode_no key, treeCacheNode * right) {
 
 	int left_index;
-	treeCacheNode *parent = left->parent;	//Fixme: left or right parent?
+	treeCacheNode *parent = left->parent;
 
 	if (left == parent)
 		return insert_into_new_root(dev, left, key, right);
@@ -671,7 +671,7 @@ int get_neighbor_index( p_dev* dev, treeCacheNode * n ){
         treeCacheNode *parent = n->parent;
 
         for (i = 0; i <= parent->raw.num_keys; i++)
-                if (parent->pointers[i] == n)
+                if (parent->pointers[i] == n)		//It is allowed for all other pointers to be invalid
                         return i - 1;
 
         // Error state.
@@ -842,13 +842,8 @@ PAFFS_RESULT coalesce_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * neigh
 		}
 	}
 
-	PAFFS_RESULT r = removeCacheNode(dev, n);
-	if(r != PAFFS_OK)
-			return r;
-
 	neighbor->dirty = true;
 
-	//lets hope, n->key is k_prime
 	return delete_entry(dev, n->parent, k_prime);
 
 }
@@ -987,8 +982,8 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeCacheNode * n, pInode_no key){
 	 * to be preserved after deletion.
 	 */
 
-	//cut(btree_leaf/branch_order) - 1 oder ohne -1?
-	min_keys = n->raw.is_leaf ? cut(btree_leaf_order) : cut(btree_branch_order);
+
+	min_keys = n->raw.is_leaf ? cut(btree_leaf_order) : cut(btree_branch_order) - 1;	//todo: is -1 necessary?
 
 	/* Case:  treeCacheNode stays at or above minimum.
 	 * (The simple case.)
@@ -1022,7 +1017,7 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeCacheNode * n, pInode_no key){
 
 	/* Coalescence. */
 
-	if (neighbor->raw.num_keys + n->raw.num_keys < capacity)
+	if (neighbor->raw.num_keys + n->raw.num_keys <= capacity)
 		//Write of Nodes happens in coalesce_nodes
 		return coalesce_nodes(dev, n, neighbor, neighbor_index, k_prime);
 
