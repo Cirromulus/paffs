@@ -12,12 +12,12 @@
 #include "btree.h"
 
 
-PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode* tcn);
+PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode** tcn);
 
 PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
-									treeCacheNode* parent, treeCacheNode* child);
+									treeCacheNode* parent, treeCacheNode** child);
 
-PAFFS_RESULT addNewCacheNode(p_dev* dev, treeCacheNode* newTcn);
+PAFFS_RESULT addNewCacheNode(p_dev* dev, treeCacheNode** newTcn);
 
 PAFFS_RESULT removeCacheNode(p_dev* dev, treeCacheNode* tcn);
 

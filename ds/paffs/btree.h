@@ -70,7 +70,7 @@ int length_to_root( p_dev* dev, treeCacheNode * child );
 PAFFS_RESULT path_from_root( p_dev* dev, treeCacheNode * child, p_addr* path, unsigned int* lengthOut);
 int find_range( p_dev* dev, treeCacheNode * root, pInode_no key_start, pInode_no key_end,
                 int returned_keys[], void * returned_pointers[]); 
-PAFFS_RESULT find_leaf(  p_dev* dev, pInode_no key, treeCacheNode* outtreeCacheNode);
+PAFFS_RESULT find_leaf(  p_dev* dev, pInode_no key, treeCacheNode** outtreeCacheNode);
 PAFFS_RESULT find_in_leaf (treeCacheNode* leaf, pInode_no key, pInode* outInode);
 PAFFS_RESULT find( p_dev* dev, pInode_no key, pInode* outInode);
 int cut( int length );

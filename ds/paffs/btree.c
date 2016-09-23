@@ -23,7 +23,7 @@ PAFFS_RESULT getInode( p_dev* dev, pInode_no number, pInode* outInode){
 
 PAFFS_RESULT updateExistingInode( p_dev* dev, pInode* inode){
 	treeCacheNode *node = NULL;
-	PAFFS_RESULT r = find_leaf(dev, inode->no, node);
+	PAFFS_RESULT r = find_leaf(dev, inode->no, &node);
 	if(r != PAFFS_OK)
 		return r;
 
@@ -46,26 +46,26 @@ PAFFS_RESULT updateExistingInode( p_dev* dev, pInode* inode){
 PAFFS_RESULT deleteInode( p_dev* dev, pInode_no number){
 
 	pInode key;
-	treeCacheNode key_leaf;
+	treeCacheNode* key_leaf;
 
 	//Safety or Speed ? Search is not really necessary
 	PAFFS_RESULT r = find_leaf(dev, number, &key_leaf);
 	if(r != PAFFS_OK)
 		return r;
-	r = find_in_leaf (&key_leaf, number, &key);
+	r = find_in_leaf (key_leaf, number, &key);
 	if(r != PAFFS_OK)
 		return r;
-	return delete_entry(dev, &key_leaf, number);
+	return delete_entry(dev, key_leaf, number);
 }
 
 PAFFS_RESULT findFirstFreeNo(p_dev* dev, pInode_no* outNumber){
 	treeCacheNode *c = NULL;
 	*outNumber = 0;
-	PAFFS_RESULT r = getRootNodeFromCache(dev, c);
+	PAFFS_RESULT r = getRootNodeFromCache(dev, &c);
 	if(r != PAFFS_OK)
 		return r;
 	while(!c->raw.is_leaf){
-		r = getTreeNodeAtIndexFrom(dev, c->raw.num_keys, c, c);
+		r = getTreeNodeAtIndexFrom(dev, c->raw.num_keys, c, &c);
 		if(r != PAFFS_OK)
 			return r;
 	}
@@ -90,7 +90,7 @@ int height( p_dev* dev, treeCacheNode * root ) {
         int h = 0;
         treeCacheNode *curr = root;
         while (!curr->raw.is_leaf) {
-                PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, 0, curr, curr);
+                PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, 0, curr, &curr);
                 if(r != PAFFS_OK){
                 	paffs_lasterr = r;
                 	return -1;
@@ -118,11 +118,11 @@ int length_to_root( p_dev* dev, treeCacheNode * child ){
  * if the verbose flag is set.
  * Returns the leaf containing the given key.
  */
-PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeCacheNode* outtreeCacheNode) {
+PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeCacheNode** outtreeCacheNode) {
 	int i = 0;
 	treeCacheNode *c = NULL;
 
-	PAFFS_RESULT r = getRootNodeFromCache(dev, c);
+	PAFFS_RESULT r = getRootNodeFromCache(dev, &c);
 	if(r != PAFFS_OK)
 		return r;
 
@@ -136,12 +136,12 @@ PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeCacheNode* outtreeCacheNo
 		}
 
 		//printf("%d ->\n", i);
-		PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, i, c, c);
+		PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, i, c, &c);
 		if(r != PAFFS_OK)
 			return r;
 	}
 
-	outtreeCacheNode = c;
+	*outtreeCacheNode = c;
 	return PAFFS_OK;
 }
 
@@ -160,7 +160,7 @@ PAFFS_RESULT find_in_leaf (treeCacheNode* leaf, pInode_no key, pInode* outInode)
  */
 PAFFS_RESULT find( p_dev* dev, pInode_no key, pInode* outInode){
     treeCacheNode *c = NULL;
-    PAFFS_RESULT r = find_leaf( dev, key, c);
+    PAFFS_RESULT r = find_leaf( dev, key, &c);
     if(r != PAFFS_OK)
     	return r;
     return find_in_leaf(c, key, outInode);
@@ -324,7 +324,7 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, 
 
 	treeCacheNode *new_leaf = NULL;
 
-	PAFFS_RESULT r = addNewCacheNode(dev, new_leaf);
+	PAFFS_RESULT r = addNewCacheNode(dev, &new_leaf);
 	if(r != PAFFS_OK)
 		return r;
 
@@ -374,6 +374,7 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, 
 		new_leaf->raw.as_leaf.keys[i] = 0;
 	}
 
+	new_leaf->parent = leaf->parent;
 	new_key = new_leaf->raw.as_leaf.keys[0];
 
 	return insert_into_parent(dev, leaf, new_key, new_leaf);
@@ -421,7 +422,7 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 	p_addr temp_addresses[btree_branch_order+1];
 
 
-	PAFFS_RESULT r = addNewCacheNode(dev, new_node);
+	PAFFS_RESULT r = addNewCacheNode(dev, &new_node);
 	if(r != PAFFS_OK)
 		return r;
 
@@ -497,7 +498,7 @@ PAFFS_RESULT insert_into_parent(p_dev* dev, treeCacheNode * left, pInode_no key,
 	int left_index;
 	treeCacheNode *parent = left->parent;	//Fixme: left or right parent?
 
-	if (parent->parent == parent)
+	if (left == parent)
 		return insert_into_new_root(dev, left, key, right);
 
 
@@ -561,7 +562,7 @@ PAFFS_RESULT insert_into_parent(p_dev* dev, treeCacheNode * left, pInode_no key,
  */
 PAFFS_RESULT insert_into_new_root(p_dev* dev, treeCacheNode * left, pInode_no key, treeCacheNode * right) {
 	treeCacheNode *new_root = NULL;
-	PAFFS_RESULT r = addNewCacheNode(dev, new_root);
+	PAFFS_RESULT r = addNewCacheNode(dev, &new_root);
 	if(r != PAFFS_OK)
 		return r;
 
@@ -576,6 +577,7 @@ PAFFS_RESULT insert_into_new_root(p_dev* dev, treeCacheNode * left, pInode_no ke
 
 	new_root->raw.num_keys = 1;
 	new_root->dirty = true;
+	new_root->parent = new_root;
 
 	return setCacheRoot(dev, new_root);
 }
@@ -588,11 +590,12 @@ PAFFS_RESULT insert_into_new_root(p_dev* dev, treeCacheNode * left, pInode_no ke
 PAFFS_RESULT start_new_tree(p_dev* dev) {
 
 	treeCacheNode *new_root = NULL;
-	PAFFS_RESULT r = addNewCacheNode(dev, new_root);
+	PAFFS_RESULT r = addNewCacheNode(dev, &new_root);
 	if(r != PAFFS_OK)
 		return r;
 	new_root->raw.is_leaf = true;
 	new_root->dirty = true;
+	new_root->parent = new_root;
     return setCacheRoot(dev, new_root);
 }
 
@@ -623,7 +626,7 @@ PAFFS_RESULT insert( p_dev* dev, pInode* value) {
         }
 
         /* Not really necessary */
-        r = getRootNodeFromCache(dev, node);
+        r = getRootNodeFromCache(dev, &node);
         if (r != PAFFS_OK)
         	return r;
 
@@ -634,7 +637,7 @@ PAFFS_RESULT insert( p_dev* dev, pInode* value) {
          * (Rest of function body.)
          */
 
-        r = find_leaf(dev, value->no, node);
+        r = find_leaf(dev, value->no, &node);
         if(r != PAFFS_OK)
         	return r;
 
@@ -749,6 +752,7 @@ PAFFS_RESULT adjust_root(p_dev* dev, treeCacheNode * root) {
 	// as the new root.
 
 	if (!root->raw.is_leaf) {
+		root->pointers[0]->parent = root->pointers[0];
 		PAFFS_RESULT r = setCacheRoot(dev, root->pointers[0]);
 		if(r != PAFFS_OK)
 			return r;
@@ -1009,8 +1013,8 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeCacheNode * n, pInode_no key){
 	neighbor_index = get_neighbor_index( dev, n );
 	k_prime_index = neighbor_index == -1 ? 0 : neighbor_index;
 	k_prime = n->parent->raw.as_branch.keys[k_prime_index];
-	r = neighbor_index == -1 ? getTreeNodeAtIndexFrom(dev, 1, n->parent, neighbor) :
-			getTreeNodeAtIndexFrom(dev, neighbor_index, n->parent, neighbor);
+	r = neighbor_index == -1 ? getTreeNodeAtIndexFrom(dev, 1, n->parent, &neighbor) :
+			getTreeNodeAtIndexFrom(dev, neighbor_index, n->parent, &neighbor);
 	if(r != PAFFS_OK)
 		return r;
 
@@ -1036,7 +1040,7 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeCacheNode * n, pInode_no key){
  */
 void print_tree( p_dev* dev) {
 	treeCacheNode *n = NULL;
-	PAFFS_RESULT r = getRootNodeFromCache(dev, n);
+	PAFFS_RESULT r = getRootNodeFromCache(dev, &n);
 	if(r != PAFFS_OK){
 		printf("%s!\n", paffs_err_msg(r));
 		return;
@@ -1057,7 +1061,7 @@ void print_leaves(p_dev* dev, treeCacheNode* c) {
 	}else{
 		for(int i = 0; i <= c->raw.num_keys; i++){
 			treeCacheNode *n = NULL;
-			PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, i, c, n);
+			PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, i, c, &n);
 			if(r != PAFFS_OK){
 				printf("%s!\n", paffs_err_msg(r));
 				return;
@@ -1079,7 +1083,7 @@ void print_queued_keys_r(p_dev* dev, queue_s* q){
 		for(int i = 0; i <= n->raw.num_keys; i++){
 			if(!n->raw.is_leaf){
 				treeCacheNode *nn = NULL;
-				PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, i, n, nn);
+				PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, i, n, &nn);
 				if(r != PAFFS_OK){
 					printf("%s!\n", paffs_err_msg(r));
 					return;
