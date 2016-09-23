@@ -56,7 +56,7 @@ PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
 	target->parent = parent;
 	*child = target;
 
-	return readTreeNode(dev, parent->raw.as_branch.pointers[index], *child);
+	return readTreeNode(dev, parent->raw.as_branch.pointers[index], &(*child)->raw);
 }
 
 PAFFS_RESULT addNewCacheNode(p_dev* dev, treeCacheNode** newTcn){
@@ -71,7 +71,6 @@ PAFFS_RESULT addNewCacheNode(p_dev* dev, treeCacheNode** newTcn){
 }
 
 PAFFS_RESULT removeCacheNode(p_dev* dev, treeCacheNode* tcn){
-	//FIXME: Not used at the moment because of complex deletion algorithm
 	free(tcn);
 	return PAFFS_OK;
 }

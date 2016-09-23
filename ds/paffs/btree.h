@@ -42,7 +42,7 @@ typedef struct treeNode{
 
 typedef struct treeCacheNode{
 	treeNode raw;
-	struct treeCacheNode* parent;
+	struct treeCacheNode* parent;	//Parent either points to parent or to node itself if is root
 	struct treeCacheNode* pointers[BRANCH_ORDER];	//pointer can be NULL if not cached yet
 	bool dirty;
 } treeCacheNode;
@@ -93,7 +93,7 @@ PAFFS_RESULT start_new_tree(p_dev* dev);
 
 // Deletion.
 
-int get_neighbor_index( p_dev* dev, treeCacheNode * n );
+int get_neighbor_index( treeCacheNode * n );
 PAFFS_RESULT adjust_root(p_dev* dev, treeCacheNode * root);
 PAFFS_RESULT coalesce_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * neighbor, int neighbor_index, int k_prime);
 PAFFS_RESULT redistribute_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * neighbor, int neighbor_index,

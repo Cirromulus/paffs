@@ -239,7 +239,7 @@ PAFFS_RESULT readInodeData(pInode* inode,
 
 
 	if(offs + bytes > inode->size){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read bigger than size of object! (was: %d, max: %llu)", offs+bytes, inode->size);
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read bigger than size of object! (was: %d, max: %lu)", offs+bytes, (long unsigned) inode->size);
 		//TODO: return less bytes_read
 		return paffs_lasterr = PAFFS_NIMPL;
 	}

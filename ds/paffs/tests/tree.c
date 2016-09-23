@@ -34,14 +34,14 @@ int main( int argc, char ** argv ) {
 	PAFFS_RESULT r = paffs_mnt("1");
 	p_dev * device = getDevice();
 
-	unsigned char values[] = {0xAA, 0x88, 0x03, 0x70, 0xF0};
+	//unsigned char values[] = {0xAA, 0x88, 0x03, 0x70, 0xF0};
 
 	print_tree(device);
 	for(int i = 5; i > 0; i--){
 		printf("Insert nr. %d:", i);
 		fflush(stdout);
 		pInode test;
-		memset(&test, values[i-1], sizeof(pInode));
+		memset(&test, 0, sizeof(pInode));
 		test.no = i;
 
 		r = insertInode(device, &test);

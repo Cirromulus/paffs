@@ -665,7 +665,7 @@ PAFFS_RESULT insert( p_dev* dev, pInode* value) {
  * is the leftmost child), returns -1 to signify
  * this special case.
  */
-int get_neighbor_index( p_dev* dev, treeCacheNode * n ){
+int get_neighbor_index( treeCacheNode * n ){
 
         int i;
         treeCacheNode *parent = n->parent;
@@ -689,31 +689,24 @@ PAFFS_RESULT remove_entry_from_node(p_dev* dev, treeCacheNode * n, pInode_no key
 	// Remove the key and shift other keys accordingly.
 	i = 0;
 	while (n->raw.as_branch.keys[i] != key)
-			i++;
-	if(!n->raw.is_leaf){
-		PAFFS_RESULT r = removeCacheNode(dev, n->pointers[i]);
-		if(r != PAFFS_OK)
-			return r;
-	}
-
-
+		i++;
 	for (++i; i < n->raw.num_keys; i++)
-			n->raw.as_branch.keys[i - 1] = n->raw.as_branch.keys[i];
+		n->raw.as_branch.keys[i - 1] = n->raw.as_branch.keys[i];
 
 	// Remove the pointer and shift other pointers accordingly.
 	// First determine number of pointers.
 	num_pointers = n->raw.is_leaf ? n->raw.num_keys : n->raw.num_keys + 1;
 	i = 0;
-	while (n->raw.as_branch.keys[i] != key && i < n->raw.num_keys)	//boundary only of something is wrong
+	while (n->pointers[i] != n && i < n->raw.num_keys)	//boundary only of something is wrong, other pointers may be NULL
 		i++;
-	for (++i; i < num_pointers; i++)
+	for (++i; i < num_pointers; i++){
 		if (n->raw.is_leaf)
 			n->raw.as_leaf.pInodes[i - 1] = n->raw.as_leaf.pInodes[i];
 		else{
 			n->raw.as_branch.pointers[i - 1] = n->raw.as_branch.pointers[i];
 			n->pointers[i - 1] = n->pointers[i];
 		}
-
+	}
 
 	// One key fewer.
 	n->raw.num_keys--;
@@ -764,7 +757,7 @@ PAFFS_RESULT adjust_root(p_dev* dev, treeCacheNode * root) {
 	// If it is a leaf (has no children),
 	// then the whole tree is empty.
 
-	return PAFFS_OK;
+	return removeCacheNode(dev, root);
 }
 
 
@@ -828,6 +821,15 @@ PAFFS_RESULT coalesce_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * neigh
 		neighbor->raw.as_branch.pointers[i] = n->raw.as_branch.pointers[j];
 		neighbor->pointers[i] = n->pointers[j];
 
+
+		/* All children must now point up to the same parent.
+		 */
+
+		for (i = 0; i < neighbor->raw.num_keys + 1; i++) {
+			tmp = neighbor->pointers[i];
+			tmp->parent = neighbor;
+		}
+
 	}
 
 	/* In a leaf, append the keys and pointers of
@@ -844,8 +846,11 @@ PAFFS_RESULT coalesce_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * neigh
 
 	neighbor->dirty = true;
 
-	return delete_entry(dev, n->parent, k_prime);
+	PAFFS_RESULT r =  delete_entry(dev, n->parent, k_prime);
+	if(r != PAFFS_OK)
+		return r;
 
+	return removeCacheNode(dev, n);
 }
 
 
@@ -868,22 +873,24 @@ PAFFS_RESULT redistribute_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * n
 
 	if (neighbor_index != -1) {
 		if (!n->raw.is_leaf){
-			n->raw.as_leaf.pInodes[n->raw.num_keys + 1] = n->raw.as_leaf.pInodes[n->raw.num_keys];
-			for (i = n->raw.num_keys; i > 0; i--) {
-				n->raw.as_leaf.keys[i] = n->raw.as_leaf.keys[i - 1];
-				n->raw.as_leaf.pInodes[i] = n->raw.as_leaf.pInodes[i - 1];
-			}
-		}else{
+			n->raw.as_branch.pointers[n->raw.num_keys + 1] = n->raw.as_branch.pointers[n->raw.num_keys];
+			n->pointers[n->raw.num_keys + 1] = n->pointers[n->raw.num_keys];
 			for (i = n->raw.num_keys; i > 0; i--) {
 				n->raw.as_branch.keys[i] = n->raw.as_branch.keys[i - 1];
 				n->pointers[i] = n->pointers[i - 1];
 				n->raw.as_branch.pointers[i] = n->raw.as_branch.pointers[i - 1];
+			}
+		}else{
+			for (i = n->raw.num_keys; i > 0; i--) {
+				n->raw.as_leaf.keys[i] = n->raw.as_leaf.keys[i - 1];
+				n->raw.as_leaf.pInodes[i] = n->raw.as_leaf.pInodes[i - 1];
 			}
 		}
 
 		if (!n->raw.is_leaf) {
 			n->pointers[0] = neighbor->pointers[neighbor->raw.num_keys];
 			n->raw.as_branch.pointers[0] = neighbor->raw.as_branch.pointers[neighbor->raw.num_keys];
+			n->pointers[0]->parent = n;
 			neighbor->pointers[neighbor->raw.num_keys] = NULL;
 			neighbor->raw.as_branch.pointers[neighbor->raw.num_keys] = 0;
 			n->raw.as_branch.keys[0] = k_prime;
@@ -918,6 +925,7 @@ PAFFS_RESULT redistribute_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * n
 			n->raw.as_branch.keys[n->raw.num_keys] = k_prime;
 			n->pointers[n->raw.num_keys + 1] = neighbor->pointers[0];
 			n->raw.as_branch.pointers[n->raw.num_keys + 1] = neighbor->raw.as_branch.pointers[0];
+			n->pointers[n->raw.num_keys + 1]->parent = n;
 			n->parent->raw.as_branch.keys[k_prime_index] = neighbor->raw.as_branch.keys[0];
 			for (i = 0; i < neighbor->raw.num_keys - 1; i++) {
 				neighbor->raw.as_branch.keys[i] = neighbor->raw.as_branch.keys[i + 1];
@@ -1005,7 +1013,7 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeCacheNode * n, pInode_no key){
 	 * to the neighbor.
 	 */
 
-	neighbor_index = get_neighbor_index( dev, n );
+	neighbor_index = get_neighbor_index(n);
 	k_prime_index = neighbor_index == -1 ? 0 : neighbor_index;
 	k_prime = n->parent->raw.as_branch.keys[k_prime_index];
 	r = neighbor_index == -1 ? getTreeNodeAtIndexFrom(dev, 1, n->parent, &neighbor) :
@@ -1018,7 +1026,6 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeCacheNode * n, pInode_no key){
 	/* Coalescence. */
 
 	if (neighbor->raw.num_keys + n->raw.num_keys <= capacity)
-		//Write of Nodes happens in coalesce_nodes
 		return coalesce_nodes(dev, n, neighbor, neighbor_index, k_prime);
 
 	/* Redistribution. */
