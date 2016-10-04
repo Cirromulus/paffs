@@ -16,6 +16,9 @@ COMPILE_AS_CXX11()
 add_subdirectory(driver)
 
 add_library(paffs ${SOURCES})
+target_compile_definitions(paffs 
+	PUBLIC TREENODECACHESIZE=50
+)
 
 add_executable(tree_test ${SOURCES} tests/tree.c)
 add_executable(dir_test tests/dirtest.c)

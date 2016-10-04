@@ -9,8 +9,11 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include "../paffs.h"
 #include "fc_driver.h"
 #include <string.h>
+
+static c_flashCell* c_fc[2];
 
 NANDADRESS translatePageToAddress(unsigned long long sector, flashCell* fc){
 	NANDADRESS r;

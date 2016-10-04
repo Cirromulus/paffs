@@ -8,7 +8,6 @@
 #ifndef DS_PAFFS_DRIVER_FC_DRIVER_H_
 #define DS_PAFFS_DRIVER_FC_DRIVER_H_
 
-#include "../paffs.h"
 #include <stddef.h>
 
 typedef void c_flashCell;
@@ -16,8 +15,6 @@ typedef void c_flashCell;
 struct context{
 	int package;
 };
-
-static c_flashCell* c_fc[2];
 
 
 p_dev* paffs_FC_install_drv(const char *name, c_flashCell* fc);

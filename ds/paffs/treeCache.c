@@ -12,6 +12,9 @@
 
 static treeCacheNode* cache_root = NULL;
 
+static treeCacheNode  cache[TREENODECACHESIZE];
+//TODO: use static cache instead of malloc usw.
+
 PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode** tcn){
 	if(cache_root != NULL){
 		*tcn = cache_root;

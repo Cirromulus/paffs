@@ -433,7 +433,6 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 	 * keys and pointers to the old treeCacheNode and
 	 * the other half to the new.
 	 */
-
 	for (i = 0, j = 0; i < old_node->raw.num_keys + 1; i++, j++) {
 			if (j == left_index + 1) j++;
 			temp_addresses[j] = old_node->raw.as_branch.pointers[i];

@@ -19,7 +19,6 @@ extern "C" {
 
 #include "paffs_trace.h"
 
-
 typedef enum PAFFS_RESULT{
 	PAFFS_OK = 0,
 	PAFFS_FAIL,
@@ -32,20 +31,6 @@ typedef enum PAFFS_RESULT{
 	PAFFS_LOWMEM,
 	num_PAFFS_RESULT
 } PAFFS_RESULT;
-
-static const char* PAFFS_RESULT_MSG[] = {
-		"OK",
-		"Unknown error",
-		"Object not found",
-		"Input values malformed",
-		"Operation not yet supported",
-		"Gratulations, you found a Bug",
-		"Node is already root, no Parent",
-		"No (usable) space left on device",
-		"Not enough RAM for cache",
-		"You should not be seeing this..."
-};
-
 
 typedef char paffs_permission;
 
@@ -180,8 +165,6 @@ typedef enum p_summaryEntry{
 	DIRTY
 }p_summaryEntry;
 
-static unsigned int activeArea[area_types_no];
-
 typedef struct p_area{
 	p_areaType type:3;
 	p_areaStatus status:2;
@@ -204,7 +187,9 @@ typedef struct p_dev{
 	p_area* areaMap;
 } p_dev;
 
-static PAFFS_RESULT paffs_lasterr = PAFFS_OK;
+#warning "HALLO?"
+PAFFS_RESULT paffs_lasterr;
+unsigned int activeArea[area_types_no];
 
 PAFFS_RESULT paffs_initialize(p_dev* dev);
 

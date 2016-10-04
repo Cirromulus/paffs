@@ -17,6 +17,19 @@ static pDentry* dentry_buf[DENTRY_BUFSIZE];
 static unsigned char dentrys_buf_used = 0;
 */
 
+static const char* PAFFS_RESULT_MSG[] = {
+		"OK",
+		"Unknown error",
+		"Object not found",
+		"Input values malformed",
+		"Operation not yet supported",
+		"Gratulations, you found a Bug",
+		"Node is already root, no Parent",
+		"No (usable) space left on device",
+		"Not enough RAM for cache",
+		"You should not be seeing this..."
+};
+
 const char* paffs_err_msg(PAFFS_RESULT pr){
 	return PAFFS_RESULT_MSG[pr];
 }
@@ -40,7 +53,7 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 	activeArea[JOURNALAREA] = 0;
 	activeArea[DATAAREA] = 0;
 
-
+	paffs_lasterr = PAFFS_OK;
 	return PAFFS_OK;
 }
 

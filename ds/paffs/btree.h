@@ -20,8 +20,8 @@
 		/ (sizeof(pInode) + sizeof(pInode_no)) ) //todo: '512' Dynamisch machen
 
 
-static int btree_branch_order = BRANCH_ORDER;
-static int btree_leaf_order = LEAF_ORDER;
+static const int btree_branch_order = BRANCH_ORDER;
+static const int btree_leaf_order = LEAF_ORDER;
 
 typedef struct treeNode{
 	union {
