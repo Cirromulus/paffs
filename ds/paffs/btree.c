@@ -697,13 +697,16 @@ PAFFS_RESULT remove_entry_from_node(p_dev* dev, treeCacheNode * n, pInode_no key
 
 	// Remove the pointer and shift other pointers accordingly.
 	i = 0;
-	//FIXME: Ddetermine if leaf entry or branch entry is deleted!
-	while (n->pointers[i] != n && i < n->raw.num_keys)
-		i++;
-	for (++i; i < num_pointers; i++){
-		if (n->raw.is_leaf)
+	if(n->raw.is_leaf){
+		while (n->raw.as_leaf.keys[i] != key && i < n->raw.num_keys)
+			i++;
+		for (++i; i < num_pointers; i++){
 			n->raw.as_leaf.pInodes[i - 1] = n->raw.as_leaf.pInodes[i];
-		else{
+		}
+	}else{
+		while (n->raw.as_branch.keys[i] != key && i < n->raw.num_keys)
+			i++;
+		for (++i; i < num_pointers; i++){
 			n->raw.as_branch.pointers[i - 1] = n->raw.as_branch.pointers[i];
 			n->pointers[i - 1] = n->pointers[i];
 		}
@@ -1014,6 +1017,7 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeCacheNode * n, pInode_no key){
 	 * to the neighbor.
 	 */
 
+	//FIXME: Maybe its a off-by-one of k_prime?
 	neighbor_index = get_neighbor_index(n);
 	k_prime_index = neighbor_index == -1 ? 0 : neighbor_index;
 	k_prime = n->parent->raw.as_branch.keys[k_prime_index];
