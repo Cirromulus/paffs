@@ -168,7 +168,7 @@ typedef enum p_summaryEntry{
 typedef struct p_area{
 	p_areaType type:3;
 	p_areaStatus status:2;
-	uint32_t erasecount:17;	//Overflow at 132.000 is acceptable
+	uint32_t erasecount:17;	//Overflow at 132.000 is acceptable (assuming less than 100k erase cycles)
 	uint32_t position;	//physical position, not logical
 	p_summaryEntry* areaSummary; //May be invalid if status == closed; Optimizable bitusage
 	uint32_t dirtyPages; 	//redundant to contents of areaSummary
@@ -187,9 +187,8 @@ typedef struct p_dev{
 	p_area* areaMap;
 } p_dev;
 
-#warning "HALLO?"
-PAFFS_RESULT paffs_lasterr;
-unsigned int activeArea[area_types_no];
+extern PAFFS_RESULT paffs_lasterr;				//defined in paffs.c
+extern unsigned int activeArea[area_types_no]; 	//defined in paffs_flash.c
 
 PAFFS_RESULT paffs_initialize(p_dev* dev);
 

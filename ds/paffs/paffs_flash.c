@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+unsigned int activeArea[area_types_no] = {0};
+
 unsigned int findWritableArea(p_areaType areaType, p_dev* dev){
 	if(activeArea[areaType] == 0 || dev->areaMap[activeArea[areaType]].status == CLOSED){
 		for(int try = 1; try <= 2; try++){

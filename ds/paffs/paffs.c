@@ -11,6 +11,8 @@
 
 static p_dev* device = NULL;
 
+PAFFS_RESULT paffs_lasterr = PAFFS_OK;
+
 //Dentrys zur schnelleren verfügung
 /*#define DENTRY_BUFSIZE 10
 static pDentry* dentry_buf[DENTRY_BUFSIZE];
@@ -53,7 +55,6 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 	activeArea[JOURNALAREA] = 0;
 	activeArea[DATAAREA] = 0;
 
-	paffs_lasterr = PAFFS_OK;
 	return PAFFS_OK;
 }
 
