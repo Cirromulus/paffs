@@ -40,7 +40,7 @@ PAFFS_RESULT updateExistingInode( p_dev* dev, pInode* inode){
 	node->dirty = true;
 
 	//todo: check cache memory consumption, possibly flush
-	return PAFFS_NIMPL;
+	return PAFFS_OK;
 }
 
 PAFFS_RESULT deleteInode( p_dev* dev, pInode_no number){
@@ -992,7 +992,7 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeCacheNode * n, pInode_no key){
 	 */
 
 
-	min_keys = n->raw.is_leaf ? cut(btree_leaf_order) : cut(btree_branch_order) - 1;	//todo: is -1 necessary?
+	min_keys = n->raw.is_leaf ? cut(btree_leaf_order) : cut(btree_branch_order) - 1;
 
 	/* Case:  treeCacheNode stays at or above minimum.
 	 * (The simple case.)
@@ -1014,7 +1014,6 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeCacheNode * n, pInode_no key){
 	 * to the neighbor.
 	 */
 
-	//FIXME: Maybe its a off-by-one of k_prime?
 	neighbor_index = get_neighbor_index(n);
 	k_prime_index = neighbor_index == -1 ? 0 : neighbor_index;
 	k_prime = n->parent->raw.as_branch.keys[k_prime_index];

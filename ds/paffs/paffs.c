@@ -40,6 +40,10 @@ PAFFS_RESULT paffs_getLastErr(){
 	return paffs_lasterr;
 }
 
+void paffs_resetLastErr(){
+	paffs_lasterr = PAFFS_OK;
+}
+
 PAFFS_RESULT paffs_initialize(p_dev* dev){
 	device = dev;
 	p_param* param = &device->param;
@@ -324,6 +328,7 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 	directoryEntryCount ++;
 	memcpy (dirData, &directoryEntryCount, sizeof(dirEntryCount));
 
+	//FIXME: THIS RETURNS PAFFS_NF
 	r = writeInodeData(contDir, 0, contDir->size + direntryl, &bytes, dirData, device);
 	contDir->size += direntryl;
 	free(dirData);

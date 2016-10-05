@@ -90,44 +90,47 @@ void dirTest(){
 	PAFFS_RESULT r = paffs_mnt("1");
 	print_tree(getDevice());
 	paffs_permission p = 0;
-	while(getchar() == EOF);
-	r = paffs_mkdir("/a", p);
-	if(r != PAFFS_OK)
-		printf("%s\n", paffs_err_msg(r));
+	printf("Creating directory /a... ");
+	fflush(stdout);
+//	while(getchar() == EOF);
+	printf("%s\n", paffs_err_msg(paffs_mkdir("/a", p)));
 	print_tree(getDevice());
-	//while(getchar() == EOF);
-	r = paffs_mkdir("/b", p);
-	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(r));
+//	while(getchar() == EOF);
+	printf("Creating directory /b... ");
+	fflush(stdout);
+//	while(getchar() == EOF);
+	printf("%s\n", paffs_err_msg(paffs_mkdir("/b", p)));
 	print_tree(getDevice());
-	while(getchar() == EOF);
-	r = paffs_mkdir("/b/c", p);
-	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(r));
+//	while(getchar() == EOF);
+	printf("Creating directory /b/foo... ");
+	fflush(stdout);
+//	while(getchar() == EOF);
+	printf("%s\n", paffs_err_msg(paffs_mkdir("/b/foo", p)));
 	print_tree(getDevice());
-	while(getchar() == EOF);
-	r = paffs_touch ("/b/file");
-	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(r));
+	printf("Touching file /b/file ... ");
+	fflush(stdout);
+//	while(getchar() == EOF);
+	printf("%s\n", paffs_err_msg(paffs_touch ("/b/file")));
 	print_tree(getDevice());
-	while(getchar() == EOF);
+
 	listDir("/");
 
 	listDir("/b/");
 
 	listDir("/a");
 	
+	printf("opening file /b/file ...");
+	fflush(stdout);
+
 	paffs_obj *fil = paffs_open("/b/file", PAFFS_FW);
 
 	if(fil == NULL){
 		printf("Open err: %s\n", paffs_err_msg(paffs_getLastErr()));
-		return;	/* Find the appropriate neighbor treeNode with which
-		 * to coalesce.
-		 * Also find the key (k_prime) in the parent
-		 * between the pointer to treeNode n and the pointer
-		 * to the neighbor.
-		 */
+		return;
 	}
+
+	//	while(getchar() == EOF);
+
 
 	//first write ----
 	char t[] = ".                         Text";	//30 chars

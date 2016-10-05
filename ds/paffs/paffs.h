@@ -3,8 +3,6 @@
  * Author: Pascal Pieper
  */
 
-//todo: Types definiert definieren (unsigned int -> uint32_t)
-
 #ifndef __PAFFS_H__
 #define __PAFFS_H__
 
@@ -195,6 +193,7 @@ PAFFS_RESULT paffs_initialize(p_dev* dev);
 PAFFS_RESULT paffs_mnt(const char* devicename);
 const char* paffs_err_msg(PAFFS_RESULT pr);
 PAFFS_RESULT paffs_getLastErr();
+void paffs_resetLastErr();
 
 //Private(ish)
 PAFFS_RESULT paffs_createInode(pInode* outInode, paffs_permission mask);
