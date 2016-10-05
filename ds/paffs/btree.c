@@ -682,47 +682,46 @@ int get_neighbor_index( treeCacheNode * n ){
  */
 PAFFS_RESULT remove_entry_from_node(p_dev* dev, treeCacheNode * n, pInode_no key) {
 
-	int i, num_pointers;
+	int i;
 
 	// Remove the key and shift other keys accordingly.
 	i = 0;
-	while (n->raw.as_branch.keys[i] != key)		//as_branch is OK, because it is same memory as as_leaf
+	while (n->raw.as_branch.keys[i] != key  && i < n->raw.num_keys)		//as_branch is OK, because it is same memory as as_leaf
 		i++;
-	for (++i; i < n->raw.num_keys; i++)
-		n->raw.as_branch.keys[i - 1] = n->raw.as_branch.keys[i];
+	if(key < n->raw.as_branch.keys[i-1]){
+		PAFFS_DBG(PAFFS_BUG, "Key to delete (%lu) not found!", (long unsigned) key);
+		return PAFFS_BUG;
+	}
 
 
-	// First determine number of pointers.
-	num_pointers = n->raw.is_leaf ? n->raw.num_keys : n->raw.num_keys + 1;
-
-	// Remove the pointer and shift other pointers accordingly.
-	i = 0;
 	if(n->raw.is_leaf){
-		while (n->raw.as_leaf.keys[i] != key && i < n->raw.num_keys)
-			i++;
-		for (++i; i < num_pointers; i++){
+		for (++i; i < n->raw.num_keys; i++){
+			n->raw.as_leaf.keys[i - 1] = n->raw.as_leaf.keys[i];
 			n->raw.as_leaf.pInodes[i - 1] = n->raw.as_leaf.pInodes[i];
 		}
 	}else{
-		while (n->raw.as_branch.keys[i] != key && i < n->raw.num_keys)
-			i++;
-		for (++i; i < num_pointers; i++){
-			n->raw.as_branch.pointers[i - 1] = n->raw.as_branch.pointers[i];
-			n->pointers[i - 1] = n->pointers[i];
+		for (++i; i < n->raw.num_keys; i++){
+			n->raw.as_branch.keys[i - 1] = n->raw.as_branch.keys[i];
+			n->raw.as_branch.pointers[i] = n->raw.as_branch.pointers[i + 1];
+			n->pointers[i] = n->pointers[i + 1];
 		}
 	}
+
 
 	// One key fewer.
 	n->raw.num_keys--;
 
 	// Set the other pointers to NULL for tidiness.
 	if (n->raw.is_leaf)
-		for (i = n->raw.num_keys; i < btree_leaf_order; i++)
+		for (i = n->raw.num_keys; i < btree_leaf_order; i++){
 			memset(&n->raw.as_leaf.pInodes[i], 0, sizeof(pInode));
+			n->raw.as_leaf.keys[i] = 0;
+		}
 	else
 		for (i = n->raw.num_keys + 1; i < btree_branch_order; i++){
 			n->raw.as_branch.pointers[i] = 0;
 			n->pointers[i] = NULL;
+			n->raw.as_branch.keys[i - 1] = 0;
 		}
 
 	n->dirty = true;
@@ -753,9 +752,7 @@ PAFFS_RESULT adjust_root(p_dev* dev, treeCacheNode * root) {
 		PAFFS_RESULT r = setCacheRoot(dev, root->pointers[0]);
 		if(r != PAFFS_OK)
 			return r;
-		r = removeCacheNode(dev, root);
-		if(r != PAFFS_OK)
-			return r;
+		return removeCacheNode(dev, root);
 	}
 
 	// If it is a leaf (has no children),

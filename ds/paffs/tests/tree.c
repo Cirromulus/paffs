@@ -57,6 +57,7 @@ int main( int argc, char ** argv ) {
 			printf("\tFound Inode %d\n", test.no);
 	}
 
+	//To test coalesce_nodes
 	printf("Delete Node 3: ");
 	fflush(stdout);
 	r = deleteInode(device, 3);
@@ -66,9 +67,11 @@ int main( int argc, char ** argv ) {
 	}
 	printf("ok\n");
 	print_tree(device);
-	printf("Delete Node 2:");
+
+	//to test redistribute_nodes
+	printf("Delete Node 4:");
 	fflush(stdout);
-	r = deleteInode(device, 2);
+	r = deleteInode(device, 4);
 	if(r != PAFFS_OK){
 		printf("\t %s\n", paffs_err_msg(r));
 		print_tree(device);
