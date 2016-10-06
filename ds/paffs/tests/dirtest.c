@@ -173,27 +173,39 @@ void dirTest(){
 			printf("%s\n", paffs_err_msg(r));
 
 	out[fileInfo.size - 9] = 0;
-	printf("Read Contents (+9):      %s\n", out);
+	printf("Read Contents misaligned (+9)... ");
+	fflush(stdout);
+	if(memcmp(&tl[9], out, fileInfo.size - 9) == 0){
+		printf("OK\n");
+	}else{
+		printf("Different!\n%s", out);
+		return;
+	}
 	free(out);
 	//--- read misaligned
 
 //	while(getchar() == EOF);
 
 	//write misaligned - over Size----
-	printf("write misaligned - over Size\n");
+	printf("write misaligned - over Size... ");
+	fflush(stdout);
 	r = paffs_seek(fil, -5, PAFFS_SEEK_END);
-	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(r));
-
+	if(r != PAFFS_OK){
+		printf("%s\n", paffs_err_msg(r));
+		return;
+	}
 	char testlauf[] = "---Testlauf---";
+
+
 	r = paffs_write(fil, testlauf, strlen(testlauf), &bytes);
 	if(r != PAFFS_OK)
 			printf("%s\n", paffs_err_msg(r));
 	// ---- write misaligned 1
 
-	printWholeFile("/b/file");
+
 //	while(getchar() == EOF);
 
+	//TODO: test with memcmp
 	//write misaligned - end misaligned ----
 	printf("write misaligned - last page misaligned\n");
 	r = paffs_seek(fil, -11, PAFFS_SEEK_END);
@@ -228,11 +240,11 @@ void dirTest(){
 	r = paffs_seek(fil, 530, PAFFS_SEEK_SET);
 
 	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(r));
+		printf("%s\n", paffs_err_msg(r));
 
 	r = paffs_write(fil, testlauf, strlen(testlauf), &bytes);
 	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(r));
+		printf("%s\n", paffs_err_msg(r));
 	// ---- write misaligned 3
 
 
@@ -240,12 +252,46 @@ void dirTest(){
 //	while(getchar() == EOF);
 
 	r = paffs_getObjInfo("/b/file", &fileInfo);
-	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(r));
+	if(r != PAFFS_OK){
+		printf("%s\n", paffs_err_msg(r));
+		return;
+	}
 	printInfo(&fileInfo);
 
 
 //	while(getchar() == EOF);
+	printf("Changing permissions of /b/file to 0... ");
+	fflush(stdout);
+	r = paffs_chmod("/b/file", 0);
+	printf("%s\n", paffs_err_msg(r));
+	if(r != PAFFS_OK){
+		return;
+	}
+
+	r = paffs_getObjInfo("/b/file", &fileInfo);
+	if(r != PAFFS_OK){
+		printf("%s\n", paffs_err_msg(r));
+		return;
+	}
+	printInfo(&fileInfo);
+
+	printf("Removing /b/file... ");
+	fflush(stdout);
+	r = paffs_remove("/b/file");
+	printf("%s\n", paffs_err_msg(r));
+	if(r != PAFFS_OK){
+		return;
+	}
+
+//	while(getchar() == EOF);
+
+	printf("Removing /b/... ");
+	fflush(stdout);
+	r = paffs_remove("/b/");
+	printf("%s\n", paffs_err_msg(r));
+	if(r != PAFFS_OK){
+		return;
+	}
 
 	free (tl);
 	paffs_close(fil);

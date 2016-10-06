@@ -753,7 +753,13 @@ PAFFS_RESULT paffs_flush(paffs_obj* obj){
 }
 
 PAFFS_RESULT paffs_chmod(const char* path, paffs_permission perm){
-	return PAFFS_NIMPL;
+	pInode object;
+	PAFFS_RESULT r;
+	if((r = paffs_getInodeOfElem(&object, path)) != PAFFS_OK){
+		return r;
+	}
+	object.perm = perm;
+	return updateExistingInode(device, &object);
 }
 PAFFS_RESULT paffs_remove(const char* path){
 	pInode object;
