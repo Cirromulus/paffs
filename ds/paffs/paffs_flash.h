@@ -20,13 +20,14 @@ PAFFS_RESULT checkActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType area
 
 void initArea(p_dev* dev, unsigned long int area);
 
+//Updates changes to treeCache as well
 PAFFS_RESULT writeInodeData(pInode* inode,
 					unsigned int offs, unsigned int bytes,unsigned int *bytes_written,
 					const char* data, p_dev* dev);
 PAFFS_RESULT readInodeData(pInode* inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_read,
 					char* data, p_dev* dev);
-PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev);
+PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev, unsigned int offs);
 
 
 

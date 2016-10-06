@@ -17,7 +17,7 @@ extern "C" {
 
 #include "paffs_trace.h"
 
-typedef enum PAFFS_RESULT{
+typedef enum PAFFS_RESULT{	//See paffs.c for String versions
 	PAFFS_OK = 0,
 	PAFFS_FAIL,
 	PAFFS_NF,
@@ -27,6 +27,8 @@ typedef enum PAFFS_RESULT{
 	PAFFS_NOPARENT,
 	PAFFS_NOSP,
 	PAFFS_LOWMEM,
+	PAFFS_NOPERM,
+	PAFFS_DIRNOTEMPTY,
 	num_PAFFS_RESULT
 } PAFFS_RESULT;
 
@@ -70,10 +72,10 @@ typedef unsigned long p_date;
 
 typedef uint64_t p_addr;
 
-typedef uint32_t fileSize_t; //~ 4 GB per file. Enough!
+typedef uint32_t fileSize_t; 	  //~ 4 GB per file. Enough!
 typedef uint32_t pInode_no;
-typedef uint32_t dirEntryCount;
-typedef uint32_t dirEntryLength;
+typedef uint16_t dirEntryCount_t; //65,535 Entries per Directory
+typedef uint8_t dirEntryLength_t; //255 characters per Directory entry
 
 typedef enum pInode_type{
     PINODE_FILE,
@@ -87,8 +89,8 @@ typedef struct pInode{
 	paffs_permission perm:3;
 	p_date crea;
 	p_date mod;
-	fileSize_t reservedSize;
-	fileSize_t size;
+	fileSize_t reservedSize;	//Space on filesystem used in bytes
+	fileSize_t size;			//Space on filesystem needed in bytes
 	p_addr direct[11];
 	p_addr indir;
 	p_addr d_indir;
@@ -97,7 +99,7 @@ typedef struct pInode{
 
 
 typedef struct pDentry{
-	char* name;
+	char* name;		//is actually full path
 	pInode* iNode;
 	struct pDentry* parent;
 } pDentry;
@@ -117,7 +119,7 @@ typedef struct paffs_dirent{
 typedef struct paffs_dir{
 	pDentry* dentry;
 	paffs_dirent** dirents;
-	dirEntryCount no_entrys;
+	dirEntryCount_t no_entrys;
 	unsigned int pos;
 }paffs_dir;
 
@@ -205,6 +207,7 @@ PAFFS_RESULT paffs_getInodeInDir( pInode* outInode, pInode* folder, const char* 
 PAFFS_RESULT paffs_getInodeOfElem( pInode* outInode, const char* fullPath);
 //newElem should be already inserted in Tree
 PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* newElem);
+PAFFS_RESULT paffs_removeInodeFromDir(pInode* contDir, pInode* elem);
 PAFFS_RESULT paffs_createFile(pInode* outFile, const char* fullPath, paffs_permission mask);
 p_addr combineAddress(uint32_t logical_area, uint32_t page);
 unsigned int extractLogicalArea(p_addr addr);			//Address-wrapper für einfacheren Garbagecollector
@@ -221,13 +224,17 @@ void paffs_rewinddir(paffs_dir* dir);
 
 //File
 paffs_obj* paffs_open(const char* path, fileopenmask mask);
+PAFFS_RESULT paffs_close(paffs_obj* obj);
 PAFFS_RESULT paffs_touch(const char* path);
 PAFFS_RESULT paffs_getObjInfo(const char *fullPath, paffs_objInfo* nfo);
 PAFFS_RESULT paffs_read(paffs_obj* obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read);
 PAFFS_RESULT paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written);
 PAFFS_RESULT paffs_seek(paffs_obj* obj, int m, paffs_seekmode mode);
 PAFFS_RESULT paffs_flush(paffs_obj* obj);
-PAFFS_RESULT paffs_close(paffs_obj* obj);
+PAFFS_RESULT paffs_truncate(paffs_obj* obj);
+
+PAFFS_RESULT paffs_chmod(const char* path, paffs_permission perm);
+PAFFS_RESULT paffs_remove(const char* path);
 
 //ONLY FOR DEBUG
 p_dev* getDevice();

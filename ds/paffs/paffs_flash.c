@@ -92,7 +92,7 @@ void initArea(p_dev* dev, unsigned long int area){
 			* dev->param.pages_per_block);
 }
 
-
+//modifies inode->size and inode->reserved size as well
 PAFFS_RESULT writeInodeData(pInode* inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_written,
 					const char* data, p_dev* dev){
@@ -190,6 +190,7 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 				//pageoffset is only at applied to first page
 				pageOffs = 0;
 			}else{
+				//not misaligned
 				*bytes_written += btw;
 			}
 
@@ -198,8 +199,12 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 			dev->areaMap[oldArea].dirtyPages ++;
 
 		}else{
+			//we are writing to a new page
 			*bytes_written += btw;
+			inode->reservedSize += dev->param.data_bytes_per_page;
 		}
+		inode->size += btw;
+
 		inode->direct[page+pageFrom] = pageAddress;
 
 		PAFFS_RESULT res = dev->drv.drv_write_page_fn(dev, getPageNumber(pageAddress, dev), buf, btw);
@@ -215,15 +220,11 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 
 		res = checkActiveAreaFull(dev, &activeArea[DATAAREA], DATAAREA);
 		if(res != PAFFS_OK)
-			return paffs_lasterr = res;
+			return res;
 
 	}
 
-	if((pageTo+1)*dev->param.data_bytes_per_page > inode->size){
-		//filesize increased
-		inode->reservedSize = (pageTo+1) * dev->param.total_bytes_per_page;
-	}
-	return PAFFS_OK;
+	return updateExistingInode(dev, inode);
 }
 PAFFS_RESULT readInodeData(pInode* inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_read,
@@ -243,12 +244,12 @@ PAFFS_RESULT readInodeData(pInode* inode,
 	if(offs + bytes > inode->size){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read bigger than size of object! (was: %d, max: %lu)", offs+bytes, (long unsigned) inode->size);
 		//TODO: return less bytes_read
-		return paffs_lasterr = PAFFS_NIMPL;
+		return PAFFS_NIMPL;
 	}
 
 	if(pageTo > 11){
 		//todo Read indirection Layers
-		return paffs_lasterr = PAFFS_NIMPL;
+		return PAFFS_NIMPL;
 	}
 
 	char* wrap = data;
@@ -298,9 +299,49 @@ PAFFS_RESULT readInodeData(pInode* inode,
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev){
 
-	return PAFFS_NIMPL;
+//inode->size and inode->reservedSize is altered.
+PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev, unsigned int offs){
+	//TODO: This calculation contains errors in border cases
+	unsigned int pageFrom = offs/dev->param.data_bytes_per_page;
+	unsigned int pageTo = (inode->size - 1) / dev->param.data_bytes_per_page;
+	unsigned int pageOffs = offs % dev->param.data_bytes_per_page;
+
+	if(inode->size < offs){
+		//Offset bigger than actual filesize
+		return PAFFS_EINVAL;
+	}
+
+	if(pageTo > 11){
+		//todo Read indirection Layers
+		return PAFFS_NIMPL;
+	}
+
+	inode->size -= pageOffs + ((pageTo - pageFrom) * dev->param.data_bytes_per_page);
+
+	for(int page = 0; page <= pageTo - pageFrom; page++){
+
+		unsigned int area = extractLogicalArea(inode->direct[page + pageFrom]);
+
+		if(dev->areaMap[area].type != DATAAREA){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of invalid area at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
+			return PAFFS_BUG;
+		}
+
+		if(dev->areaMap[area].areaSummary[extractPage(inode->direct[page + pageFrom])] == DIRTY){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of outdated (dirty) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
+			return PAFFS_BUG;
+		}
+
+		//Mark old pages dirty
+		dev->areaMap[area].areaSummary[page] = DIRTY;
+		dev->areaMap[area].dirtyPages ++;
+
+		inode->reservedSize -= dev->param.data_bytes_per_page;
+
+	}
+
+	return PAFFS_OK;
 }
 
 //TODO: Save Rootnode's Address in Flash (Superblockarea)
