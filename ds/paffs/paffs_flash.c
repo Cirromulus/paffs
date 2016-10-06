@@ -130,7 +130,7 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 		unsigned int firstFreePage = 0;
 		if(findFirstFreePage(&firstFreePage, dev, activeArea[DATAAREA]) == PAFFS_NOSP){
 			PAFFS_DBG(PAFFS_BUG, "BUG: findWritableArea returned full area (%d).", activeArea[DATAAREA]);
-			return paffs_lasterr = PAFFS_BUG;
+			return PAFFS_BUG;
 		}
 		p_addr pageAddress = combineAddress(dev->areaMap[activeArea[DATAAREA]].position, firstFreePage);
 
@@ -203,8 +203,6 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 			*bytes_written += btw;
 			inode->reservedSize += dev->param.data_bytes_per_page;
 		}
-		inode->size += btw;
-
 		inode->direct[page+pageFrom] = pageAddress;
 
 		PAFFS_RESULT res = dev->drv.drv_write_page_fn(dev, getPageNumber(pageAddress, dev), buf, btw);
@@ -223,6 +221,9 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 			return res;
 
 	}
+
+	if(inode->size < *bytes_written + offs)
+		inode->size = *bytes_written + offs;
 
 	return updateExistingInode(dev, inode);
 }

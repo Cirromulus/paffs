@@ -158,7 +158,7 @@ void dirTest(){
 
 
 	printWholeFile("/b/file");
-	while(getchar() == EOF);
+//	while(getchar() == EOF);
 
 	//read misaligned ---
 	paffs_objInfo fileInfo = {0};
@@ -177,7 +177,7 @@ void dirTest(){
 	free(out);
 	//--- read misaligned
 
-	while(getchar() == EOF);
+//	while(getchar() == EOF);
 
 	//write misaligned - over Size----
 	printf("write misaligned - over Size\n");
@@ -192,7 +192,7 @@ void dirTest(){
 	// ---- write misaligned 1
 
 	printWholeFile("/b/file");
-	while(getchar() == EOF);
+//	while(getchar() == EOF);
 
 	//write misaligned - end misaligned ----
 	printf("write misaligned - last page misaligned\n");
@@ -207,7 +207,7 @@ void dirTest(){
 	// ---- write misaligned 2
 
 	printWholeFile("/b/file");
-	while(getchar() == EOF);
+//	while(getchar() == EOF);
 
 	//write misaligned - write over page boundaries ----
 	printf("write misaligned - over page boundaries\n");
@@ -221,7 +221,7 @@ void dirTest(){
 	// ---- write misaligned 2
 
 	printWholeFile("/b/file");
-	while(getchar() == EOF);
+//	while(getchar() == EOF);
 
 	//write misaligned - write inside not start/end page ----
 	printf("write misaligned - write inside non start/end page\n");
@@ -237,7 +237,7 @@ void dirTest(){
 
 
 	printWholeFile("/b/file");
-	while(getchar() == EOF);
+//	while(getchar() == EOF);
 
 	r = paffs_getObjInfo("/b/file", &fileInfo);
 	if(r != PAFFS_OK)
@@ -245,7 +245,7 @@ void dirTest(){
 	printInfo(&fileInfo);
 
 
-	while(getchar() == EOF);
+//	while(getchar() == EOF);
 
 	free (tl);
 	paffs_close(fil);
