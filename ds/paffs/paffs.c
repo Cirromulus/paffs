@@ -194,12 +194,12 @@ PAFFS_RESULT paffs_getParentDir(const char* fullPath, pInode* parDir, unsigned i
 //Currently Linearer Aufwand
 PAFFS_RESULT paffs_getInodeInDir( pInode* outInode, pInode* folder, const char* name){
         if(folder->type != PINODE_DIR){
-        	return paffs_lasterr = PAFFS_BUG;
+        	return PAFFS_BUG;
         }
         
         if(folder->size <= sizeof(dirEntryCount)){
         	//Just contains a zero for "No entrys"
-        	return paffs_lasterr = PAFFS_NF;
+        	return PAFFS_NF;
         }
 
         char* buf = malloc(folder->size);
@@ -214,7 +214,7 @@ PAFFS_RESULT paffs_getInodeInDir( pInode* outInode, pInode* folder, const char* 
         while(p < folder->size){
                 dirEntryLength direntryl = buf[p];
                 if(direntryl < sizeof(dirEntryLength)){
-                	return paffs_lasterr = PAFFS_BUG;
+                	return PAFFS_BUG;
                 }
                 unsigned int dirnamel = direntryl - sizeof(dirEntryLength) - sizeof(pInode_no);
                 p += sizeof(dirEntryLength);
@@ -239,7 +239,7 @@ PAFFS_RESULT paffs_getInodeInDir( pInode* outInode, pInode* folder, const char* 
                 free(tmpname);
         }
         free(buf);
-        return paffs_lasterr = PAFFS_NF;
+        return PAFFS_NF;
 
 }
 
@@ -328,7 +328,6 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 	directoryEntryCount ++;
 	memcpy (dirData, &directoryEntryCount, sizeof(dirEntryCount));
 
-	//FIXME: THIS RETURNS PAFFS_NF
 	r = writeInodeData(contDir, 0, contDir->size + direntryl, &bytes, dirData, device);
 	contDir->size += direntryl;
 	free(dirData);
