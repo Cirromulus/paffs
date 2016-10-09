@@ -85,32 +85,38 @@ void printWholeFile(const char* path){
 
 }
 
-void dirTest(){
+int main( int argc, char ** argv ) {
+	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
 	paffs_start_up();
 	PAFFS_RESULT r = paffs_mnt("1");
+	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
 	print_tree(getDevice());
 	paffs_permission p = 0;
 	printf("Creating directory /a... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
 	printf("%s\n", paffs_err_msg(paffs_mkdir("/a", p)));
+	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
 	print_tree(getDevice());
 //	while(getchar() == EOF);
 	printf("Creating directory /b... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
 	printf("%s\n", paffs_err_msg(paffs_mkdir("/b", p)));
+	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
 	print_tree(getDevice());
 //	while(getchar() == EOF);
 	printf("Creating directory /b/foo... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
 	printf("%s\n", paffs_err_msg(paffs_mkdir("/b/foo", p)));
+	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
 	print_tree(getDevice());
 	printf("Touching file /b/file ... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
 	printf("%s\n", paffs_err_msg(paffs_touch ("/b/file")));
+	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
 	print_tree(getDevice());
 
 	listDir("/");
@@ -126,7 +132,7 @@ void dirTest(){
 
 	if(fil == NULL){
 		printf("Open err: %s\n", paffs_err_msg(paffs_getLastErr()));
-		return;
+		return -1;
 	}
 
 	//	while(getchar() == EOF);
@@ -179,7 +185,7 @@ void dirTest(){
 		printf("OK\n");
 	}else{
 		printf("Different!\n%s", out);
-		return;
+		return -1;
 	}
 	free(out);
 	//--- read misaligned
@@ -192,7 +198,7 @@ void dirTest(){
 	r = paffs_seek(fil, -5, PAFFS_SEEK_END);
 	if(r != PAFFS_OK){
 		printf("%s\n", paffs_err_msg(r));
-		return;
+		return -1;
 	}
 	char testlauf[] = "---Testlauf---";
 
@@ -254,7 +260,7 @@ void dirTest(){
 	r = paffs_getObjInfo("/b/file", &fileInfo);
 	if(r != PAFFS_OK){
 		printf("%s\n", paffs_err_msg(r));
-		return;
+		return -1;
 	}
 	printInfo(&fileInfo);
 
@@ -265,22 +271,31 @@ void dirTest(){
 	r = paffs_chmod("/b/file", 0);
 	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK){
-		return;
+		return -1;
 	}
 
 	r = paffs_getObjInfo("/b/file", &fileInfo);
 	if(r != PAFFS_OK){
 		printf("%s\n", paffs_err_msg(r));
-		return;
+		return -1;
 	}
 	printInfo(&fileInfo);
+
+//	while(getchar() == EOF);
+	printf("Changing permissions of /b/file to rwx... ");
+	fflush(stdout);
+	r = paffs_chmod("/b/file", PAFFS_R | PAFFS_W | PAFFS_X);
+	printf("%s\n", paffs_err_msg(r));
+	if(r != PAFFS_OK){
+		return -1;
+	}
 
 	printf("Removing /b/file... ");
 	fflush(stdout);
 	r = paffs_remove("/b/file");
 	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK){
-		return;
+		return -1;
 	}
 
 //	while(getchar() == EOF);
@@ -290,13 +305,10 @@ void dirTest(){
 	r = paffs_remove("/b/");
 	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK){
-		return;
+		return -1;
 	}
 
 	free (tl);
 	paffs_close(fil);
-}
-
-int main( int argc, char ** argv ) {
-	dirTest();
+	return 0;
 }

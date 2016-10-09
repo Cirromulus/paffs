@@ -306,7 +306,6 @@ PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev, unsigned int offs){
 	//TODO: This calculation contains errors in border cases
 	unsigned int pageFrom = offs/dev->param.data_bytes_per_page;
 	unsigned int pageTo = (inode->size - 1) / dev->param.data_bytes_per_page;
-	unsigned int pageOffs = offs % dev->param.data_bytes_per_page;
 
 	if(inode->size < offs){
 		//Offset bigger than actual filesize
@@ -318,24 +317,29 @@ PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev, unsigned int offs){
 		return PAFFS_NIMPL;
 	}
 
-	inode->size -= pageOffs + ((pageTo - pageFrom) * dev->param.data_bytes_per_page);
+	inode->size = offs;
+
+	if(inode->size >= inode->reservedSize - dev->param.data_bytes_per_page)
+		//doesn't leave a whole page blank
+		return PAFFS_OK;
 
 	for(int page = 0; page <= pageTo - pageFrom; page++){
 
 		unsigned int area = extractLogicalArea(inode->direct[page + pageFrom]);
+		unsigned int relPage = extractPage(inode->direct[page + pageFrom]);
 
 		if(dev->areaMap[area].type != DATAAREA){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of invalid area at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
 			return PAFFS_BUG;
 		}
 
-		if(dev->areaMap[area].areaSummary[extractPage(inode->direct[page + pageFrom])] == DIRTY){
+		if(dev->areaMap[area].areaSummary[relPage] == DIRTY){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of outdated (dirty) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
 			return PAFFS_BUG;
 		}
 
 		//Mark old pages dirty
-		dev->areaMap[area].areaSummary[page] = DIRTY;
+		dev->areaMap[area].areaSummary[relPage] = DIRTY;
 		dev->areaMap[area].dirtyPages ++;
 
 		inode->reservedSize -= dev->param.data_bytes_per_page;

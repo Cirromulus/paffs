@@ -8,16 +8,27 @@
 #include "treeCache.h"
 #include "paffs_flash.h"
 #include <string.h>
-#include "btree.h"
 
-static treeCacheNode* cache_root = NULL;
+static int16_t cache_root = 0;
 
-static treeCacheNode  cache[TREENODECACHESIZE];
+static treeCacheNode cache[TREENODECACHESIZE];
 //TODO: use static cache instead of malloc usw.
 
+int16_t findFirstFreeIndex(){
+	for(int i = 0; i < TREENODECACHESIZE; i++){
+		if(cache[i].parent == NULL)
+			return i;
+	}
+	return -1;
+}
+
+int16_t getIndexFromPointer(treeCacheNode* tcn){
+	return tcn - cache;
+}
+
 PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode** tcn){
-	if(cache_root != NULL){
-		*tcn = cache_root;
+	if(cache[cache_root].parent != NULL){
+		*tcn = &cache[cache_root];
 		return PAFFS_OK;
 	}
 
@@ -25,12 +36,18 @@ PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode** tcn){
 	if(addr == 0)
 		PAFFS_DBG(PAFFS_TRACE_TREE, "get Rootnode, but does not exist!");
 
-	PAFFS_RESULT r = addNewCacheNode(dev, &cache_root);
+	treeCacheNode* new_root;
+	PAFFS_RESULT r = addNewCacheNode(dev, &new_root);
+	if(r != PAFFS_OK){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Rootnode can't be loaded, cache size (%d) too small!", TREENODECACHESIZE);
+		return r;
+	}
+	new_root->parent = new_root;
+	r = setCacheRoot(dev, new_root);
 	if(r != PAFFS_OK)
 		return r;
-	*tcn = cache_root;
-	cache_root->parent = cache_root;
-	return readTreeNode(dev, addr, &cache_root->raw);
+
+	return readTreeNode(dev, addr, &cache[cache_root].raw);
 }
 
 PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
@@ -53,8 +70,17 @@ PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
 	}
 
 	PAFFS_RESULT r = addNewCacheNode(dev, &target);
-	if(r != PAFFS_OK)
-		return r;	//TODO: this could actually be solved by a cache flush
+	if(r == PAFFS_LOWMEM){
+		flushTreeCache(dev);
+		r = addNewCacheNode(dev, &target);
+		if(r != PAFFS_OK){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not generate new cache node after complete flush!\n"
+					"Maybe Cache size (%d) is too small.", TREENODECACHESIZE);
+			return r;
+		}
+	}else if(r != PAFFS_OK){
+		return r;
+	}
 
 	target->parent = parent;
 	*child = target;
@@ -62,19 +88,22 @@ PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
 	return readTreeNode(dev, parent->raw.as_branch.pointers[index], &(*child)->raw);
 }
 
+/*
+ * The new tcn->parent has to be changed _before_ calling another addNewCacheNode!
+ */
 PAFFS_RESULT addNewCacheNode(p_dev* dev, treeCacheNode** newTcn){
-	*newTcn = (treeCacheNode*) malloc(sizeof(treeCacheNode));
-	memset(*newTcn, 0, sizeof(treeCacheNode));
-	(*newTcn)->dirty = true;
-	if(*newTcn == NULL){
+	int16_t index = findFirstFreeIndex();
+	if(index < 0){
 		PAFFS_DBG(PAFFS_TRACE_ALLOCATE, "RAN OUT OF RAM!");
 		return PAFFS_LOWMEM;
 	}
+	*newTcn = &cache[index];
+	memset(*newTcn, 0, sizeof(treeCacheNode));
 	return PAFFS_OK;
 }
 
 PAFFS_RESULT removeCacheNode(p_dev* dev, treeCacheNode* tcn){
-	free(tcn);
+	tcn->parent = NULL;
 	return PAFFS_OK;
 }
 
@@ -83,9 +112,26 @@ PAFFS_RESULT setCacheRoot(p_dev* dev, treeCacheNode* rootTcn){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: setCacheRoot with root->parent not pointing to itself");
 		return PAFFS_BUG;
 	}
-	cache_root = rootTcn;
+	cache_root = getIndexFromPointer(rootTcn);
 	return PAFFS_OK;
 }
 
+PAFFS_RESULT flushTreeCache(p_dev* dev){
+	return PAFFS_NIMPL;
+}
 
+
+//debug
+uint16_t getCacheUsage(){
+	uint16_t usage = 0;
+	for(int i = 0; i < TREENODECACHESIZE; i++){
+		if(cache[i].parent != NULL)
+			usage++;
+	}
+	return usage;
+}
+
+uint16_t getCacheSize(){
+	return TREENODECACHESIZE;
+}
 

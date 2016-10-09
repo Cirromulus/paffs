@@ -25,4 +25,9 @@ PAFFS_RESULT setCacheRoot(p_dev* dev, treeCacheNode* rootTcn);
 
 PAFFS_RESULT flushTreeCache(p_dev* dev);
 
+
+//debug
+uint16_t getCacheUsage();
+uint16_t getCacheSize();
+
 #endif /* TREECACHE_H_ */

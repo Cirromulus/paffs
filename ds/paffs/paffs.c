@@ -362,7 +362,7 @@ PAFFS_RESULT paffs_removeInodeFromDir(pInode* contDir, pInode* elem){
 
 
 	fileSize_t pointer = sizeof(dirEntryCount_t);
-	while(pointer < contDir->size){
+	while(pointer < contDir->size - sizeof(dirEntryCount_t)){
 		dirEntryLength_t entryl = (dirEntryLength_t) dirData[pointer];
 		if(memcmp(&dirData[pointer + sizeof(dirEntryLength_t)], &(elem->no), sizeof(pInode_no)) == 0){
 			//Found
@@ -372,7 +372,8 @@ PAFFS_RESULT paffs_removeInodeFromDir(pInode* contDir, pInode* elem){
 				return r;
 
 			unsigned int bw = 0;
-			return writeInodeData(contDir, pointer, contDir->size - (pointer + entryl), &bw, &dirData[pointer], device);
+			if(contDir)
+			return writeInodeData(contDir, 0, contDir->size - (pointer + entryl), &bw, &dirData[pointer], device);
 		}
 		pointer += entryl;
 	}

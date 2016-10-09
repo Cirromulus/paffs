@@ -178,98 +178,6 @@ int cut( int length ) {
 
 // INSERTION
 
-/* Creates a new general treeCacheNode, which can be adapted
- * to serve as either a leaf or an internal treeCacheNode.
- *
-treeCacheNode * make_node( void ) {
-        treeCacheNode * new_node;
-        new_node = malloc(sizeof(treeCacheNode));
-        if (new_node == NULL) {
-                perror("treeCacheNode creation.");
-                return NULL;
-        }
-        new_node->keys = malloc( (btree_branch_order - 1) * sizeof(int) );
-        if (new_node->keys == NULL) {
-                perror("New treeCacheNode keys array.");
-                return NULL;
-        }
-        new_node->pointers = malloc( btree_branch_order * sizeof(void *) );
-        if (new_node->pointers == NULL) {
-                perror("New treeCacheNode pointers array.");
-                return NULL;
-        }
-        new_node->is_leaf = false;
-        new_node->num_keys = 0;
-        new_node->parent = NULL;
-        new_node->next = NULL;
-        return new_node;
-}*/
-
-/* Creates a new leaf by creating a treeCacheNode
- * and then adapting it appropriately.
- *
-treeCacheNode * make_leaf( void ) {
-        treeCacheNode * leaf = make_node();
-        leaf->is_leaf = true;
-        return leaf;
-}*/
-
-
-/*PAFFS_RESULT updatetreeCacheNodePath( p_dev* dev, treeCacheNode* node){
-
-	PAFFS_RESULT r;
-	if(node->self != getRootnodeAddr(dev)){	//We are non-root
-		unsigned int length = length_to_root(dev, node) + 1;
-		p_addr *nodes = (p_addr*) malloc(length * sizeof(p_addr));
-		r = path_from_root(dev, node, nodes, &length);
-		if(r != PAFFS_OK)
-			return r;
-		treeCacheNode prev = *node;
-		treeCacheNode c = {{0}};
-		for(int i = length -1; i >= 0; i--){	//Skip first entry, is own node
-			r = readtreeCacheNode(dev, nodes[i], &c);
-			if(r != PAFFS_OK)
-				return r;
-
-			//find outdated entry
-			int pos = 0;
-			while(*getPointerAsAddr(c.pointers, pos) != prev.self){
-				if(pos > c.num_keys){
-					PAFFS_DBG( PAFFS_TRACE_BUG, "BU G: Did not find old address");
-					return PAFFS_BUG;
-				}
-				pos++;
-			}
-
-			//Write previous node and register its new address in current node
-			r = writetreeCacheNode(dev, &prev);
-			if(r != PAFFS_OK)
-				return r;
-			*getPointerAsAddr(c.pointers, pos) = prev.self;
-
-			prev = c;
-		}
-		if(c.self != getRootnodeAddr(dev)){
-			PAFFS_DBG(PAFFS_TRACE_BUG, "Last Element in path_from_root is not actually root.");
-			return PAFFS_BUG;
-		}
-		r = writetreeCacheNode(dev, &c);
-		if(r != PAFFS_OK)
-			return r;
-		registerRootnode(dev, c.self);
-
-	}else{
-		//first case would do it as well, but
-		//this is more efficient
-		r = writetreeCacheNode(dev, node);
-		if(r != PAFFS_OK)
-			return r;
-		registerRootnode(dev, node->self);
-	}
-	return PAFFS_OK;
-}*/
-
-
 /* Helper function used in insert_into_parent
  * to find the index of the parent's pointer to 
  * the treeCacheNode to the left of the key to be inserted.
@@ -512,48 +420,6 @@ PAFFS_RESULT insert_into_parent(p_dev* dev, treeCacheNode * left, pInode_no key,
 
 
 
-/* Due to the removed parent-member, parent has to be determined before changes to Child-Nodes are done
- * if formerParent == NULL, NOPARENT is assumed
- * Inserts a new treeCacheNode (leaf or internal treeCacheNode) into the B+ tree.
- * Returns the root of the tree after insertion.
- * *** further Tree-action pending ***
- */
-//PAFFS_RESULT insert_into_former_parent(p_dev* dev, treeCacheNode* formerParent, treeCacheNode* left, pInode_no key, treeCacheNode* right) {
-//
-//        int left_index;
-//
-//
-//        /* Case: new root. */
-//        if (formerParent == NULL)
-//                return insert_into_new_root(dev, left, key, right);
-//
-//
-//
-//        /* Case: leaf or treeCacheNode. (Remainder of
-//         * function body.)
-//         */
-//
-//        /* Find the parent's pointer to the left
-//         * treeCacheNode. (is done before changes were made)
-//         */
-//
-//        left_index = get_left_index(formerParent, left);
-//
-//
-//        /* Simple case: the new key fits into the treeCacheNode.
-//         */
-//
-//        if (formerParent->num_keys < btree_branch_order)
-//                return insert_into_node(dev, formerParent, left_index, key, right);
-//
-//        /* Harder case:  split a treeCacheNode in order
-//         * to preserve the B+ tree properties.
-//         */
-//
-//        return insert_into_node_after_splitting(dev, formerParent, left_index, key, right);
-//}
-
-
 /* Creates a new root for two subtrees
  * and inserts the appropriate key into
  * the new root.
@@ -607,50 +473,50 @@ PAFFS_RESULT start_new_tree(p_dev* dev) {
  */
 PAFFS_RESULT insert( p_dev* dev, pInode* value) {
 
-        treeCacheNode *node = NULL;
-        PAFFS_RESULT r;
+	treeCacheNode *node = NULL;
+	PAFFS_RESULT r;
 
-        /* The current implementation ignores
-         * duplicates.
-         */
-
-
-        r = find(dev, value->no, value);
-        if(r == PAFFS_OK){
-        	PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Pinode already existing with n° %d", value->no);
-			return PAFFS_BUG;
-        }else if(r != PAFFS_NF){
-        	return r;
-        }
-
-        /* Not really necessary */
-        r = getRootNodeFromCache(dev, &node);
-        if (r != PAFFS_OK)
-        	return r;
-
-        /**  rootnode not used  **/
+	/* The current implementation ignores
+	 * duplicates.
+	 */
 
 
-        /* Case: the tree already exists.
-         * (Rest of function body.)
-         */
+	r = find(dev, value->no, value);
+	if(r == PAFFS_OK){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Pinode already existing with n° %d", value->no);
+		return PAFFS_BUG;
+	}else if(r != PAFFS_NF){
+		return r;
+	}
 
-        r = find_leaf(dev, value->no, &node);
-        if(r != PAFFS_OK)
-        	return r;
+	/* Not really necessary */
+	r = getRootNodeFromCache(dev, &node);
+	if (r != PAFFS_OK)
+		return r;
 
-        /* Case: leaf has room for key and pointer.
-         */
-
-        if (node->raw.num_keys < btree_leaf_order) {
-                return insert_into_leaf(dev, node, value);
-        }
+	/**  rootnode not used  **/
 
 
-        /* Case:  leaf must be split.
-         */
+	/* Case: the tree already exists.
+	 * (Rest of function body.)
+	 */
 
-        return insert_into_leaf_after_splitting(dev, node, value);
+	r = find_leaf(dev, value->no, &node);
+	if(r != PAFFS_OK)
+		return r;
+
+	/* Case: leaf has room for key and pointer.
+	 */
+
+	if (node->raw.num_keys < btree_leaf_order) {
+			return insert_into_leaf(dev, node, value);
+	}
+
+
+	/* Case:  leaf must be split.
+	 */
+
+	return insert_into_leaf_after_splitting(dev, node, value);
 }
 
 
