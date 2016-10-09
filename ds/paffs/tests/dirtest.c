@@ -91,7 +91,7 @@ int main( int argc, char ** argv ) {
 	PAFFS_RESULT r = paffs_mnt("1");
 	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
 	print_tree(getDevice());
-	paffs_permission p = 0;
+	paffs_permission p = PAFFS_R | PAFFS_W;
 	printf("Creating directory /a... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
@@ -297,6 +297,27 @@ int main( int argc, char ** argv ) {
 	if(r != PAFFS_OK){
 		return -1;
 	}
+
+//	while(getchar() == EOF);
+
+	printf("Removing /b/... ");
+	fflush(stdout);
+	r = paffs_remove("/b/");
+	printf("%s\n", paffs_err_msg(r));
+	if(r != PAFFS_DIRNOTEMPTY){
+		return -1;
+	}
+
+//	while(getchar() == EOF);
+
+	printf("Removing /b/foo... ");
+	fflush(stdout);
+	r = paffs_remove("/b/foo");
+	printf("%s\n", paffs_err_msg(r));
+	if(r != PAFFS_OK){
+		return -1;
+	}
+
 
 //	while(getchar() == EOF);
 

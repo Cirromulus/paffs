@@ -30,7 +30,7 @@ static const char* PAFFS_RESULT_MSG[] = {
 		"No (usable) space left on device",
 		"Not enough RAM for cache",
 		"Operation not permitted",
-		"Directory is not empty"
+		"Directory is not empty",
 		"You should not be seeing this..."
 };
 
@@ -340,6 +340,8 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 
 }
 
+
+//TODO: mark deleted treeCacheNodes as dirty
 PAFFS_RESULT paffs_removeInodeFromDir(pInode* contDir, pInode* elem){
 	if(contDir == NULL){
 		paffs_lasterr = PAFFS_BUG;
@@ -362,18 +364,26 @@ PAFFS_RESULT paffs_removeInodeFromDir(pInode* contDir, pInode* elem){
 
 
 	fileSize_t pointer = sizeof(dirEntryCount_t);
-	while(pointer < contDir->size - sizeof(dirEntryCount_t)){
+	while(pointer < contDir->size){
 		dirEntryLength_t entryl = (dirEntryLength_t) dirData[pointer];
 		if(memcmp(&dirData[pointer + sizeof(dirEntryLength_t)], &(elem->no), sizeof(pInode_no)) == 0){
 			//Found
-			memcpy(&dirData[pointer], &dirData[pointer + entryl], contDir->size - (pointer + entryl));
+			unsigned int newSize = contDir->size - entryl;
+			unsigned int restByte = newSize - pointer;
 
-			if((r = deleteInodeData(contDir, device, contDir->size - entryl)) != PAFFS_OK)
+			if((r = deleteInodeData(contDir, device, newSize)) != PAFFS_OK)
 				return r;
 
+			if(restByte > 0 && restByte < 4)	//should either be 0 (no entries left) or bigger than 4 (minimum size for one entry)
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Something is fishy! (%d)", restByte);
+
+			if(newSize == 0)
+				return PAFFS_OK;
+
+			memcpy(&dirData[pointer], &dirData[pointer + entryl], restByte);
+
 			unsigned int bw = 0;
-			if(contDir)
-			return writeInodeData(contDir, 0, contDir->size - (pointer + entryl), &bw, &dirData[pointer], device);
+			return writeInodeData(contDir, 0, newSize, &bw, dirData, device);
 		}
 		pointer += entryl;
 	}

@@ -317,11 +317,15 @@ PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev, unsigned int offs){
 		return PAFFS_NIMPL;
 	}
 
+	if(inode->size == 0)
+		return PAFFS_OK;
+
 	inode->size = offs;
 
 	if(inode->size >= inode->reservedSize - dev->param.data_bytes_per_page)
 		//doesn't leave a whole page blank
 		return PAFFS_OK;
+
 
 	for(int page = 0; page <= pageTo - pageFrom; page++){
 
@@ -343,6 +347,7 @@ PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev, unsigned int offs){
 		dev->areaMap[area].dirtyPages ++;
 
 		inode->reservedSize -= dev->param.data_bytes_per_page;
+		inode->direct[page+pageFrom] = 0;
 
 	}
 
