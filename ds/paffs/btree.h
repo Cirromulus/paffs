@@ -54,7 +54,8 @@ p_addr* getPointerAsAddr(char* pointers, unsigned int pos);
 pInode* getPointerAsInode(char* pointers, unsigned int pos);
 void insertAddrInPointer(char* pointers, p_addr* addr, unsigned int pos);
 void insertInodeInPointer(char* pointers, pInode* inode, unsigned int pos);
-PAFFS_RESULT updateAddrIntreeCacheNode(treeCacheNode* node, p_addr* old, p_addr* newAddress);
+PAFFS_RESULT updateAddrInTreeCacheNode(treeCacheNode* node, p_addr* old, p_addr* newAddress);
+bool isTreeCacheNodeEqual(treeCacheNode* left, treeCacheNode* right);
 
 
 PAFFS_RESULT insertInode( p_dev* dev, pInode* inode);
@@ -71,6 +72,7 @@ int length_to_root( p_dev* dev, treeCacheNode * child );
 PAFFS_RESULT path_from_root( p_dev* dev, treeCacheNode * child, p_addr* path, unsigned int* lengthOut);
 int find_range( p_dev* dev, treeCacheNode * root, pInode_no key_start, pInode_no key_end,
                 int returned_keys[], void * returned_pointers[]); 
+PAFFS_RESULT find_branch(  p_dev* dev, treeCacheNode* target, treeCacheNode** outtreeCacheNode);
 PAFFS_RESULT find_leaf(  p_dev* dev, pInode_no key, treeCacheNode** outtreeCacheNode);
 PAFFS_RESULT find_in_leaf (treeCacheNode* leaf, pInode_no key, pInode* outInode);
 PAFFS_RESULT find( p_dev* dev, pInode_no key, pInode* outInode);

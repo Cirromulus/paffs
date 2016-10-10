@@ -12,6 +12,14 @@
 #include <string.h>
 #include <inttypes.h>
 
+bool isTreeCacheNodeEqual(treeCacheNode* left, treeCacheNode* right){
+	for(int i = 0; i <= left->raw.num_keys; i++)
+		if(left->raw.as_branch.keys[i] != right->raw.as_branch.keys[i])
+			return false;
+
+	return true;
+}
+
 
 PAFFS_RESULT insertInode( p_dev* dev, pInode* inode){
 	return insert(dev, inode);
@@ -112,9 +120,39 @@ int length_to_root( p_dev* dev, treeCacheNode * child ){
 	return length;
 }
 
+/* Traces the path from the root to a branch, searching
+ * by key.
+ * Returns the branch containing the given key.
+ */
+PAFFS_RESULT find_branch( p_dev* dev, treeCacheNode* target, treeCacheNode** outtreeCacheNode) {
+	int i = 0;
+	treeCacheNode *c = NULL;
+
+	PAFFS_RESULT r = getRootNodeFromCache(dev, &c);
+	if(r != PAFFS_OK)
+		return r;
+
+
+	while (!isTreeCacheNodeEqual(c, target)) {
+
+		i = 0;
+		while (i < c->raw.num_keys) {
+			if (target->raw.as_branch.keys[0] >= c->raw.as_branch.keys[i]) i++;
+			else break;
+		}
+
+		//printf("%d ->\n", i);
+		PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, i, c, &c);
+		if(r != PAFFS_OK)
+			return r;
+	}
+
+	*outtreeCacheNode = c;
+	return PAFFS_OK;
+}
+
 /* Traces the path from the root to a leaf, searching
- * by key.  Displays information about the path
- * if the verbose flag is set.
+ * by key.
  * Returns the leaf containing the given key.
  */
 PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeCacheNode** outtreeCacheNode) {
