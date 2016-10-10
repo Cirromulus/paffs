@@ -29,6 +29,7 @@ typedef enum PAFFS_RESULT{	//See paffs.c for String versions
 	PAFFS_LOWMEM,
 	PAFFS_NOPERM,
 	PAFFS_DIRNOTEMPTY,
+	PAFFS_FLUSHEDCACHE,
 	num_PAFFS_RESULT
 } PAFFS_RESULT;
 

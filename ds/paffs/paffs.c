@@ -31,6 +31,7 @@ static const char* PAFFS_RESULT_MSG[] = {
 		"Not enough RAM for cache",
 		"Operation not permitted",
 		"Directory is not empty",
+		"Cache had to be flushed, any current TCN can be invalidated now",
 		"You should not be seeing this..."
 };
 

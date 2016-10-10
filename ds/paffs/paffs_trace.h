@@ -17,6 +17,12 @@ extern unsigned int paffs_trace_mask;
 		}\
 	} while(0)
 
+#define PAFFS_DBG_S(mask, msg, ...) do {\
+		if(mask & paffs_trace_mask || mask & PAFFS_TRACE_ALWAYS){\
+			fprintf(stderr, "paffs: " msg "\n", ##__VA_ARGS__);\
+		}\
+	} while(0)
+
 #define PAFFS_TRACE_OS			0x00000002
 #define PAFFS_TRACE_ALLOCATE	0x00000004
 #define PAFFS_TRACE_SCAN		0x00000008

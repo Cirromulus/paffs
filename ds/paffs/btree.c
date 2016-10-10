@@ -231,8 +231,15 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, 
 
 	treeCacheNode *new_leaf = NULL;
 
-	PAFFS_RESULT r = addNewCacheNode(dev, &new_leaf);
-	if(r != PAFFS_OK)
+	treeCacheNode leaf_c = *leaf;
+	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_leaf);
+	if(r == PAFFS_FLUSHEDCACHE){
+		//Read back nodes from flash
+		r = buildUpCacheToNode(dev, &leaf_c, leaf);
+		if(r != PAFFS_OK)
+			return r;
+	}
+	else if(r != PAFFS_OK)
 		return r;
 
 	new_leaf->raw.is_leaf = true;
@@ -329,8 +336,18 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 	p_addr temp_addresses[btree_branch_order+1];
 
 
-	PAFFS_RESULT r = addNewCacheNode(dev, &new_node);
-	if(r != PAFFS_OK)
+	treeCacheNode old_node_c = *old_node, right_c = *right;
+	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_node);
+	if(r == PAFFS_FLUSHEDCACHE){
+		//Read back nodes from flash
+		r = buildUpCacheToNode(dev, &old_node_c, old_node);
+		if(r != PAFFS_OK)
+			return r;
+		r = buildUpCacheToNode(dev, &right_c, right);
+		if(r != PAFFS_OK)
+			return r;
+	}
+	else if(r != PAFFS_OK)
 		return r;
 
 	/* First create a temporary set of keys and pointers
@@ -423,12 +440,23 @@ PAFFS_RESULT insert_into_parent(p_dev* dev, treeCacheNode * left, pInode_no key,
 /* Creates a new root for two subtrees
  * and inserts the appropriate key into
  * the new root.
+ * COULD INITIATE A CACHE FLUSH
  */
 PAFFS_RESULT insert_into_new_root(p_dev* dev, treeCacheNode * left, pInode_no key, treeCacheNode * right) {
 	treeCacheNode *new_root = NULL;
-	PAFFS_RESULT r = addNewCacheNode(dev, &new_root);
-	if(r != PAFFS_OK)
+	treeCacheNode left_c = *left, right_c = *right;
+	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_root);
+	if(r == PAFFS_FLUSHEDCACHE){
+		//Rescan for left and right treeCache node
+		r = buildUpCacheToNode(dev, &left_c, left);
+		if(r != PAFFS_OK)
+			return r;
+		r = buildUpCacheToNode(dev, &right_c, right);
+		if(r != PAFFS_OK)
+			return r;
+	}else if (r != PAFFS_OK){
 		return r;
+	}
 
 	new_root->raw.is_leaf = false;
 	new_root->raw.as_branch.keys[0] = key;
@@ -454,7 +482,7 @@ PAFFS_RESULT insert_into_new_root(p_dev* dev, treeCacheNode * left, pInode_no ke
 PAFFS_RESULT start_new_tree(p_dev* dev) {
 
 	treeCacheNode *new_root = NULL;
-	PAFFS_RESULT r = addNewCacheNode(dev, &new_root);
+	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_root);
 	if(r != PAFFS_OK)
 		return r;
 	new_root->raw.is_leaf = true;
@@ -730,7 +758,6 @@ PAFFS_RESULT coalesce_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * neigh
 PAFFS_RESULT redistribute_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * neighbor,
 			int neighbor_index, int k_prime_index, int k_prime) {
 	int i;
-	PAFFS_RESULT r;
 
 
 	/* Case: n has a neighbor to the left.
