@@ -14,6 +14,7 @@
 #include <time.h>
 #include "paffs.h"
 #include "btree.h"
+#include "treeCache.h"
 
 void listDir(const char* path){
 	printf("Opening Dir '%s'.\n", path);
@@ -24,7 +25,21 @@ void listDir(const char* path){
 	}
 	paffs_dirent* dir;
 	while((dir = paffs_readdir(rewt)) != NULL){
-			printf("\tFound item: \"%s\"\n", dir->name);
+		printf("\tFound ");
+		switch(dir->node->type){
+		case PINODE_FILE:
+			printf("file: ");
+			break;
+		case PINODE_DIR:
+			printf("dir : ");
+			break;
+		case PINODE_LNK:
+			printf("link: ");
+			break;
+		default:
+			printf("unknown: ");
+		}
+		printf("\"%s\"\n", dir->name);
 	}
 	if(paffs_getLastErr() != PAFFS_OK)
 		//printf("Error reading Dir: %s\n", paffs_err_msg(paffs_getLastErr()));
@@ -298,9 +313,11 @@ int main( int argc, char ** argv ) {
 		return -1;
 	}
 
+	listDir("/b");
+
 //	while(getchar() == EOF);
 
-	printf("Removing /b/... ");
+	printf("Trying to remove /b/... ");
 	fflush(stdout);
 	r = paffs_remove("/b/");
 	printf("%s\n", paffs_err_msg(r));
@@ -318,6 +335,8 @@ int main( int argc, char ** argv ) {
 		return -1;
 	}
 
+	listDir("/b");
+
 
 //	while(getchar() == EOF);
 
@@ -329,7 +348,11 @@ int main( int argc, char ** argv ) {
 		return -1;
 	}
 
+	listDir("/");
+
 	free (tl);
 	paffs_close(fil);
+
+	printf("Success.\n");
 	return 0;
 }

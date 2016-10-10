@@ -363,6 +363,7 @@ PAFFS_RESULT paffs_removeInodeFromDir(pInode* contDir, pInode* elem){
 	}
 
 
+	dirEntryCount_t *entries = (dirEntryCount_t*) &dirData[0];
 	fileSize_t pointer = sizeof(dirEntryCount_t);
 	while(pointer < contDir->size){
 		dirEntryLength_t entryl = (dirEntryLength_t) dirData[pointer];
@@ -380,6 +381,7 @@ PAFFS_RESULT paffs_removeInodeFromDir(pInode* contDir, pInode* elem){
 			if(newSize == 0)
 				return PAFFS_OK;
 
+			(*entries)--;
 			memcpy(&dirData[pointer], &dirData[pointer + entryl], restByte);
 
 			unsigned int bw = 0;
@@ -481,6 +483,12 @@ paffs_dir* paffs_opendir(const char* path){
 	}
 
 	free(dirData);
+
+	if(entry != dir->no_entrys){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Directory stated it had %u entries, but has actually %u!", dir->no_entrys, entry);
+		paffs_lasterr = PAFFS_BUG;
+		return NULL;
+	}
 
 	return dir;
 }
