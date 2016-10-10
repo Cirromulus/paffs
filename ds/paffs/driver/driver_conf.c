@@ -13,6 +13,7 @@
 		 PAFFS_TRACE_ERROR |
 		 PAFFS_TRACE_BUG |
 		 PAFFS_TRACE_TREE |
+		 PAFFS_TRACE_CACHE |
 		 0;
 
 PAFFS_RESULT paffs_start_up(){
