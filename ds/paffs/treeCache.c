@@ -152,12 +152,10 @@ void deleteFromParent(treeCacheNode* tcn){
  * Maybe this function has to be everywhere a tcn is accessed...
  */
 PAFFS_RESULT buildUpCacheToNode(p_dev* dev, treeCacheNode* localCopyOfNode, treeCacheNode* cachedOutputNode){
-	treeCacheNode* tmp;
 	if(localCopyOfNode->raw.is_leaf)
-		return find_leaf(dev, localCopyOfNode->raw.as_leaf.keys[0], &tmp);
+		return find_leaf(dev, localCopyOfNode->raw.as_leaf.keys[0], &cachedOutputNode);
 
-
-	return PAFFS_NIMPL;
+	return find_branch(dev, localCopyOfNode, &cachedOutputNode);
 }
 
 
