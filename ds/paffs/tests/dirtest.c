@@ -279,6 +279,17 @@ int main( int argc, char ** argv ) {
 	}
 	printInfo(&fileInfo);
 
+	print_tree(getDevice());
+	printf("Flushing Cache ... ");
+	fflush(stdout);
+	r = flushTreeCache(getDevice());
+	printf("%s\n", paffs_err_msg(r));
+	if(r != PAFFS_OK){
+		return -1;
+	}
+
+	listDir("/");
+
 
 //	while(getchar() == EOF);
 	printf("Changing permissions of /b/file to 0... ");
@@ -354,5 +365,8 @@ int main( int argc, char ** argv ) {
 	paffs_close(fil);
 
 	printf("Success.\n");
+
+//	while(getchar() == EOF);
+
 	return 0;
 }

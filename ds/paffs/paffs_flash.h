@@ -33,7 +33,7 @@ PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev, unsigned int offs);
 
 
 // TreeNode related
-void registerRootnode(p_dev* dev, p_addr addr);
+PAFFS_RESULT registerRootnode(p_dev* dev, p_addr addr);
 
 p_addr getRootnodeAddr(p_dev* dev);
 

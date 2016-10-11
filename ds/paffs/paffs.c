@@ -802,7 +802,9 @@ PAFFS_RESULT paffs_remove(const char* path){
 	if((r = paffs_getParentDir(path, &parentDir, &lastSlash)) != PAFFS_OK)
 		return r;
 
-	return paffs_removeInodeFromDir(&parentDir, &object);
+	if((r = paffs_removeInodeFromDir(&parentDir, &object)) != PAFFS_OK)
+		return r;
+	return deleteInode(device, object.no);
 }
 
 

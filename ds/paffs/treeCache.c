@@ -174,7 +174,9 @@ void cleanTreeCache(){
 
 	resolveDirtyPaths(&cache[cache_root]);
 	for(int i = 0; i < TREENODECACHESIZE; i++){
-		if(cache[i].dirty){
+		if(cache[i].parent == NULL)
+			continue;
+		if(!cache[i].dirty){
 			deleteFromParent(&cache[i]);
 			cache[i].parent = NULL;	//you are free now!
 		}
@@ -182,9 +184,63 @@ void cleanTreeCache(){
 
 	//debug ---->
 	if(paffs_trace_mask & PAFFS_TRACE_CACHE){
-		PAFFS_DBG(PAFFS_TRACE_CACHE, "CleanTreeCache freed %d Nodes.", usedCache - getCacheUsage());
+		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "CleanTreeCache freed %d Nodes.", usedCache - getCacheUsage());
 	}
 	//<---- debug
+}
+
+/**
+ * Deletes all the nodes
+ */
+void deleteTreeCache(){
+	for(int i = 0; i < TREENODECACHESIZE; i++){
+		cache[i].parent = NULL;
+	}
+}
+
+/**
+ * Takes the node->raw.self to update parents flash pointer
+ */
+PAFFS_RESULT updateFlashAddressInParent(p_dev* dev, treeCacheNode* node){
+	if(node->parent == node){
+		//Rootnode
+		return registerRootnode(dev, node->raw.self);
+	}
+	for(int i = 0; i <= node->parent->raw.num_keys; i++){
+		if(node->parent->pointers[i] == node){
+			node->parent->raw.as_branch.pointers[i] = node->raw.self;
+			return PAFFS_OK;
+		}
+	}
+
+	return PAFFS_NF;
+}
+
+PAFFS_RESULT commitNodesRecursively(p_dev* dev, treeCacheNode* node) {
+	PAFFS_RESULT r;
+	if(node->raw.is_leaf){
+		r = writeTreeNode(dev, &node->raw);
+		if(r != PAFFS_OK){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write cached Treenode leaf!");
+			return r;
+		}
+		return updateFlashAddressInParent(dev, node);
+	}
+
+	for(int i = 0; i <= node->raw.num_keys; i++){
+		if(node->pointers[i] == NULL)
+			continue;
+		r = commitNodesRecursively(dev, node->pointers[i]);
+		if(r != PAFFS_OK)
+			return r;
+	}
+
+	r = writeTreeNode(dev, &node->raw);
+	if(r != PAFFS_OK){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write cached Treenode branch!");
+		return r;
+	}
+	return updateFlashAddressInParent(dev, node);
 }
 
 /**
@@ -192,8 +248,34 @@ void cleanTreeCache(){
  */
 
 PAFFS_RESULT flushTreeCache(p_dev* dev){
+	//debug ---->
+	uint16_t usedCache;
+	if(paffs_trace_mask & PAFFS_TRACE_CACHE){
+		usedCache = getCacheUsage();
+	}
+	//<---- debug
 
-	return PAFFS_NIMPL;
+
+	cleanTreeCache();
+	treeCacheNode* root;
+	PAFFS_RESULT r = getRootNodeFromCache(dev, &root);
+	if(r != PAFFS_OK)
+		return r;
+
+	r = commitNodesRecursively(dev, root);
+	if(r != PAFFS_OK)
+		return r;
+
+	//TODO: Dont delete all of the Node elements for optimizing usage
+	deleteTreeCache();
+
+	//debug ---->
+	if(paffs_trace_mask & PAFFS_TRACE_CACHE){
+		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "flushTreeCache freed %d Nodes.", usedCache - getCacheUsage());
+	}
+	//<---- debug
+
+	return PAFFS_OK;
 }
 
 
@@ -205,12 +287,14 @@ PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode** tcn){
 		return PAFFS_OK;
 	}
 
+	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Load rootnode from Flash");
+
 	p_addr addr = getRootnodeAddr(dev);
 	if(addr == 0)
 		PAFFS_DBG(PAFFS_TRACE_TREE, "get Rootnode, but does not exist!");
 
 	treeCacheNode* new_root;
-	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_root);
+	PAFFS_RESULT r = addNewCacheNode(&new_root);
 	if(r != PAFFS_OK){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Rootnode can't be loaded, cache size (%d) too small!", TREENODECACHESIZE);
 		return r;
@@ -219,6 +303,8 @@ PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode** tcn){
 	r = setCacheRoot(dev, new_root);
 	if(r != PAFFS_OK)
 		return r;
+
+	*tcn = new_root;
 
 	return readTreeNode(dev, addr, &cache[cache_root].raw);
 }
@@ -262,15 +348,18 @@ PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache Miss, loaded target %p (position %ld)", target, target - cache);
 
 	target->parent = parent;
+	parent->pointers[index] = target;
 	*child = target;
 
 	return readTreeNode(dev, parent->raw.as_branch.pointers[index], &(*child)->raw);
 }
 
 PAFFS_RESULT removeCacheNode(p_dev* dev, treeCacheNode* tcn){
-	PAFFS_DBG(PAFFS_TRACE_BUG, "Is treeCacheNode deleted in Flash?! I dont think so.");
-	//TODO: Delete flash pendant
 	tcn->parent = NULL;
+	if(tcn->raw.self != 0) {
+		return deleteTreeNode(dev, &tcn->raw);
+	}
+
 	return PAFFS_OK;
 }
 
