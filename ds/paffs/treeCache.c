@@ -147,7 +147,7 @@ void markParentPathDirty(treeCacheNode* tcn){
 }
 
 void deleteFromParent(treeCacheNode* tcn){
-	treeCacheNode* parent = tcn;
+	treeCacheNode* parent = tcn->parent;
 	if(parent == tcn)
 		return;
 	if(isIndexUsed(getIndexFromPointer(parent))){
