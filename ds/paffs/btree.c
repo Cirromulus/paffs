@@ -1007,7 +1007,7 @@ void print_leaves(p_dev* dev, treeCacheNode* c) {
 }
 
 /**
- * Function only valid if whole tree fits in cache due to memory footprint reduce
+ * This only works to depth 'n' if RAM cache is big enough to at least hold all nodes to depth 'n-1'!
  */
 void print_queued_keys_r(p_dev* dev, queue_s* q){
 	queue_s* new_q = queue_new();
@@ -1022,7 +1022,9 @@ void print_queued_keys_r(p_dev* dev, queue_s* q){
 					printf("%s!\n", paffs_err_msg(r));
 					return;
 				}
-				queue_enqueue(new_q, nn);
+				treeCacheNode* nn_copy = (treeCacheNode*) malloc(sizeof(treeCacheNode));
+				*nn_copy = *nn;
+				queue_enqueue(new_q, nn_copy);
 				if(i == 0)
 					printf(".");
 				if(i < n->raw.num_keys) printf("%" PRIu32 ".", (uint32_t) n->raw.as_branch.keys[i]);
@@ -1033,6 +1035,7 @@ void print_queued_keys_r(p_dev* dev, queue_s* q){
 			}
 		}
 		printf("|");
+		free(n);
 	}
 	printf("\n");
 	queue_destroy(q);
@@ -1042,7 +1045,9 @@ void print_queued_keys_r(p_dev* dev, queue_s* q){
 
 void print_keys(p_dev* dev, treeCacheNode* c){
 	queue_s* q = queue_new();
-	queue_enqueue(q, c);
+	treeCacheNode* c_copy = (treeCacheNode*) malloc(sizeof(treeCacheNode));
+	*c_copy = *c;
+	queue_enqueue(q, c_copy);
 	print_queued_keys_r(dev, q);
 }
 

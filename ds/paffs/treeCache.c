@@ -67,6 +67,8 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 	//First, try to clean up unchanged nodes
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache full, cleaning cache!");
 	cleanTreeCache();
+	if(paffs_lasterr != PAFFS_OK)
+		return paffs_lasterr;
 	r = addNewCacheNode(newTcn);
 	if(r == PAFFS_OK)
 		return PAFFS_FLUSHEDCACHE;
@@ -150,7 +152,7 @@ void deleteFromParent(treeCacheNode* tcn){
 	treeCacheNode* parent = tcn->parent;
 	if(parent == tcn)
 		return;
-	if(isIndexUsed(getIndexFromPointer(parent))){
+	if(!isIndexUsed(getIndexFromPointer(parent))){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Parent of %p is not in cache!", tcn);
 		paffs_lasterr = PAFFS_BUG;
 		return;
@@ -194,6 +196,8 @@ void cleanTreeCache(){
 			continue;
 		if(!cache[i].dirty){
 			deleteFromParent(&cache[i]);
+			if(paffs_lasterr != PAFFS_OK)
+				return;
 			setIndexFree(i);	//you are free now!
 		}
 	}
@@ -348,6 +352,8 @@ PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
 		return PAFFS_OK;	//cache hit
 	}
 
+	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache Miss");
+
 	treeCacheNode parent_c = *parent;
 	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &target);
 	if(r == PAFFS_FLUSHEDCACHE){
@@ -360,8 +366,6 @@ PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
 		return r;
 	}
 
-
-	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache Miss, loaded target %p (position %ld)", target, target - cache);
 
 	target->parent = parent;
 	parent->pointers[index] = target;
