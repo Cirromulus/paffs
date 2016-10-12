@@ -13,12 +13,27 @@
 static int16_t cache_root = 0;
 
 static treeCacheNode cache[TREENODECACHESIZE];
-//TODO: use static cache instead of malloc usw.
+
+static uint8_t cache_usage[(TREENODECACHESIZE/8)+1];
+
+void setIndexUsed(uint16_t index){
+	cache_usage[index / 8] |= 1 << index % 8;
+}
+
+void setIndexFree(uint16_t index){
+	cache_usage[index / 8] &= ~(1 << index % 8);
+}
+
+bool isIndexUsed(uint16_t index){
+	return cache_usage[index / 8] & (1 << index % 8);
+}
 
 int16_t findFirstFreeIndex(){
-	for(int i = 0; i < TREENODECACHESIZE; i++){
-		if(cache[i].parent == NULL)
-			return i;
+	for(int i = 0; i <= TREENODECACHESIZE/8; i++){
+		if(cache_usage[i] != 0xFF)
+			for(int j = 0; j < 8; j++)
+				if(!isIndexUsed(i*8 + j) && i*8 + j < TREENODECACHESIZE)
+					return i*8 + j;
 	}
 	return -1;
 }
@@ -27,21 +42,22 @@ int16_t getIndexFromPointer(treeCacheNode* tcn){
 	return tcn - cache;
 }
 
-/*
- * The new tcn->parent has to be changed _before_ calling another addNewCacheNode!
- */
 PAFFS_RESULT addNewCacheNode(treeCacheNode** newTcn){
 	int16_t index = findFirstFreeIndex();
 	if(index < 0){
-		PAFFS_DBG(PAFFS_TRACE_ALLOCATE, "RAN OUT OF RAM!");
+		PAFFS_DBG(PAFFS_TRACE_ALLOCATE, "Ran out of RAM while trying to add new cache Element!");
 		return PAFFS_LOWMEM;
 	}
 	*newTcn = &cache[index];
 	memset(*newTcn, 0, sizeof(treeCacheNode));
+	setIndexUsed(index);
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created new Cache element %p (position %d)", *newTcn, index);
 	return PAFFS_OK;
 }
 
+/*
+ * The new tcn->parent has to be changed _before_ calling another addNewCacheNode!
+ */
 PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn){
 	PAFFS_RESULT r = addNewCacheNode(newTcn);
 	if(r == PAFFS_OK)
@@ -49,7 +65,7 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 	if(r != PAFFS_LOWMEM)
 		return r;
 	//First, try to clean up unchanged nodes
-	PAFFS_DBG(PAFFS_TRACE_CACHE, "Cache full, cleaning cache!");
+	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache full, cleaning cache!");
 	cleanTreeCache();
 	r = addNewCacheNode(newTcn);
 	if(r == PAFFS_OK)
@@ -108,7 +124,7 @@ bool resolveDirtyPaths(treeCacheNode* tcn){
 
 	bool anyDirt = false;
 	for(int i = 0; i <= tcn->raw.num_keys; i++){
-		if(tcn->pointers[i] == NULL)	//Siblings not in cache
+		if(!isIndexUsed(getIndexFromPointer(tcn->pointers[i])))	//Siblings not in cache
 			continue;
 		if(resolveDirtyPaths(tcn->pointers[i])){
 			tcn->dirty = true;
@@ -122,8 +138,8 @@ void markParentPathDirty(treeCacheNode* tcn){
 	tcn->dirty = true;
 	if(tcn->parent == tcn)
 		return;
-	if(tcn->parent == NULL){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Parent of %p is NULL!", tcn);
+	if(isIndexUsed(getIndexFromPointer(tcn->parent))){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Parent of %p is not in cache!", tcn);
 		paffs_lasterr = PAFFS_BUG;
 		return;
 	}
@@ -134,8 +150,8 @@ void deleteFromParent(treeCacheNode* tcn){
 	treeCacheNode* parent = tcn;
 	if(parent == tcn)
 		return;
-	if(parent == NULL){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Parent of %p is NULL!", tcn);
+	if(isIndexUsed(getIndexFromPointer(parent))){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Parent of %p is not in cache!", tcn);
 		paffs_lasterr = PAFFS_BUG;
 		return;
 	}
@@ -151,11 +167,11 @@ void deleteFromParent(treeCacheNode* tcn){
  * Builds up cache with Elements in the Path to tcn.
  * Maybe this function has to be everywhere a tcn is accessed...
  */
-PAFFS_RESULT buildUpCacheToNode(p_dev* dev, treeCacheNode* localCopyOfNode, treeCacheNode* cachedOutputNode){
+PAFFS_RESULT buildUpCacheToNode(p_dev* dev, treeCacheNode* localCopyOfNode, treeCacheNode** cachedOutputNode){
 	if(localCopyOfNode->raw.is_leaf)
-		return find_leaf(dev, localCopyOfNode->raw.as_leaf.keys[0], &cachedOutputNode);
+		return find_leaf(dev, localCopyOfNode->raw.as_leaf.keys[0], cachedOutputNode);
 
-	return find_branch(dev, localCopyOfNode, &cachedOutputNode);
+	return find_branch(dev, localCopyOfNode, cachedOutputNode);
 }
 
 
@@ -178,7 +194,7 @@ void cleanTreeCache(){
 			continue;
 		if(!cache[i].dirty){
 			deleteFromParent(&cache[i]);
-			cache[i].parent = NULL;	//you are free now!
+			setIndexFree(i);	//you are free now!
 		}
 	}
 
@@ -194,7 +210,7 @@ void cleanTreeCache(){
  */
 void deleteTreeCache(){
 	for(int i = 0; i < TREENODECACHESIZE; i++){
-		cache[i].parent = NULL;
+		setIndexFree(i);
 	}
 }
 
@@ -282,7 +298,7 @@ PAFFS_RESULT flushTreeCache(p_dev* dev){
 
 
 PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode** tcn){
-	if(cache[cache_root].parent != NULL){
+	if(isIndexUsed(cache_root)){
 		*tcn = &cache[cache_root];
 		return PAFFS_OK;
 	}
@@ -336,7 +352,7 @@ PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
 	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &target);
 	if(r == PAFFS_FLUSHEDCACHE){
 		//We need to make sure parent and child is in cache again
-		r = buildUpCacheToNode(dev, &parent_c, parent);
+		r = buildUpCacheToNode(dev, &parent_c, &parent);
 		if(r != PAFFS_OK)
 			return r;
 	}
@@ -377,7 +393,7 @@ PAFFS_RESULT setCacheRoot(p_dev* dev, treeCacheNode* rootTcn){
 uint16_t getCacheUsage(){
 	uint16_t usage = 0;
 	for(int i = 0; i < TREENODECACHESIZE; i++){
-		if(cache[i].parent != NULL)
+		if(isIndexUsed(i))
 			usage++;
 	}
 	return usage;

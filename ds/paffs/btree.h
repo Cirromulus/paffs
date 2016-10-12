@@ -40,11 +40,10 @@ typedef struct treeNode{
 							//If Branch: Number of addresses - 1
 } treeNode;
 
-//FIXME: Change how system interacts with TCN, can be freed at any time!
 typedef struct treeCacheNode{
 	treeNode raw;
 	struct treeCacheNode* parent;	//Parent either points to parent or to node itself if is root. Special case: NULL if node is invalid.
-	struct treeCacheNode* pointers[BRANCH_ORDER];	//pointer can be NULL if not cached yet
+	struct treeCacheNode* pointers[BRANCH_ORDER];
 	bool dirty;	//TODO: translate in Checksum
 } treeCacheNode;
 

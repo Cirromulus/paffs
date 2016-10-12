@@ -273,7 +273,7 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, 
 	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_leaf);
 	if(r == PAFFS_FLUSHEDCACHE){
 		//Read back nodes from flash
-		r = buildUpCacheToNode(dev, &leaf_c, leaf);
+		r = buildUpCacheToNode(dev, &leaf_c, &leaf);
 		if(r != PAFFS_OK)
 			return r;
 	}
@@ -378,10 +378,10 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_node);
 	if(r == PAFFS_FLUSHEDCACHE){
 		//Read back nodes from flash
-		r = buildUpCacheToNode(dev, &old_node_c, old_node);
+		r = buildUpCacheToNode(dev, &old_node_c, &old_node);
 		if(r != PAFFS_OK)
 			return r;
-		r = buildUpCacheToNode(dev, &right_c, right);
+		r = buildUpCacheToNode(dev, &right_c, &right);
 		if(r != PAFFS_OK)
 			return r;
 	}
@@ -486,10 +486,10 @@ PAFFS_RESULT insert_into_new_root(p_dev* dev, treeCacheNode * left, pInode_no ke
 	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_root);
 	if(r == PAFFS_FLUSHEDCACHE){
 		//Rescan for left and right treeCache node
-		r = buildUpCacheToNode(dev, &left_c, left);
+		r = buildUpCacheToNode(dev, &left_c, &left);
 		if(r != PAFFS_OK)
 			return r;
-		r = buildUpCacheToNode(dev, &right_c, right);
+		r = buildUpCacheToNode(dev, &right_c, &right);
 		if(r != PAFFS_OK)
 			return r;
 	}else if (r != PAFFS_OK){

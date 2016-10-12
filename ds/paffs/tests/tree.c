@@ -45,7 +45,7 @@ int main( int argc, char ** argv ) {
 		print_tree(device);
 		//while(getchar() == EOF);
 	}
-	for(int i = 1; i <= 5; i++){
+	for(int i = 0; i <= 5; i++){
 		pInode test = {0};
 
 		printf("Get nr. %d: ", i);

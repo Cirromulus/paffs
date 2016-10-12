@@ -17,9 +17,7 @@
 int16_t findFirstFreeIndex();
 
 int16_t getIndexFromPointer(treeCacheNode* tcn);
-/*
- * The new tcn->parent has to be changed _before_ calling another addNewCacheNode!
- */
+
 PAFFS_RESULT addNewCacheNode(treeCacheNode** newTcn);
 
 PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn);
@@ -46,7 +44,7 @@ void deleteFromParent(treeCacheNode* tcn);
  * Builds up cache with Elements in the Path to tcn.
  * Maybe this function has to be everywhere a tcn is accessed...
  */
-PAFFS_RESULT buildUpCacheToNode(p_dev* dev, treeCacheNode* localCopyOfNode, treeCacheNode* cachedOutputNode);
+PAFFS_RESULT buildUpCacheToNode(p_dev* dev, treeCacheNode* localCopyOfNode, treeCacheNode** cachedOutputNode);
 
 /*
  * Just frees clean nodes
