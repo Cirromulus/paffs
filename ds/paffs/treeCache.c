@@ -21,14 +21,27 @@ static uint16_t cache_hits = 0;
 static uint16_t cache_misses = 0;
 
 void setIndexUsed(uint16_t index){
+	if(index > TREENODECACHESIZE){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Index used at %u!", index);
+		paffs_lasterr = PAFFS_BUG;
+	}
 	cache_usage[index / 8] |= 1 << index % 8;
 }
 
 void setIndexFree(uint16_t index){
+	if(index > TREENODECACHESIZE){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Index free at %u!", index);
+		paffs_lasterr = PAFFS_BUG;
+	}
 	cache_usage[index / 8] &= ~(1 << index % 8);
 }
 
 bool isIndexUsed(uint16_t index){
+	if(index > TREENODECACHESIZE){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to query Index Used at %u!", index);
+		paffs_lasterr = PAFFS_BUG;
+		return true;
+	}
 	return cache_usage[index / 8] & (1 << index % 8);
 }
 
@@ -43,6 +56,11 @@ int16_t findFirstFreeIndex(){
 }
 
 int16_t getIndexFromPointer(treeCacheNode* tcn){
+	if(tcn - cache > TREENODECACHESIZE){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Index from Pointer not inside array (%p)!", tcn);
+		paffs_lasterr = PAFFS_BUG;
+		return 0;
+	}
 	return tcn - cache;
 }
 
@@ -70,6 +88,7 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 		return r;
 	//First, try to clean up unchanged nodes
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache full, cleaning cache!");
+	paffs_lasterr = PAFFS_OK;	//not nice code
 	cleanTreeCacheLeaves();
 	if(paffs_lasterr != PAFFS_OK)
 		return paffs_lasterr;
