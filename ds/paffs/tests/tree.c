@@ -12,6 +12,8 @@
 #include "btree.h"
 #include "paffs.h"
 
+#include "treeCache.h"
+
 
 int main( int argc, char ** argv ) {
 	printf("Branch-Order: %lu, Leaf-Order: %lu\nSpace in Pointers: %lu Byte, Sizeof pInode: %lu Byte\n", BRANCH_ORDER, LEAF_ORDER, BRANCH_ORDER * sizeof(p_addr), sizeof(pInode));
@@ -92,5 +94,6 @@ int main( int argc, char ** argv ) {
 	printf("ok\n");
 	print_tree(device);
 
+	printf("\nCache-Hits: %d, Cache-Misses: %d\n\tHit ratio: %.5f%%\n", getCacheHits(), getCacheMisses(), ((float)getCacheHits())/(getCacheHits()+getCacheMisses()));
 
 }

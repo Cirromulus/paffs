@@ -50,6 +50,10 @@ PAFFS_RESULT buildUpCacheToNode(p_dev* dev, treeCacheNode* localCopyOfNode, tree
  * Just frees clean nodes
  */
 void cleanTreeCache();
+/*
+ * Just frees clean leaf nodes, so cache still contains branches...
+ */
+void cleanTreeCacheLeaves();
 
 /**
  * Commits complete Tree to Flash (Later on it should try to leave some in cache)
@@ -78,5 +82,8 @@ PAFFS_RESULT setCacheRoot(p_dev* dev, treeCacheNode* rootTcn);
 //debug
 uint16_t getCacheUsage();
 uint16_t getCacheSize();
+uint16_t getCacheHits();
+uint16_t getCacheMisses();
+
 
 #endif /* TREECACHE_H_ */

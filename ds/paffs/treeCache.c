@@ -16,6 +16,10 @@ static treeCacheNode cache[TREENODECACHESIZE];
 
 static uint8_t cache_usage[(TREENODECACHESIZE/8)+1];
 
+//Just for debug/tuning purposes
+static uint16_t cache_hits = 0;
+static uint16_t cache_misses = 0;
+
 void setIndexUsed(uint16_t index){
 	cache_usage[index / 8] |= 1 << index % 8;
 }
@@ -66,7 +70,7 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 		return r;
 	//First, try to clean up unchanged nodes
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache full, cleaning cache!");
-	cleanTreeCache();
+	cleanTreeCacheLeaves();
 	if(paffs_lasterr != PAFFS_OK)
 		return paffs_lasterr;
 	r = addNewCacheNode(newTcn);
@@ -197,6 +201,36 @@ PAFFS_RESULT buildUpCacheToNode(p_dev* dev, treeCacheNode* localCopyOfNode, tree
 
 
 /*
+ * Just frees clean leaf nodes, cache will be more efficient...
+ */
+void cleanTreeCacheLeaves(){
+
+	//debug ---->
+	uint16_t usedCache;
+	if(paffs_trace_mask & PAFFS_TRACE_CACHE){
+		usedCache = getCacheUsage();
+	}
+	//<---- debug
+
+
+	resolveDirtyPaths(&cache[cache_root]);
+	for(int i = 0; i < TREENODECACHESIZE; i++){
+		if(!isIndexUsed(getIndexFromPointer(&cache[i])))
+			continue;
+		if(!cache[i].dirty && cache[i].raw.is_leaf){
+			deleteFromParent(&cache[i]);
+			setIndexFree(i);
+		}
+	}
+
+	//debug ---->
+	if(paffs_trace_mask & PAFFS_TRACE_CACHE){
+		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "CleanTreeCacheLeaves freed %d Leaves.", usedCache - getCacheUsage());
+	}
+	//<---- debug
+}
+
+/*
  * Just frees clean nodes
  */
 void cleanTreeCache(){
@@ -261,6 +295,7 @@ PAFFS_RESULT commitNodesRecursively(p_dev* dev, treeCacheNode* node) {
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write cached Treenode leaf!");
 			return r;
 		}
+		node->dirty = false;
 		return updateFlashAddressInParent(dev, node);
 	}
 
@@ -277,6 +312,7 @@ PAFFS_RESULT commitNodesRecursively(p_dev* dev, treeCacheNode* node) {
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write cached Treenode branch!");
 		return r;
 	}
+	node->dirty = false;
 	return updateFlashAddressInParent(dev, node);
 }
 
@@ -303,8 +339,10 @@ PAFFS_RESULT flushTreeCache(p_dev* dev){
 	if(r != PAFFS_OK)
 		return r;
 
-	//TODO: Dont delete all of the Node elements for optimizing usage
-	deleteTreeCache();
+	cleanTreeCacheLeaves();
+
+	if(findFirstFreeIndex() < 0)
+		cleanTreeCache();	//Obviously, tree cache did not contain any leaves
 
 	//debug ---->
 	if(paffs_trace_mask & PAFFS_TRACE_CACHE){
@@ -321,8 +359,10 @@ PAFFS_RESULT flushTreeCache(p_dev* dev){
 PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode** tcn){
 	if(isIndexUsed(cache_root)){
 		*tcn = &cache[cache_root];
+		cache_hits++;
 		return PAFFS_OK;
 	}
+	cache_misses++;
 
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Load rootnode from Flash");
 
@@ -365,9 +405,11 @@ PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
 	}
 	if(target != NULL){
 		*child = target;
+		cache_hits++;
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache hit, found target %p (position %ld)", target, target - cache);
 		return PAFFS_OK;	//cache hit
 	}
+	cache_misses++;
 
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache Miss");
 
@@ -377,7 +419,7 @@ PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
 		//We need to make sure parent and child is in cache again
 		r = buildUpCacheToNode(dev, &parent_c, &parent);
 		if(r != PAFFS_OK)
-			return r;
+			return PAFFS_FLUSHEDCACHE;
 	}
 	if(r != PAFFS_OK){
 		return r;
@@ -392,7 +434,7 @@ PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
 }
 
 PAFFS_RESULT removeCacheNode(p_dev* dev, treeCacheNode* tcn){
-	tcn->parent = NULL;
+	setIndexFree(getIndexFromPointer(tcn));
 	if(tcn->raw.self != 0) {
 		return deleteTreeNode(dev, &tcn->raw);
 	}
@@ -424,3 +466,9 @@ uint16_t getCacheSize(){
 	return TREENODECACHESIZE;
 }
 
+uint16_t getCacheHits(){
+	return cache_hits;
+}
+uint16_t getCacheMisses(){
+	return cache_misses;
+}

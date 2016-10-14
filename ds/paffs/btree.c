@@ -73,7 +73,7 @@ PAFFS_RESULT findFirstFreeNo(p_dev* dev, pInode_no* outNumber){
 		return r;
 	while(!c->raw.is_leaf){
 		r = getTreeNodeAtIndexFrom(dev, c->raw.num_keys, c, &c);
-		if(r != PAFFS_OK)
+		if(r != PAFFS_OK && r != PAFFS_FLUSHEDCACHE)
 			return r;
 	}
 	if(c->raw.num_keys > 0){
@@ -98,7 +98,7 @@ int height( p_dev* dev, treeCacheNode * root ) {
         treeCacheNode *curr = root;
         while (!curr->raw.is_leaf) {
                 PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, 0, curr, &curr);
-                if(r != PAFFS_OK){
+                if(r != PAFFS_OK && r != PAFFS_FLUSHEDCACHE){
                 	paffs_lasterr = r;
                 	return -1;
                 }
@@ -143,7 +143,7 @@ PAFFS_RESULT find_branch( p_dev* dev, treeCacheNode* target, treeCacheNode** out
 
 		//printf("%d ->\n", i);
 		PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, i, c, &c);
-		if(r != PAFFS_OK)
+		if(r != PAFFS_OK && r != PAFFS_FLUSHEDCACHE)
 			return r;
 	}
 
@@ -174,7 +174,7 @@ PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeCacheNode** outtreeCacheN
 
 		//printf("%d ->\n", i);
 		PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, i, c, &c);
-		if(r != PAFFS_OK)
+		if(r != PAFFS_OK && r != PAFFS_FLUSHEDCACHE)
 			return r;
 	}
 
@@ -821,7 +821,7 @@ PAFFS_RESULT redistribute_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * n
 		}
 
 		if (!n->raw.is_leaf) {
-			n->pointers[0] = neighbor->pointers[neighbor->raw.num_keys];
+			n->pointers[0] = neighbor->pointers[neighbor->raw.num_keys];	//getTreeNodeIndex not needed, NULL is also allowed
 			n->raw.as_branch.pointers[0] = neighbor->raw.as_branch.pointers[neighbor->raw.num_keys];
 			n->pointers[0]->parent = n;
 			neighbor->pointers[neighbor->raw.num_keys] = NULL;
@@ -951,7 +951,7 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeCacheNode * n, pInode_no key){
 	k_prime = n->parent->raw.as_branch.keys[k_prime_index];
 	r = neighbor_index == -1 ? getTreeNodeAtIndexFrom(dev, 1, n->parent, &neighbor) :
 			getTreeNodeAtIndexFrom(dev, neighbor_index, n->parent, &neighbor);
-	if(r != PAFFS_OK)
+	if(r != PAFFS_OK && r != PAFFS_FLUSHEDCACHE)
 		return r;
 
 	capacity = neighbor->raw.is_leaf ? btree_leaf_order : btree_branch_order;	//-1?
@@ -997,7 +997,7 @@ void print_leaves(p_dev* dev, treeCacheNode* c) {
 		for(int i = 0; i <= c->raw.num_keys; i++){
 			treeCacheNode *n = NULL;
 			PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, i, c, &n);
-			if(r != PAFFS_OK){
+			if(r != PAFFS_OK && r != PAFFS_FLUSHEDCACHE){
 				printf("%s!\n", paffs_err_msg(r));
 				return;
 			}
@@ -1019,7 +1019,7 @@ void print_queued_keys_r(p_dev* dev, queue_s* q){
 			if(!n->raw.is_leaf){
 				treeCacheNode *nn = NULL;
 				PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, i, n, &nn);
-				if(r != PAFFS_OK){
+				if(r != PAFFS_OK && r != PAFFS_FLUSHEDCACHE){
 					printf("%s!\n", paffs_err_msg(r));
 					return;
 				}
