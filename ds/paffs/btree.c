@@ -281,7 +281,6 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, 
 		return r;
 
 	new_leaf->raw.is_leaf = true;
-	new_leaf->dirty = true;
 
 	insertion_index = 0;
 	while (insertion_index < btree_leaf_order && leaf->raw.as_leaf.keys[insertion_index] < newInode->no)
@@ -326,8 +325,10 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, 
 		new_leaf->raw.as_leaf.keys[i] = 0;
 	}
 
+	new_leaf->dirty = true;
 	new_leaf->parent = leaf->parent;
 	new_key = new_leaf->raw.as_leaf.keys[0];
+	leaf->dirty = true;
 
 	return insert_into_parent(dev, leaf, new_key, new_leaf);
 }

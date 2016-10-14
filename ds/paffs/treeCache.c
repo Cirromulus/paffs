@@ -153,8 +153,8 @@ void deleteFromParent(treeCacheNode* tcn){
 	if(parent == tcn)
 		return;
 	if(!isIndexUsed(getIndexFromPointer(parent))){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Parent of %p is not in cache!", tcn);
-		paffs_lasterr = PAFFS_BUG;
+		//PAFFS_DBG(PAFFS_TRACE_BUG, "Parent of %p is not in cache!", tcn);
+		//paffs_lasterr = PAFFS_BUG;	//This is not a bug since the parent could be freed before the sibling
 		return;
 	}
 	for(int i = 0; i <= parent->raw.num_keys; i++){
@@ -165,6 +165,25 @@ void deleteFromParent(treeCacheNode* tcn){
 	}
 }
 
+
+bool hasNoSiblings(treeCacheNode* tcn){
+	if(tcn->raw.is_leaf)
+		return true;
+	for(int i = 0; i <= tcn->raw.num_keys; i++)
+		if(tcn->pointers[i] != NULL)
+			return false;
+	return true;
+}
+
+void deletePathToRoot(treeCacheNode* tcn){
+	if(tcn->dirty)
+		return;
+
+	deleteFromParent(tcn);
+	setIndexFree(getIndexFromPointer(tcn));
+	if(tcn->parent != tcn && hasNoSiblings(tcn->parent))
+		deletePathToRoot(tcn->parent);
+}
 /**
  * Builds up cache with Elements in the Path to tcn.
  * Maybe this function has to be everywhere a tcn is accessed...
@@ -192,13 +211,11 @@ void cleanTreeCache(){
 
 	resolveDirtyPaths(&cache[cache_root]);
 	for(int i = 0; i < TREENODECACHESIZE; i++){
-		if(cache[i].parent == NULL)
+		if(!isIndexUsed(getIndexFromPointer(&cache[i])))
 			continue;
-		if(!cache[i].dirty){
+		if(!cache[i].dirty && hasNoSiblings(&cache[i])){
 			deleteFromParent(&cache[i]);
-			if(paffs_lasterr != PAFFS_OK)
-				return;
-			setIndexFree(i);	//you are free now!
+			setIndexFree(i);
 		}
 	}
 

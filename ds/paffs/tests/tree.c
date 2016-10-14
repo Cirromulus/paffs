@@ -45,6 +45,7 @@ int main( int argc, char ** argv ) {
 		print_tree(device);
 		//while(getchar() == EOF);
 	}
+	print_tree(device);
 	for(int i = 0; i <= 5; i++){
 		pInode test = {0};
 
