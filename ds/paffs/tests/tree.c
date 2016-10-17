@@ -79,7 +79,7 @@ int main( int argc, char ** argv ) {
 		printf(RED "\t %s" RESET "\n", paffs_err_msg(r));
 		return -1;
 	}
-	printf(GRN "OK" RESET "\n");
+	printf(GRN "\t OK" RESET "\n");
 	print_tree(device);
 
 	//to test redistribute_nodes
@@ -91,7 +91,7 @@ int main( int argc, char ** argv ) {
 		print_tree(device);
 		return -1;
 	}
-	printf(GRN "OK" RESET "\n");
+	printf(GRN "\t OK" RESET "\n");
 	print_tree(device);
 
 	printf("Delete Node 1:");
@@ -102,7 +102,7 @@ int main( int argc, char ** argv ) {
 		print_tree(device);
 		return -1;
 	}
-	printf(GRN "OK" RESET "\n");
+	printf(GRN "\t OK" RESET "\n");
 	print_tree(device);
 
 	printf("\nCache-Hits: %d, Cache-Misses: %d\n\tHit ratio: %.5f%%\n",

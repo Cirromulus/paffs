@@ -67,7 +67,7 @@ int16_t getIndexFromPointer(treeCacheNode* tcn){
 PAFFS_RESULT addNewCacheNode(treeCacheNode** newTcn){
 	int16_t index = findFirstFreeIndex();
 	if(index < 0){
-		PAFFS_DBG_S(PAFFS_TRACE_ALLOCATE, "Cache is full!");
+		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache is full!");
 		return PAFFS_LOWMEM;
 	}
 	*newTcn = &cache[index];
