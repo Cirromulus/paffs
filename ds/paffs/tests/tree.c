@@ -14,6 +14,15 @@
 
 #include "treeCache.h"
 
+#define RED   "\x1B[31m"
+#define GRN   "\x1B[32m"
+#define YEL   "\x1B[33m"
+#define BLU   "\x1B[34m"
+#define MAG   "\x1B[35m"
+#define CYN   "\x1B[36m"
+#define WHT   "\x1B[37m"
+#define RESET "\x1B[0m"
+
 
 int main( int argc, char ** argv ) {
 	printf("Branch-Order: %lu, Leaf-Order: %lu\nSpace in Pointers: %lu Byte, Sizeof pInode: %lu Byte\n", BRANCH_ORDER, LEAF_ORDER, BRANCH_ORDER * sizeof(p_addr), sizeof(pInode));
@@ -40,10 +49,11 @@ int main( int argc, char ** argv ) {
 		test.no = i;
 
 		r = insertInode(device, &test);
-		if(r != PAFFS_OK)
-			printf("\t%s!\n", paffs_err_msg(r));
-		else
-			printf("\tOK\n");
+		if(r != PAFFS_OK){
+			printf( RED "\t%s!" RESET "\n", paffs_err_msg(r));
+			return -1;
+		}else
+			printf(GRN "\tOK" RESET "\n");
 		print_tree(device);
 		//while(getchar() == EOF);
 	}
@@ -54,10 +64,11 @@ int main( int argc, char ** argv ) {
 		printf("Get nr. %d: ", i);
 		fflush(stdout);
 		r = getInode(device, i, &test);
-		if(r != PAFFS_OK)
-			printf("\t%s!\n", paffs_err_msg(r));
-		else
-			printf("\tFound Inode %d\n", test.no);
+		if(r != PAFFS_OK){
+			printf(RED "\t%s!" RESET "\n", paffs_err_msg(r));
+			return -1;
+		}else
+			printf(GRN "\tFound Inode %d" RESET "\n", test.no);
 	}
 
 	//To test coalesce_nodes
@@ -65,10 +76,10 @@ int main( int argc, char ** argv ) {
 	fflush(stdout);
 	r = deleteInode(device, 3);
 	if(r != PAFFS_OK){
-		printf("\t %s\n", paffs_err_msg(r));
+		printf(RED "\t %s" RESET "\n", paffs_err_msg(r));
 		return -1;
 	}
-	printf("ok\n");
+	printf(GRN "OK" RESET "\n");
 	print_tree(device);
 
 	//to test redistribute_nodes
@@ -76,22 +87,22 @@ int main( int argc, char ** argv ) {
 	fflush(stdout);
 	r = deleteInode(device, 4);
 	if(r != PAFFS_OK){
-		printf("\t %s\n", paffs_err_msg(r));
+		printf(RED "\t %s" RESET "\n", paffs_err_msg(r));
 		print_tree(device);
 		return -1;
 	}
-	printf("ok\n");
+	printf(GRN "OK" RESET "\n");
 	print_tree(device);
 
 	printf("Delete Node 1:");
 	fflush(stdout);
 	r = deleteInode(device, 1);
 	if(r != PAFFS_OK){
-		printf("\t %s\n", paffs_err_msg(r));
+		printf(RED "\t %s" RESET "\n", paffs_err_msg(r));
 		print_tree(device);
 		return -1;
 	}
-	printf("ok\n");
+	printf(GRN "OK" RESET "\n");
 	print_tree(device);
 
 	printf("\nCache-Hits: %d, Cache-Misses: %d\n\tHit ratio: %.5f%%\n", getCacheHits(), getCacheMisses(), ((float)getCacheHits())/(getCacheHits()+getCacheMisses()));

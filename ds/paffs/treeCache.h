@@ -20,8 +20,6 @@ int16_t getIndexFromPointer(treeCacheNode* tcn);
 
 PAFFS_RESULT addNewCacheNode(treeCacheNode** newTcn);
 
-PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn);
-
 bool isParentPathClean(treeCacheNode* tcn);
 
 /**
@@ -42,7 +40,6 @@ void deleteFromParent(treeCacheNode* tcn);
 
 /**
  * Builds up cache with Elements in the Path to tcn.
- * Maybe this function has to be everywhere a tcn is accessed...
  */
 PAFFS_RESULT buildUpCacheToNode(p_dev* dev, treeCacheNode* localCopyOfNode, treeCacheNode** cachedOutputNode);
 
@@ -76,7 +73,7 @@ PAFFS_RESULT removeCacheNode(p_dev* dev, treeCacheNode* tcn);
 
 PAFFS_RESULT setCacheRoot(p_dev* dev, treeCacheNode* rootTcn);
 
-
+PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn);
 
 
 //debug

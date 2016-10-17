@@ -1008,7 +1008,7 @@ void print_leaves(p_dev* dev, treeCacheNode* c) {
 }
 
 /**
- * This only works to depth 'n' if RAM cache is big enough to at least hold all nodes to depth 'n-1'!
+ * This only works to depth 'n' if RAM cache is big enough to at least hold all nodes in Path to depth 'n-1'
  */
 void print_queued_keys_r(p_dev* dev, queue_s* q){
 	queue_s* new_q = queue_new();
@@ -1017,8 +1017,18 @@ void print_queued_keys_r(p_dev* dev, queue_s* q){
 		treeCacheNode *n = queue_dequeue(q);
 		for(int i = 0; i <= n->raw.num_keys; i++){
 			if(!n->raw.is_leaf){
-				treeCacheNode *nn = NULL;
-				PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, i, n, &nn);
+				treeCacheNode *nn = NULL;			//next node
+				treeCacheNode *n_cache = NULL;		//cache version of the copy of the former cache entry...
+
+				//Build up cache to current branch.
+				//This is not very efficient, but doing that once per branch would require
+				//cache to fit all child nodes of the current branch.
+				PAFFS_RESULT r = find_branch(dev, n, &n_cache);
+				if(r != PAFFS_OK){
+					printf("%s!\n", paffs_err_msg(r));
+					return;
+				}
+				r = getTreeNodeAtIndexFrom(dev, i, n_cache, &nn);
 				if(r != PAFFS_OK && r != PAFFS_FLUSHEDCACHE){
 					printf("%s!\n", paffs_err_msg(r));
 					return;
