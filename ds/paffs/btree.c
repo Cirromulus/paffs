@@ -123,6 +123,7 @@ int length_to_root( p_dev* dev, treeCacheNode * child ){
 /* Traces the path from the root to a branch, searching
  * by key.
  * Returns the branch containing the given key.
+ * This function is used to build up cache to a given leaf after a cache clean.
  */
 PAFFS_RESULT find_branch( p_dev* dev, treeCacheNode* target, treeCacheNode** outtreeCacheNode) {
 	int i = 0;
@@ -154,6 +155,7 @@ PAFFS_RESULT find_branch( p_dev* dev, treeCacheNode* target, treeCacheNode** out
 /* Traces the path from the root to a leaf, searching
  * by key.
  * Returns the leaf containing the given key.
+ * This function is also used to build up cache to a given leaf after a cache clean.
  */
 PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeCacheNode** outtreeCacheNode) {
 	int i = 0;
@@ -163,8 +165,13 @@ PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeCacheNode** outtreeCacheN
 	if(r != PAFFS_OK)
 		return r;
 
-
+	unsigned int depth = 0;
 	while (!c->raw.is_leaf) {
+		depth++;
+		if(depth >= TREENODECACHESIZE-1){	//-1 because one node is needed for insert functions.
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Cache size (%d) too small for depth %d!", TREENODECACHESIZE, depth);
+			return PAFFS_LOWMEM;
+		}
 
 		i = 0;
 		while (i < c->raw.num_keys) {
@@ -172,7 +179,6 @@ PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeCacheNode** outtreeCacheN
 			else break;
 		}
 
-		//printf("%d ->\n", i);
 		PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, i, c, &c);
 		if(r != PAFFS_OK && r != PAFFS_FLUSHEDCACHE)
 			return r;

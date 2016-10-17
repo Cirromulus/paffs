@@ -40,11 +40,12 @@ static const paffs_permission PAFFS_W = 0x2;
 static const paffs_permission PAFFS_X = 0x4;
 
 typedef char fileopenmask;
-static const fileopenmask PAFFS_FC = 0x01;	//file create
-static const fileopenmask PAFFS_FR = 0x02;	//file read
-static const fileopenmask PAFFS_FW = 0x04;	//file write
+static const fileopenmask PAFFS_FR = 0x01;	//file read
+static const fileopenmask PAFFS_FW = 0x02;	//file write
+static const fileopenmask PAFFS_FEX= 0x04;	//file execute
 static const fileopenmask PAFFS_FA = 0x08;	//file append
 static const fileopenmask PAFFS_FE = 0x10;	//file open only existing
+static const fileopenmask PAFFS_FC = 0x11;	//file create
 
 PAFFS_RESULT paffs_start_up();
 PAFFS_RESULT paffs_custom_start_up(void* fc);

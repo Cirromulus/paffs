@@ -105,6 +105,8 @@ int main( int argc, char ** argv ) {
 	printf(GRN "OK" RESET "\n");
 	print_tree(device);
 
-	printf("\nCache-Hits: %d, Cache-Misses: %d\n\tHit ratio: %.5f%%\n", getCacheHits(), getCacheMisses(), ((float)getCacheHits())/(getCacheHits()+getCacheMisses()));
+	printf("\nCache-Hits: %d, Cache-Misses: %d\n\tHit ratio: %.5f%%\n",
+			getCacheHits(),
+			getCacheMisses(), 100*((float)getCacheHits())/(getCacheHits()+getCacheMisses()));
 
 }

@@ -145,10 +145,9 @@ int main( int argc, char ** argv ) {
 
 	paffs_obj *fil = paffs_open("/b/file", PAFFS_FW);
 
-	if(fil == NULL){
-		printf("Open err: %s\n", paffs_err_msg(paffs_getLastErr()));
+	printf("%s\n", paffs_err_msg(paffs_getLastErr()));
+	if(fil == NULL)
 		return -1;
-	}
 
 	//	while(getchar() == EOF);
 
@@ -172,8 +171,9 @@ int main( int argc, char ** argv ) {
 
 	unsigned int bytes = 0;
 	r = paffs_write(fil, tl, strlen(tl), &bytes);
+	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
-			printf("Write: %s\n", paffs_err_msg(r));
+		return -1;
 	printf("Wrote content  '%s' 25 times to file\n", t);
 	// ----- first write
 
@@ -185,13 +185,15 @@ int main( int argc, char ** argv ) {
 	paffs_objInfo fileInfo = {0};
 	r = paffs_seek(fil, 9, PAFFS_SEEK_SET);
 	r = paffs_getObjInfo("/b/file", &fileInfo);
+	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(r));
+		return -1;
 
 	char* out = malloc(fileInfo.size - 8);
 	r = paffs_read(fil, out, fileInfo.size - 9, &bytes);
+	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(r));
+		return -1;
 
 	out[fileInfo.size - 9] = 0;
 	printf("Read Contents misaligned (+9)... ");
@@ -211,16 +213,18 @@ int main( int argc, char ** argv ) {
 	printf("write misaligned - over Size... ");
 	fflush(stdout);
 	r = paffs_seek(fil, -5, PAFFS_SEEK_END);
-	if(r != PAFFS_OK){
-		printf("%s\n", paffs_err_msg(r));
+	printf("%s\n", paffs_err_msg(r));
+	if(r != PAFFS_OK)
 		return -1;
-	}
+
 	char testlauf[] = "---Testlauf---";
 
 
 	r = paffs_write(fil, testlauf, strlen(testlauf), &bytes);
-	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(r));
+	if(r != PAFFS_OK){
+		printf("%s\n", paffs_err_msg(r));
+		return -1;
+	}
 	// ---- write misaligned 1
 
 
@@ -230,13 +234,15 @@ int main( int argc, char ** argv ) {
 	//write misaligned - end misaligned ----
 	printf("write misaligned - last page misaligned\n");
 	r = paffs_seek(fil, -11, PAFFS_SEEK_END);
+	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(r));
+		return -1;
 
 	char kurz[] = "kurz";
 	r = paffs_write(fil, kurz, strlen(kurz), &bytes);
+	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(r));
+		return -1;
 	// ---- write misaligned 2
 
 	printWholeFile("/b/file");
@@ -245,12 +251,14 @@ int main( int argc, char ** argv ) {
 	//write misaligned - write over page boundaries ----
 	printf("write misaligned - over page boundaries\n");
 	r = paffs_seek(fil, 508, PAFFS_SEEK_SET);
+	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(r));
+		return -1;
 
 	r = paffs_write(fil, testlauf, strlen(testlauf), &bytes);
+	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
-			printf("%s\n", paffs_err_msg(r));
+		return -1;
 	// ---- write misaligned 2
 
 	printWholeFile("/b/file");
@@ -260,12 +268,14 @@ int main( int argc, char ** argv ) {
 	printf("write misaligned - write inside non start/end page\n");
 	r = paffs_seek(fil, 530, PAFFS_SEEK_SET);
 
+	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
-		printf("%s\n", paffs_err_msg(r));
+		return -1;
 
 	r = paffs_write(fil, testlauf, strlen(testlauf), &bytes);
+	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
-		printf("%s\n", paffs_err_msg(r));
+		return -1;
 	// ---- write misaligned 3
 
 
@@ -273,10 +283,10 @@ int main( int argc, char ** argv ) {
 //	while(getchar() == EOF);
 
 	r = paffs_getObjInfo("/b/file", &fileInfo);
-	if(r != PAFFS_OK){
-		printf("%s\n", paffs_err_msg(r));
+	printf("%s\n", paffs_err_msg(r));
+	if(r != PAFFS_OK)
 		return -1;
-	}
+
 	printInfo(&fileInfo);
 
 	print_tree(getDevice());
@@ -284,9 +294,8 @@ int main( int argc, char ** argv ) {
 	fflush(stdout);
 	r = flushTreeCache(getDevice());
 	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK){
+	if(r != PAFFS_OK)
 		return -1;
-	}
 
 	listDir("/");
 
@@ -296,9 +305,8 @@ int main( int argc, char ** argv ) {
 	fflush(stdout);
 	r = paffs_chmod("/b/file", 0);
 	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK){
+	if(r != PAFFS_OK)
 		return -1;
-	}
 
 	r = paffs_getObjInfo("/b/file", &fileInfo);
 	if(r != PAFFS_OK){
@@ -366,6 +374,9 @@ int main( int argc, char ** argv ) {
 
 	printf("Success.\n");
 
+	printf("\nCache-Hits: %d, Cache-Misses: %d\n\tHit ratio: %.5f%%\n",
+			getCacheHits(), getCacheMisses(),
+			100*((float)getCacheHits())/(getCacheHits()+getCacheMisses()));
 //	while(getchar() == EOF);
 
 	return 0;

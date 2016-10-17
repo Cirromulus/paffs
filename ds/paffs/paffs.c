@@ -511,7 +511,7 @@ PAFFS_RESULT paffs_closedir(paffs_dir* dir){
 }
 
 /**
- * TODO: What happens, if dir is changed after opendir?
+ * TODO: What happens if dir is changed after opendir?
  */
 paffs_dirent* paffs_readdir(paffs_dir* dir){
 	if(dir->no_entrys == 0)
@@ -548,6 +548,12 @@ paffs_dirent* paffs_readdir(paffs_dir* dir){
 	   paffs_lasterr = PAFFS_BUG;
 	   return NULL;
 	}
+	if((item.perm & PAFFS_R) == 0){
+		paffs_lasterr = PAFFS_NOPERM;
+		return NULL;
+	}
+
+
 	dir->dirents[dir->pos]->node = malloc(sizeof(pInode));
 	*dir->dirents[dir->pos]->node = item;
 	if(dir->dirents[dir->pos]->node->type == PINODE_DIR){
@@ -637,6 +643,11 @@ paffs_obj* paffs_open(const char* path, fileopenmask mask){
 		return NULL;
 	}
 
+	if((file.perm & mask) != mask){
+		paffs_lasterr = PAFFS_NOPERM;
+		return NULL;
+	}
+
 	paffs_obj* obj = malloc(sizeof(paffs_obj));
 	obj->dentry = malloc(sizeof(pDentry));
 	obj->dentry->name = malloc(strlen(path));
@@ -710,6 +721,14 @@ PAFFS_RESULT paffs_read(paffs_obj* obj, char* buf, unsigned int bytes_to_read, u
 	if(obj->dentry->iNode->type == PINODE_LNK){
 		return paffs_lasterr = PAFFS_NIMPL;
 	}
+	if((obj->dentry->iNode->perm & PAFFS_R) == 0)
+		return PAFFS_NOPERM;
+
+	if(obj->dentry->iNode->size == 0){
+		*bytes_read = 0;
+		return PAFFS_OK;
+	}
+
 	PAFFS_RESULT r = readInodeData(obj->dentry->iNode, obj->fp, bytes_to_read, bytes_read, buf, device);
 	if(r != PAFFS_OK){
 		return r;
@@ -730,6 +749,8 @@ PAFFS_RESULT paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_
 	if(obj->dentry->iNode->type == PINODE_LNK){
 		return paffs_lasterr = PAFFS_NIMPL;
 	}
+	if((obj->dentry->iNode->perm & PAFFS_W) == 0)
+		return PAFFS_NOPERM;
 
 	PAFFS_RESULT r = writeInodeData(obj->dentry->iNode, obj->fp, bytes_to_write, bytes_written, buf, device);
 	if(r != PAFFS_OK){
