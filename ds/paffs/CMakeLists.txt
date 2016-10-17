@@ -17,7 +17,7 @@ add_subdirectory(driver)
 
 add_library(paffs ${SOURCES})
 target_compile_definitions(paffs 
-	PUBLIC TREENODECACHESIZE=3
+	PUBLIC TREENODECACHESIZE=4
 )
 
 add_executable(tree_test ${SOURCES} tests/tree.c)

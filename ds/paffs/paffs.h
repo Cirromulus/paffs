@@ -175,7 +175,7 @@ typedef struct p_area{
 	p_summaryEntry* areaSummary; //May be invalid if status == closed; Optimizable bitusage
 	uint32_t dirtyPages; 	//redundant to contents of areaSummary
 	uint32_t usedPages;	//redundant to contents of areaSummary, just for quick lookup.
-	//--Not to be mistaken with the areaSummary-status "used", this means used _and_ dirty pages.
+	//--Not to be mistaken with the areaSummary-status "used", this counts used _and_ dirty pages.
 } p_area;
 
 

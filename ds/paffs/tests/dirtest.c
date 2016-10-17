@@ -102,9 +102,9 @@ void printWholeFile(const char* path){
 
 int main( int argc, char ** argv ) {
 	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
+	printf("Cache size: %lu Bytes\n", getCacheSize() * sizeof(treeCacheNode));
 	paffs_start_up();
 	PAFFS_RESULT r = paffs_mnt("1");
-	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
 	print_tree(getDevice());
 	paffs_permission p = PAFFS_R | PAFFS_W;
 	printf("Creating directory /a... ");
