@@ -17,6 +17,8 @@ extern "C" {
 
 #include "paffs_trace.h"
 
+#define BYTES_PER_PAGE 512	//Fixme: Dirty. Should be dynamic for structs..
+
 typedef enum PAFFS_RESULT{	//See paffs.c for String versions
 	PAFFS_OK = 0,
 	PAFFS_FAIL,
@@ -74,8 +76,8 @@ typedef unsigned long p_date;
 
 typedef uint64_t p_addr;
 
-typedef uint32_t fileSize_t; 	  //~ 4 GB per file. Enough!
-typedef uint32_t pInode_no;
+typedef uint32_t fileSize_t; 	  //~ 4 GB per file
+typedef uint32_t pInode_no;		  //~ 4 Million files
 typedef uint16_t dirEntryCount_t; //65,535 Entries per Directory
 typedef uint8_t dirEntryLength_t; //255 characters per Directory entry
 
@@ -173,11 +175,7 @@ typedef struct p_area{
 	uint32_t erasecount:17;	//Overflow at 132.000 is acceptable (assuming less than 100k erase cycles)
 	uint32_t position;	//physical position, not logical
 	p_summaryEntry* areaSummary; //May be invalid if status == closed; Optimizable bitusage
-	uint32_t dirtyPages; 	//redundant to contents of areaSummary
-	uint32_t usedPages;	//redundant to contents of areaSummary, just for quick lookup.
-	//--Not to be mistaken with the areaSummary-status "used", this counts used _and_ dirty pages.
 } p_area;
-
 
 typedef struct p_dev{
 	p_param param;

@@ -10,6 +10,7 @@
 
 #include "paffs.h"
 #include "btree.h"
+#include "superblock.h"
 
 //Returns same area if there is still writable Space left
 unsigned int findWritableArea(p_areaType areaType, p_dev* dev);
@@ -33,15 +34,21 @@ PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev, unsigned int offs);
 
 
 // TreeNode related
-PAFFS_RESULT registerRootnode(p_dev* dev, p_addr addr);
-
-p_addr getRootnodeAddr(p_dev* dev);
-
 PAFFS_RESULT writeTreeNode(p_dev* dev, treeNode* node);
-
 PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node);
-
 PAFFS_RESULT deleteTreeNode(p_dev* dev, treeNode* node);
+
+
+// Superblock related
+PAFFS_RESULT writeAnchorEntry(p_dev* dev, p_addr* out_addr, anchorEntry* entry);
+PAFFS_RESULT readAnchorEntry(p_dev* dev, p_addr addr, anchorEntry* entry);
+
+PAFFS_RESULT writeJumpPadEntry(p_dev* dev, p_addr* out_addr, jumpPadEntry* entry);
+PAFFS_RESULT readJumpPadEntry(p_dev* dev, p_addr addr, jumpPadEntry* entry);
+
+PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr* out_addr, superIndex* entry);
+PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry);
+
 
 
 #endif /* PAFFS_FLASH_H_ */

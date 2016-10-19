@@ -317,11 +317,6 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, 
 		new_leaf->raw.num_keys++;
 	}
 
-	/*Next cousin is no longer supported
-	new_leaf.pointers[btree_branch_order - 1] = leaf->pointers[btree_branch_order - 1];
-	leaf->pointers[btree_branch_order - 1] = new_leaf;
-	*/
-
 	for (i = leaf->raw.num_keys; i < btree_leaf_order; i++){
 		memset(&leaf->raw.as_leaf.pInodes[i], 0, sizeof(pInode));
 		leaf->raw.as_leaf.keys[i] = 0;

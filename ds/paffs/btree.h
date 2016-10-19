@@ -11,13 +11,13 @@
 #include "paffs.h"
 
 //Calculates how many pointers a node can hold in one page
-#define BRANCH_ORDER ((512 - sizeof(p_addr)\
+#define BRANCH_ORDER ((BYTES_PER_PAGE - sizeof(p_addr)\
 		- sizeof(unsigned char))\
-		/ (sizeof(p_addr) + sizeof(pInode_no)) ) //todo: '512' Dynamisch machen
+		/ (sizeof(p_addr) + sizeof(pInode_no)) ) //todo: 'BYTES_PER_PAGE' Dynamisch machen
 
-#define LEAF_ORDER ((512 - sizeof(p_addr)\
+#define LEAF_ORDER ((BYTES_PER_PAGE - sizeof(p_addr)\
 		- sizeof(unsigned char))\
-		/ (sizeof(pInode) + sizeof(pInode_no)) ) //todo: '512' Dynamisch machen
+		/ (sizeof(pInode) + sizeof(pInode_no)) ) //todo: 'BYTES_PER_PAGE' Dynamisch machen
 
 
 static const int btree_branch_order = BRANCH_ORDER;

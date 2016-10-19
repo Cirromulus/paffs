@@ -12,20 +12,27 @@
 #include "paffs.h"
 
 typedef struct anchorEntry{
-	uint64_t no;			//This only has to hold as many numbers as there are pages in superblock area
+	uint64_t no;	//This only has to hold as many numbers as there are pages in superblock area
 	uint8_t fs_version;
 	p_param param;
-	p_addr jump_pad;
+	uint32_t jump_pad_area;
 	//Todo: Still space free
 } anchorEntry;
 
 typedef struct jumpPadEntry{
-	p_addr next;
+	uint64_t no;	//This only has to hold as many numbers as there are pages in superblock area
+	uint32_t nextArea;
 } jumpPadEntry;
 
-typedef struct superPage{
+typedef struct superIndex{
+	uint64_t no;	//This only has to hold as many numbers as there are pages in superblock area
 	p_addr rootNode;
-	areamap
-};
+	p_area* areaMap;
+} superIndex;
+
+PAFFS_RESULT registerRootnode(p_dev* dev, p_addr addr);
+
+p_addr getRootnodeAddr(p_dev* dev);
+
 
 #endif /* DS_PAFFS_SUPERBLOCK_H_ */

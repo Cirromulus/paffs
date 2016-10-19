@@ -62,6 +62,10 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 	activeArea[JOURNALAREA] = 0;
 	activeArea[DATAAREA] = 0;
 
+	if(param->blocks_per_area < 2){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device too small, at least 12 Blocks are needed!");
+		return PAFFS_EINVAL;
+	}
 	return PAFFS_OK;
 }
 
@@ -74,20 +78,21 @@ PAFFS_RESULT paffs_mnt(const char* devicename){
 	bool emptyFlash = true;
 
 	if(emptyFlash){
-		bool had_superblock = false;	//Todo: have_enough
+		unsigned int superblocks_needed = 4 / device->param.blocks_per_area;
+		unsigned int superblocks = 0;
 		bool had_index = false;
 		bool had_journal = false;
 		for(int area = 0; area < device->param.areas_no; area++){
 			device->areaMap[area].status = EMPTY;
 			device->areaMap[area].erasecount = 0;
 			device->areaMap[area].position = area;
-			device->areaMap[area].dirtyPages = 0;
 
-			if(!had_superblock){
+			if(superblocks < superblocks_needed){
 				device->areaMap[area].type = SUPERBLOCKAREA;
-				had_superblock = true;
-				activeArea[SUPERBLOCKAREA] = area;
-				initArea(device, area);
+				device->areaMap[area].status = ACTIVE;
+				superblocks++;
+				activeArea[SUPERBLOCKAREA] = area;	//TODO: this may not be applicable in future
+				//initArea(device, area); No allocation of areaSummary needed
 				continue;
 			}
 			if(!had_index){

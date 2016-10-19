@@ -7,6 +7,7 @@
 
 #include "treeCache.h"
 #include "paffs_flash.h"
+#include "superblock.h"
 #include "btree.h"
 #include <string.h>
 
@@ -233,7 +234,7 @@ PAFFS_RESULT buildUpCacheToNode(p_dev* dev, treeCacheNode* localCopyOfNode, tree
 
 
 /*
- * Just frees clean leaf nodes, cache will be more efficient...
+ * Just frees clean leaf nodes, cache is more efficient...
  */
 void cleanTreeCacheLeaves(){
 
@@ -263,7 +264,7 @@ void cleanTreeCacheLeaves(){
 }
 
 /*
- * Just frees clean nodes
+ * Frees clean nodes
  */
 void cleanTreeCache(){
 
