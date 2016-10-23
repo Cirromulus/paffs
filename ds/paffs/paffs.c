@@ -23,6 +23,7 @@ static const char* PAFFS_RESULT_MSG[] = {
 		"OK",
 		"Unknown error",
 		"Object not found",
+		"Object already exists",
 		"Input values malformed",
 		"Operation not yet supported",
 		"Gratulations, you found a Bug",
@@ -71,14 +72,13 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 
 PAFFS_RESULT paffs_mnt(const char* devicename){
 	if(strcmp(devicename, device->param.name) != 0){
-		paffs_lasterr = PAFFS_EINVAL;
 		return PAFFS_EINVAL;
 	}
 	//TODO: Read Superblock on nand-Flash
 	bool emptyFlash = true;
 
 	if(emptyFlash){
-		unsigned int superblocks_needed = 4 / device->param.blocks_per_area;
+		unsigned int superblocks_needed = 1; //4 / device->param.blocks_per_area;
 		unsigned int superblocks = 0;
 		bool had_index = false;
 		bool had_journal = false;
@@ -611,8 +611,8 @@ unsigned int extractPage(p_addr addr){
 	return page;
 }
 
-unsigned long long getPageNumber(p_addr addr, p_dev *dev){
-	unsigned long long page = dev->areaMap[extractLogicalArea(addr)].position *
+uint64_t getPageNumber(p_addr addr, p_dev *dev){
+	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
 								dev->param.blocks_per_area * dev->param.pages_per_block;
 	page += extractPage(addr);
 	return page;
@@ -624,11 +624,13 @@ paffs_obj* paffs_open(const char* path, fileopenmask mask){
 	if(r == PAFFS_NF){
 		//create new file
 		if(mask & PAFFS_FC){
-			PAFFS_RESULT r = paffs_createFile(&file, path, mask);
-			if(r != PAFFS_OK)
+			r = paffs_createFile(&file, path, mask);
+			if(r != PAFFS_OK){
 				paffs_lasterr = r;
 				return NULL;
+			}
 		}else{
+			paffs_lasterr = PAFFS_EXISTS;
 			return NULL;
 		}
 	}else if(r != PAFFS_OK){
@@ -648,7 +650,7 @@ paffs_obj* paffs_open(const char* path, fileopenmask mask){
 		return NULL;
 	}
 
-	if((file.perm & mask) != mask){
+	if((file.perm & (mask & PAFFS_PERM_MASK)) != mask){
 		paffs_lasterr = PAFFS_NOPERM;
 		return NULL;
 	}
@@ -674,6 +676,8 @@ paffs_obj* paffs_open(const char* path, fileopenmask mask){
 }
 
 PAFFS_RESULT paffs_close(paffs_obj* obj){
+	if(obj == NULL)
+		return PAFFS_EINVAL;
 	paffs_flush(obj);
 	free(obj->dentry->iNode);
 	free(obj->dentry);
@@ -746,13 +750,13 @@ PAFFS_RESULT paffs_read(paffs_obj* obj, char* buf, unsigned int bytes_to_read, u
 
 PAFFS_RESULT paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written){
 	if(obj == NULL)
-		return paffs_lasterr = PAFFS_EINVAL;
+		return PAFFS_EINVAL;
 
 	if(obj->dentry->iNode->type == PINODE_DIR){
-		return paffs_lasterr = PAFFS_EINVAL;
+		return PAFFS_EINVAL;
 	}
 	if(obj->dentry->iNode->type == PINODE_LNK){
-		return paffs_lasterr = PAFFS_NIMPL;
+		return PAFFS_NIMPL;
 	}
 	if((obj->dentry->iNode->perm & PAFFS_W) == 0)
 		return PAFFS_NOPERM;

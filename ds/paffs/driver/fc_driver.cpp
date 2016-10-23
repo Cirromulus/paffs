@@ -15,7 +15,7 @@ extern "C" {
 
 static c_flashCell* c_fc[2];
 
-NANDADRESS translatePageToAddress(unsigned long long sector, flashCell* fc){
+NANDADRESS translatePageToAddress(uint64_t sector, flashCell* fc){
 	NANDADRESS r;
 	r.page = sector % fc->blockSize;
 	r.block = (sector / fc->blockSize) % fc->planeSize;
@@ -23,7 +23,7 @@ NANDADRESS translatePageToAddress(unsigned long long sector, flashCell* fc){
 	return r;
 }
 
-NANDADRESS translateBlockToAddress(unsigned long block, flashCell* fc){
+NANDADRESS translateBlockToAddress(uint32_t block, flashCell* fc){
 	NANDADRESS r;
 	r.plane = block / fc->planeSize;
 	r.block = block % fc->planeSize;
@@ -61,7 +61,7 @@ p_dev* paffs_FC_install_drv(const char *name, c_flashCell* fc){
 }
 
 //See paffs.h struct p_drv
-PAFFS_RESULT p_FC_WritePage(struct p_dev *dev, unsigned long long page_no,
+PAFFS_RESULT p_FC_WritePage(struct p_dev *dev, uint64_t page_no,
 								void* data, unsigned int data_len){
 	flashCell* fc = (flashCell*) c_fc[((struct context*)dev->driver_context)->package];
 	if(!fc)
@@ -85,7 +85,7 @@ PAFFS_RESULT p_FC_WritePage(struct p_dev *dev, unsigned long long page_no,
 	free(buf);
 	return PAFFS_OK;
 }
-PAFFS_RESULT p_FC_ReadPage(struct p_dev *dev, unsigned long long page_no,
+PAFFS_RESULT p_FC_ReadPage(struct p_dev *dev, uint64_t page_no,
 								void* data, unsigned int data_len){
 	flashCell* fc = (flashCell*) c_fc[((struct context*)dev->driver_context)->package];
 	if(!fc)
@@ -102,7 +102,7 @@ PAFFS_RESULT p_FC_ReadPage(struct p_dev *dev, unsigned long long page_no,
 	free(buf);
 	return PAFFS_OK;
 }
-PAFFS_RESULT p_FC_EraseBlock(struct p_dev *dev, unsigned long block_no){
+PAFFS_RESULT p_FC_EraseBlock(struct p_dev *dev, uint32_t block_no){
 	flashCell* fc = (flashCell*) c_fc[((struct context*)dev->driver_context)->package];
 	if(!fc)
 		return PAFFS_BUG;
@@ -111,10 +111,10 @@ PAFFS_RESULT p_FC_EraseBlock(struct p_dev *dev, unsigned long block_no){
 
 	return fc->eraseBlock(d.plane, d.block) == 0 ? PAFFS_OK : PAFFS_FAIL;
 }
-PAFFS_RESULT p_FC_MarkBad(struct p_dev *dev, unsigned long block_no){
+PAFFS_RESULT p_FC_MarkBad(struct p_dev *dev, uint32_t block_no){
 	return PAFFS_NIMPL;
 }
-PAFFS_RESULT p_FC_CheckBad(struct p_dev *dev, unsigned long block_no){
+PAFFS_RESULT p_FC_CheckBad(struct p_dev *dev, uint32_t block_no){
 	return PAFFS_NIMPL;
 }
 PAFFS_RESULT p_FC_Initialize(struct p_dev *dev){

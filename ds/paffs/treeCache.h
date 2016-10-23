@@ -53,9 +53,9 @@ void cleanTreeCache();
 void cleanTreeCacheLeaves();
 
 /**
- * Commits complete Tree to Flash (Later on it should try to leave some in cache)
+ * Commits complete Tree to Flash
  */
-PAFFS_RESULT flushTreeCache(p_dev* dev);
+PAFFS_RESULT commitTreeCache(p_dev* dev);
 
 //--------------------------------------
 

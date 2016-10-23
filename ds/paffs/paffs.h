@@ -23,6 +23,7 @@ typedef enum PAFFS_RESULT{	//See paffs.c for String versions
 	PAFFS_OK = 0,
 	PAFFS_FAIL,
 	PAFFS_NF,
+	PAFFS_EXISTS,
 	PAFFS_EINVAL,
 	PAFFS_NIMPL,
 	PAFFS_BUG,
@@ -40,6 +41,7 @@ typedef char paffs_permission;
 static const paffs_permission PAFFS_R = 0x1;
 static const paffs_permission PAFFS_W = 0x2;
 static const paffs_permission PAFFS_X = 0x4;
+static const paffs_permission PAFFS_PERM_MASK = 0b111;
 
 typedef char fileopenmask;
 static const fileopenmask PAFFS_FR = 0x01;	//file read
@@ -47,7 +49,7 @@ static const fileopenmask PAFFS_FW = 0x02;	//file write
 static const fileopenmask PAFFS_FEX= 0x04;	//file execute
 static const fileopenmask PAFFS_FA = 0x08;	//file append
 static const fileopenmask PAFFS_FE = 0x10;	//file open only existing
-static const fileopenmask PAFFS_FC = 0x11;	//file create
+static const fileopenmask PAFFS_FC = 0x20;	//file create
 
 PAFFS_RESULT paffs_start_up();
 PAFFS_RESULT paffs_custom_start_up(void* fc);
@@ -138,13 +140,13 @@ typedef struct paffs_objInfo{
 struct p_dev;
 
 typedef struct p_driver {
-	PAFFS_RESULT (*drv_write_page_fn) (struct p_dev *dev, unsigned long long page_no,
+	PAFFS_RESULT (*drv_write_page_fn) (struct p_dev *dev, uint64_t page_no,
 			void* data, unsigned int data_len);
-	PAFFS_RESULT (*drv_read_page_fn) (struct p_dev *dev, unsigned long long page_no,
+	PAFFS_RESULT (*drv_read_page_fn) (struct p_dev *dev, uint64_t page_no,
 			void* data, unsigned int data_len);
-	PAFFS_RESULT (*drv_erase_fn) (struct p_dev *dev, unsigned long block_no);
-	PAFFS_RESULT (*drv_mark_bad_fn) (struct p_dev *dev, unsigned long block_no);
-	PAFFS_RESULT (*drv_check_bad_fn) (struct p_dev *dev, unsigned long block_no);
+	PAFFS_RESULT (*drv_erase_fn) (struct p_dev *dev, uint32_t block_no);
+	PAFFS_RESULT (*drv_mark_bad_fn) (struct p_dev *dev, uint32_t block_no);
+	PAFFS_RESULT (*drv_check_bad_fn) (struct p_dev *dev, uint32_t block_no);
 	PAFFS_RESULT (*drv_initialise_fn) (struct p_dev *dev);
 	PAFFS_RESULT (*drv_deinitialise_fn) (struct p_dev *dev);
 } p_driver;
@@ -212,7 +214,7 @@ PAFFS_RESULT paffs_createFile(pInode* outFile, const char* fullPath, paffs_permi
 p_addr combineAddress(uint32_t logical_area, uint32_t page);
 unsigned int extractLogicalArea(p_addr addr);			//Address-wrapper für einfacheren Garbagecollector
 unsigned int extractPage(p_addr addr);
-unsigned long long getPageNumber(p_addr addr, p_dev *dev);	//Translates p_addr to physical page number in respect to the Area mapping
+uint64_t getPageNumber(p_addr addr, p_dev *dev);	//Translates p_addr to physical page number in respect to the Area mapping
 
 
 //Directory

@@ -111,7 +111,7 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 
 	//Ok, we have to flush the cache now
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Flushing cache.");
-	flushTreeCache(dev);
+	commitTreeCache(dev);
 	r = addNewCacheNode(newTcn);
 	if(r == PAFFS_OK)
 		return PAFFS_FLUSHEDCACHE;
@@ -353,7 +353,7 @@ PAFFS_RESULT commitNodesRecursively(p_dev* dev, treeCacheNode* node) {
  * Commits complete Tree to Flash
  */
 
-PAFFS_RESULT flushTreeCache(p_dev* dev){
+PAFFS_RESULT commitTreeCache(p_dev* dev){
 	//debug ---->
 	uint16_t usedCache;
 	if(paffs_trace_mask & PAFFS_TRACE_CACHE){

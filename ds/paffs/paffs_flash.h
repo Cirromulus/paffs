@@ -40,15 +40,18 @@ PAFFS_RESULT deleteTreeNode(p_dev* dev, treeNode* node);
 
 
 // Superblock related
-PAFFS_RESULT writeAnchorEntry(p_dev* dev, p_addr* out_addr, anchorEntry* entry);
-PAFFS_RESULT readAnchorEntry(p_dev* dev, p_addr addr, anchorEntry* entry);
+PAFFS_RESULT findFirstFreeEntryInBlock(p_dev* dev, uint32_t area, uint8_t block, uint32_t* out_pos, unsigned int required_pages);
+PAFFS_RESULT findMostRecentEntryInBlock(p_dev* dev, uint32_t area, uint8_t block, uint32_t* out_pos, uint32_t* out_index);
 
-PAFFS_RESULT writeJumpPadEntry(p_dev* dev, p_addr* out_addr, jumpPadEntry* entry);
+PAFFS_RESULT writeAnchorEntry(p_dev* dev, p_addr _addr, anchorEntry* entry);
+PAFFS_RESULT readAnchorEntry(p_dev* dev, p_addr addr, anchorEntry* entry);
+PAFFS_RESULT deleteAnchorBlock(p_dev* dev, uint32_t area, uint8_t block);
+
+PAFFS_RESULT writeJumpPadEntry(p_dev* dev, p_addr addr, jumpPadEntry* entry);
 PAFFS_RESULT readJumpPadEntry(p_dev* dev, p_addr addr, jumpPadEntry* entry);
 
-PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr* out_addr, superIndex* entry);
-PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry);
-
+PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry);
+PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, bool withAreaMap);
 
 
 #endif /* PAFFS_FLASH_H_ */

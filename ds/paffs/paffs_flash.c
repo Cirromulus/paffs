@@ -363,11 +363,11 @@ PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev, unsigned int offs){
 PAFFS_RESULT writeTreeNode(p_dev* dev, treeNode* node){
 	if(node == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode NULL");
-				return paffs_lasterr = PAFFS_BUG;
+				return PAFFS_BUG;
 	}
 	if(sizeof(treeNode) > dev->param.data_bytes_per_page){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode bigger than Page (Was %lu, should %u)", sizeof(treeNode), dev->param.data_bytes_per_page);
-		return paffs_lasterr = PAFFS_BUG;
+		return PAFFS_BUG;
 	}
 
 	if(node->self != 0){
@@ -375,6 +375,7 @@ PAFFS_RESULT writeTreeNode(p_dev* dev, treeNode* node){
 		dev->areaMap[extractLogicalArea(node->self)].areaSummary[extractPage(node->self)] = DIRTY;
 	}
 
+	paffs_lasterr = PAFFS_OK;
 	activeArea[INDEXAREA] = findWritableArea(INDEXAREA, dev);
 	if(paffs_lasterr != PAFFS_OK){
 		return paffs_lasterr;
@@ -443,15 +444,19 @@ PAFFS_RESULT deleteTreeNode(p_dev* dev, treeNode* node){
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT findFirstFreeEntryInBlock(p_dev* dev, uint32_t block, uint32_t* out_pos, unsigned int needed_pages){
+
+// Superblock related
+
+PAFFS_RESULT findFirstFreeEntryInBlock(p_dev* dev, uint32_t area, uint8_t block, uint32_t* out_pos, unsigned int required_pages){
 	unsigned int in_a_row = 0;
+	uint64_t page_offs = dev->param.pages_per_block * block;
 	for(unsigned int i = 0; i < dev->param.pages_per_block; i++) {
-		p_addr addr = combineAddress(block, i);
-		uint64_t no;
-		PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), &no, sizeof(uint64_t));
+		p_addr addr = combineAddress(area, i + page_offs);
+		uint32_t no;
+		PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), &no, sizeof(uint32_t));
 		if(r != PAFFS_OK)
 			return r;
-		if(no != 0xFFFFFFFFFFFFFFFF){
+		if(no != 0xFFFFFFFF){
 			if(in_a_row != 0){
 				*out_pos = 0;
 				in_a_row = 0;
@@ -460,49 +465,77 @@ PAFFS_RESULT findFirstFreeEntryInBlock(p_dev* dev, uint32_t block, uint32_t* out
 		}
 
 		// Unprogrammed, therefore empty
-		*out_pos = i;
-		if(++in_a_row == needed_pages)
+		*out_pos = i + page_offs;
+		if(++in_a_row == required_pages)
 			return PAFFS_OK;
 	}
 	return PAFFS_NF;
 }
 
-PAFFS_RESULT findLatestEntryInBlock(p_dev* dev, uint32_t block, uint32_t* out_pos){
-	uint64_t maximum = 0;
+PAFFS_RESULT findMostRecentEntryInBlock(p_dev* dev, uint32_t area, uint8_t block, uint32_t* out_pos, uint32_t* out_index){
+	uint32_t* maximum = out_index;
+	*maximum = 0;
 	*out_pos = 0;
+	uint32_t page_offs = dev->param.pages_per_block * block;
 	for(unsigned int i = 0; i < dev->param.pages_per_block; i++) {
-		p_addr addr = combineAddress(block, i);
-		uint64_t no;
-		PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), &no, sizeof(uint64_t));
+		p_addr addr = combineAddress(area, i + page_offs);
+		uint32_t no;
+		PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), &no, sizeof(uint32_t));
 		if(r != PAFFS_OK)
 			return r;
-		if(no == 0xFFFFFFFFFFFFFFFF){
+		if(no == 0xFFFFFFFF){
 			// Unprogrammed, therefore empty
-			if(maximum != 0)
+			if(*maximum != 0)
 				return PAFFS_OK;
 			return PAFFS_NF;
 		}
 
-		if(no > maximum){
-			*out_pos = i;
-			maximum = no;
+		if(no > *maximum){
+			*out_pos = i + page_offs;
+			*maximum = no;
 		}
 	}
 
 	return PAFFS_OK;
 }
 
-// Superblock related
-PAFFS_RESULT writeAnchorEntry(p_dev* dev, p_addr* out_addr, anchorEntry* entry){
 
+PAFFS_RESULT writeAnchorEntry(p_dev* dev, p_addr addr, anchorEntry* entry){
+	//Currently not implemented to simplify Find-Strategy
+	return PAFFS_NIMPL;
 }
-PAFFS_RESULT readAnchorEntry(p_dev* dev, p_addr addr, anchorEntry* entry);
+PAFFS_RESULT readAnchorEntry(p_dev* dev, p_addr addr, anchorEntry* entry){
+	//Currently not implemented to simplify Find-Strategy
+	return PAFFS_NIMPL;
+}
 
-PAFFS_RESULT writeJumpPadEntry(p_dev* dev, p_addr* out_addr, jumpPadEntry* entry);
-PAFFS_RESULT readJumpPadEntry(p_dev* dev, p_addr addr, jumpPadEntry* entry);
+PAFFS_RESULT deleteAnchorBlock(p_dev* dev, uint32_t area, uint8_t block) {
+	uint32_t block_offs = dev->areaMap[area].position * dev->param.blocks_per_area;
+	return dev->drv.drv_erase_fn(dev, block_offs + block);
+}
 
-PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr* out_addr, superIndex* entry);
-PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry);
+PAFFS_RESULT writeJumpPadEntry(p_dev* dev, p_addr addr, jumpPadEntry* entry){
+	//Currently not implemented to simplify Find-Strategy
+	return PAFFS_NIMPL;
+}
+
+PAFFS_RESULT readJumpPadEntry(p_dev* dev, p_addr addr, jumpPadEntry* entry){
+	//Currently not implemented to simplify Find-Strategy
+	return PAFFS_NIMPL;
+}
+
+
+//Make sure that free space is sufficient!
+PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry){
+
+	return PAFFS_NIMPL;
+}
+
+PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, bool withAreaMap){
+	if(!withAreaMap)
+		 return dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), entry, sizeof(uint32_t) + sizeof(p_addr));
+	return PAFFS_NIMPL;
+}
 
 
 

@@ -292,7 +292,7 @@ int main( int argc, char ** argv ) {
 	print_tree(getDevice());
 	printf("Flushing Cache ... ");
 	fflush(stdout);
-	r = flushTreeCache(getDevice());
+	r = commitTreeCache(getDevice());
 	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
 		return -1;

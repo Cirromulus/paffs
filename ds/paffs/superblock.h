@@ -12,7 +12,8 @@
 #include "paffs.h"
 
 typedef struct anchorEntry{
-	uint64_t no;	//This only has to hold as many numbers as there are pages in superblock area
+	uint32_t no;	//This only has to hold as many numbers as there are pages in superblock area
+					//Value Zero and 0xFF... is reserved.
 	uint8_t fs_version;
 	p_param param;
 	uint32_t jump_pad_area;
@@ -20,19 +21,31 @@ typedef struct anchorEntry{
 } anchorEntry;
 
 typedef struct jumpPadEntry{
-	uint64_t no;	//This only has to hold as many numbers as there are pages in superblock area
+	uint32_t no;	//This only has to hold as many numbers as there are pages in superblock area
+					//Value Zero and 0xFF... is reserved.
 	uint32_t nextArea;
 } jumpPadEntry;
 
 typedef struct superIndex{
-	uint64_t no;	//This only has to hold as many numbers as there are pages in superblock area
+	uint32_t no;	//This only has to hold as many numbers as there are pages in superblock area.
+					//Value Zero and 0xFF... is reserved.
 	p_addr rootNode;
-	p_area* areaMap;
+	p_area* areaMap;	//Size can be calculated via dev->param
 } superIndex;
 
 PAFFS_RESULT registerRootnode(p_dev* dev, p_addr addr);
 
 p_addr getRootnodeAddr(p_dev* dev);
+
+
+//returns PAFFS_NF if no superindex is in flash
+PAFFS_RESULT getAddrOfMostRecentSuperIndex(p_dev* dev, p_addr *out);
+
+PAFFS_RESULT readSuperIndex(p_dev* dev, superIndex *out_Index);
+PAFFS_RESULT commitSuperIndex(p_dev* dev);
+
+
+//debug
 
 
 #endif /* DS_PAFFS_SUPERBLOCK_H_ */
