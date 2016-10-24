@@ -167,7 +167,7 @@ typedef enum p_areaStatus{
 
 typedef enum p_summaryEntry{
 	FREE = 0,
-	USED,
+	USED,		//If read from super Index, USED can mean both free and used to save a bit per entry.
 	DIRTY
 }p_summaryEntry;
 

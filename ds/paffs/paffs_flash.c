@@ -215,9 +215,9 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 		if(misaligned)
 			free(buf);
 
-		PAFFS_DBG(PAFFS_TRACE_WRITE, "DBG: write r.P: %d/%d, phy.P: %llu", page+1, pageTo+1, getPageNumber(pageAddress, dev));
+		PAFFS_DBG(PAFFS_TRACE_WRITE, "DBG: write r.P: %d/%d, phy.P: %llu", page+1, pageTo+1, (long long unsigned int) getPageNumber(pageAddress, dev));
 		if(res != PAFFS_OK){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "ERR: write returned FAIL at phy.P: %llu", getPageNumber(pageAddress, dev));
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "ERR: write returned FAIL at phy.P: %llu", (long long unsigned int) getPageNumber(pageAddress, dev));
 			return PAFFS_FAIL;
 		}
 
@@ -510,6 +510,10 @@ PAFFS_RESULT readAnchorEntry(p_dev* dev, p_addr addr, anchorEntry* entry){
 }
 
 PAFFS_RESULT deleteAnchorBlock(p_dev* dev, uint32_t area, uint8_t block) {
+	if(dev->areaMap[area].type != SUPERBLOCKAREA){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete Block outside of SUPARBLCOKAREA");
+		return PAFFS_BUG;
+	}
 	uint32_t block_offs = dev->areaMap[area].position * dev->param.blocks_per_area;
 	return dev->drv.drv_erase_fn(dev, block_offs + block);
 }
@@ -527,8 +531,58 @@ PAFFS_RESULT readJumpPadEntry(p_dev* dev, p_addr addr, jumpPadEntry* entry){
 
 //Make sure that free space is sufficient!
 PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry){
+	if(dev->areaMap[extractLogicalArea(addr)].type != SUPERBLOCKAREA){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
+		return PAFFS_BUG;
+	}
 
-	return PAFFS_NIMPL;
+	//This is constant for given Devices
+	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(p_addr) +
+		dev->param.areas_no * (sizeof(p_area) - sizeof(p_summaryEntry*))+ // AreaMap without summaryEntry pointer
+		2 * dev->param.pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
+
+	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
+
+	char buf[needed_bytes];
+	memset(buf, 0, needed_bytes);
+	memcpy(buf, entry, sizeof(uint32_t) + sizeof(p_addr));
+
+	long areaSummaryPositions[2];
+	unsigned char pospos = 0;	//Stupid name
+	unsigned int pointer = sizeof(uint32_t) + sizeof(p_addr);
+	for(unsigned int i = 0; i < dev->param.areas_no; i++){
+		memcpy(&buf[pointer], &entry->areaMap[i], sizeof(p_area) - sizeof(p_summaryEntry*));
+		//TODO: Optimize bitusage, currently wasting 1,25 Bytes per Entry
+		pointer += sizeof(p_area) - sizeof(p_summaryEntry*);
+		if((entry->areaMap[i].type == INDEXAREA || entry->areaMap[i].type == DATAAREA) && entry->areaMap[i].areaSummary != 0){
+			areaSummaryPositions[pospos++] = i;
+		}
+	}
+
+	for(unsigned int i = 0; i < 2; i++){
+		for(unsigned int j = 0; j < dev->param.pages_per_area; j++){
+			if(entry->areaMap[areaSummaryPositions[i]].areaSummary[j] != DIRTY)
+				buf[pointer + j/8] |= 1 << j%8;
+		}
+		pointer += dev->param.pages_per_area / 8;
+	}
+
+	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "%u bytes have been written to Buffer", pointer);
+
+	pointer = 0;
+	uint64_t page_offs = getPageNumber(addr, dev);
+	PAFFS_RESULT r;
+	for(unsigned page = 0; page < needed_pages; page++){
+		unsigned int btw = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
+							: needed_bytes - pointer;
+		r = dev->drv.drv_write_page_fn(dev, page_offs + page, &buf[pointer], btw);
+		if(r != PAFFS_OK)
+			return r;
+
+		pointer += btw;
+	}
+
+	return PAFFS_OK;
 }
 
 PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, bool withAreaMap){
