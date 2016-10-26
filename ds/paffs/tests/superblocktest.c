@@ -19,8 +19,8 @@
 
 
 void printSuperIndex(superIndex* ind){
-	printf("No:\t\t%d", ind->no);
-	printf("Roonode addr.: \t%u:%u", extractLogicalArea(ind->rootNode), extractPage(ind->rootNode));
+	printf("No:\t\t%d\n", ind->no);
+	printf("Roonode addr.: \t%u:%u\n", extractLogicalArea(ind->rootNode), extractPage(ind->rootNode));
 	printf("areaMap: (first eight entrys)\n");
 	for(int i = 0; i < 8; i ++){
 		printf("\t%d->%d\n", i, ind->areaMap[i].position);
@@ -56,7 +56,7 @@ int main( int argc, char ** argv ) {
 	commitTreeCache(getDevice());
 	print_tree(getDevice());
 
-	printf("Printing initial super Index...");
+	printf("Printing initial super Index...\n");
 	superIndex actual;
 	actual.no = 0;
 	actual.rootNode = getRootnodeAddr(getDevice());
@@ -93,7 +93,7 @@ int main( int argc, char ** argv ) {
 	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
 		return -1;
-
+	printSuperIndex(&index);
 
 	return 0;
 }

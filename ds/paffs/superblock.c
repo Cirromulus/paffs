@@ -36,7 +36,7 @@ PAFFS_RESULT getAddrOfMostRecentSuperIndex(p_dev* dev, p_addr *out){
 		return r1;
 
 	uint32_t pos2, index2;
-	PAFFS_RESULT r2 = findMostRecentEntryInBlock(dev, 0, 0, &pos2, &index2);
+	PAFFS_RESULT r2 = findMostRecentEntryInBlock(dev, 0, 1, &pos2, &index2);
 	if(r2 != PAFFS_OK && r2 != PAFFS_NF)
 		return r2;
 
@@ -65,7 +65,7 @@ PAFFS_RESULT commitSuperIndex(p_dev* dev){
 	}
 
 	uint32_t rel_page2 = 0;
-	PAFFS_RESULT r2 = findFirstFreeEntryInBlock(dev, 0, 0, &rel_page2, needed_pages);
+	PAFFS_RESULT r2 = findFirstFreeEntryInBlock(dev, 0, 1, &rel_page2, needed_pages);
 	if(r2 != PAFFS_OK && r2 != PAFFS_NF){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Error while getting space on second block for new superIndex!");
 		return r2;
