@@ -50,6 +50,13 @@ PAFFS_RESULT findFirstFreePage(unsigned int* p_out, p_dev* dev, unsigned int are
 	return PAFFS_NOSP;
 }
 
+uint64_t getPageNumber(p_addr addr, p_dev *dev){
+	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
+								dev->param.blocks_per_area * dev->param.pages_per_block;
+	page += extractPage(addr);
+	return page;
+}
+
 PAFFS_RESULT checkActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType areaType){
 	if(dev->areaMap[*area].areaSummary == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access invalid areaSummary!");
@@ -91,14 +98,19 @@ void initArea(p_dev* dev, unsigned long int area){
 	PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Init new Area %lu.", area);
 	//generate the areaSummary in Memory
 	dev->areaMap[area].status = ACTIVE;
-	dev->areaMap[area].areaSummary = malloc(
-			sizeof(p_summaryEntry)
-			* dev->param.blocks_per_area
-			* dev->param.pages_per_block);
-	memset(dev->areaMap[area].areaSummary, 0,
-			sizeof(p_summaryEntry)
-			* dev->param.blocks_per_area
-			* dev->param.pages_per_block);
+	if(dev->areaMap[area].type == INDEXAREA || dev->areaMap[area].type == DATAAREA){
+		dev->areaMap[area].areaSummary = malloc(
+				sizeof(p_summaryEntry)
+				* dev->param.blocks_per_area
+				* dev->param.pages_per_block);
+		memset(dev->areaMap[area].areaSummary, 0,
+				sizeof(p_summaryEntry)
+				* dev->param.blocks_per_area
+				* dev->param.pages_per_block);
+		dev->areaMap[area].has_areaSummary = true;
+	}else{
+		dev->areaMap[area].has_areaSummary = false;
+	}
 }
 
 //modifies inode->size and inode->reserved size as well
@@ -551,12 +563,14 @@ PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry){
 	unsigned char pospos = 0;	//Stupid name
 	unsigned int pointer = sizeof(uint32_t) + sizeof(p_addr);
 	for(unsigned int i = 0; i < dev->param.areas_no; i++){
+		if((entry->areaMap[i].type == INDEXAREA || entry->areaMap[i].type == DATAAREA) && entry->areaMap[i].areaSummary != 0){
+			areaSummaryPositions[pospos++] = i;
+			entry->areaMap[i].has_areaSummary = true;
+		}
+
 		memcpy(&buf[pointer], &entry->areaMap[i], sizeof(p_area) - sizeof(p_summaryEntry*));
 		//TODO: Optimize bitusage, currently wasting 1,25 Bytes per Entry
 		pointer += sizeof(p_area) - sizeof(p_summaryEntry*);
-		if((entry->areaMap[i].type == INDEXAREA || entry->areaMap[i].type == DATAAREA) && entry->areaMap[i].areaSummary != 0){
-			areaSummaryPositions[pospos++] = i;
-		}
 	}
 
 	for(unsigned int i = 0; i < 2; i++){
@@ -588,7 +602,81 @@ PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry){
 PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, bool withAreaMap){
 	if(!withAreaMap)
 		 return dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), entry, sizeof(uint32_t) + sizeof(p_addr));
-	return PAFFS_NIMPL;
+
+	if(entry->areaMap == 0)
+		return PAFFS_EINVAL;
+
+	//This is constant for given Devices
+	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(p_addr) +
+		dev->param.areas_no * (sizeof(p_area) - sizeof(p_summaryEntry*))+ // AreaMap without summaryEntry pointer
+		2 * dev->param.pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
+
+	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
+
+	char buf[needed_bytes];
+	memset(buf, 0, needed_bytes);
+	uint32_t pointer = 0;
+	uint64_t page_offs = getPageNumber(addr, dev);
+	PAFFS_RESULT r;
+	for(unsigned page = 0; page < needed_pages; page++){
+		unsigned int btr = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
+							: needed_bytes - pointer;
+		r = dev->drv.drv_read_page_fn(dev, page_offs + page, &buf[pointer], btr);
+		if(r != PAFFS_OK)
+			return r;
+
+		pointer += btr;
+	}
+	//buffer ready
+	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "SuperIndex Buffer was filled with %u Bytes.", pointer);
+
+	memcpy(entry, buf, sizeof(uint32_t) + sizeof(p_addr));
+
+	long areaSummaryPositions[2];
+	unsigned char pospos = 0;	//Stupid name
+	pointer = sizeof(uint32_t) + sizeof(p_addr);
+	for(unsigned int i = 0; i < dev->param.areas_no; i++){
+		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(p_area) - sizeof(p_summaryEntry*));
+		pointer += sizeof(p_area) - sizeof(p_summaryEntry*);
+		if(entry->areaMap[i].has_areaSummary)
+			areaSummaryPositions[pospos++] = i;
+	}
+
+	unsigned char pagebuf[BYTES_PER_PAGE];
+	for(unsigned int i = 0; i < 2; i++){
+
+		if(entry->areaMap[areaSummaryPositions[i]].areaSummary == 0){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "Schlawienering some bytes to areaMap");
+			//FIXME: This should be taken from static space
+			entry->areaMap[areaSummaryPositions[i]].areaSummary = malloc(sizeof(p_summaryEntry) * dev->param.pages_per_area);
+		}
+
+		for(unsigned int j = 0; j < dev->param.pages_per_area; j++){
+			if(buf[pointer + j/8] & 1 << j%8){
+				//TODO: Normally, we would check in the OOB for a Checksum or so, which is present all the time
+				p_addr tmp = combineAddress(areaSummaryPositions[i], j);
+				r = dev->drv.drv_read_page_fn(dev, getPageNumber(tmp, dev), pagebuf, dev->param.data_bytes_per_page);
+				if(r != PAFFS_OK)
+					return r;
+				bool contains_data = false;
+				for(int byte = 0; byte < dev->param.data_bytes_per_page; byte++){
+					if(pagebuf[byte] != 0xFF){
+						contains_data = true;
+						break;
+					}
+				}
+				if(contains_data)
+					entry->areaMap[areaSummaryPositions[i]].areaSummary[j] = USED;
+				else
+					entry->areaMap[areaSummaryPositions[i]].areaSummary[j] = FREE;
+			}else{
+				entry->areaMap[areaSummaryPositions[i]].areaSummary[j] = DIRTY;
+			}
+		}
+		pointer += dev->param.pages_per_area / 8;
+	}
+
+	return PAFFS_OK;
 }
 
 

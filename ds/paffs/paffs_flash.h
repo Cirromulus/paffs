@@ -17,6 +17,8 @@ unsigned int findWritableArea(p_areaType areaType, p_dev* dev);
 
 PAFFS_RESULT findFirstFreePage(unsigned int* p_out, p_dev* dev, unsigned int area);
 
+uint64_t getPageNumber(p_addr addr, p_dev *dev);	//Translates p_addr to physical page number in respect to the Area mapping
+
 PAFFS_RESULT checkActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType areaType);
 
 void initArea(p_dev* dev, unsigned long int area);

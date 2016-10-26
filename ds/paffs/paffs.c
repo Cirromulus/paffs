@@ -611,13 +611,6 @@ unsigned int extractPage(p_addr addr){
 	return page;
 }
 
-uint64_t getPageNumber(p_addr addr, p_dev *dev){
-	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
-								dev->param.blocks_per_area * dev->param.pages_per_block;
-	page += extractPage(addr);
-	return page;
-}
-
 paffs_obj* paffs_open(const char* path, fileopenmask mask){
 	pInode file;
 	PAFFS_RESULT r = paffs_getInodeOfElem(&file, path);

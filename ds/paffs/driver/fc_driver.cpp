@@ -91,7 +91,7 @@ PAFFS_RESULT p_FC_ReadPage(struct p_dev *dev, uint64_t page_no,
 	if(!fc)
 		return PAFFS_FAIL;
 
-	void* buf = malloc(dev->param.total_bytes_per_page);
+	unsigned char buf [dev->param.total_bytes_per_page];
 
 	NANDADRESS d = translatePageToAddress(page_no, fc);
 
@@ -99,7 +99,6 @@ PAFFS_RESULT p_FC_ReadPage(struct p_dev *dev, uint64_t page_no,
 		return PAFFS_FAIL;
 	}
 	memcpy(data, buf, data_len);
-	free(buf);
 	return PAFFS_OK;
 }
 PAFFS_RESULT p_FC_EraseBlock(struct p_dev *dev, uint32_t block_no){

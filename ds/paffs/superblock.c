@@ -148,7 +148,7 @@ PAFFS_RESULT readSuperIndex(p_dev* dev, superIndex *out_index){
 	if(r != PAFFS_OK)
 		return r;
 
-	r = readSuperPageIndex(dev, addr, out_index, false);	//todo: Switch to "true"
+	r = readSuperPageIndex(dev, addr, out_index, true);	//todo: Switch to "true"
 	if(r != PAFFS_OK){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read Super Index!");
 		return r;

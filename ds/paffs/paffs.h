@@ -175,9 +175,10 @@ typedef struct p_area{
 	p_areaType type:3;
 	p_areaStatus status:2;
 	uint32_t erasecount:17;	//Overflow at 132.000 is acceptable (assuming less than 100k erase cycles)
+	bool has_areaSummary:1;
 	uint32_t position;	//physical position, not logical
 	p_summaryEntry* areaSummary; //May be invalid if status == closed; Optimizable bitusage
-} p_area;
+} p_area;	//3 + 2 + 17 + 1 + 32 (+64/32) = 55 (119/87) Bit = 6,875 (14,875/10,875) Byte
 
 typedef struct p_dev{
 	p_param param;
@@ -214,7 +215,6 @@ PAFFS_RESULT paffs_createFile(pInode* outFile, const char* fullPath, paffs_permi
 p_addr combineAddress(uint32_t logical_area, uint32_t page);
 unsigned int extractLogicalArea(p_addr addr);			//Address-wrapper für einfacheren Garbagecollector
 unsigned int extractPage(p_addr addr);
-uint64_t getPageNumber(p_addr addr, p_dev *dev);	//Translates p_addr to physical page number in respect to the Area mapping
 
 
 //Directory

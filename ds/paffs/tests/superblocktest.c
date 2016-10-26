@@ -21,19 +21,30 @@
 void printSuperIndex(superIndex* ind){
 	printf("No:\t\t%d", ind->no);
 	printf("Roonode addr.: \t%u:%u", extractLogicalArea(ind->rootNode), extractPage(ind->rootNode));
-	printf("areaMap: (first four entrys)\n");
-	for(int i = 0; i < 4; i ++){
+	printf("areaMap: (first eight entrys)\n");
+	for(int i = 0; i < 8; i ++){
 		printf("\t%d->%d\n", i, ind->areaMap[i].position);
 		printf("\tType: %d\n", ind->areaMap[i].type);
-		printf("\tSummary Present: %s\n", ind->areaMap[i].areaSummary != 0 ? "true" : "false");
+		if(ind->areaMap[i].has_areaSummary){
+			unsigned int free = 0, used = 0, dirty = 0;
+			for(unsigned int j = 0; j < getDevice()->param.pages_per_area; j++){
+				if(ind->areaMap[i].areaSummary[j] == FREE)
+					free++;
+				if(ind->areaMap[i].areaSummary[j] == USED)
+					used++;
+				if(ind->areaMap[i].areaSummary[j] == DIRTY)
+					dirty++;
+			}
+			printf("\tFree/Used/Dirty Pages: %u/%u/%u\n", free, used, dirty);
+		}else{
+			printf("\tSummary not present.\n");
+		}
 		printf("\t----------------\n");
 	}
 }
 
 
 int main( int argc, char ** argv ) {
-
-
 	paffs_start_up();
 	paffs_mnt("1");
 	paffs_obj* fil = paffs_open("/foo", PAFFS_FC | PAFFS_FW);
@@ -45,6 +56,13 @@ int main( int argc, char ** argv ) {
 	commitTreeCache(getDevice());
 	print_tree(getDevice());
 
+	printf("Printing initial super Index...");
+	superIndex actual;
+	actual.no = 0;
+	actual.rootNode = getRootnodeAddr(getDevice());
+	actual.areaMap = getDevice()->areaMap;
+	printSuperIndex(&actual);
+
 
 	printf("Committing super Index...");
 	fflush(stdout);
@@ -52,11 +70,15 @@ int main( int argc, char ** argv ) {
 	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
 		return -1;
-	while(getchar() == EOF);
+	//while(getchar() == EOF);
 
 	printf("Reading super Index...");
 	fflush(stdout);
-	superIndex index;
+	superIndex index = {0};
+	p_area test_area_map[getDevice()->param.areas_no];	//Normally, the version in paffs_flasj is used
+	memset(test_area_map, 0, sizeof(p_area) * getDevice()->param.areas_no);
+	index.areaMap = test_area_map;
+
 	r = readSuperIndex(getDevice(), &index);
 	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
