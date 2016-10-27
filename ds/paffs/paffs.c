@@ -150,7 +150,7 @@ PAFFS_RESULT paffs_mnt(const char* devicename){
 	return PAFFS_OK;
 }
 PAFFS_RESULT paffs_unmnt(const char* devicename){
-	return PAFFS_OK;
+	return PAFFS_NIMPL;
 }
 
 PAFFS_RESULT paffs_createInode(pInode* outInode, paffs_permission mask){
