@@ -165,9 +165,9 @@ typedef enum p_areaStatus{
 	EMPTY
 } p_areaStatus;
 
-typedef enum p_summaryEntry{
+typedef enum __attribute__ ((__packed__))p_summaryEntry{
 	FREE = 0,
-	USED,		//If read from super Index, USED can mean both free and used to save a bit per entry.
+	USED,		//If read from super Index, USED can mean both FREE and USED to save a bit per entry.
 	DIRTY
 }p_summaryEntry;
 
@@ -184,7 +184,7 @@ typedef struct p_dev{
 	p_param param;
 	p_driver drv;
 	void* driver_context;
-
+	unsigned int activeArea[area_types_no];
 	//Automatically filled
 	paffs_obj root_dir;
 	p_area* areaMap;
@@ -195,7 +195,9 @@ extern unsigned int activeArea[area_types_no]; 	//defined in paffs_flash.c
 
 PAFFS_RESULT paffs_initialize(p_dev* dev);
 
+PAFFS_RESULT paffs_format(const char* devicename);
 PAFFS_RESULT paffs_mnt(const char* devicename);
+PAFFS_RESULT paffs_unmnt(const char* devicename);
 const char* paffs_err_msg(PAFFS_RESULT pr);
 PAFFS_RESULT paffs_getLastErr();
 void paffs_resetLastErr();

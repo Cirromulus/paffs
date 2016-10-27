@@ -5,11 +5,13 @@
 
 #include "paffs.h"
 #include "paffs_flash.h"
-#include "btree.h"
+#include "treeCache.h"
 #include <linux/string.h>
 #include <time.h>
 
 static p_dev* device = NULL;
+
+static p_summaryEntry* summaryEntry_containers[2];
 
 PAFFS_RESULT paffs_lasterr = PAFFS_OK;
 
@@ -56,12 +58,14 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 	param->data_bytes_per_page = param->total_bytes_per_page - param->oob_bytes_per_page;
 	param->pages_per_area = param->pages_per_block * param->blocks_per_area;
 	device->areaMap = malloc(sizeof(p_area) * device->param.areas_no);
+	summaryEntry_containers[0] = malloc(sizeof(p_summaryEntry) * param->pages_per_area);
+	summaryEntry_containers[1] = malloc(sizeof(p_summaryEntry) * param->pages_per_area);
 	device->drv.drv_initialise_fn(dev);
 
-	activeArea[SUPERBLOCKAREA] = 0;
-	activeArea[INDEXAREA] = 0;
-	activeArea[JOURNALAREA] = 0;
-	activeArea[DATAAREA] = 0;
+	device->activeArea[SUPERBLOCKAREA] = 0;
+	device->activeArea[INDEXAREA] = 0;
+	device->activeArea[JOURNALAREA] = 0;
+	device->activeArea[DATAAREA] = 0;
 
 	if(param->blocks_per_area < 2){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device too small, at least 12 Blocks are needed!");
@@ -70,63 +74,82 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 	return PAFFS_OK;
 }
 
+PAFFS_RESULT paffs_format(const char* devicename){
+	unsigned int superblocks_needed = 1; //4 / device->param.blocks_per_area;
+	unsigned int superblocks = 0;
+	bool had_index = false;
+	bool had_journal = false;
+	for(int area = 0; area < device->param.areas_no; area++){
+		device->areaMap[area].status = EMPTY;
+		device->areaMap[area].erasecount = 0;
+		device->areaMap[area].position = area;
+
+		if(superblocks < superblocks_needed){
+			device->areaMap[area].type = SUPERBLOCKAREA;
+			device->areaMap[area].status = ACTIVE;
+			superblocks++;
+			device->activeArea[SUPERBLOCKAREA] = area;	//TODO: this may not be applicable in future
+			//initArea(device, area); No areaSummary needed
+			continue;
+		}
+		if(!had_index){
+			device->areaMap[area].type = INDEXAREA;
+			had_index = true;
+			device->activeArea[INDEXAREA] = area;
+			initArea(device, area);
+			continue;
+		}
+		if(!had_journal){
+			device->areaMap[area].type = JOURNALAREA;
+			had_journal = true;
+			device->activeArea[JOURNALAREA] = area;
+			//initArea(device, area); No areaSummary needed
+			continue;
+		}
+		device->areaMap[area].type = DATAAREA;
+
+	}
+
+	PAFFS_RESULT r = start_new_tree(device);
+	if(r != PAFFS_OK)
+		return r;
+
+	pInode rootDir = {0};
+	if((r = paffs_createDirInode(&rootDir, PAFFS_R | PAFFS_W | PAFFS_X) != PAFFS_OK)){
+		return r;
+	}
+	if((r = insertInode(device, &rootDir) != PAFFS_OK)){
+		return r;
+	}
+	if((r = commitTreeCache(device) != PAFFS_OK)){
+		return r;
+	}
+	if((r = commitSuperIndex(device) != PAFFS_OK)){
+		return r;
+	}
+	return PAFFS_OK;
+}
+
 PAFFS_RESULT paffs_mnt(const char* devicename){
 	if(strcmp(devicename, device->param.name) != 0){
 		return PAFFS_EINVAL;
 	}
-	//TODO: Read Superblock on nand-Flash
-	bool emptyFlash = true;
-
-	if(emptyFlash){
-		unsigned int superblocks_needed = 1; //4 / device->param.blocks_per_area;
-		unsigned int superblocks = 0;
-		bool had_index = false;
-		bool had_journal = false;
-		for(int area = 0; area < device->param.areas_no; area++){
-			device->areaMap[area].status = EMPTY;
-			device->areaMap[area].erasecount = 0;
-			device->areaMap[area].position = area;
-
-			if(superblocks < superblocks_needed){
-				device->areaMap[area].type = SUPERBLOCKAREA;
-				device->areaMap[area].status = ACTIVE;
-				superblocks++;
-				activeArea[SUPERBLOCKAREA] = area;	//TODO: this may not be applicable in future
-				//initArea(device, area); No allocation of areaSummary needed
-				continue;
-			}
-			if(!had_index){
-				device->areaMap[area].type = INDEXAREA;
-				had_index = true;
-				activeArea[INDEXAREA] = area;
-				initArea(device, area);
-				continue;
-			}
-			if(!had_journal){
-				device->areaMap[area].type = JOURNALAREA;
-				had_journal = true;
-				activeArea[JOURNALAREA] = area;
-				initArea(device, area);
-				continue;
-			}
-			device->areaMap[area].type = DATAAREA;
-
-		}
-
-		PAFFS_RESULT r = start_new_tree(device);
-		if(r != PAFFS_OK)
-			return r;
-
-	}else{
-		//Todo: Scan NAND-Flash
+	superIndex index;
+	index.areaMap = device->areaMap;		//not very nice
+	PAFFS_RESULT r = readSuperIndex(device, &index, summaryEntry_containers);
+	if(r == PAFFS_NF){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Tried mounting a device with an empty superblock!");
+		return r;
 	}
-	pInode rootDir = {0};
-	if(paffs_createDirInode(&rootDir, PAFFS_R | PAFFS_W | PAFFS_X) != PAFFS_OK){
-		return paffs_lasterr;
-	}
-	if(insertInode(device, &rootDir) != PAFFS_OK){
-		return paffs_lasterr;
-	}
+	if(r != PAFFS_OK)
+		return r;
+
+	r = registerRootnode(device, index.rootNode);
+	if(r != PAFFS_OK)
+		return r;
+	return PAFFS_OK;
+}
+PAFFS_RESULT paffs_unmnt(const char* devicename){
 	return PAFFS_OK;
 }
 

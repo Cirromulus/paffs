@@ -28,24 +28,20 @@ typedef struct jumpPadEntry{
 
 typedef struct superIndex{
 	uint32_t no;	//This only has to hold as many numbers as there are pages in superblock area.
-					//Value Zero and 0xFF... is reserved.
+					//Values Zero and 0xFF... are reserved.
 	p_addr rootNode;
 	p_area* areaMap;	//Size can be calculated via dev->param
 } superIndex;
 
 PAFFS_RESULT registerRootnode(p_dev* dev, p_addr addr);
-
 p_addr getRootnodeAddr(p_dev* dev);
+
+//returns PAFFS_NF if no superindex is in flash
+PAFFS_RESULT readSuperIndex(p_dev* dev, superIndex *out_Index, p_summaryEntry **summary_Containers);
+PAFFS_RESULT commitSuperIndex(p_dev* dev);
 
 
 //returns PAFFS_NF if no superindex is in flash
 PAFFS_RESULT getAddrOfMostRecentSuperIndex(p_dev* dev, p_addr *out);
-
-PAFFS_RESULT readSuperIndex(p_dev* dev, superIndex *out_Index);
-PAFFS_RESULT commitSuperIndex(p_dev* dev);
-
-
-//debug
-
 
 #endif /* DS_PAFFS_SUPERBLOCK_H_ */

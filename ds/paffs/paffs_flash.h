@@ -53,7 +53,7 @@ PAFFS_RESULT writeJumpPadEntry(p_dev* dev, p_addr addr, jumpPadEntry* entry);
 PAFFS_RESULT readJumpPadEntry(p_dev* dev, p_addr addr, jumpPadEntry* entry);
 
 PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry);
-PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, bool withAreaMap);
+PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry,  p_summaryEntry* summary_Containers[2], bool withAreaMap);
 
 
 #endif /* PAFFS_FLASH_H_ */

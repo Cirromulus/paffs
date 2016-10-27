@@ -116,7 +116,7 @@ PAFFS_RESULT commitSuperIndex(p_dev* dev){
 	superIndex lastIndex = {0};
 
 	if(r != PAFFS_NF){
-		r = readSuperPageIndex(dev, lastEntry, &lastIndex, false);
+		r = readSuperPageIndex(dev, lastEntry, &lastIndex, NULL, false);
 		if(r != PAFFS_OK)
 			return r;
 	}
@@ -142,13 +142,13 @@ PAFFS_RESULT commitSuperIndex(p_dev* dev){
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT readSuperIndex(p_dev* dev, superIndex *out_index){
+PAFFS_RESULT readSuperIndex(p_dev* dev, superIndex *out_index, p_summaryEntry **summary_Containers){
 	p_addr addr;
 	PAFFS_RESULT r = getAddrOfMostRecentSuperIndex(dev, &addr);
 	if(r != PAFFS_OK)
 		return r;
 
-	r = readSuperPageIndex(dev, addr, out_index, true);	//todo: Switch to "true"
+	r = readSuperPageIndex(dev, addr, out_index, summary_Containers,  true);
 	if(r != PAFFS_OK){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read Super Index!");
 		return r;
