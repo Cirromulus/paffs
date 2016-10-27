@@ -477,7 +477,7 @@ PAFFS_RESULT findFirstFreeEntryInBlock(p_dev* dev, uint32_t area, uint8_t block,
 		}
 
 		// Unprogrammed, therefore empty
-		*out_pos = i + page_offs;
+		*out_pos = i;
 		if(++in_a_row == required_pages)
 			return PAFFS_OK;
 	}

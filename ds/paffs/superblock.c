@@ -104,10 +104,10 @@ PAFFS_RESULT commitSuperIndex(p_dev* dev){
 		return PAFFS_BUG;
 	}
 
-	p_addr target = chosen_block == 0 ? combineAddress(0, rel_page1) : combineAddress(0, rel_page2);
+	p_addr target = chosen_block == 0 ? combineAddress(0, rel_page1) : combineAddress(0, rel_page2 + dev->param.pages_per_block);
 
 	p_addr lastEntry;
-	PAFFS_RESULT r = getAddrOfMostRecentSuperIndex(dev, &lastEntry);
+ 	PAFFS_RESULT r = getAddrOfMostRecentSuperIndex(dev, &lastEntry);
 	if(r != PAFFS_OK && r != PAFFS_NF){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not determine Address of last SuperIndex!");
 		return r;

@@ -70,7 +70,7 @@ int main( int argc, char ** argv ) {
 	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
 		return -1;
-	//while(getchar() == EOF);
+	while(getchar() == EOF);
 
 	printf("Reading super Index...");
 	fflush(stdout);
@@ -94,6 +94,7 @@ int main( int argc, char ** argv ) {
 	if(r != PAFFS_OK)
 		return -1;
 	printSuperIndex(&index);
+	while(getchar() == EOF);
 
 	return 0;
 }
