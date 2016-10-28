@@ -17,101 +17,80 @@
 #include "superblock.h"
 
 
-
-void printSuperIndex(superIndex* ind){
-	printf("No:\t\t%d\n", ind->no);
-	printf("Roonode addr.: \t%u:%u\n", extractLogicalArea(ind->rootNode), extractPage(ind->rootNode));
-	printf("areaMap: (first eight entrys)\n");
-	char* names[] = {"SUPERBLOCKAREA","INDEXAREA","JOURNALAREA", "DATAAREA"};
-	for(int i = 0; i < 8; i ++){
-		printf("\t%d->%d\n", i, ind->areaMap[i].position);
-		printf("\tType: %s\n", names[ind->areaMap[i].type]);
-		if(ind->areaMap[i].has_areaSummary){
-			unsigned int free = 0, used = 0, dirty = 0;
-			for(unsigned int j = 0; j < getDevice()->param.pages_per_area; j++){
-				if(ind->areaMap[i].areaSummary[j] == FREE)
-					free++;
-				if(ind->areaMap[i].areaSummary[j] == USED)
-					used++;
-				if(ind->areaMap[i].areaSummary[j] == DIRTY)
-					dirty++;
-			}
-			printf("\tFree/Used/Dirty Pages: %u/%u/%u\n", free, used, dirty);
-		}else{
-			printf("\tSummary not present.\n");
-		}
-		printf("\t----------------\n");
-	}
-}
-
-
 int main( int argc, char ** argv ) {
-	paffs_start_up();
-	paffs_format("1");
-	paffs_mnt("1");
+	printf("Starting FS contexts...");
+	fflush(stdout);
+	PAFFS_RESULT r = paffs_start_up();
+	printf("%s\n", paffs_err_msg(r));
+	if(r != PAFFS_OK)
+		return -1;
+
+	printf("Formatting '1'...");
+	fflush(stdout);
+	r = paffs_format("1");
+	printf("%s\n", paffs_err_msg(r));
+	if(r != PAFFS_OK)
+		return -1;
+
+	printf("mounting '1'...");
+	fflush(stdout);
+	r = paffs_mnt("1");
+	printf("%s\n", paffs_err_msg(r));
+	if(r != PAFFS_OK)
+		return -1;
+
+
+
+
+	printf("creating file /foo and write something to it...");
 	paffs_obj* fil = paffs_open("/foo", PAFFS_FC | PAFFS_FW);
+	if(fil == NULL){
+		printf("%s\n", paffs_err_msg(paffs_getLastErr()));
+		return -1;
+	}
 	unsigned int bw;
-	paffs_write(fil, "Hallo.", 7, &bw);
+	r = paffs_write(fil, "Hallo.", 7, &bw);
+	printf("%s\n", paffs_err_msg(r));
+	if(r != PAFFS_OK)
+		return -1;
 	paffs_close(fil);
 	//Nothing new until here
 
-	commitTreeCache(getDevice());
-	print_tree(getDevice());
 
-	printf("Printing initial super Index...\n");
-	superIndex actual;
-	actual.no = 0;
-	actual.rootNode = getRootnodeAddr(getDevice());
-	actual.areaMap = getDevice()->areaMap;
-	printSuperIndex(&actual);
-
-
-	printf("Committing super Index...");
+	printf("Unmounting '1'...");
 	fflush(stdout);
-	PAFFS_RESULT r = commitSuperIndex(getDevice());
+	r = paffs_unmnt("1");
 	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
 		return -1;
-//	while(getchar() == EOF);
 
-	printf("Reading super Index...");
+	printf("mounting '1'...");
 	fflush(stdout);
-	superIndex index = {0};
-	p_area test_area_map[getDevice()->param.areas_no];	//Normally, the version in paffs_flasj is used
-	p_summaryEntry* summaryEntryContainers[2];
-	for(int i = 0; i < 2; i++)
-		summaryEntryContainers[i] = malloc(sizeof(p_summaryEntry) * getDevice()->param.pages_per_area);
-	memset(test_area_map, 0, sizeof(p_area) * getDevice()->param.areas_no);
-	index.areaMap = test_area_map;
-
-	r = readSuperIndex(getDevice(), &index, summaryEntryContainers);
+	r = paffs_mnt("1");
 	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
 		return -1;
-	printSuperIndex(&index);
 
-
-
-	printf("Committing super Index again...");
-	fflush(stdout);
-	r = commitSuperIndex(getDevice());
+	printf("Reading file /foo ...");
+	fil = paffs_open("/foo", PAFFS_FR);
+	if(fil == NULL){
+		printf("%s\n", paffs_err_msg(paffs_getLastErr()));
+		return -1;
+	}
+	unsigned int br;
+	char buf[7];
+	r = paffs_read(fil, buf, 7, &br);
 	printf("%s\n", paffs_err_msg(r));
 	if(r != PAFFS_OK)
 		return -1;
-	printSuperIndex(&index);
-//	while(getchar() == EOF);
+	paffs_close(fil);
+	printf("read: %s\n", buf);
 
-	printf("Reading super Index...");
-	fflush(stdout);
-	memset(test_area_map, 0, sizeof(p_area) * getDevice()->param.areas_no);
-	index.areaMap = test_area_map;
-
-	r = readSuperIndex(getDevice(), &index, summaryEntryContainers);
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK)
+	if(strcmp("Hallo.", buf) != 0){
+		printf("%s does not match 'Hallo.'\n", buf);
 		return -1;
-	printSuperIndex(&index);
+	}
 
-
+	printf("Success.\n");
 	return 0;
 }

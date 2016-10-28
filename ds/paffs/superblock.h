@@ -37,7 +37,7 @@ PAFFS_RESULT registerRootnode(p_dev* dev, p_addr addr);
 p_addr getRootnodeAddr(p_dev* dev);
 
 //returns PAFFS_NF if no superindex is in flash
-PAFFS_RESULT readSuperIndex(p_dev* dev, superIndex *out_Index, p_summaryEntry **summary_Containers);
+PAFFS_RESULT readSuperIndex(p_dev* dev, p_summaryEntry **summary_Containers);
 PAFFS_RESULT commitSuperIndex(p_dev* dev);
 
 

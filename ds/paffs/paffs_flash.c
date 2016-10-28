@@ -94,7 +94,7 @@ PAFFS_RESULT checkActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType area
 }
 
 void initArea(p_dev* dev, unsigned long int area){
-	PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Init new Area %lu.", area);
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init new Area %lu.", area);
 	//generate the areaSummary in Memory
 	dev->areaMap[area].status = ACTIVE;
 	if(dev->areaMap[area].type == INDEXAREA || dev->areaMap[area].type == DATAAREA){
@@ -560,19 +560,24 @@ PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry){
 
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 
+	unsigned int pointer = 0;
 	char buf[needed_bytes];
 	memset(buf, 0, needed_bytes);
-	memcpy(buf, entry, sizeof(uint32_t) + sizeof(p_addr));
-
+	memcpy(buf, &entry->no, sizeof(uint32_t));
+	pointer += sizeof(uint32_t);
+	memcpy(&buf[pointer], &entry->rootNode, sizeof(p_addr));
+	pointer += sizeof(p_addr);
 	long areaSummaryPositions[2];
 	areaSummaryPositions[0] = -1;
 	areaSummaryPositions[1] = -1;
 	unsigned char pospos = 0;	//Stupid name
-	unsigned int pointer = sizeof(uint32_t) + sizeof(p_addr);
+
 	for(unsigned int i = 0; i < dev->param.areas_no; i++){
 		if((entry->areaMap[i].type == INDEXAREA || entry->areaMap[i].type == DATAAREA) && entry->areaMap[i].areaSummary != 0){
 			areaSummaryPositions[pospos++] = i;
 			entry->areaMap[i].has_areaSummary = true;
+		}else{
+			entry->areaMap[i].has_areaSummary = false;
 		}
 
 		memcpy(&buf[pointer], &entry->areaMap[i], sizeof(p_area) - sizeof(p_summaryEntry*));
@@ -641,13 +646,15 @@ PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, p_su
 	//buffer ready
 	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "SuperIndex Buffer was filled with %u Bytes.", pointer);
 
-	memcpy(entry, buf, sizeof(uint32_t) + sizeof(p_addr));
-
+	pointer = 0;
+	memcpy(&entry->no, buf, sizeof(uint32_t));
+	pointer += sizeof(uint32_t);
+	memcpy(&entry->rootNode, &buf[pointer], sizeof(p_addr));
+	pointer += sizeof(p_addr);
 	long areaSummaryPositions[2];
 	areaSummaryPositions[0] = -1;
 	areaSummaryPositions[1] = -1;
 	unsigned char pospos = 0;	//Stupid name
-	pointer = sizeof(uint32_t) + sizeof(p_addr);
 	for(unsigned int i = 0; i < dev->param.areas_no; i++){
 		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(p_area) - sizeof(p_summaryEntry*));
 		pointer += sizeof(p_area) - sizeof(p_summaryEntry*);

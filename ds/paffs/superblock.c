@@ -10,12 +10,13 @@
 
 
 static p_addr rootnode_addr = 0;
+static bool rootnode_dirty = 0;
 
 PAFFS_RESULT registerRootnode(p_dev* dev, p_addr addr){
 	if(addr == 0)
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Tried to set Rootnode to 0");
 	rootnode_addr = addr;
-
+	rootnode_dirty = true;
 	return PAFFS_OK;
 }
 
@@ -25,6 +26,33 @@ p_addr getRootnodeAddr(p_dev* dev){
 	}
 
 	return rootnode_addr;
+}
+
+
+void printSuperIndex(superIndex* ind){
+	printf("No:\t\t%d\n", ind->no);
+	printf("Roonode addr.: \t%u:%u\n", extractLogicalArea(ind->rootNode), extractPage(ind->rootNode));
+	printf("areaMap: (first eight entrys)\n");
+	char* names[] = {"SUPERBLOCKAREA","INDEXAREA","JOURNALAREA", "DATAAREA"};
+	for(int i = 0; i < 8; i ++){
+		printf("\t%d->%d\n", i, ind->areaMap[i].position);
+		printf("\tType: %s\n", names[ind->areaMap[i].type]);
+		if(ind->areaMap[i].has_areaSummary){
+			unsigned int free = 0, used = 0, dirty = 0;
+			for(unsigned int j = 0; j < getDevice()->param.pages_per_area; j++){
+				if(ind->areaMap[i].areaSummary[j] == FREE)
+					free++;
+				if(ind->areaMap[i].areaSummary[j] == USED)
+					used++;
+				if(ind->areaMap[i].areaSummary[j] == DIRTY)
+					dirty++;
+			}
+			printf("\tFree/Used/Dirty Pages: %u/%u/%u\n", free, used, dirty);
+		}else{
+			printf("\tSummary not present.\n");
+		}
+		printf("\t----------------\n");
+	}
 }
 
 
@@ -54,7 +82,7 @@ PAFFS_RESULT commitSuperIndex(p_dev* dev){
 			dev->param.areas_no * (sizeof(p_area) - sizeof(p_summaryEntry*)) + // AreaMap without summaryEntry pointer
 			2 * dev->param.pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
-	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Pages needed for SuperIndex: %d (%d bytes)", needed_pages, needed_bytes);
+	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed for SuperIndex: %d (%d bytes)", needed_pages, needed_bytes);
 
 
 	uint32_t rel_page1 = 0;
@@ -121,10 +149,15 @@ PAFFS_RESULT commitSuperIndex(p_dev* dev){
 			return r;
 	}
 
-	superIndex new_entry;
+	superIndex new_entry = {0};
 	new_entry.no = lastIndex.no+1;
-	new_entry.rootNode = rootnode_addr;
+	new_entry.rootNode = rootnode_addr;	//Just 4 Byte are written?
 	new_entry.areaMap = dev->areaMap;
+
+	if(paffs_trace_mask & PAFFS_TRACE_SUPERBLOCK){
+		printf("write Super Index:\n");
+		printSuperIndex(&new_entry);
+	}
 
 	r = writeSuperIndex(dev, target, &new_entry);
 	if(r != PAFFS_OK)
@@ -139,20 +172,35 @@ PAFFS_RESULT commitSuperIndex(p_dev* dev){
 		return deleteAnchorBlock(dev, 0, 1);
 	}
 
+	rootnode_dirty = false;
+
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT readSuperIndex(p_dev* dev, superIndex *out_index, p_summaryEntry **summary_Containers){
+PAFFS_RESULT readSuperIndex(p_dev* dev, p_summaryEntry **summary_Containers){
 	p_addr addr;
 	PAFFS_RESULT r = getAddrOfMostRecentSuperIndex(dev, &addr);
 	if(r != PAFFS_OK)
 		return r;
 
-	r = readSuperPageIndex(dev, addr, out_index, summary_Containers,  true);
+	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found Super Index at %u:%u\n", extractLogicalArea(addr), extractPage(addr));
+
+	superIndex index = {0};
+	index.areaMap = dev->areaMap;
+
+	r = readSuperPageIndex(dev, addr, &index, summary_Containers,  true);
 	if(r != PAFFS_OK){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read Super Index!");
 		return r;
 	}
+
+	if(paffs_trace_mask & PAFFS_TRACE_SUPERBLOCK){
+		printf("Read Super Index:\n");
+		printSuperIndex(&index);
+	}
+
+	rootnode_addr = index.rootNode;
+	rootnode_dirty = false;
 	return PAFFS_OK;
 }
 

@@ -134,23 +134,33 @@ PAFFS_RESULT paffs_mnt(const char* devicename){
 	if(strcmp(devicename, device->param.name) != 0){
 		return PAFFS_EINVAL;
 	}
-	superIndex index;
-	index.areaMap = device->areaMap;		//not very nice
-	PAFFS_RESULT r = readSuperIndex(device, &index, summaryEntry_containers);
+
+	PAFFS_RESULT r = readSuperIndex(device, summaryEntry_containers);
 	if(r == PAFFS_NF){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Tried mounting a device with an empty superblock!");
 		return r;
 	}
+
+	return r;
+}
+PAFFS_RESULT paffs_unmnt(const char* devicename){
+	if(strcmp(devicename, device->param.name) != 0){
+		return PAFFS_EINVAL;
+	}
+
+	PAFFS_RESULT r = commitTreeCache(device);
 	if(r != PAFFS_OK)
 		return r;
 
-	r = registerRootnode(device, index.rootNode);
+	r = commitSuperIndex(device);
 	if(r != PAFFS_OK)
 		return r;
+
+	//just for cleanup & tests
+	memset(device->areaMap, 0, sizeof(p_area) * device->param.areas_no);
+	deleteTreeCache();
+
 	return PAFFS_OK;
-}
-PAFFS_RESULT paffs_unmnt(const char* devicename){
-	return PAFFS_NIMPL;
 }
 
 PAFFS_RESULT paffs_createInode(pInode* outInode, paffs_permission mask){
@@ -161,7 +171,9 @@ PAFFS_RESULT paffs_createInode(pInode* outInode, paffs_permission mask){
 	if(r != PAFFS_OK)
 		return r;
 
-	outInode->perm = mask;
+	outInode->perm = (mask & PAFFS_PERM_MASK);
+	if(mask & PAFFS_W)
+		outInode->perm |= PAFFS_R;
 	outInode->size = 0;
 	outInode->reservedSize = 0;
 	outInode->crea = time(0);
@@ -666,7 +678,7 @@ paffs_obj* paffs_open(const char* path, fileopenmask mask){
 		return NULL;
 	}
 
-	if((file.perm & (mask & PAFFS_PERM_MASK)) != mask){
+	if((file.perm & (mask & PAFFS_PERM_MASK)) != (mask & PAFFS_PERM_MASK)){
 		paffs_lasterr = PAFFS_NOPERM;
 		return NULL;
 	}
