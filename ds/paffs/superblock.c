@@ -163,7 +163,7 @@ PAFFS_RESULT commitSuperIndex(p_dev* dev){
 	if(r != PAFFS_OK)
 		return r;
 
-	//Handle deletion
+	//Handle deletion. TODO: Increase deletion Count before writing new entry
 	if(r1 == PAFFS_NF){
 		return deleteAnchorBlock(dev, 0, 0);
 	}
