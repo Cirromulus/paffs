@@ -708,6 +708,7 @@ PAFFS_RESULT paffs_close(paffs_obj* obj){
 		return PAFFS_EINVAL;
 	paffs_flush(obj);
 	free(obj->dentry->iNode);
+	free(obj->dentry->name);
 	free(obj->dentry);
 	free(obj);
 

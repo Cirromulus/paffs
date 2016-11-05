@@ -553,10 +553,12 @@ PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry){
 		return PAFFS_BUG;
 	}
 
-	//This is constant for given Devices
+	//This is constant for given Devices if write_areaSummary_to_flash is implemented
+	//FIXME: Actually, there mustn't be more than two summaries present
+
 	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(p_addr) +
 		dev->param.areas_no * (sizeof(p_area) - sizeof(p_summaryEntry*))+ // AreaMap without summaryEntry pointer
-		2 * dev->param.pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
+		16 * dev->param.pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
 
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 
@@ -567,7 +569,8 @@ PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry){
 	pointer += sizeof(uint32_t);
 	memcpy(&buf[pointer], &entry->rootNode, sizeof(p_addr));
 	pointer += sizeof(p_addr);
-	long areaSummaryPositions[2];
+	long areaSummaryPositions[16];		//FIXME: Experimental.
+										//Actually, there mustn't be more than two summaries present, they have to be written to flash
 	areaSummaryPositions[0] = -1;
 	areaSummaryPositions[1] = -1;
 	unsigned char pospos = 0;	//Stupid name
@@ -622,10 +625,12 @@ PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, p_su
 
 	unsigned int summary_Container_count = 0;
 
-	//This is constant for given Devices
+	//This is constant for given Devices if write_areaSummary_to_flash is implemented
+	//FIXME: Actually, there mustn't be more than two summaries present
+
 	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(p_addr) +
 		dev->param.areas_no * (sizeof(p_area) - sizeof(p_summaryEntry*))+ // AreaMap without summaryEntry pointer
-		2 * dev->param.pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
+		16 * dev->param.pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
 
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 
@@ -651,9 +656,11 @@ PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, p_su
 	pointer += sizeof(uint32_t);
 	memcpy(&entry->rootNode, &buf[pointer], sizeof(p_addr));
 	pointer += sizeof(p_addr);
-	long areaSummaryPositions[2];
-	areaSummaryPositions[0] = -1;
-	areaSummaryPositions[1] = -1;
+	long areaSummaryPositions[16];		//FIXME: Experimental.
+										//Actually, there mustn't be more than two summaries present, they have to be written to flash
+	for(int i = 0; i < 16; i++){
+		areaSummaryPositions[i] = -1;
+	}
 	unsigned char pospos = 0;	//Stupid name
 	for(unsigned int i = 0; i < dev->param.areas_no; i++){
 		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(p_area) - sizeof(p_summaryEntry*));
