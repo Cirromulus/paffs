@@ -56,10 +56,12 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 	param->areas_no = param->blocks / 2;	//For now: 16 b -> 8 Areas
 	param->blocks_per_area = param->blocks / param->areas_no;
 	param->data_bytes_per_page = param->total_bytes_per_page - param->oob_bytes_per_page;
-	param->pages_per_area = param->pages_per_block * param->blocks_per_area;
+	param->total_pages_per_area = param->pages_per_block * param->blocks_per_area;
+	unsigned int needed_pages_for_AS = 1;	//Todo: actually calculate
+	param->data_pages_per_area = param->total_pages_per_area - needed_pages_for_AS;
 	device->areaMap = malloc(sizeof(p_area) * device->param.areas_no);
-	summaryEntry_containers[0] = malloc(sizeof(p_summaryEntry) * param->pages_per_area);
-	summaryEntry_containers[1] = malloc(sizeof(p_summaryEntry) * param->pages_per_area);
+	summaryEntry_containers[0] = malloc(sizeof(p_summaryEntry) * param->data_pages_per_area);
+	summaryEntry_containers[1] = malloc(sizeof(p_summaryEntry) * param->data_pages_per_area);
 	device->drv.drv_initialise_fn(dev);
 
 	device->activeArea[SUPERBLOCKAREA] = 0;
@@ -624,26 +626,6 @@ PAFFS_RESULT paffs_createFile(pInode* outFile, const char* fullPath, paffs_permi
 		return res;
 
 	return paffs_insertInodeInDir(&fullPath[lastSlash], &parDir, outFile);
-}
-
-
-p_addr combineAddress(uint32_t logical_area, uint32_t page){
-	p_addr addr = 0;
-	memcpy(&addr, &logical_area, sizeof(uint32_t));
-	memcpy(&((char*)&addr)[sizeof(uint32_t)], &page, sizeof(uint32_t));
-
-	return addr;
-}
-
-unsigned int extractLogicalArea(p_addr addr){
-	unsigned int area = 0;
-	memcpy(&area, &addr, sizeof(uint32_t));
-	return area;
-}
-unsigned int extractPage(p_addr addr){
-	unsigned int page = 0;
-	memcpy(&page, &((char*)&addr)[sizeof(uint32_t)], sizeof(uint32_t));
-	return page;
 }
 
 paffs_obj* paffs_open(const char* path, fileopenmask mask){

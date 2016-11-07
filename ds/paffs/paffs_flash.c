@@ -40,7 +40,7 @@ unsigned int findWritableArea(p_areaType areaType, p_dev* dev){
 
 PAFFS_RESULT findFirstFreePage(unsigned int* p_out, p_dev* dev, unsigned int area){
 
-	for(int i = 0; i < dev->param.blocks_per_area * dev->param.pages_per_block; i++){
+	for(int i = 0; i < dev->param.data_pages_per_area; i++){
 		if(dev->areaMap[area].areaSummary[i] == FREE){
 			*p_out = i;
 			return PAFFS_OK;
@@ -51,8 +51,27 @@ PAFFS_RESULT findFirstFreePage(unsigned int* p_out, p_dev* dev, unsigned int are
 
 uint64_t getPageNumber(p_addr addr, p_dev *dev){
 	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
-								dev->param.blocks_per_area * dev->param.pages_per_block;
+								dev->param.total_pages_per_area;
 	page += extractPage(addr);
+	return page;
+}
+
+p_addr combineAddress(uint32_t logical_area, uint32_t page){
+	p_addr addr = 0;
+	memcpy(&addr, &logical_area, sizeof(uint32_t));
+	memcpy(&((char*)&addr)[sizeof(uint32_t)], &page, sizeof(uint32_t));
+
+	return addr;
+}
+
+unsigned int extractLogicalArea(p_addr addr){
+	unsigned int area = 0;
+	memcpy(&area, &addr, sizeof(uint32_t));
+	return area;
+}
+unsigned int extractPage(p_addr addr){
+	unsigned int page = 0;
+	memcpy(&page, &((char*)&addr)[sizeof(uint32_t)], sizeof(uint32_t));
 	return page;
 }
 
@@ -63,19 +82,15 @@ PAFFS_RESULT checkActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType area
 	}
 
 	unsigned int usedPages = 0;
-	for(int i = 0; i < dev->param.pages_per_area; i++){
+	for(int i = 0; i < dev->param.data_pages_per_area; i++){
 		if(dev->areaMap[*area].areaSummary[i] != FREE)
 			usedPages++;
 	}
 
-	if(usedPages == dev->param.pages_per_area){
+	if(usedPages == dev->param.data_pages_per_area){
 		PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Area %u (Type %d) full.", *area, areaType);
 		//Area is full!
-		//TODO: Check if dirty Pages are inside and
-		//garbage collect this instead of just closing it...
-		dev->areaMap[*area].status = CLOSED;
-		//Second try. Normally there would be more, because
-		//areas could be full without being closed
+		closeArea(dev, *area);
 		*area = findWritableArea(areaType, dev);
 		if(paffs_lasterr != PAFFS_OK){
 			return paffs_lasterr;
@@ -86,8 +101,8 @@ PAFFS_RESULT checkActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType area
 		}
 	}
 	//Safety-check
-	if(usedPages > dev->param.pages_per_area){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: used Pages bigger than actual pagecount (was: %u, should %u)", usedPages, dev->param.pages_per_area);
+	if(usedPages > dev->param.data_pages_per_area){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: used Pages bigger than actual pagecount (was: %u, should %u)", usedPages, dev->param.data_pages_per_area);
 		return PAFFS_BUG;
 	}
 	return PAFFS_OK;
@@ -112,6 +127,42 @@ void initArea(p_dev* dev, unsigned long int area){
 	}
 }
 
+PAFFS_RESULT closeArea(p_dev *dev, unsigned int area){
+
+	dev->areaMap[area].status = CLOSED;
+
+	if(dev->areaMap[area].type == DATAAREA || dev->areaMap[area].type == INDEXAREA){
+		unsigned int needed_bytes = 1 + dev->param.data_pages_per_area / 8;
+		unsigned int needed_pages = 1 + needed_bytes / dev->param.data_bytes_per_page;
+		if(needed_pages != dev->param.total_pages_per_area - dev->param.data_pages_per_area){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
+			return PAFFS_FAIL;
+		}
+
+		char buf[needed_bytes];
+		memset(buf, 0, needed_bytes);
+
+		for(unsigned int j = 0; j < dev->param.data_pages_per_area; j++){
+			if(dev->areaMap[area].areaSummary[j] != DIRTY)
+				buf[j/8] |= 1 << j%8;
+		}
+
+		unsigned int pointer = 0;
+		PAFFS_RESULT r;
+		uint64_t page_offs = getPageNumber(combineAddress(area, dev->param.data_pages_per_area), dev);
+		for(unsigned page = 0; page < needed_pages; page++){
+			unsigned int btw = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
+								: needed_bytes - pointer;
+			r = dev->drv.drv_write_page_fn(dev, page_offs + page, &buf[pointer], btw);
+			if(r != PAFFS_OK)
+				return r;
+
+			pointer += btw;
+		}
+	}
+
+	return PAFFS_OK;
+}
 //modifies inode->size and inode->reserved size as well
 PAFFS_RESULT writeInodeData(pInode* inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_written,
@@ -152,7 +203,7 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 			PAFFS_DBG(PAFFS_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[DATAAREA]);
 			return PAFFS_BUG;
 		}
-		p_addr pageAddress = combineAddress(dev->areaMap[dev->activeArea[DATAAREA]].position, firstFreePage);
+		p_addr pageAddress = combineAddress(dev->activeArea[DATAAREA], firstFreePage);
 
 		dev->areaMap[dev->activeArea[DATAAREA]].areaSummary[firstFreePage] = USED;
 
@@ -402,7 +453,7 @@ PAFFS_RESULT writeTreeNode(p_dev* dev, treeNode* node){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[INDEXAREA]);
 		return paffs_lasterr = PAFFS_BUG;
 	}
-	p_addr addr = combineAddress(dev->areaMap[dev->activeArea[INDEXAREA]].position, firstFreePage);
+	p_addr addr = combineAddress(dev->activeArea[INDEXAREA], firstFreePage);
 	node->self = addr;
 
 	dev->areaMap[dev->activeArea[INDEXAREA]].areaSummary[firstFreePage] = USED;
@@ -553,12 +604,9 @@ PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry){
 		return PAFFS_BUG;
 	}
 
-	//This is constant for given Devices if write_areaSummary_to_flash is implemented
-	//FIXME: Actually, there mustn't be more than two summaries present
-
 	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(p_addr) +
 		dev->param.areas_no * (sizeof(p_area) - sizeof(p_summaryEntry*))+ // AreaMap without summaryEntry pointer
-		16 * dev->param.pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
+		2 * dev->param.data_pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
 
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 
@@ -569,14 +617,13 @@ PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry){
 	pointer += sizeof(uint32_t);
 	memcpy(&buf[pointer], &entry->rootNode, sizeof(p_addr));
 	pointer += sizeof(p_addr);
-	long areaSummaryPositions[16];		//FIXME: Experimental.
-										//Actually, there mustn't be more than two summaries present, they have to be written to flash
+	long areaSummaryPositions[2];
 	areaSummaryPositions[0] = -1;
 	areaSummaryPositions[1] = -1;
 	unsigned char pospos = 0;	//Stupid name
 
 	for(unsigned int i = 0; i < dev->param.areas_no; i++){
-		if((entry->areaMap[i].type == INDEXAREA || entry->areaMap[i].type == DATAAREA) && entry->areaMap[i].areaSummary != 0){
+		if((entry->areaMap[i].type == INDEXAREA || entry->areaMap[i].type == DATAAREA) && entry->areaMap[i].status == ACTIVE){
 			areaSummaryPositions[pospos++] = i;
 			entry->areaMap[i].has_areaSummary = true;
 		}else{
@@ -591,11 +638,11 @@ PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry){
 	for(unsigned int i = 0; i < 2; i++){
 		if(areaSummaryPositions[i] < 0)
 			continue;
-		for(unsigned int j = 0; j < dev->param.pages_per_area; j++){
+		for(unsigned int j = 0; j < dev->param.data_pages_per_area; j++){
 			if(entry->areaMap[areaSummaryPositions[i]].areaSummary[j] != DIRTY)
 				buf[pointer + j/8] |= 1 << j%8;
 		}
-		pointer += dev->param.pages_per_area / 8;
+		pointer += dev->param.data_pages_per_area / 8;
 	}
 
 	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "%u bytes have been written to Buffer", pointer);
@@ -630,7 +677,7 @@ PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, p_su
 
 	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(p_addr) +
 		dev->param.areas_no * (sizeof(p_area) - sizeof(p_summaryEntry*))+ // AreaMap without summaryEntry pointer
-		16 * dev->param.pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
+		16 * dev->param.data_pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
 
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 
@@ -656,11 +703,9 @@ PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, p_su
 	pointer += sizeof(uint32_t);
 	memcpy(&entry->rootNode, &buf[pointer], sizeof(p_addr));
 	pointer += sizeof(p_addr);
-	long areaSummaryPositions[16];		//FIXME: Experimental.
-										//Actually, there mustn't be more than two summaries present, they have to be written to flash
-	for(int i = 0; i < 16; i++){
-		areaSummaryPositions[i] = -1;
-	}
+	long areaSummaryPositions[2];
+	areaSummaryPositions[0] = -1;
+	areaSummaryPositions[1] = -1;
 	unsigned char pospos = 0;	//Stupid name
 	for(unsigned int i = 0; i < dev->param.areas_no; i++){
 		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(p_area) - sizeof(p_summaryEntry*));
@@ -677,7 +722,7 @@ PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, p_su
 			entry->areaMap[areaSummaryPositions[i]].areaSummary = summary_Containers[summary_Container_count++];
 		}
 
-		for(unsigned int j = 0; j < dev->param.pages_per_area; j++){
+		for(unsigned int j = 0; j < dev->param.data_pages_per_area; j++){
 			if(buf[pointer + j/8] & 1 << j%8){
 				//TODO: Normally, we would check in the OOB for a Checksum or so, which is present all the time
 				p_addr tmp = combineAddress(areaSummaryPositions[i], j);
@@ -699,7 +744,7 @@ PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, p_su
 				entry->areaMap[areaSummaryPositions[i]].areaSummary[j] = DIRTY;
 			}
 		}
-		pointer += dev->param.pages_per_area / 8;
+		pointer += dev->param.data_pages_per_area / 8;
 	}
 
 	return PAFFS_OK;

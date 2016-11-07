@@ -39,7 +39,7 @@ void printSuperIndex(superIndex* ind){
 		printf("\tType: %s\n", names[ind->areaMap[i].type]);
 		if(ind->areaMap[i].has_areaSummary){
 			unsigned int free = 0, used = 0, dirty = 0;
-			for(unsigned int j = 0; j < getDevice()->param.pages_per_area; j++){
+			for(unsigned int j = 0; j < getDevice()->param.total_pages_per_area; j++){
 				if(ind->areaMap[i].areaSummary[j] == FREE)
 					free++;
 				if(ind->areaMap[i].areaSummary[j] == USED)
@@ -80,7 +80,7 @@ PAFFS_RESULT getAddrOfMostRecentSuperIndex(p_dev* dev, p_addr *out){
 PAFFS_RESULT commitSuperIndex(p_dev* dev){
 	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(p_addr) +
 			dev->param.areas_no * (sizeof(p_area) - sizeof(p_summaryEntry*)) + // AreaMap without summaryEntry pointer
-			2 * dev->param.pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
+			2 * dev->param.data_pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed for SuperIndex: %d (%d bytes)", needed_pages, needed_bytes);
 
@@ -126,7 +126,6 @@ PAFFS_RESULT commitSuperIndex(p_dev* dev){
 			//First is full, second is current
 			chosen_block = 1;
 		}
-
 	}else{
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Both Superblocks are full?");
 		return PAFFS_BUG;

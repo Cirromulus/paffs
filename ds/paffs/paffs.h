@@ -70,7 +70,8 @@ typedef struct p_param{
 	unsigned int data_bytes_per_page;
 	unsigned long areas_no;
 	unsigned int blocks_per_area;
-	unsigned int pages_per_area;
+	unsigned int total_pages_per_area;
+	unsigned int data_pages_per_area;
 } p_param;
 
 
@@ -214,9 +215,6 @@ PAFFS_RESULT paffs_getInodeOfElem( pInode* outInode, const char* fullPath);
 PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* newElem);
 PAFFS_RESULT paffs_removeInodeFromDir(pInode* contDir, pInode* elem);
 PAFFS_RESULT paffs_createFile(pInode* outFile, const char* fullPath, paffs_permission mask);
-p_addr combineAddress(uint32_t logical_area, uint32_t page);
-unsigned int extractLogicalArea(p_addr addr);			//Address-wrapper für einfacheren Garbagecollector
-unsigned int extractPage(p_addr addr);
 
 
 //Directory
