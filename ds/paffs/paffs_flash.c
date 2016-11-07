@@ -142,6 +142,7 @@ PAFFS_RESULT closeArea(p_dev *dev, unsigned int area){
 		char buf[needed_bytes];
 		memset(buf, 0, needed_bytes);
 
+		//TODO: Is it really necessary to save 16 bit while slowing down garbage collection?
 		for(unsigned int j = 0; j < dev->param.data_pages_per_area; j++){
 			if(dev->areaMap[area].areaSummary[j] != DIRTY)
 				buf[j/8] |= 1 << j%8;
