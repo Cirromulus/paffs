@@ -79,12 +79,13 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 PAFFS_RESULT paffs_format(const char* devicename){
 	unsigned int superblocks_needed = 1; //4 / device->param.blocks_per_area;
 	unsigned int superblocks = 0;
-	bool had_index = false;
-	bool had_journal = false;
+	unsigned char had_areaType = 0;		//Efficiency hack, bc. there are less than 2⁸ area types
 	for(int area = 0; area < device->param.areas_no; area++){
 		device->areaMap[area].status = EMPTY;
 		device->areaMap[area].erasecount = 0;
 		device->areaMap[area].position = area;
+
+		//TODO: Mark areas as UNSET, and handle them in findWritableArea()
 
 		if(superblocks < superblocks_needed){
 			device->areaMap[area].type = SUPERBLOCKAREA;

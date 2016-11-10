@@ -23,7 +23,7 @@ p_addr combineAddress(uint32_t logical_area, uint32_t page);
 unsigned int extractLogicalArea(p_addr addr);			//Address-wrapper für einfacheren Garbagecollector
 unsigned int extractPage(p_addr addr);
 
-PAFFS_RESULT checkActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType areaType);
+PAFFS_RESULT manageActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType areaType);
 
 PAFFS_RESULT closeArea(p_dev *dev, unsigned int area);
 

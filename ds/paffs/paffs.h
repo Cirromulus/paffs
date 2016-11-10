@@ -157,6 +157,8 @@ typedef enum p_areaType{
 	INDEXAREA,
 	JOURNALAREA,
 	DATAAREA,
+	GARBAGE_BUFFER,
+	UNSET,
 	area_types_no
 } p_areaType;
 

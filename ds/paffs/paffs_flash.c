@@ -14,7 +14,7 @@ unsigned int findWritableArea(p_areaType areaType, p_dev* dev){
 	if(dev->activeArea[areaType] == 0 || dev->areaMap[dev->activeArea[areaType]].status == CLOSED){
 		for(int try = 1; try <= 2; try++){
 			for(int area = 0; area < dev->param.areas_no; area++){
-				if(dev->areaMap[area].type != areaType){
+				if(dev->areaMap[area].type != areaType || ){
 					continue;
 				}
 				if(try == 1){
@@ -34,6 +34,7 @@ unsigned int findWritableArea(p_areaType areaType, p_dev* dev){
 		//current Area has still space left
 		return dev->activeArea[areaType];
 	}
+	//TODO: start Garbage collection here!
 	paffs_lasterr = PAFFS_NOSP;
 	return 0;
 }
@@ -75,21 +76,23 @@ unsigned int extractPage(p_addr addr){
 	return page;
 }
 
-PAFFS_RESULT checkActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType areaType){
+PAFFS_RESULT manageActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType areaType){
 	if(dev->areaMap[*area].areaSummary == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access invalid areaSummary!");
 		return PAFFS_BUG;
 	}
 
-	unsigned int usedPages = 0;
+	bool isFull = true;
 	for(int i = 0; i < dev->param.data_pages_per_area; i++){
-		if(dev->areaMap[*area].areaSummary[i] != FREE)
-			usedPages++;
+		if(dev->areaMap[*area].areaSummary[i] == FREE) {
+			isFull = false;
+			break;
+		}
 	}
 
-	if(usedPages == dev->param.data_pages_per_area){
+	if(isFull){
 		PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Area %u (Type %d) full.", *area, areaType);
-		//Area is full!
+		//Current Area is full!
 		closeArea(dev, *area);
 		*area = findWritableArea(areaType, dev);
 		if(paffs_lasterr != PAFFS_OK){
@@ -100,11 +103,7 @@ PAFFS_RESULT checkActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType area
 			return paffs_lasterr;
 		}
 	}
-	//Safety-check
-	if(usedPages > dev->param.data_pages_per_area){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: used Pages bigger than actual pagecount (was: %u, should %u)", usedPages, dev->param.data_pages_per_area);
-		return PAFFS_BUG;
-	}
+
 	return PAFFS_OK;
 }
 
@@ -284,7 +283,7 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 			return PAFFS_FAIL;
 		}
 
-		res = checkActiveAreaFull(dev, &dev->activeArea[DATAAREA], DATAAREA);
+		res = manageActiveAreaFull(dev, &dev->activeArea[DATAAREA], DATAAREA);
 		if(res != PAFFS_OK)
 			return res;
 
@@ -461,11 +460,11 @@ PAFFS_RESULT writeTreeNode(p_dev* dev, treeNode* node){
 
 	PAFFS_RESULT r = dev->drv.drv_write_page_fn(dev, getPageNumber(node->self, dev), node, sizeof(treeNode));
 	if(r != PAFFS_OK)
-		return paffs_lasterr = r;
+		return r;
 
-	r = checkActiveAreaFull(dev, &dev->activeArea[INDEXAREA], INDEXAREA);
+	r = manageActiveAreaFull(dev, &dev->activeArea[INDEXAREA], INDEXAREA);
 	if(r != PAFFS_OK)
-			return paffs_lasterr = r;
+		return r;
 
 	return PAFFS_OK;
 }
