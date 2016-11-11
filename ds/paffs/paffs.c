@@ -77,39 +77,36 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 }
 
 PAFFS_RESULT paffs_format(const char* devicename){
-	unsigned int superblocks_needed = 1; //4 / device->param.blocks_per_area;
-	unsigned int superblocks = 0;
-	unsigned char had_areaType = 0;		//Efficiency hack, bc. there are less than 2⁸ area types
+	unsigned char had_areaType = 0;		//Efficiency hack, bc there are less than 2⁸ area types
 	for(int area = 0; area < device->param.areas_no; area++){
 		device->areaMap[area].status = EMPTY;
 		device->areaMap[area].erasecount = 0;
 		device->areaMap[area].position = area;
 
-		//TODO: Mark areas as UNSET, and handle them in findWritableArea()
-
-		if(superblocks < superblocks_needed){
+		if(!(had_areaType & 1 << SUPERBLOCKAREA)){
+			device->activeArea[SUPERBLOCKAREA] = area;
 			device->areaMap[area].type = SUPERBLOCKAREA;
-			device->areaMap[area].status = ACTIVE;
-			superblocks++;
-			device->activeArea[SUPERBLOCKAREA] = area;	//TODO: this may not be applicable in future
-			//initArea(device, area); No areaSummary needed
-			continue;
-		}
-		if(!had_index){
-			device->areaMap[area].type = INDEXAREA;
-			had_index = true;
-			device->activeArea[INDEXAREA] = area;
 			initArea(device, area);
+			had_areaType |= 1 << SUPERBLOCKAREA;
 			continue;
 		}
-		if(!had_journal){
-			device->areaMap[area].type = JOURNALAREA;
-			had_journal = true;
+		if(!(had_areaType & 1 << JOURNALAREA)){
 			device->activeArea[JOURNALAREA] = area;
-			//initArea(device, area); No areaSummary needed
+			device->areaMap[area].type = JOURNALAREA;
+			initArea(device, area);
+			had_areaType |= 1 << JOURNALAREA;
 			continue;
 		}
-		device->areaMap[area].type = DATAAREA;
+
+		if(!(had_areaType & 1 << GARBAGE_BUFFER)){
+			device->activeArea[GARBAGE_BUFFER] = area;
+			device->areaMap[area].type = GARBAGE_BUFFER;
+			initArea(device, area);
+			had_areaType |= 1 << GARBAGE_BUFFER;
+			continue;
+		}
+
+		device->areaMap[area].type = UNSET;
 
 	}
 

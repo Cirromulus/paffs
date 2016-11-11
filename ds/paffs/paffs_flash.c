@@ -10,24 +10,24 @@
 #include <string.h>
 
 
+char* area_names[] = {
+		"UNSET",
+		"SUPERBLOCK",
+		"INDEX",
+		"JOURNAL",
+		"DATA",
+		"GARBAGE_BUFFER",
+		"YOUSHOULDNOTBESEEINGTHIS"
+};
+
+
 unsigned int findWritableArea(p_areaType areaType, p_dev* dev){
 	if(dev->activeArea[areaType] == 0 || dev->areaMap[dev->activeArea[areaType]].status == CLOSED){
-		for(int try = 1; try <= 2; try++){
-			for(int area = 0; area < dev->param.areas_no; area++){
-				if(dev->areaMap[area].type != areaType || ){
-					continue;
-				}
-				if(try == 1){
-					if(dev->areaMap[area].status == ACTIVE){	//ACTIVE oder closed first?
-						return area;
-					}
-				}else{
-					//Now look for "new", empty one. Ideal would be to pick the one with less erases
-					if(dev->areaMap[area].status == EMPTY){	//unclosed oder empty first?
-						return area;
-					}
-				}
-
+		for(int area = 0; area < dev->param.areas_no; area++){
+			if(dev->areaMap[area].type == UNSET){
+				dev->areaMap[area].type = areaType;
+				initArea(dev, area);
+				return area;
 			}
 		}
 	}else{
@@ -91,24 +91,24 @@ PAFFS_RESULT manageActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType are
 	}
 
 	if(isFull){
-		PAFFS_DBG(PAFFS_TRACE_AREA, "Info: Area %u (Type %d) full.", *area, areaType);
+		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Area %u (Type %s) full.", *area, area_names[areaType]);
 		//Current Area is full!
 		closeArea(dev, *area);
-		*area = findWritableArea(areaType, dev);
+/*		*area = findWritableArea(areaType, dev);
 		if(paffs_lasterr != PAFFS_OK){
 			return paffs_lasterr;
 		}
 		initArea(dev, *area);
 		if(paffs_lasterr != PAFFS_OK){
 			return paffs_lasterr;
-		}
+		}*/
 	}
 
 	return PAFFS_OK;
 }
 
 void initArea(p_dev* dev, unsigned long int area){
-	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init new Area %lu.", area);
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init new Area %lu as %s.", area, area_names[dev->areaMap[area].type]);
 	//generate the areaSummary in Memory
 	dev->areaMap[area].status = ACTIVE;
 	if(dev->areaMap[area].type == INDEXAREA || dev->areaMap[area].type == DATAAREA){
@@ -160,7 +160,7 @@ PAFFS_RESULT closeArea(p_dev *dev, unsigned int area){
 			pointer += btw;
 		}
 	}
-
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Closed %s Area at pos. %u.", area_names[dev->areaMap[area].type], area);
 	return PAFFS_OK;
 }
 //modifies inode->size and inode->reserved size as well
@@ -480,19 +480,18 @@ PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node){
 	}
 
 	if(dev->areaMap[extractLogicalArea(addr)].areaSummary == 0){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ operation on INDEXAREA without areaSummary!");
-		//TODO: Later on, it will be possible to read on non-cached areaSummaries.
-		return PAFFS_BUG;
-	}
+		PAFFS_DBG_S(PAFFS_TRACE_SCAN, "READ operation on INDEXAREA without areaSummary!");
+		//TODO: Could be safer if areaSummary would be read from flash for safety
+	}else{
+		if(dev->areaMap[extractLogicalArea(addr)].areaSummary[extractPage(addr)] == DIRTY){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "READ operation of obsoleted data at %X:%X", extractLogicalArea(addr), extractPage(addr));
+			return PAFFS_BUG;
+		}
 
-	if(dev->areaMap[extractLogicalArea(addr)].areaSummary[extractPage(addr)] == DIRTY){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ operation of obsoleted data at %X:%X", extractLogicalArea(addr), extractPage(addr));
-		return PAFFS_BUG;
-	}
-
-	if(extractLogicalArea(addr) == 0){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ TREE NODE operation on (log.) first Area at %X:%X", extractLogicalArea(addr), extractPage(addr));
-		return PAFFS_BUG;
+		if(extractLogicalArea(addr) == 0){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "READ TREE NODE operation on (log.) first Area at %X:%X", extractLogicalArea(addr), extractPage(addr));
+			return PAFFS_BUG;
+		}
 	}
 
 	PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), node, sizeof(treeNode));

@@ -247,6 +247,8 @@ void cleanTreeCacheLeaves(){
 
 
 	resolveDirtyPaths(&cache[cache_root]);
+	if(paffs_lasterr != PAFFS_OK)
+		return;
 	for(int i = 0; i < TREENODECACHESIZE; i++){
 		if(!isIndexUsed(getIndexFromPointer(&cache[i])))
 			continue;
@@ -363,7 +365,8 @@ PAFFS_RESULT commitTreeCache(p_dev* dev){
 
 
 	resolveDirtyPaths(&cache[cache_root]);
-
+	if(paffs_lasterr != PAFFS_OK)
+		return paffs_lasterr;
 	PAFFS_RESULT r = commitNodesRecursively(dev, &cache[cache_root]);
 	if(r != PAFFS_OK)
 		return r;

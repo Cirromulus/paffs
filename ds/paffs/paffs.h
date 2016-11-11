@@ -153,14 +153,16 @@ typedef struct p_driver {
 } p_driver;
 
 typedef enum p_areaType{
+	UNSET,
 	SUPERBLOCKAREA,
 	INDEXAREA,
 	JOURNALAREA,
 	DATAAREA,
 	GARBAGE_BUFFER,
-	UNSET,
 	area_types_no
 } p_areaType;
+
+extern char* area_names[];		//Initialized in paffs_flash.c
 
 typedef enum p_areaStatus{
 	CLOSED,

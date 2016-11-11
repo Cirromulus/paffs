@@ -12,6 +12,8 @@
 #include <string.h>
 #include <inttypes.h>
 
+//TODO: Is k_prime limiting max number of pinodes?
+
 bool isTreeCacheNodeEqual(treeCacheNode* left, treeCacheNode* right){
 	for(int i = 0; i <= left->raw.num_keys; i++)
 		if(left->raw.as_branch.keys[i] != right->raw.as_branch.keys[i])
@@ -41,8 +43,10 @@ PAFFS_RESULT updateExistingInode( p_dev* dev, pInode* inode){
 			break;
 	}
 
-	if(pos == node->raw.num_keys)
+	if(pos == node->raw.num_keys){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Tried to update existing Inode %u, but could not find it!", inode->no);
 		return PAFFS_BUG;	//This Key did not exist
+	}
 
 	node->raw.as_leaf.pInodes[pos] = *inode;
 	node->dirty = true;
@@ -227,11 +231,17 @@ int cut( int length ) {
  * the treeCacheNode to the left of the key to be inserted.
  */
 int get_left_index(treeCacheNode * parent, treeCacheNode * left) {
-        int left_index = 0;
-        while (left_index < parent->raw.num_keys &&
-                        parent->raw.as_branch.pointers[left_index] != left->raw.self)
-                left_index++;
-        return left_index;
+	int left_index = 0;
+	while (left_index < parent->raw.num_keys){
+		if(parent->raw.as_branch.pointers[left_index] != 0)
+			if(parent->raw.as_branch.pointers[left_index] == left->raw.self)
+				break;
+		if(parent->pointers[left_index] != 0)
+			if(parent->pointers[left_index] == left)
+				break;
+		left_index++;
+	}
+	return left_index;
 }
 
 /* Inserts a new pointer to a pinode and its corresponding
@@ -267,6 +277,7 @@ PAFFS_RESULT insert_into_leaf( p_dev* dev, treeCacheNode * leaf, pInode * newIno
  */
 PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, pInode * newInode) {
 
+	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert into leaf after splitting");
 	pInode_no temp_keys[btree_leaf_order+1];
 	pInode temp_pInodes[btree_leaf_order+1];
 	int insertion_index, split, new_key, i, j;
@@ -368,7 +379,7 @@ PAFFS_RESULT insert_into_node(p_dev *dev, treeCacheNode * node,
  */
 PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_node, int left_index,
                 pInode_no key, treeCacheNode * right) {
-
+	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert into node after splitting at key %u, index %d", key, left_index);
 	int i, j, split, k_prime;
 	treeCacheNode *new_node;
 	pInode_no temp_keys[btree_branch_order+1];
@@ -434,10 +445,15 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 			new_node->raw.as_branch.pointers[j] = temp_addresses[i];
 			new_node->raw.as_branch.keys[j] = temp_keys[i];
 			new_node->raw.num_keys++;
+			//cleanup
+			old_node->pointers[i] = 0;
+			old_node->raw.as_branch.pointers[i] = 0;
+			old_node->raw.as_branch.keys[i] = 0;
+
 	}
+
 	new_node->pointers[j] = temp_RAMaddresses[i];
 	new_node->raw.as_branch.pointers[j] = temp_addresses[i];
-
 	new_node->parent = old_node->parent;
 
 	old_node->dirty = true;
@@ -468,7 +484,7 @@ PAFFS_RESULT insert_into_parent(p_dev* dev, treeCacheNode * left, pInode_no key,
 	left_index = get_left_index(parent, left);
 
 
-	if (parent->raw.num_keys < btree_branch_order)
+	if (parent->raw.num_keys < btree_branch_order - 1)
 			return insert_into_node(dev, parent, left_index, key, right);
 
 
@@ -483,6 +499,7 @@ PAFFS_RESULT insert_into_parent(p_dev* dev, treeCacheNode * left, pInode_no key,
  * COULD INITIATE A CACHE FLUSH
  */
 PAFFS_RESULT insert_into_new_root(p_dev* dev, treeCacheNode * left, pInode_no key, treeCacheNode * right) {
+	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert into new root at key %u", key);
 	treeCacheNode *new_root = NULL;
 	treeCacheNode left_c = *left, right_c = *right;
 	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_root);
@@ -707,6 +724,8 @@ PAFFS_RESULT coalesce_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * neigh
 	int i, j, neighbor_insertion_index, n_end;
 	treeCacheNode *tmp;
 
+	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Coalesce nodes at %d", k_prime);
+
 	/* Swap neighbor with treeCacheNode if treeCacheNode is on the
 	 * extreme left and neighbor is to its right.
 	 */
@@ -799,7 +818,7 @@ PAFFS_RESULT redistribute_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * n
 			int neighbor_index, int k_prime_index, int k_prime) {
 	int i;
 
-
+	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Redistribute Nodes at k_prime %d", k_prime);
 	/* Case: n has a neighbor to the left.
 	 * Pull the neighbor's last key-pointer pair over
 	 * from the neighbor's right end to n's left end.
@@ -955,7 +974,7 @@ PAFFS_RESULT delete_entry( p_dev* dev, treeCacheNode * n, pInode_no key){
 	if(r != PAFFS_OK && r != PAFFS_FLUSHEDCACHE)
 		return r;
 
-	capacity = neighbor->raw.is_leaf ? btree_leaf_order : btree_branch_order;	//-1?
+	capacity = neighbor->raw.is_leaf ? btree_leaf_order : btree_branch_order -1;
 
 	/* Coalescence. */
 

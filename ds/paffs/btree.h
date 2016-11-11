@@ -26,7 +26,7 @@ static const int btree_leaf_order = LEAF_ORDER;
 typedef struct treeNode{
 	union {
 		struct as_branch {
-			pInode_no keys[BRANCH_ORDER];
+			pInode_no keys[BRANCH_ORDER-1];
 			p_addr pointers[BRANCH_ORDER];
 		} as_branch;
 		struct as_leaf {

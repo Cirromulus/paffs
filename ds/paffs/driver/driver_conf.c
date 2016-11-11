@@ -9,11 +9,12 @@
 #include "../paffs.h"
 
  unsigned int paffs_trace_mask =
-		 //PAFFS_TRACE_AREA |
+		 PAFFS_TRACE_AREA |
 		 PAFFS_TRACE_ERROR |
 		 PAFFS_TRACE_BUG |
-		 //PAFFS_TRACE_TREE |
-		 //PAFFS_TRACE_CACHE |
+		 PAFFS_TRACE_TREE |
+		 PAFFS_TRACE_CACHE |
+		 PAFFS_TRACE_SCAN |
 		 //PAFFS_TRACE_WRITE |
 		 //PAFFS_TRACE_SUPERBLOCK |
 		 PAFFS_TRACE_ALLOCATE |
