@@ -472,11 +472,16 @@ PAFFS_RESULT writeTreeNode(p_dev* dev, treeNode* node){
 PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node){
 	if(node == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode NULL");
-				return paffs_lasterr = PAFFS_BUG;
+		return PAFFS_BUG;
 	}
 	if(sizeof(treeNode) > dev->param.data_bytes_per_page){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode bigger than Page (Was %lu, should %u)", sizeof(treeNode), dev->param.data_bytes_per_page);
-		return paffs_lasterr = PAFFS_BUG;
+		return PAFFS_BUG;
+	}
+
+	if(dev->areaMap[extractLogicalArea(addr)].type != INDEXAREA){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ TREEENODE operation on %s!", area_names[dev->areaMap[extractLogicalArea(addr)].type]);
+		return PAFFS_BUG;
 	}
 
 	if(dev->areaMap[extractLogicalArea(addr)].areaSummary == 0){

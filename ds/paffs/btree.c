@@ -24,6 +24,8 @@ bool isTreeCacheNodeEqual(treeCacheNode* left, treeCacheNode* right){
 
 
 PAFFS_RESULT insertInode( p_dev* dev, pInode* inode){
+	if(inode->no == 83)
+		printf("Hello");
 	return insert(dev, inode);
 }
 
@@ -448,7 +450,8 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 			//cleanup
 			old_node->pointers[i] = 0;
 			old_node->raw.as_branch.pointers[i] = 0;
-			old_node->raw.as_branch.keys[i] = 0;
+			if(i < btree_branch_order - 1)
+				old_node->raw.as_branch.keys[i] = 0;
 
 	}
 
