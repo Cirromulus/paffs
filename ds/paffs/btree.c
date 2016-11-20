@@ -388,6 +388,10 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 	treeCacheNode* temp_RAMaddresses[btree_branch_order+1];
 	p_addr temp_addresses[btree_branch_order+1];
 
+	/*FIXME: If cache gets flushed here AND we are coming from another split,
+	 * an entry orphan will be placed somewhere, invalidating its whole sub-tree.
+	*/
+
 
 	treeCacheNode old_node_c = *old_node, right_c = *right;
 	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_node);
