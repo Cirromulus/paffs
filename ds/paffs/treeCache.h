@@ -82,6 +82,7 @@ uint16_t getCacheSize();
 uint16_t getCacheHits();
 uint16_t getCacheMisses();
 void deleteTreeCache();
+void printTreeCache();
 
 
 #endif /* TREECACHE_H_ */

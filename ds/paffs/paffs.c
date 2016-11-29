@@ -638,7 +638,7 @@ paffs_obj* paffs_open(const char* path, fileopenmask mask){
 				return NULL;
 			}
 		}else{
-			paffs_lasterr = PAFFS_EXISTS;
+			paffs_lasterr = PAFFS_EXISTS;	//not exsist
 			return NULL;
 		}
 	}else if(r != PAFFS_OK){

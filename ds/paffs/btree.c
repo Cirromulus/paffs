@@ -24,8 +24,14 @@ bool isTreeCacheNodeEqual(treeCacheNode* left, treeCacheNode* right){
 
 
 PAFFS_RESULT insertInode( p_dev* dev, pInode* inode){
-	if(inode->no == 83)
-		printf("Hello");
+	if(inode->no == 83){
+		printf("Special overflow condition met.\n");
+		//Dirty test-hack to prevent buffer error
+		printTreeCache();
+		if(commitTreeCache(dev) != PAFFS_OK)
+			printf("Noooo\n");
+		printTreeCache();
+	}
 	return insert(dev, inode);
 }
 

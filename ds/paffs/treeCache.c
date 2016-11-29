@@ -318,7 +318,7 @@ PAFFS_RESULT updateFlashAddressInParent(p_dev* dev, treeCacheNode* node){
 			return PAFFS_OK;
 		}
 	}
-
+	PAFFS_DBG(PAFFS_TRACE_BUG, "Could not find Node %d in its parent (Node %d)!", getIndexFromPointer(node), getIndexFromPointer(node->parent));
 	return PAFFS_NF;
 }
 
@@ -338,8 +338,10 @@ PAFFS_RESULT commitNodesRecursively(p_dev* dev, treeCacheNode* node) {
 		if(node->pointers[i] == NULL)
 			continue;
 		r = commitNodesRecursively(dev, node->pointers[i]);
-		if(r != PAFFS_OK)
+		if(r != PAFFS_OK){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write Node %d's child n° %d (%d) to flash!",getIndexFromPointer(node), i, getIndexFromPointer(node->pointers[i]));
 			return r;
+		}
 	}
 
 	r = writeTreeNode(dev, &node->raw);
@@ -368,15 +370,18 @@ PAFFS_RESULT commitTreeCache(p_dev* dev){
 	if(paffs_lasterr != PAFFS_OK)
 		return paffs_lasterr;
 	PAFFS_RESULT r = commitNodesRecursively(dev, &cache[cache_root]);
-	if(r != PAFFS_OK)
+	if(r != PAFFS_OK){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write Node to flash! (%s)", paffs_err_msg(r));
 		return r;
+	}
+
 
 	cleanTreeCacheLeaves();
 	if(paffs_lasterr != PAFFS_OK)
 		return paffs_lasterr;
 
 	if(findFirstFreeIndex() < 0)
-		cleanTreeCache();	//if tree cache did not contain any leaves
+		cleanTreeCache();	//if tree cache did not contain any leaves (unlikely)
 
 	//debug ---->
 	if(paffs_trace_mask & PAFFS_TRACE_CACHE){
@@ -521,4 +526,51 @@ uint16_t getCacheHits(){
 }
 uint16_t getCacheMisses(){
 	return cache_misses;
+}
+
+void printSubtree(treeCacheNode* node){
+	printf("[ID: %d, PAR: %d ", getIndexFromPointer(node), getIndexFromPointer(node->parent));
+	if(node->raw.is_leaf){
+		for(int i = 0; i < node->raw.num_keys; i++)
+			printf (", %d", node->raw.as_leaf.keys[i]);
+		printf("]\n");
+	}else{
+		if(node->pointers[0] == 0)
+			printf("x");
+		else
+			printf("%d", getIndexFromPointer(node->pointers[0]));
+
+		bool isGap = false;
+		for(int i = 1; i <= node->raw.num_keys; i++) {
+			if(!isGap)
+				printf("/%d\\", node->raw.as_branch.keys[i-1]);
+			if(node->pointers[i] == 0){
+				if(!isGap){
+					printf("...");
+					isGap = true;
+				}
+			}
+			else{
+				printf("%d", getIndexFromPointer(node->pointers[i]));
+				isGap = false;
+			}
+
+
+
+		}
+		printf("]\n");
+		for(int i = 0; i <= node->raw.num_keys; i++) {
+			if(node->pointers[i] != 0)
+				printSubtree(node->pointers[i]);
+		}
+	}
+
+}
+void printTreeCache(){
+	printf("----------------\n");
+	if(isIndexUsed(cache_root)){
+		printSubtree(&cache[cache_root]);
+	}else
+		printf("Empty treeCache.\n");
+	printf("----------------\n");
 }
