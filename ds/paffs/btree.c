@@ -40,6 +40,13 @@ PAFFS_RESULT getInode( p_dev* dev, pInode_no number, pInode* outInode){
 }
 
 PAFFS_RESULT updateExistingInode( p_dev* dev, pInode* inode){
+	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Update existing inode n° %d", inode->no);
+	//debug ---->
+	if(paffs_trace_mask & PAFFS_TRACE_CACHE){
+		printTreeCache();
+	}
+	//<---- debug
+
 	treeCacheNode *node = NULL;
 	PAFFS_RESULT r = find_leaf(dev, inode->no, &node);
 	if(r != PAFFS_OK)
@@ -397,7 +404,6 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 	/*FIXME: If cache gets flushed here AND we are coming from another split,
 	 * an entry orphan will be placed somewhere, invalidating its whole sub-tree.
 	*/
-	printf("Old Node: %d, right: %d\n", getIndexFromPointer(old_node), getIndexFromPointer(right));
 
 	treeCacheNode old_node_c = *old_node, right_c = *right;
 	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_node);
@@ -582,7 +588,7 @@ PAFFS_RESULT insert( p_dev* dev, pInode* value) {
 	/* The current implementation ignores
 	 * duplicates.
 	 */
-
+	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert Inode n° %d", value->no);
 
 	r = find(dev, value->no, value);
 	if(r == PAFFS_OK){

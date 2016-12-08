@@ -87,6 +87,7 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 		return r;
 	if(r != PAFFS_LOWMEM)
 		return r;
+	printTreeCache();
 	//First, try to clean up unchanged nodes
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Soft cleaning cache (leaves).");
 	paffs_lasterr = PAFFS_OK;	//not nice code
@@ -94,8 +95,10 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 	if(paffs_lasterr != PAFFS_OK)
 		return paffs_lasterr;
 	r = addNewCacheNode(newTcn);
-	if(r == PAFFS_OK)
+	if(r == PAFFS_OK){
 		return PAFFS_FLUSHEDCACHE;
+		printTreeCache();
+	}
 	if(r != PAFFS_LOWMEM)
 		return r;
 
@@ -104,8 +107,10 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 	if(paffs_lasterr != PAFFS_OK)
 		return paffs_lasterr;
 	r = addNewCacheNode(newTcn);
-	if(r == PAFFS_OK)
+	if(r == PAFFS_OK){
+		printTreeCache();
 		return PAFFS_FLUSHEDCACHE;
+	}
 	if(r != PAFFS_LOWMEM)
 		return r;
 
@@ -113,8 +118,10 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Flushing cache.");
 	commitTreeCache(dev);
 	r = addNewCacheNode(newTcn);
-	if(r == PAFFS_OK)
+	if(r == PAFFS_OK){
+		printTreeCache();
 		return PAFFS_FLUSHEDCACHE;
+	}
 	return r;
 }
 
@@ -148,6 +155,56 @@ bool areSiblingsClean(treeCacheNode* tcn){
 			return false;
 		}
 	}
+	return true;
+}
+
+bool isSubTreeValid(treeCacheNode* node){
+
+	if(node->parent == NULL){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Node n° %d has invalid parent!", getIndexFromPointer(node));
+		return false;
+	}
+
+	if(node->raw.self == 0 && !node->dirty){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Node n° %d is not dirty, but has no flash address!", getIndexFromPointer(node));
+		return false;
+	}
+
+	if(node->raw.is_leaf){
+		int last = -1;
+		for(int i = 0; i < node->raw.num_keys; i++){
+			if(node->raw.as_leaf.keys[i] != node->raw.as_leaf.pInodes[i].no){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Node n° %d has different Inode number (%d) than its key stated (%d)!", getIndexFromPointer(node), node->raw.as_leaf.keys[i], node->raw.as_leaf.pInodes[i].no);
+				return false;
+			}
+
+			if(node->raw.as_leaf.keys[i] < last){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Node n° %d is not sorted (prev: %d, curr: %d)!", getIndexFromPointer(node), node->raw.as_leaf.keys[i], last);
+				return false;
+			}
+			last = node->raw.as_leaf.keys[i];
+		}
+	}else{
+		int last = -1;
+		for(int i = 0; i < node->raw.num_keys; i++){
+			if(node->raw.as_branch.keys[i] < last){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Node n° %d is not sorted (prev: %d, curr: %d)!", getIndexFromPointer(node), node->raw.as_leaf.keys[i], last);
+				return false;
+			}
+			last = node->raw.as_branch.keys[i];
+
+			if(node->pointers[i] != NULL){
+				if(node->pointers[i].parent != node){
+					PAFFS_DBG(PAFFS_TRACE_BUG, "Node n° %d stated parent was %d, but is actually %d!"
+						,getIndexFromPointer(node->pointers[i]), getIndexFromPointer(node->pointers[i].parent), getIndexFromPointer(node));
+					return false;
+				}
+				if(!isSubTreeValid(node->pointers[i]))
+					return false;
+			}
+		}
+	}
+
 	return true;
 }
 
@@ -234,7 +291,7 @@ PAFFS_RESULT buildUpCacheToNode(p_dev* dev, treeCacheNode* localCopyOfNode, tree
 
 
 /*
- * Just frees clean leaf nodes, cache is more efficient...
+ * Just frees clean leaf nodes
  */
 void cleanTreeCacheLeaves(){
 
