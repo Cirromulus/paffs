@@ -623,6 +623,9 @@ PAFFS_RESULT paffs_createFile(pInode* outFile, const char* fullPath, paffs_permi
 	if(res != PAFFS_OK)
 		return res;
 
+	//DEBUG FIXME
+	printTreeCache();
+
 	return paffs_insertInodeInDir(&fullPath[lastSlash], &parDir, outFile);
 }
 

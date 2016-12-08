@@ -528,11 +528,17 @@ uint16_t getCacheMisses(){
 	return cache_misses;
 }
 
-void printSubtree(treeCacheNode* node){
-	printf("[ID: %d, PAR: %d ", getIndexFromPointer(node), getIndexFromPointer(node->parent));
+void printSubtree(int layer, treeCacheNode* node){
+	for(int i = 0; i < layer; i++){
+		printf(".");
+	}
+	printf("[ID: %d PAR: %d |", getIndexFromPointer(node), getIndexFromPointer(node->parent));
 	if(node->raw.is_leaf){
-		for(int i = 0; i < node->raw.num_keys; i++)
-			printf (", %d", node->raw.as_leaf.keys[i]);
+		for(int i = 0; i < node->raw.num_keys; i++){
+			if(i > 0)
+				printf(",");
+			printf (" %d", node->raw.as_leaf.keys[i]);
+		}
 		printf("]\n");
 	}else{
 		if(node->pointers[0] == 0)
@@ -561,7 +567,7 @@ void printSubtree(treeCacheNode* node){
 		printf("]\n");
 		for(int i = 0; i <= node->raw.num_keys; i++) {
 			if(node->pointers[i] != 0)
-				printSubtree(node->pointers[i]);
+				printSubtree(layer+1, node->pointers[i]);
 		}
 	}
 
@@ -569,7 +575,7 @@ void printSubtree(treeCacheNode* node){
 void printTreeCache(){
 	printf("----------------\n");
 	if(isIndexUsed(cache_root)){
-		printSubtree(&cache[cache_root]);
+		printSubtree(0, &cache[cache_root]);
 	}else
 		printf("Empty treeCache.\n");
 	printf("----------------\n");

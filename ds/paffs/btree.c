@@ -397,7 +397,7 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 	/*FIXME: If cache gets flushed here AND we are coming from another split,
 	 * an entry orphan will be placed somewhere, invalidating its whole sub-tree.
 	*/
-
+	printf("Old Node: %d, right: %d\n", getIndexFromPointer(old_node), getIndexFromPointer(right));
 
 	treeCacheNode old_node_c = *old_node, right_c = *right;
 	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_node);
@@ -406,7 +406,7 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 		r = buildUpCacheToNode(dev, &old_node_c, &old_node);
 		if(r != PAFFS_OK)
 			return r;
-		r = buildUpCacheToNode(dev, &right_c, &right);
+		r = buildUpCacheToNode(dev, &right_c, &right);	//TODO: Maybe save whole subtree, it could be detached and GC'ed away
 		if(r != PAFFS_OK)
 			return r;
 	}
@@ -422,14 +422,14 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 	 * the other half to the new.
 	 */
 	for (i = 0, j = 0; i < old_node->raw.num_keys + 1; i++, j++) {
-			if (j == left_index + 1) j++;
-			temp_addresses[j] = old_node->raw.as_branch.pointers[i];
-			temp_RAMaddresses[j] = old_node->pointers[i];
+		if (j == left_index + 1) j++;
+		temp_addresses[j] = old_node->raw.as_branch.pointers[i];
+		temp_RAMaddresses[j] = old_node->pointers[i];
 	}
 
 	for (i = 0, j = 0; i < old_node->raw.num_keys; i++, j++) {
-			if (j == left_index) j++;
-			temp_keys[j] = old_node->raw.as_branch.keys[i];
+		if (j == left_index) j++;
+		temp_keys[j] = old_node->raw.as_branch.keys[i];
 	}
 
 	temp_addresses[left_index + 1] = right->raw.self;
@@ -448,25 +448,30 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 		old_node->pointers[i] = temp_RAMaddresses[i];
 		old_node->raw.as_branch.keys[i] = temp_keys[i];
 		old_node->raw.num_keys++;
+
+
 	}
 	old_node->raw.as_branch.pointers[i] = temp_addresses[i];
 	old_node->pointers[i] = temp_RAMaddresses[i];
 	k_prime = temp_keys[split - 1];
 	for (++i, j = 0; i < btree_branch_order; i++, j++) {
-			new_node->pointers[j] = temp_RAMaddresses[i];
-			new_node->raw.as_branch.pointers[j] = temp_addresses[i];
-			new_node->raw.as_branch.keys[j] = temp_keys[i];
-			new_node->raw.num_keys++;
-			//cleanup
-			old_node->pointers[i] = 0;
-			old_node->raw.as_branch.pointers[i] = 0;
-			if(i < btree_branch_order - 1)
-				old_node->raw.as_branch.keys[i] = 0;
-
+		new_node->pointers[j] = temp_RAMaddresses[i];
+		new_node->raw.as_branch.pointers[j] = temp_addresses[i];
+		new_node->raw.as_branch.keys[j] = temp_keys[i];
+		new_node->raw.num_keys++;
+		if(new_node->pointers[j] != NULL)
+			new_node->pointers[j]->parent = new_node;
+		//cleanup
+		old_node->pointers[i] = 0;
+		old_node->raw.as_branch.pointers[i] = 0;
+		if(i < btree_branch_order - 1)
+			old_node->raw.as_branch.keys[i] = 0;
 	}
 
 	new_node->pointers[j] = temp_RAMaddresses[i];
 	new_node->raw.as_branch.pointers[j] = temp_addresses[i];
+	if(new_node->pointers[j] != NULL)
+		new_node->pointers[j]->parent = new_node;
 	new_node->parent = old_node->parent;
 
 	old_node->dirty = true;
