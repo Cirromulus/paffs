@@ -275,11 +275,11 @@ bool isTreeCacheValid(){
 	if(memcmp(cache_node_reachable,cache_usage, (TREENODECACHESIZE/8)+1)){
 		for(int i = 0; i <= TREENODECACHESIZE/8; i++){
 			for(int j = 0; j < 8; j++){
-				if((cache_usage[i*8] |= 1 << j % 8) < (cache_node_reachable[i*8] |= 1 << j % 8)){
+				if((cache_usage[i*8] & 1 << j % 8) < (cache_node_reachable[i*8] & 1 << j % 8)){
 					PAFFS_DBG(PAFFS_TRACE_BUG, "Deleted Node n° %d still reachable!", i*8 + j);
 					return false;
 				}
-				if((cache_usage[i*8] |= 1 << j % 8) > (cache_node_reachable[i*8] |= 1 << j % 8)){
+				if((cache_usage[i*8] & 1 << j % 8) > (cache_node_reachable[i*8] & 1 << j % 8)){
 					PAFFS_DBG(PAFFS_TRACE_BUG, "Cache contains unreachable node %d!", i*8 + j);
 					return false;
 				}
