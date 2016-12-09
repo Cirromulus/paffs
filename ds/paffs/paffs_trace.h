@@ -19,7 +19,7 @@ extern unsigned int paffs_trace_mask;
 		if(mask & paffs_trace_mask || mask & PAFFS_TRACE_ALWAYS){\
 			fprintf(stderr, "paffs: " msg "\n\t-line %d, file %s\n", ##__VA_ARGS__,  __LINE__, __FILENAME__);\
 			if(mask & PAFFS_TRACE_BUG || mask & PAFFS_TRACE_ERROR)\
-				raise(SIGABRT);\
+				raise(SIGINT);\
 		}\
 	} while(0)
 

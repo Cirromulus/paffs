@@ -85,6 +85,7 @@ PAFFS_RESULT addNewCacheNode(treeCacheNode** newTcn){
 
 /*
  * The new tcn->parent has to be changed _before_ calling another addNewCacheNode!
+ * IDEA: Lock nodes when operating to prevent deletion
  */
 PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn){
 	PAFFS_RESULT r = addNewCacheNode(newTcn);
@@ -281,6 +282,12 @@ bool isTreeCacheValid(){
 				}
 				if((cache_usage[i*8] & 1 << j % 8) > (cache_node_reachable[i*8] & 1 << j % 8)){
 					PAFFS_DBG(PAFFS_TRACE_BUG, "Cache contains unreachable node %d!", i*8 + j);
+					/**
+					 * FIXME: It is the case that a branch is cleared that is part of the current
+					 * 		traverse path (i.e. used)
+					 * 		While building path to reconstruct it, cache runs out of nodes again.
+					 * 		This causes cache to clear while the added node is not yet eingehängt
+					 */
 					return false;
 				}
 			}
@@ -600,7 +607,11 @@ PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
 		return PAFFS_BUG;
 	}
 	if(target != NULL){
-		*child = target;
+		*child = target;			else break;
+	}
+
+	PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, i, c, &c);
+	if(r != PAFFS_OK && r != PAFFS_FLUSHEDCACHE
 		cache_hits++;
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache hit, found target %p (position %ld)", target, target - cache);
 		return PAFFS_OK;	//cache hit
