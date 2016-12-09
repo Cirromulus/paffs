@@ -19,10 +19,12 @@ add_subdirectory(driver)
 add_library(paffs ${SOURCES})
 target_compile_definitions(paffs 
 	PUBLIC TREENODECACHESIZE=5
+	
 )
 set_target_properties(paffs PROPERTIES
 	COMPILE_FLAGS "-Wall -std=gnu99"
 )
+
 
 add_executable(dir_test tests/dirtest.c)
 target_link_libraries(dir_test paffs simu)

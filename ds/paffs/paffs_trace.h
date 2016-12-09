@@ -11,9 +11,15 @@
 
 extern unsigned int paffs_trace_mask;
 
+#include <string.h>
+#include <signal.h>
+#define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+
 #define PAFFS_DBG(mask, msg, ...) do {\
 		if(mask & paffs_trace_mask || mask & PAFFS_TRACE_ALWAYS){\
-			fprintf(stderr, "paffs: " msg "\n\t-line %d, file %s\n", ##__VA_ARGS__,  __LINE__, __FILE__);\
+			fprintf(stderr, "paffs: " msg "\n\t-line %d, file %s\n", ##__VA_ARGS__,  __LINE__, __FILENAME__);\
+			if(mask & PAFFS_TRACE_BUG || mask & PAFFS_TRACE_ERROR)\
+				raise(SIGABRT);\
 		}\
 	} while(0)
 

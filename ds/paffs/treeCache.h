@@ -28,6 +28,13 @@ bool isParentPathClean(treeCacheNode* tcn);
  */
 bool areSiblingsClean(treeCacheNode* tcn);
 
+
+/**
+ * Consistency checkers for Treecache
+ */
+bool isSubTreeValid(treeCacheNode* node, uint8_t* cache_node_reachable, long keyMin, long keyMax);
+bool isTreeCacheValid();
+
 /**
  * returns true if path contains dirty elements
  * traverses through all paths and marks them
@@ -58,6 +65,11 @@ void cleanTreeCacheLeaves();
 PAFFS_RESULT commitTreeCache(p_dev* dev);
 
 //--------------------------------------
+
+/**
+ * Clears all internal Memory Structures
+ */
+void initCache();
 
 /**
  * Possible cache flush. Although rootnode should be at any case in cache.

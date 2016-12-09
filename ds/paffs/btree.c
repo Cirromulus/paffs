@@ -561,7 +561,7 @@ PAFFS_RESULT insert_into_new_root(p_dev* dev, treeCacheNode * left, pInode_no ke
  * So init rootnode
  */
 PAFFS_RESULT start_new_tree(p_dev* dev) {
-
+	initCache();
 	treeCacheNode *new_root = NULL;
 	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_root);
 	if(r != PAFFS_OK)
