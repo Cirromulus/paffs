@@ -301,16 +301,14 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, 
 
 	treeCacheNode *new_leaf = NULL;
 
-	treeCacheNode leaf_c = *leaf;
+	lockTreeCacheNode(dev, leaf);
 	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_leaf);
 	if(r == PAFFS_FLUSHEDCACHE){
-		//Read back nodes from flash
-		r = buildUpCacheToNode(dev, &leaf_c, &leaf);
-		if(r != PAFFS_OK)
-			return r;
+
 	}
 	else if(r != PAFFS_OK)
 		return r;
+	unlockTreeCacheNode(dev, leaf);
 
 	new_leaf->raw.is_leaf = true;
 
@@ -405,19 +403,16 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 	 * an entry orphan will be placed somewhere, invalidating its whole sub-tree.
 	*/
 
-	treeCacheNode old_node_c = *old_node, right_c = *right;
+	lockTreeCacheNode(dev, old_node);
+	lockTreeCacheNode(dev, right);
 	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_node);
 	if(r == PAFFS_FLUSHEDCACHE){
-		//Read back nodes from flash
-		r = buildUpCacheToNode(dev, &old_node_c, &old_node);
-		if(r != PAFFS_OK)
-			return r;
-		r = buildUpCacheToNode(dev, &right_c, &right);	//TODO: Maybe save whole subtree, it could be detached and GC'ed away
-		if(r != PAFFS_OK)
-			return r;
+
 	}
 	else if(r != PAFFS_OK)
 		return r;
+	unlockTreeCacheNode(dev, old_node);
+	unlockTreeCacheNode(dev, right);
 
 	/* First create a temporary set of keys and pointers
 	 * to hold everything in order, including
@@ -525,19 +520,14 @@ PAFFS_RESULT insert_into_parent(p_dev* dev, treeCacheNode * left, pInode_no key,
 PAFFS_RESULT insert_into_new_root(p_dev* dev, treeCacheNode * left, pInode_no key, treeCacheNode * right) {
 	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert into new root at key %u", key);
 	treeCacheNode *new_root = NULL;
-	treeCacheNode left_c = *left, right_c = *right;
+	lockTreeCacheNode(dev, left);
+	lockTreeCacheNode(dev, right);
 	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_root);
-	if(r == PAFFS_FLUSHEDCACHE){
-		//Rescan for left and right treeCache node
-		r = buildUpCacheToNode(dev, &left_c, &left);
-		if(r != PAFFS_OK)
-			return r;
-		r = buildUpCacheToNode(dev, &right_c, &right);
-		if(r != PAFFS_OK)
-			return r;
-	}else if (r != PAFFS_OK){
+	if(r != PAFFS_OK && r != PAFFS_FLUSHEDCACHE){
 		return r;
 	}
+	unlockTreeCacheNode(dev, left);
+	unlockTreeCacheNode(dev, right);
 
 	new_root->raw.is_leaf = false;
 	new_root->raw.as_branch.keys[0] = key;

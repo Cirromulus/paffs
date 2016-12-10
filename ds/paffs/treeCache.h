@@ -72,6 +72,14 @@ PAFFS_RESULT commitTreeCache(p_dev* dev);
 void initCache();
 
 /**
+ * This locks specified treeCache node and its path from Rootnode
+ * To prevent Cache GC from deleting it
+ */
+PAFFS_RESULT lockTreeCacheNode(p_dev* dev, treeCacheNode* tcn);
+
+PAFFS_RESULT unlockTreeCacheNode(p_dev* dev, treeCacheNode* tcn);
+
+/**
  * Possible cache flush. Although rootnode should be at any case in cache.
  */
 PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode** tcn);

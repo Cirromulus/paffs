@@ -281,14 +281,10 @@ bool isTreeCacheValid(){
 					return false;
 				}
 				if((cache_usage[i*8] & 1 << j % 8) > (cache_node_reachable[i*8] & 1 << j % 8)){
-					PAFFS_DBG(PAFFS_TRACE_BUG, "Cache contains unreachable node %d!", i*8 + j);
-					/**
-					 * FIXME: It is the case that a branch is cleared that is part of the current
-					 * 		traverse path (i.e. used)
-					 * 		While building path to reconstruct it, cache runs out of nodes again.
-					 * 		This causes cache to clear while the added node is not yet eingehängt
-					 */
-					return false;
+					if(!cache[i*8+j].locked && !cache[i*8+j].inheritedLock){
+						PAFFS_DBG(PAFFS_TRACE_BUG, "Cache contains unreachable node %d!", i*8 + j);
+						return false;
+					}
 				}
 			}
 		}
@@ -408,7 +404,7 @@ void cleanTreeCacheLeaves(){
 	for(int i = 0; i < TREENODECACHESIZE; i++){
 		if(!isIndexUsed(getIndexFromPointer(&cache[i])))
 			continue;
-		if(!cache[i].dirty && cache[i].raw.is_leaf){
+		if(!cache[i].dirty && !cache[i].locked && !cache[i].inheritedLock && cache[i].raw.is_leaf){
 			deleteFromParent(&cache[i]);
 			setIndexFree(i);
 		}
@@ -425,7 +421,7 @@ void cleanTreeCacheLeaves(){
  * Frees clean nodes
  */
 void cleanTreeCache(){
-
+	//TODO: This only removes one layer of clean nodes, should check whole path to root
 	//debug ---->
 	uint16_t usedCache;
 	if(paffs_trace_mask & PAFFS_TRACE_CACHE){
@@ -442,7 +438,7 @@ void cleanTreeCache(){
 	for(int i = 0; i < TREENODECACHESIZE; i++){
 		if(!isIndexUsed(getIndexFromPointer(&cache[i])))
 			continue;
-		if(!cache[i].dirty && hasNoSiblings(&cache[i])){
+		if(!cache[i].dirty && !cache[i].locked && !cache[i].inheritedLock && hasNoSiblings(&cache[i])){
 			deleteFromParent(&cache[i]);
 			setIndexFree(i);
 		}
@@ -556,7 +552,76 @@ PAFFS_RESULT commitTreeCache(p_dev* dev){
 	return PAFFS_OK;
 }
 
+/**
+ * This locks specified treeCache node and its path from Rootnode
+ * To prevent Cache GC from deleting it
+ */
+PAFFS_RESULT lockTreeCacheNode(p_dev* dev, treeCacheNode* tcn){
+	tcn->locked = true;
+	if(tcn->parent == NULL)
+		return PAFFS_OK;	//FIXME: Is it allowed to violate the treerules?
 
+	treeCacheNode* curr = tcn->parent;
+	while(curr->parent != curr){
+		curr->inheritedLock = true;
+		curr = curr->parent;
+	}
+	curr->inheritedLock = true;
+
+	return PAFFS_OK;
+}
+
+bool hasLockedChilds(p_dev* dev, treeCacheNode* tcn){
+	if(tcn == NULL){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Node is invalid!");
+		return false;
+	}
+	if(tcn->raw.is_leaf){
+		//PAFFS_DBG(PAFFS_TRACE_BUG, "Node is leaf, has no childs!");
+		return false;
+	}
+	for(int i = 0; i <= tcn->raw.num_keys; i++){
+		if(tcn->pointers[i] != NULL){
+			if(tcn->pointers[i]->inheritedLock || tcn->pointers[i]->locked)
+				return true;
+		}
+	}
+	return false;
+}
+
+PAFFS_RESULT unlockTreeCacheNode(p_dev* dev, treeCacheNode* tcn){
+	if(!tcn->locked){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Tried to double-unlock node n° %d!", getIndexFromPointer(tcn));
+	}
+	tcn->locked = false;
+
+	if(tcn->parent == NULL){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Node %d with invalid parent !", getIndexFromPointer(tcn));
+		return PAFFS_FAIL;
+	}
+
+	treeCacheNode* curr = tcn->parent;
+	treeCacheNode *old = NULL;
+	do{
+		if(hasLockedChilds(dev, curr))
+			break;
+
+		curr->inheritedLock = false;
+
+		if(curr->locked)
+			break;
+
+		if(tcn->parent == NULL){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Node %d with invalid parent !", getIndexFromPointer(tcn));
+			return PAFFS_FAIL;
+		}
+		old = curr;
+		curr = curr->parent;
+
+	}while(old != curr);
+
+	return PAFFS_OK;
+}
 
 
 PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode** tcn){
@@ -607,11 +672,7 @@ PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
 		return PAFFS_BUG;
 	}
 	if(target != NULL){
-		*child = target;			else break;
-	}
-
-	PAFFS_RESULT r = getTreeNodeAtIndexFrom(dev, i, c, &c);
-	if(r != PAFFS_OK && r != PAFFS_FLUSHEDCACHE
+		*child = target;
 		cache_hits++;
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache hit, found target %p (position %ld)", target, target - cache);
 		return PAFFS_OK;	//cache hit
@@ -700,7 +761,8 @@ void printSubtree(int layer, treeCacheNode* node){
 	for(int i = 0; i < layer; i++){
 		printf(".");
 	}
-	printf("[ID: %d PAR: %d |", getIndexFromPointer(node), getIndexFromPointer(node->parent));
+	printf("[ID: %d PAR: %d %s%s%s|", getIndexFromPointer(node), getIndexFromPointer(node->parent),
+			node->dirty ? "d" : "-", node->locked ? "l" : "-", node->inheritedLock ? "i" : "-");
 	if(node->raw.is_leaf){
 		for(int i = 0; i < node->raw.num_keys; i++){
 			if(i > 0)

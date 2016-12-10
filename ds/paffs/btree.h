@@ -44,7 +44,9 @@ typedef struct treeCacheNode{
 	treeNode raw;
 	struct treeCacheNode* parent;	//Parent either points to parent or to node itself if is root. Special case: NULL if node is invalid.
 	struct treeCacheNode* pointers[BRANCH_ORDER];
-	bool dirty;	//TODO: translate in Checksum
+	bool dirty:1;
+	bool locked:1;
+	bool inheritedLock:1;
 } treeCacheNode;
 
 
