@@ -377,12 +377,12 @@ void deletePathToRoot(treeCacheNode* tcn){
  * Builds up cache with Elements in the Path to tcn.
  * Maybe this function has to be everywhere a tcn is accessed...
  */
-PAFFS_RESULT buildUpCacheToNode(p_dev* dev, treeCacheNode* localCopyOfNode, treeCacheNode** cachedOutputNode){
+/*PAFFS_RESULT buildUpCacheToNode(p_dev* dev, treeCacheNode* localCopyOfNode, treeCacheNode** cachedOutputNode){
 	if(localCopyOfNode->raw.is_leaf)
 		return find_leaf(dev, localCopyOfNode->raw.as_leaf.keys[0], cachedOutputNode);
 
 	return find_branch(dev, localCopyOfNode, cachedOutputNode);
-}
+}*/
 
 
 /*
@@ -694,17 +694,14 @@ PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
 	cache_misses++;
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache Miss");
 
-	treeCacheNode parent_c = *parent;
+	lockTreeCacheNode(dev, parent);
 	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &target);
 	if(r == PAFFS_FLUSHEDCACHE){
-		//We need to make sure parent and child is in cache again
-		r = buildUpCacheToNode(dev, &parent_c, &parent);
-		if(r != PAFFS_OK)
-			return r;
-		r = PAFFS_FLUSHEDCACHE;
+
 	}else if(r != PAFFS_OK){
 		return r;
 	}
+	unlockTreeCacheNode(dev, parent);
 
 
 	target->parent = parent;

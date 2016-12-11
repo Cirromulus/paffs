@@ -48,7 +48,7 @@ void deleteFromParent(treeCacheNode* tcn);
 /**
  * Builds up cache with Elements in the Path to tcn.
  */
-PAFFS_RESULT buildUpCacheToNode(p_dev* dev, treeCacheNode* localCopyOfNode, treeCacheNode** cachedOutputNode);
+//PAFFS_RESULT buildUpCacheToNode(p_dev* dev, treeCacheNode* localCopyOfNode, treeCacheNode** cachedOutputNode);
 
 /*
  * Just frees clean nodes

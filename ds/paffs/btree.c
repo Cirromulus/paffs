@@ -24,14 +24,14 @@ bool isTreeCacheNodeEqual(treeCacheNode* left, treeCacheNode* right){
 
 
 PAFFS_RESULT insertInode( p_dev* dev, pInode* inode){
-	if(inode->no == 83){
+	/*if(inode->no == 83){
 		printf("Special overflow condition met.\n");
 		//Dirty test-hack to prevent buffer error
 		printTreeCache();
 		if(commitTreeCache(dev) != PAFFS_OK)
 			printf("Noooo\n");
 		printTreeCache();
-	}
+	}*/
 	return insert(dev, inode);
 }
 
@@ -399,17 +399,11 @@ PAFFS_RESULT insert_into_node_after_splitting(p_dev* dev, treeCacheNode * old_no
 	treeCacheNode* temp_RAMaddresses[btree_branch_order+1];
 	p_addr temp_addresses[btree_branch_order+1];
 
-	/*FIXME: If cache gets flushed here AND we are coming from another split,
-	 * an entry orphan will be placed somewhere, invalidating its whole sub-tree.
-	*/
 
 	lockTreeCacheNode(dev, old_node);
 	lockTreeCacheNode(dev, right);
 	PAFFS_RESULT r = addNewCacheNodeWithPossibleFlush(dev, &new_node);
-	if(r == PAFFS_FLUSHEDCACHE){
-
-	}
-	else if(r != PAFFS_OK)
+	if(r != PAFFS_FLUSHEDCACHE && r != PAFFS_OK)
 		return r;
 	unlockTreeCacheNode(dev, old_node);
 	unlockTreeCacheNode(dev, right);
