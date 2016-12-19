@@ -93,9 +93,12 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 		return r;
 	if(r != PAFFS_LOWMEM)
 		return r;
-	printTreeCache();
-	if(!isTreeCacheValid())
+
+	if(!isTreeCacheValid()){
+		printTreeCache();
 		return PAFFS_BUG;
+	}
+
 
 	//First, try to clean up unchanged nodes
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Freeing clean leaves.");
@@ -106,7 +109,6 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 	r = addNewCacheNode(newTcn);
 	if(r == PAFFS_OK){
 		return PAFFS_FLUSHEDCACHE;
-		printTreeCache();
 	}
 	if(r != PAFFS_LOWMEM)
 		return r;
@@ -117,7 +119,6 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 		return paffs_lasterr;
 	r = addNewCacheNode(newTcn);
 	if(r == PAFFS_OK){
-		printTreeCache();
 		return PAFFS_FLUSHEDCACHE;
 	}
 	if(r != PAFFS_LOWMEM)
@@ -128,7 +129,6 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 	commitTreeCache(dev);
 	r = addNewCacheNode(newTcn);
 	if(r == PAFFS_OK){
-		printTreeCache();
 		return PAFFS_FLUSHEDCACHE;
 	}
 	return r;
@@ -262,6 +262,7 @@ bool isSubTreeValid(treeCacheNode* node, uint8_t* cache_node_reachable, long key
 
 bool isTreeCacheValid(){
 	//Just for debugging purposes
+	//TODO: Switch to deactivate this costly but safer execution
 	uint8_t cache_node_reachable[(TREENODECACHESIZE/8)+1];
 	memset(cache_node_reachable, 0, (TREENODECACHESIZE/8)+1);	//See c. 162
 

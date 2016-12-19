@@ -12,8 +12,6 @@
 #include <string.h>
 #include <inttypes.h>
 
-//TODO: Is k_prime limiting max number of pinodes?
-
 bool isTreeCacheNodeEqual(treeCacheNode* left, treeCacheNode* right){
 	for(int i = 0; i <= left->raw.num_keys; i++)
 		if(left->raw.as_branch.keys[i] != right->raw.as_branch.keys[i])
@@ -24,14 +22,6 @@ bool isTreeCacheNodeEqual(treeCacheNode* left, treeCacheNode* right){
 
 
 PAFFS_RESULT insertInode( p_dev* dev, pInode* inode){
-	/*if(inode->no == 83){
-		printf("Special overflow condition met.\n");
-		//Dirty test-hack to prevent buffer error
-		printTreeCache();
-		if(commitTreeCache(dev) != PAFFS_OK)
-			printf("Noooo\n");
-		printTreeCache();
-	}*/
 	return insert(dev, inode);
 }
 

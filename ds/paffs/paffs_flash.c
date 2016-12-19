@@ -94,14 +94,6 @@ PAFFS_RESULT manageActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType are
 		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Area %u (Type %s) full.", *area, area_names[areaType]);
 		//Current Area is full!
 		closeArea(dev, *area);
-/*		*area = findWritableArea(areaType, dev);
-		if(paffs_lasterr != PAFFS_OK){
-			return paffs_lasterr;
-		}
-		initArea(dev, *area);
-		if(paffs_lasterr != PAFFS_OK){
-			return paffs_lasterr;
-		}*/
 	}
 
 	return PAFFS_OK;
@@ -141,7 +133,13 @@ PAFFS_RESULT closeArea(p_dev *dev, unsigned int area){
 		char buf[needed_bytes];
 		memset(buf, 0, needed_bytes);
 
-		//TODO: Is it really necessary to save 16 bit while slowing down garbage collection?
+		/*Is it really necessary to save 16 bit while slowing down garbage collection?
+		 *TODO: Check how cost reduction scales with bigger flashes.
+		 *		AreaSummary is without optimization 2 bit per page. 2 Kib per Page would
+		 *		allow roughly 1000 pages per Area. Usually big pages come with big Blocks,
+		 *		so a Block would be ~500 pages, so an area would be limited to two Blocks.
+		 *		Not good.
+		 */
 		for(unsigned int j = 0; j < dev->param.data_pages_per_area; j++){
 			if(dev->areaMap[area].areaSummary[j] != DIRTY)
 				buf[j/8] |= 1 << j%8;
@@ -676,12 +674,9 @@ PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, p_su
 
 	unsigned int summary_Container_count = 0;
 
-	//This is constant for given Devices if write_areaSummary_to_flash is implemented
-	//FIXME: Actually, there mustn't be more than two summaries present
-
 	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(p_addr) +
 		dev->param.areas_no * (sizeof(p_area) - sizeof(p_summaryEntry*))+ // AreaMap without summaryEntry pointer
-		16 * dev->param.data_pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
+		16 * dev->param.data_pages_per_area / 8 /* One bit per entry, two entries for INDEX and DATA section. Others dont have summaries*/;
 
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 
