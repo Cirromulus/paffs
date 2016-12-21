@@ -84,7 +84,6 @@ PAFFS_RESULT commitSuperIndex(p_dev* dev){
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed for SuperIndex: %d (%d bytes)", needed_pages, needed_bytes);
 
-
 	uint32_t rel_page1 = 0;
 	PAFFS_RESULT r1 = findFirstFreeEntryInBlock(dev, 0, 0, &rel_page1, needed_pages);
 	if(r1 != PAFFS_OK && r1 != PAFFS_NF){

@@ -5,6 +5,7 @@
 
 #include "paffs.h"
 #include "paffs_flash.h"
+#include "paffs_trace.h"
 #include "treeCache.h"
 #include <linux/string.h>
 #include <time.h>
@@ -146,6 +147,13 @@ PAFFS_RESULT paffs_mnt(const char* devicename){
 PAFFS_RESULT paffs_unmnt(const char* devicename){
 	if(strcmp(devicename, device->param.name) != 0){
 		return PAFFS_EINVAL;
+	}
+
+	if(paffs_trace_mask && PAFFS_TRACE_AREA){
+		printf("Info: \n");
+		for(int i = 0; i < device->param.areas_no; i++){
+			printf("\tArea %d as %s. from page %d\n", i, area_names[device->areaMap[i].type], device->areaMap[i].position*device->param.blocks_per_area*device->param.pages_per_block);
+		}
 	}
 
 	PAFFS_RESULT r = commitTreeCache(device);
