@@ -93,12 +93,14 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 		return r;
 	if(r != PAFFS_LOWMEM)
 		return r;
-
 	if(!isTreeCacheValid()){
 		printTreeCache();
 		return PAFFS_BUG;
 	}
 
+	if(paffs_trace_mask & PAFFS_TRACE_CACHE){
+		printTreeCache();
+	}
 
 	//First, try to clean up unchanged nodes
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Freeing clean leaves.");
@@ -108,6 +110,9 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 		return paffs_lasterr;
 	r = addNewCacheNode(newTcn);
 	if(r == PAFFS_OK){
+		if(paffs_trace_mask & PAFFS_TRACE_CACHE){
+			printTreeCache();
+		}
 		return PAFFS_FLUSHEDCACHE;
 	}
 	if(r != PAFFS_LOWMEM)
@@ -119,6 +124,9 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 		return paffs_lasterr;
 	r = addNewCacheNode(newTcn);
 	if(r == PAFFS_OK){
+		if(paffs_trace_mask & PAFFS_TRACE_CACHE){
+			printTreeCache();
+		}
 		return PAFFS_FLUSHEDCACHE;
 	}
 	if(r != PAFFS_LOWMEM)
@@ -129,6 +137,9 @@ PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn
 	commitTreeCache(dev);
 	r = addNewCacheNode(newTcn);
 	if(r == PAFFS_OK){
+		if(paffs_trace_mask & PAFFS_TRACE_CACHE){
+			printTreeCache();
+		}
 		return PAFFS_FLUSHEDCACHE;
 	}
 	return r;

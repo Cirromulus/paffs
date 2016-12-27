@@ -31,11 +31,6 @@ PAFFS_RESULT getInode( p_dev* dev, pInode_no number, pInode* outInode){
 
 PAFFS_RESULT updateExistingInode( p_dev* dev, pInode* inode){
 	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Update existing inode n° %d", inode->no);
-	//debug ---->
-	if(paffs_trace_mask & PAFFS_TRACE_CACHE){
-		printTreeCache();
-	}
-	//<---- debug
 
 	treeCacheNode *node = NULL;
 	PAFFS_RESULT r = find_leaf(dev, inode->no, &node);
