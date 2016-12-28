@@ -9,6 +9,7 @@ set(SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/btree.c
     ${CMAKE_CURRENT_SOURCE_DIR}/treeCache.c
     ${CMAKE_CURRENT_SOURCE_DIR}/superblock.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/garbage_collection.c
     ${CMAKE_CURRENT_SOURCE_DIR}/treequeue.c #currently only used for debugging
 )
 

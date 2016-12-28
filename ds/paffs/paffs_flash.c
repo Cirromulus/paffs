@@ -6,6 +6,7 @@
  */
 
 #include "paffs_flash.h"
+#include "garbage_collection.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -22,20 +23,35 @@ char* area_names[] = {
 
 
 unsigned int findWritableArea(p_areaType areaType, p_dev* dev){
-	if(dev->activeArea[areaType] == 0 || dev->areaMap[dev->activeArea[areaType]].status == CLOSED){
-		for(int area = 0; area < dev->param.areas_no; area++){
-			if(dev->areaMap[area].type == UNSET){
-				dev->areaMap[area].type = areaType;
-				initArea(dev, area);
-				return area;
-			}
-		}
-	}else{
+	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != CLOSED){
 		//current Area has still space left
 		return dev->activeArea[areaType];
 	}
-	//TODO: start Garbage collection here!
-	paffs_lasterr = PAFFS_NOSP;
+
+	for(int area = 0; area < dev->param.areas_no; area++){
+		if(dev->areaMap[area].type == UNSET){
+			dev->areaMap[area].type = areaType;
+			initArea(dev, area);
+			return area;
+		}
+	}
+
+	PAFFS_RESULT r = collectGarbage(dev);
+	if(r != PAFFS_OK){
+		paffs_lasterr = r;
+		return 0;
+	}
+
+	for(int area = 0; area < dev->param.areas_no; area++){
+		if(dev->areaMap[area].type == UNSET){
+			dev->areaMap[area].type = areaType;
+			initArea(dev, area);
+			return area;
+		}
+	}
+
+	//If we arrive here, something buggy must have happened
+	paffs_lasterr = PAFFS_BUG;
 	return 0;
 }
 

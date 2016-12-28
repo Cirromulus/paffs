@@ -73,7 +73,7 @@ When a change of the index tree has been committed to flash, the new address of 
 \subsection{Tree Indexing}
 \label{b+tree}
 \paragraph{Overview}
-B+Tree is a variation of the standard binary search tree with more keys per node. Another difference is having all actual data only in leaves. This increases space for keys and therefore the fanout. Variable size, minimum tree height + 1\footnote{Check if true.}. Tree height is $log(n)$, and so is search, insert and delete $\mathcal{O}log(n)$. Because of \textit{out-of-place-write}, with every change to a single inode, the whole path up to the root node has to be updated (see figure \ref{fig:btreewandering}). To heavily decrease flash wear, a caching strategy is used. Any modification to the tree is held back in RAM as long as possible, until main memory space is running low. Only now all nodes marked as dirty are committed to flash and freed in main memory. This caching can save 98\% of flash operations and speeds up access as well (see \referenceDocument{b+Tree}).
+B+Tree is a variation of the standard binary search tree with more keys per node. Another difference is having all actual data only in leaves. This increases space for keys and therefore the fanout. Variable size, minimum tree height + 1\footnote{Check if true.}. Tree height is $log(n)$, and so is search, insert and delete $\mathcal{O}log(n)$. Because of \textit{out-of-place-write}, with every change to a single inode, the whole path up to the root node has to be updated (see figure \ref{fig:btreewandering}). To heavily decrease flash wear, a caching strategy is used. Any modification to the tree is held back in RAM as long as possible, until cache memory is running low. Not before now all dirty nodes are committed to flash and freed in main memory. This caching can save 98\% of flash operations and speeds up access as well (see \referenceDocument{b+Tree}). Depending on cache strategy, all branch nodes are kept in cache while leaves are removed. This increases cache-hit ratio, because there is a small amount of branches, but they are more likely to be accessed again.
 
 \begin{figure}[htp]
 	\centering
@@ -113,24 +113,9 @@ Value & Description\\
 \end{table} 
 
 
-%\begin{lstlisting}[caption={Example C++ Code Listing},language=c++]
-%enum TelemetryGeneration
-%{
-%    noTelemetry,
-%    generateTelemetry
-%};
-%
-%class Example
-%{
-%public:
-%    Example(TelemetryGeneration telemetry,
-%            uint8_t* buffer,
-%            uint16_t length);
-%    ...
-%};
-%
-%Example object1(noTelemetry, 0, 0);
-%
-%uint8_t buffer[16];
-%Example object1(generateTelemetry, buffer, size(buffer));
-%\end{lstlisting}
+\appendix
+\section{TODOS}
+\begin{itemize}
+	\item CRC and ECC. How will a broken FS transferred into a safe state?
+	\item Cache - full commit from time to time. (Maybe 'used' marker?)
+\end{itemize}
