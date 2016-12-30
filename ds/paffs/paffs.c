@@ -63,7 +63,9 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 	device->areaMap = malloc(sizeof(p_area) * device->param.areas_no);
 	summaryEntry_containers[0] = malloc(sizeof(p_summaryEntry) * param->data_pages_per_area);
 	summaryEntry_containers[1] = malloc(sizeof(p_summaryEntry) * param->data_pages_per_area);
-	device->drv.drv_initialise_fn(dev);
+	PAFFS_RESULT r = device->drv.drv_initialise_fn(dev);
+	if(r != PAFFS_OK)
+		return r;
 
 	device->activeArea[SUPERBLOCKAREA] = 0;
 	device->activeArea[INDEXAREA] = 0;
@@ -142,6 +144,11 @@ PAFFS_RESULT paffs_mnt(const char* devicename){
 		return r;
 	}
 
+	//TODO: mark activeAreas
+	for(unsigned long i = 0; i < device->param.areas_no; i++){
+		//if(device->areaMap[i].type != DATAAREA)
+	}
+
 	return r;
 }
 PAFFS_RESULT paffs_unmnt(const char* devicename){
@@ -166,6 +173,7 @@ PAFFS_RESULT paffs_unmnt(const char* devicename){
 
 	//just for cleanup & tests
 	memset(device->areaMap, 0, sizeof(p_area) * device->param.areas_no);
+	//TODO: Add memset of activeareas
 	deleteTreeCache();
 
 	return PAFFS_OK;

@@ -25,6 +25,10 @@ unsigned int extractPage(p_addr addr);
 
 PAFFS_RESULT manageActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType areaType);
 
+PAFFS_RESULT writeAreasummary(p_dev *dev, unsigned int area, p_summaryEntry* summary);
+
+PAFFS_RESULT readAreasummary(p_dev *dev, unsigned int area, p_summaryEntry* out_summary);
+
 PAFFS_RESULT closeArea(p_dev *dev, unsigned int area);
 
 void initArea(p_dev* dev, unsigned long int area);

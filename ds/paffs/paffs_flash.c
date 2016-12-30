@@ -134,45 +134,55 @@ void initArea(p_dev* dev, unsigned long int area){
 	}
 }
 
+PAFFS_RESULT writeAreasummary(p_dev *dev, unsigned int area, p_summaryEntry* summary){
+	unsigned int needed_bytes = 1 + dev->param.data_pages_per_area / 8;
+	unsigned int needed_pages = 1 + needed_bytes / dev->param.data_bytes_per_page;
+	if(needed_pages != dev->param.total_pages_per_area - dev->param.data_pages_per_area){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
+		return PAFFS_FAIL;
+	}
+
+	char buf[needed_bytes];
+	memset(buf, 0, needed_bytes);
+
+	/*Is it really necessary to save 16 bit while slowing down garbage collection?
+	 *TODO: Check how cost reduction scales with bigger flashes.
+	 *		AreaSummary is without optimization 2 bit per page. 2 Kib per Page would
+	 *		allow roughly 1000 pages per Area. Usually big pages come with big Blocks,
+	 *		so a Block would be ~500 pages, so an area would be limited to two Blocks.
+	 *		Not good.
+	 *
+	 *		Thought 2: GC just cares if dirty or not. Areasummary says exactly that.
+	 *		Win.
+	 */
+	for(unsigned int j = 0; j < dev->param.data_pages_per_area; j++){
+		if(summary[j] != DIRTY)
+			buf[j/8] |= 1 << j%8;
+	}
+
+	unsigned int pointer = 0;
+	PAFFS_RESULT r;
+	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param.data_pages_per_area), dev);
+	for(unsigned page = 0; page < needed_pages; page++){
+		unsigned int btw = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
+							: needed_bytes - pointer;
+		r = dev->drv.drv_write_page_fn(dev, page_offs + page, &buf[pointer], btw);
+		if(r != PAFFS_OK)
+			return r;
+
+		pointer += btw;
+	}
+	return PAFFS_OK;
+}
+
 PAFFS_RESULT closeArea(p_dev *dev, unsigned int area){
 
 	dev->areaMap[area].status = CLOSED;
 
 	if(dev->areaMap[area].type == DATAAREA || dev->areaMap[area].type == INDEXAREA){
-		unsigned int needed_bytes = 1 + dev->param.data_pages_per_area / 8;
-		unsigned int needed_pages = 1 + needed_bytes / dev->param.data_bytes_per_page;
-		if(needed_pages != dev->param.total_pages_per_area - dev->param.data_pages_per_area){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
-			return PAFFS_FAIL;
-		}
-
-		char buf[needed_bytes];
-		memset(buf, 0, needed_bytes);
-
-		/*Is it really necessary to save 16 bit while slowing down garbage collection?
-		 *TODO: Check how cost reduction scales with bigger flashes.
-		 *		AreaSummary is without optimization 2 bit per page. 2 Kib per Page would
-		 *		allow roughly 1000 pages per Area. Usually big pages come with big Blocks,
-		 *		so a Block would be ~500 pages, so an area would be limited to two Blocks.
-		 *		Not good.
-		 */
-		for(unsigned int j = 0; j < dev->param.data_pages_per_area; j++){
-			if(dev->areaMap[area].areaSummary[j] != DIRTY)
-				buf[j/8] |= 1 << j%8;
-		}
-
-		unsigned int pointer = 0;
-		PAFFS_RESULT r;
-		uint64_t page_offs = getPageNumber(combineAddress(area, dev->param.data_pages_per_area), dev);
-		for(unsigned page = 0; page < needed_pages; page++){
-			unsigned int btw = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
-								: needed_bytes - pointer;
-			r = dev->drv.drv_write_page_fn(dev, page_offs + page, &buf[pointer], btw);
-			if(r != PAFFS_OK)
-				return r;
-
-			pointer += btw;
-		}
+		PAFFS_RESULT r = writeAreasummary(dev, area, dev->areaMap[area].areaSummary);
+		if(r != PAFFS_OK)
+			return r;
 	}
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Closed %s Area at pos. %u.", area_names[dev->areaMap[area].type], area);
 	return PAFFS_OK;
