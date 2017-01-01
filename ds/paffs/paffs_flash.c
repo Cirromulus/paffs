@@ -28,7 +28,7 @@ unsigned int findWritableArea(p_areaType areaType, p_dev* dev){
 		return dev->activeArea[areaType];
 	}
 
-	for(int area = 0; area < dev->param.areas_no; area++){
+	for(unsigned int area = 0; area < dev->param.areas_no; area++){
 		if(dev->areaMap[area].type == UNSET){
 			dev->areaMap[area].type = areaType;
 			initArea(dev, area);
@@ -43,16 +43,7 @@ unsigned int findWritableArea(p_areaType areaType, p_dev* dev){
 	}
 
 	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != CLOSED){
-		PAFFS_DBG_S(PAFFS_TRACE_GC, "Garbagecollection did not find completely dirty areas");
 		return dev->activeArea[areaType];
-	}
-
-	for(int area = 0; area < dev->param.areas_no; area++){
-		if(dev->areaMap[area].type == UNSET){
-			dev->areaMap[area].type = areaType;
-			initArea(dev, area);
-			return area;
-		}
 	}
 
 	//If we arrive here, something buggy must have happened
@@ -140,6 +131,7 @@ void initArea(p_dev* dev, unsigned long int area){
 		if(dev->areaMap[area].areaSummary != NULL){
 			//Former areatype had summary
 			free(dev->areaMap[area].areaSummary);
+			dev->areaMap[area].areaSummary = NULL;
 		}
 		dev->areaMap[area].has_areaSummary = false;
 	}

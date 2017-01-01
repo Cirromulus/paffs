@@ -39,7 +39,8 @@ PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 	//Look for the most dirty block
 	for(uint32_t i = 0; i < dev->param.areas_no; i++){
 		if(dev->areaMap[i].status == CLOSED && (dev->areaMap[i].type == DATAAREA || dev->areaMap[i].type == INDEXAREA)){
-			if(dev->areaMap[favourite_area].areaSummary == NULL){
+
+			if(dev->areaMap[i].areaSummary == NULL){
 				summary = tmp;
 				PAFFS_RESULT r = readAreasummary(dev, i, summary, false);
 				if(r != PAFFS_OK){
@@ -51,7 +52,7 @@ PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 			}
 
 			uint32_t dirty_pages = countDirtyPages(dev, summary);
-			if (fav_dirty_pages == dev->param.data_pages_per_area){
+			if (dirty_pages == dev->param.data_pages_per_area){
 				//We can't find a block with more dirty pages in it
 				favourite_area = i;
 				fav_dirty_pages = dirty_pages;
@@ -80,7 +81,7 @@ PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 
 	if(fav_dirty_pages != dev->param.data_pages_per_area){
 		//still some valid data, copy to new area
-
+		PAFFS_DBG_S(PAFFS_TRACE_GC, "GC just found partially dirty areas, this is a sign of fragmentation :(");
 		for(unsigned long page = 0; page < dev->param.data_pages_per_area; page++){
 			if(summary[page] == USED){
 				uint64_t src = dev->areaMap[favourite_area].position * dev->param.total_pages_per_area + page;
@@ -105,15 +106,20 @@ PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 	//Delete old area
 	for(int i = 0; i < dev->param.blocks_per_area; i++){
 		PAFFS_RESULT r = dev->drv.drv_erase_fn(dev, dev->areaMap[favourite_area].position*dev->param.blocks_per_area + i);
-		if(r != PAFFS_OK)
+		if(r != PAFFS_OK){
+			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block n° %u! PAFFS cant handle bad blocks by now.", dev->areaMap[favourite_area].position*dev->param.blocks_per_area + i);
 			return r;
+		}
 	}
+	dev->areaMap[favourite_area].erasecount++;
 
 	dev->activeArea[target] = dev->activeArea[GARBAGE_BUFFER];
 
 	dev->areaMap[favourite_area].type = GARBAGE_BUFFER;
 	initArea(dev, favourite_area);	//Deletes old areaSummary, too.
 	dev->activeArea[GARBAGE_BUFFER] = favourite_area;
+
+	PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "Garbagecollection freed Area no %u and activated area %u.", favourite_area, dev->activeArea[target]);
 
 	return PAFFS_OK;
 }

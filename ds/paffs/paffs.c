@@ -61,6 +61,7 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 	unsigned int needed_pages_for_AS = 1;	//Todo: actually calculate
 	param->data_pages_per_area = param->total_pages_per_area - needed_pages_for_AS;
 	device->areaMap = malloc(sizeof(p_area) * device->param.areas_no);
+	memset(device->areaMap, 0, sizeof(p_area) * device->param.areas_no);
 	summaryEntry_containers[0] = malloc(sizeof(p_summaryEntry) * param->data_pages_per_area);
 	summaryEntry_containers[1] = malloc(sizeof(p_summaryEntry) * param->data_pages_per_area);
 	PAFFS_RESULT r = device->drv.drv_initialise_fn(dev);
