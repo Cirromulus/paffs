@@ -27,28 +27,30 @@ uint32_t countDirtyPages(p_dev* dev, p_summaryEntry* summary){
  * the other areatype consumes all space without needing it. It would have to
  * be rewritten in terms of crawling through all addresses and changing their target...
  * Costly!
+ *
+ * Changes active Area to one of the new freed areas.
  */
 PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 	uint32_t favourite_area = 0;
 	uint32_t fav_dirty_pages = 0;
 	p_summaryEntry tmp[dev->param.data_pages_per_area];
-	p_summaryEntry* entry;
+	p_summaryEntry* summary;
 
 	//Look for the most dirty block
 	for(uint32_t i = 0; i < dev->param.areas_no; i++){
 		if(dev->areaMap[i].status == CLOSED && (dev->areaMap[i].type == DATAAREA || dev->areaMap[i].type == INDEXAREA)){
 			if(dev->areaMap[favourite_area].areaSummary == NULL){
-				entry = tmp;
-				PAFFS_RESULT r = readAreasummary(dev, i, entry);
+				summary = tmp;
+				PAFFS_RESULT r = readAreasummary(dev, i, summary, false);
 				if(r != PAFFS_OK){
 					PAFFS_DBG(PAFFS_TRACE_BUG,"Could not read areaSummary for GC!");
 					return r;
 				}
 			}else{
-				entry = dev->areaMap[i].areaSummary;
+				summary = dev->areaMap[i].areaSummary;
 			}
 
-			uint32_t dirty_pages = countDirtyPages(dev, entry);
+			uint32_t dirty_pages = countDirtyPages(dev, summary);
 			if (fav_dirty_pages == dev->param.data_pages_per_area){
 				//We can't find a block with more dirty pages in it
 				favourite_area = i;
@@ -72,15 +74,19 @@ PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 		return PAFFS_NOSP;
 	}
 
+	//init new Area to receive potential data
+	dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].type = dev->areaMap[favourite_area].type;
+	initArea(dev, dev->activeArea[GARBAGE_BUFFER]);
+
 	if(fav_dirty_pages != dev->param.data_pages_per_area){
 		//still some valid data, copy to new area
-		for(unsigned long page = 0; page < dev->param.data_pages_per_area; i++){
-			if(entry[i] == USED){
-				uint64_t dst = dev->areaMap[activeArea[GARBAGE_BUFFER]].position * dev->param.total_pages_per_area + i;
-				uint64_t src = dev->areaMap[favourite_area].position * dev->param.total_pages_per_area + i;
+
+		for(unsigned long page = 0; page < dev->param.data_pages_per_area; page++){
+			if(summary[page] == USED){
+				uint64_t src = dev->areaMap[favourite_area].position * dev->param.total_pages_per_area + page;
+				uint64_t dst = dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].position * dev->param.total_pages_per_area + page;
 
 
-				//TODO: Manage areasummary of new area
 				char buf[dev->param.total_bytes_per_page];
 				PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, src, buf, dev->param.total_bytes_per_page);
 				if(r != PAFFS_OK)
@@ -88,6 +94,9 @@ PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 				r = dev->drv.drv_write_page_fn(dev, dst, buf, dev->param.total_bytes_per_page);
 				if(r != PAFFS_OK)
 					return r;
+
+				//copy valid entries of Area Summary to new area
+				dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].areaSummary[page] = USED;
 			}
 		}
 
@@ -100,17 +109,11 @@ PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 			return r;
 	}
 
-	if(fav_dirty_pages != dev->param.data_pages_per_area){
-		//it contained valid pages
-		//TODO: Set area active. Swap areaSummarys
-	}else{
-		//TODO: Free areaSummary of old
-		dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].type = UNSET;
-	}
+	dev->activeArea[target] = dev->activeArea[GARBAGE_BUFFER];
 
 	dev->areaMap[favourite_area].type = GARBAGE_BUFFER;
+	initArea(dev, favourite_area);	//Deletes old areaSummary, too.
 	dev->activeArea[GARBAGE_BUFFER] = favourite_area;
 
-
-	return PAFFS_BUG;
+	return PAFFS_OK;
 }

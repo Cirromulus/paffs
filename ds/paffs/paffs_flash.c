@@ -36,10 +36,15 @@ unsigned int findWritableArea(p_areaType areaType, p_dev* dev){
 		}
 	}
 
-	PAFFS_RESULT r = collectGarbage(dev);
+	PAFFS_RESULT r = collectGarbage(dev, areaType);
 	if(r != PAFFS_OK){
 		paffs_lasterr = r;
 		return 0;
+	}
+
+	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != CLOSED){
+		PAFFS_DBG_S(PAFFS_TRACE_GC, "Garbagecollection did not find completely dirty areas");
+		return dev->activeArea[areaType];
 	}
 
 	for(int area = 0; area < dev->param.areas_no; area++){
@@ -116,20 +121,26 @@ PAFFS_RESULT manageActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType are
 }
 
 void initArea(p_dev* dev, unsigned long int area){
-	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init new Area %lu as %s.", area, area_names[dev->areaMap[area].type]);
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %lu as %s.", area, area_names[dev->areaMap[area].type]);
 	//generate the areaSummary in Memory
 	dev->areaMap[area].status = ACTIVE;
 	if(dev->areaMap[area].type == INDEXAREA || dev->areaMap[area].type == DATAAREA){
-		dev->areaMap[area].areaSummary = malloc(
-				sizeof(p_summaryEntry)
-				* dev->param.blocks_per_area
-				* dev->param.pages_per_block);
+		if(dev->areaMap[area].areaSummary == NULL){
+			dev->areaMap[area].areaSummary = malloc(
+					sizeof(p_summaryEntry)
+					* dev->param.blocks_per_area
+					* dev->param.pages_per_block);
+		}
 		memset(dev->areaMap[area].areaSummary, 0,
 				sizeof(p_summaryEntry)
 				* dev->param.blocks_per_area
 				* dev->param.pages_per_block);
 		dev->areaMap[area].has_areaSummary = true;
 	}else{
+		if(dev->areaMap[area].areaSummary != NULL){
+			//Former areatype had summary
+			free(dev->areaMap[area].areaSummary);
+		}
 		dev->areaMap[area].has_areaSummary = false;
 	}
 }
@@ -160,10 +171,10 @@ PAFFS_RESULT writeAreasummary(p_dev *dev, unsigned int area, p_summaryEntry* sum
 			buf[j/8] |= 1 << j%8;
 	}
 
-	unsigned int pointer = 0;
-	PAFFS_RESULT r;
+	uint32_t pointer = 0;
 	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param.data_pages_per_area), dev);
-	for(unsigned page = 0; page < needed_pages; page++){
+	PAFFS_RESULT r;
+	for(unsigned int page = 0; page < needed_pages; page++){
 		unsigned int btw = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
 							: needed_bytes - pointer;
 		r = dev->drv.drv_write_page_fn(dev, page_offs + page, &buf[pointer], btw);
@@ -172,6 +183,65 @@ PAFFS_RESULT writeAreasummary(p_dev *dev, unsigned int area, p_summaryEntry* sum
 
 		pointer += btw;
 	}
+	return PAFFS_OK;
+}
+
+//FIXME: readAreasummary is untested, b/c areaSummaries remain in RAM during unmount
+PAFFS_RESULT readAreasummary(p_dev *dev, unsigned int area, p_summaryEntry* out_summary, bool complete){
+	unsigned int needed_bytes = 1 + dev->param.data_pages_per_area / 8 /* One bit per entry*/;
+
+	unsigned int needed_pages = 1 + needed_bytes / dev->param.data_bytes_per_page;
+	if(needed_pages != dev->param.total_pages_per_area - dev->param.data_pages_per_area){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
+		return PAFFS_FAIL;
+	}
+
+	char buf[needed_bytes];
+	memset(buf, 0, needed_bytes);
+	uint32_t pointer = 0;
+	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param.data_pages_per_area), dev);
+	PAFFS_RESULT r;
+	for(unsigned int page = 0; page < needed_pages; page++){
+		unsigned int btr = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
+							: needed_bytes - pointer;
+		r = dev->drv.drv_read_page_fn(dev, page_offs + page, &buf[pointer], btr);
+		if(r != PAFFS_OK)
+			return r;
+
+		pointer += btr;
+	}
+	//buffer ready
+	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "SuperIndex Buffer was filled with %u Bytes.", pointer);
+
+
+	for(unsigned int j = 0; j < dev->param.data_pages_per_area; j++){
+		if(buf[j/8] & 1 << j%8){
+			if(complete){
+				unsigned char pagebuf[BYTES_PER_PAGE];
+				p_addr tmp = combineAddress(area, j);
+				r = dev->drv.drv_read_page_fn(dev, getPageNumber(tmp, dev), pagebuf, dev->param.data_bytes_per_page);
+				if(r != PAFFS_OK)
+					return r;
+				bool contains_data = false;
+				for(int byte = 0; byte < dev->param.data_bytes_per_page; byte++){
+					if(pagebuf[byte] != 0xFF){
+						contains_data = true;
+						break;
+					}
+				}
+				if(contains_data)
+					out_summary[j] = USED;
+				else
+					out_summary[j] = FREE;
+			}else{
+				//This is just a guess b/c we are in incomplete mode.
+				out_summary[j] = USED;
+			}
+		}else{
+			out_summary[j] = DIRTY;
+		}
+	}
+
 	return PAFFS_OK;
 }
 
@@ -184,6 +254,8 @@ PAFFS_RESULT closeArea(p_dev *dev, unsigned int area){
 		if(r != PAFFS_OK)
 			return r;
 	}
+	//TODO: delete areasummary if low on RAM
+
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Closed %s Area at pos. %u.", area_names[dev->areaMap[area].type], area);
 	return PAFFS_OK;
 }
