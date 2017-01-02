@@ -79,7 +79,7 @@ typedef struct p_param{
 typedef unsigned long p_date;
 
 typedef uint64_t p_addr;
-
+typedef uint32_t area_pos_t;
 typedef uint32_t fileSize_t; 	  //~ 4 GB per file
 typedef uint32_t pInode_no;		  //~ 4 Million files
 typedef uint16_t dirEntryCount_t; //65,535 Entries per Directory
@@ -191,7 +191,7 @@ typedef struct p_dev{
 	p_param param;
 	p_driver drv;
 	void* driver_context;
-	unsigned int activeArea[area_types_no];
+	area_pos_t activeArea[area_types_no];
 	//Automatically filled
 	paffs_obj root_dir;
 	p_area* areaMap;

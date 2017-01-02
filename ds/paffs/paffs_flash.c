@@ -112,6 +112,8 @@ PAFFS_RESULT manageActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType are
 	return PAFFS_OK;
 }
 
+
+//TODO: Add initAreaAs(...) to handle typical areaMap[abc].type = def; initArea(...);
 void initArea(p_dev* dev, unsigned long int area){
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %lu as %s.", area, area_names[dev->areaMap[area].type]);
 	//generate the areaSummary in Memory
