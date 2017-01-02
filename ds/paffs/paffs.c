@@ -36,6 +36,7 @@ static const char* PAFFS_RESULT_MSG[] = {
 		"Operation not permitted",
 		"Directory is not empty",
 		"Cache had to be flushed, any current TCN can be invalidated now",
+		"Flash needs retirement.",
 		"You should not be seeing this..."
 };
 

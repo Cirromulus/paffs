@@ -17,7 +17,7 @@ extern "C" {
 
 #include "paffs_trace.h"
 
-#define BYTES_PER_PAGE 512	//Fixme: Dirty. Should be dynamic for structs..
+#define BYTES_PER_PAGE 512
 
 typedef enum PAFFS_RESULT{	//See paffs.c for String versions
 	PAFFS_OK = 0,
@@ -33,6 +33,7 @@ typedef enum PAFFS_RESULT{	//See paffs.c for String versions
 	PAFFS_NOPERM,
 	PAFFS_DIRNOTEMPTY,
 	PAFFS_FLUSHEDCACHE,
+	PAFFS_BADFLASH,
 	num_PAFFS_RESULT
 } PAFFS_RESULT;
 
@@ -159,6 +160,7 @@ typedef enum p_areaType{
 	JOURNALAREA,
 	DATAAREA,
 	GARBAGE_BUFFER,
+	RETIRED,
 	area_types_no
 } p_areaType;
 

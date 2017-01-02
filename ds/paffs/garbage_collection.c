@@ -90,11 +90,15 @@ PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 
 				char buf[dev->param.total_bytes_per_page];
 				PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, src, buf, dev->param.total_bytes_per_page);
-				if(r != PAFFS_OK)
-					return r;
+				if(r != PAFFS_OK){
+					PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not read page n° %lu!", src);
+					return PAFFS_BADFLASH;
+				}
 				r = dev->drv.drv_write_page_fn(dev, dst, buf, dev->param.total_bytes_per_page);
-				if(r != PAFFS_OK)
-					return r;
+				if(r != PAFFS_OK){
+					PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not write page n° %lu!", dst);
+					return PAFFS_BADFLASH;
+				}
 
 				//copy valid entries of Area Summary to new area
 				dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].areaSummary[page] = USED;
@@ -107,8 +111,10 @@ PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 	for(int i = 0; i < dev->param.blocks_per_area; i++){
 		PAFFS_RESULT r = dev->drv.drv_erase_fn(dev, dev->areaMap[favourite_area].position*dev->param.blocks_per_area + i);
 		if(r != PAFFS_OK){
-			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block n° %u! PAFFS cant handle bad blocks by now.", dev->areaMap[favourite_area].position*dev->param.blocks_per_area + i);
-			return r;
+			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block n° %u (Area %u)! PAFFS cant handle bad blocks by now.", dev->areaMap[favourite_area].position*dev->param.blocks_per_area + i, favourite_area);
+			dev->areaMap[favourite_area].type = RETIRED;
+			initArea(dev, favourite_area);
+			return PAFFS_BADFLASH;
 		}
 	}
 	dev->areaMap[favourite_area].erasecount++;

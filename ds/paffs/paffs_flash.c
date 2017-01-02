@@ -18,6 +18,7 @@ char* area_names[] = {
 		"JOURNAL",
 		"DATA",
 		"GARBAGE_BUFFER",
+		"RETIRED",
 		"YOUSHOULDNOTBESEEINGTHIS"
 };
 

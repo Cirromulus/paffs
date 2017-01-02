@@ -537,7 +537,7 @@ PAFFS_RESULT commitTreeCache(p_dev* dev){
 	}
 	//<---- debug
 
-
+	paffs_lasterr = PAFFS_OK;
 	resolveDirtyPaths(&cache[cache_root]);
 	if(paffs_lasterr != PAFFS_OK)
 		return paffs_lasterr;
