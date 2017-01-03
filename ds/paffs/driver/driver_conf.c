@@ -9,7 +9,7 @@
 #include "../paffs.h"
 
  unsigned int paffs_trace_mask =
-		//PAFFS_TRACE_AREA |
+		PAFFS_TRACE_AREA |
 		PAFFS_TRACE_ERROR |
 		PAFFS_TRACE_BUG |
 		//PAFFS_TRACE_TREE |
@@ -19,6 +19,7 @@
 		//PAFFS_TRACE_SUPERBLOCK |
 		//PAFFS_TRACE_ALLOCATE |
 		PAFFS_TRACE_GC |
+		PAFFS_TRACE_GC_DETAIL |
 		0;
 
 PAFFS_RESULT paffs_start_up(){

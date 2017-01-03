@@ -18,7 +18,7 @@ extern unsigned int paffs_trace_mask;
 #define PAFFS_DBG(mask, msg, ...) do {\
 		if(mask & paffs_trace_mask || mask & PAFFS_TRACE_ALWAYS){\
 			fprintf(stderr, "paffs: " msg "\n\t-line %d, file %s\n", ##__VA_ARGS__,  __LINE__, __FILENAME__);\
-			if(0 && mask & PAFFS_TRACE_BUG && mask & PAFFS_TRACE_ERROR)\
+			if(mask & PAFFS_TRACE_BUG)\
 				raise(SIGINT);\
 		}\
 	} while(0)

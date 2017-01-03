@@ -21,14 +21,14 @@ uint32_t countDirtyPages(p_dev* dev, p_summaryEntry* summary){
 	return dirty;
 }
 
-area_pos_t findNextBestArea(p_dev* dev, p_areaType target, p_summaryEntry* summary, bool* oldBlockContainsData){
+area_pos_t findNextBestArea(p_dev* dev, p_areaType target, p_summaryEntry* summary, bool* srcAreaContainsData){
 	area_pos_t favourite_area = 0;
 	uint32_t fav_dirty_pages = 0;
-	*oldBlockContainsData = true;
+	*srcAreaContainsData = true;
 	p_summaryEntry* tmp = summary;
 
 	//Look for the most dirty block
-	for(uint32_t i = 0; i < dev->param.areas_no; i++){
+	for(area_pos_t i = 0; i < dev->param.areas_no; i++){
 		if(dev->areaMap[i].status == CLOSED && (dev->areaMap[i].type == DATAAREA || dev->areaMap[i].type == INDEXAREA)){
 			if(dev->areaMap[i].areaSummary == NULL){
 				summary = tmp;
@@ -47,7 +47,7 @@ area_pos_t findNextBestArea(p_dev* dev, p_areaType target, p_summaryEntry* summa
 				//We can't find a block with more dirty pages in it
 				favourite_area = i;
 				fav_dirty_pages = dirty_pages;
-				*oldBlockContainsData = false;
+				*srcAreaContainsData = false;
 				break;
 			}
 
@@ -83,9 +83,14 @@ PAFFS_RESULT moveValidDataToNewArea(p_dev* dev, area_pos_t srcArea, area_pos_t d
 			}
 
 			//copy valid entries of Area Summary to new area
-			dev->areaMap[dst].areaSummary[page] = USED;
+			dev->areaMap[dstArea].areaSummary[page] = USED;
 		}
 	}
+	//swap logical position
+	area_pos_t tmp = dev->areaMap[srcArea].position;
+	dev->areaMap[srcArea].position = dev->areaMap[dstArea].position;
+	dev->areaMap[dstArea].position = tmp;
+
 	return PAFFS_OK;
 }
 
@@ -93,9 +98,10 @@ PAFFS_RESULT deleteArea(p_dev* dev, area_pos_t area){
 	for(int i = 0; i < dev->param.blocks_per_area; i++){
 		PAFFS_RESULT r = dev->drv.drv_erase_fn(dev, dev->areaMap[area].position*dev->param.blocks_per_area + i);
 		if(r != PAFFS_OK){
-			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block n° %u (Area %u)! PAFFS cant handle bad blocks by now.", dev->areaMap[area].position*dev->param.blocks_per_area + i, area);
+			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block n° %u (Area %u)!", dev->areaMap[area].position*dev->param.blocks_per_area + i, area);
 			dev->areaMap[area].type = RETIRED;
 			initArea(dev, area);
+			dev->areaMap[area].status = CLOSED;
 			return PAFFS_BADFLASH;
 		}
 	}
@@ -113,46 +119,82 @@ PAFFS_RESULT deleteArea(p_dev* dev, area_pos_t area){
  */
 PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 	p_summaryEntry summary[dev->param.data_pages_per_area];
-	bool oldBlockContainsData = false;
-	area_pos_t favourite_area = findNextBestArea(dev, target, summary, &oldBlockContainsData);
-	if(favourite_area == 0){
-		PAFFS_DBG(PAFFS_TRACE_GC, "Could not find any GC'able pages for type %s!", area_names[target]);
+	bool srcAreaContainsData = false;
+	bool lastAreaContainedData = false;
+	bool desperateMode = dev->activeArea[GARBAGE_BUFFER] == 0;	//If we have no GARBAGE_BUFFER left
+	area_pos_t favourite_deletion_target = 0;
+	PAFFS_RESULT r;
+
+	if(desperateMode){
+		/*TODO: The last Straw.
+		 * If we find a completely dirty block
+		 * that can be successfully erased
+		 * AND we find another arbitrary erasable block,
+		 * we can escape desperate mode restoring a Garbage buffer.
+		 */
+
+		PAFFS_DBG(PAFFS_TRACE_GC, "GC is in desperate mode! Recovery is not implemented.");
 		return PAFFS_NOSP;
 	}
 
-	//init new Area to receive potential data
-	dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].type = dev->areaMap[favourite_area].type;
-	initArea(dev, dev->activeArea[GARBAGE_BUFFER]);
 
-	PAFFS_RESULT r;
-	if(oldBlockContainsData){
-		//still some valid data, copy to new area
-		PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "GC just found partially dirty areas, this is a sign of fragmentation :(");
-		r = moveValidDataToNewArea(dev, favourite_area, dev->activeArea[GARBAGE_BUFFER], summary);
-		if(r != PAFFS_OK){
-			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not copy valid pages from area %u to %u!", favourite_area, dev->activeArea[GARBAGE_BUFFER]);
-			//TODO: Handle something, maybe put area in ReadOnly or copy somewhere else..
+	while(!lastAreaContainedData){
+		favourite_deletion_target = findNextBestArea(dev, target, summary, &srcAreaContainsData);
+		if(favourite_deletion_target == 0){
+			PAFFS_DBG(PAFFS_TRACE_GC, "Could not find any GC'able pages for type %s!", area_names[target]);
+			return PAFFS_NOSP;
+		}
+
+		if(lastAreaContainedData && srcAreaContainsData){
+			//This happens if we couldn't erase former srcArea which was not empty
+			//The last resort is using our protected GC_BUFFER block...
+			PAFFS_DBG(PAFFS_TRACE_GC, "GC cant merge two areas containing USED data! Using GARBAGE_BUFFER as last resort.");
+			desperateMode = true;
+			dev->activeArea[GARBAGE_BUFFER] = 0;
+			break;
+		}
+		lastAreaContainedData = srcAreaContainsData;
+
+		//init new Area to receive potential data
+		dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].type = dev->areaMap[favourite_deletion_target].type;
+		initArea(dev, dev->activeArea[GARBAGE_BUFFER]);
+
+		if(srcAreaContainsData){
+			//still some valid data, copy to new area
+			PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "GC just found partially dirty areas, this is a sign of fragmentation :(");
+			r = moveValidDataToNewArea(dev, favourite_deletion_target, dev->activeArea[GARBAGE_BUFFER], summary);
+			if(r != PAFFS_OK){
+				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not copy valid pages from area %u to %u!", favourite_deletion_target, dev->activeArea[GARBAGE_BUFFER]);
+				//TODO: Handle something, maybe put area in ReadOnly or copy somewhere else..
+				//TODO: Maybe copy rest of Pages before quitting
+				return r;
+			}
+		}
+
+		//Delete old area
+		r = deleteArea(dev, favourite_deletion_target);
+		dev->areaMap[favourite_deletion_target].erasecount++;
+		if(r == PAFFS_BADFLASH){
+			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block in area %u! Retiring Area...", favourite_deletion_target);
+		}else if(r != PAFFS_OK){
+			//Something unexpected happened
 			return r;
+		}else{
+			//we succeeded
+			//TODO: Maybe repeat loop until "enough" areas are cleaned to lessen the GC calls
+			break;
 		}
 	}
 
-	//Delete old area
-	r = deleteArea(dev, favourite_area);
-	if(r == PAFFS_BADFLASH){
-		//TODO: Rerun area search to enable longer durability of system while bad blocks emerge
-		return r;
-	}else if(r != PAFFS_OK){
-		return r;
-	}
-	dev->areaMap[favourite_area].erasecount++;
-
+	//Swap area Types
 	dev->activeArea[target] = dev->activeArea[GARBAGE_BUFFER];
+	if(!desperateMode){
+		dev->areaMap[favourite_deletion_target].type = GARBAGE_BUFFER;
+		initArea(dev, favourite_deletion_target);	//Deletes old areaSummary, too.
+	}
+	dev->activeArea[GARBAGE_BUFFER] = favourite_deletion_target;
 
-	dev->areaMap[favourite_area].type = GARBAGE_BUFFER;
-	initArea(dev, favourite_area);	//Deletes old areaSummary, too.
-	dev->activeArea[GARBAGE_BUFFER] = favourite_area;
-
-	PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "Garbagecollection freed Area no %u and activated area %u.", favourite_area, dev->activeArea[target]);
+	PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "Garbagecollection freed Area no %u and activated area %u.", favourite_deletion_target, dev->activeArea[target]);
 
 	return PAFFS_OK;
 }
