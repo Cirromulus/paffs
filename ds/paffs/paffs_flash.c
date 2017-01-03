@@ -48,6 +48,7 @@ unsigned int findWritableArea(p_areaType areaType, p_dev* dev){
 	}
 
 	//If we arrive here, something buggy must have happened
+	PAFFS_DBG(PAFFS_TRACE_BUG, "Garbagecollection pointed to invalid area!");
 	paffs_lasterr = PAFFS_BUG;
 	return 0;
 }
@@ -115,7 +116,7 @@ PAFFS_RESULT manageActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType are
 
 //TODO: Add initAreaAs(...) to handle typical areaMap[abc].type = def; initArea(...);
 void initArea(p_dev* dev, unsigned long int area){
-	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %lu as %s.", area, area_names[dev->areaMap[area].type]);
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %lu (pos %u) as %s.", area, dev->areaMap[area].position, area_names[dev->areaMap[area].type]);
 	//generate the areaSummary in Memory
 	dev->areaMap[area].status = ACTIVE;
 	if(dev->areaMap[area].type == INDEXAREA || dev->areaMap[area].type == DATAAREA){
@@ -435,6 +436,11 @@ PAFFS_RESULT readInodeData(pInode* inode,
 
 		if(dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])].areaSummary[extractPage(inode->direct[page + pageFrom])] == DIRTY){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of outdated (dirty) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
+			return PAFFS_BUG;
+		}
+
+		if(dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])].areaSummary[extractPage(inode->direct[page + pageFrom])] == FREE){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid (FREE) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
 			return PAFFS_BUG;
 		}
 

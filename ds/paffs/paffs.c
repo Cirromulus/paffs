@@ -161,7 +161,7 @@ PAFFS_RESULT paffs_unmnt(const char* devicename){
 	if(paffs_trace_mask && PAFFS_TRACE_AREA){
 		printf("Info: \n");
 		for(int i = 0; i < device->param.areas_no; i++){
-			printf("\tArea %d as %s. from page %d\n", i, area_names[device->areaMap[i].type], device->areaMap[i].position*device->param.blocks_per_area*device->param.pages_per_block);
+			printf("\tArea %d on %u as %s from page %d\n", i, device->areaMap[i].position, area_names[device->areaMap[i].type], device->areaMap[i].position*device->param.blocks_per_area*device->param.pages_per_block);
 		}
 	}
 
@@ -307,7 +307,8 @@ PAFFS_RESULT paffs_getInodeInDir( pInode* outInode, pInode* folder, const char* 
 PAFFS_RESULT paffs_getInodeOfElem(pInode* outInode, const char* fullPath){
     pInode root;
     if(getInode(device, 0, &root) != PAFFS_OK){
-            return paffs_lasterr = PAFFS_BUG;
+    	PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find rootInode! (%s)", PAFFS_RESULT_MSG[paffs_lasterr]);
+		return PAFFS_FAIL;
     }
     pInode *curr = outInode;
     *curr = root;
@@ -737,7 +738,7 @@ PAFFS_RESULT paffs_getObjInfo(const char *fullPath, paffs_objInfo* nfo){
 	pInode object;
 	PAFFS_RESULT r;
 	if((r = paffs_getInodeOfElem(&object, fullPath)) != PAFFS_OK){
-		return r;
+		return paffs_lasterr = r;
 	}
 	nfo->created = object.crea;
 	nfo->modified = object.mod;

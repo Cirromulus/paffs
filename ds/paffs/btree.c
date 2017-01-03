@@ -159,7 +159,6 @@ PAFFS_RESULT find_branch( p_dev* dev, treeCacheNode* target, treeCacheNode** out
 /* Traces the path from the root to a leaf, searching
  * by key.
  * Returns the leaf containing the given key.
- * This function is also used to build up cache to a given leaf after a cache clean.
  */
 PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeCacheNode** outtreeCacheNode) {
 	int i = 0;
