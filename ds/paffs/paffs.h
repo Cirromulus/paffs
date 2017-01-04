@@ -182,9 +182,10 @@ typedef struct p_area{
 	p_areaType type:3;
 	p_areaStatus status:2;
 	uint32_t erasecount:17;	//Overflow at 132.000 is acceptable (assuming less than 100k erase cycles)
-	bool has_areaSummary:1;
-	uint32_t position;	//physical position, not logical
+	area_pos_t position;	//physical position, not logical
 	p_summaryEntry* areaSummary; //May be invalid if status == closed; Optimizable bitusage
+	bool has_areaSummary:1;		//TODO: Check if really necessary for superindex
+	bool isAreaSummaryDirty:1;
 } p_area;	//3 + 2 + 17 + 1 + 32 (+64/32) = 55 (119/87) Bit = 6,875 (14,875/10,875) Byte
 
 typedef struct p_dev{

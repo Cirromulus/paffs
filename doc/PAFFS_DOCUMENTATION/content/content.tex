@@ -131,5 +131,7 @@ This section is under development since the filesystem is unfinished. Meanwhile 
 		Immediately set Area active (move used contents to fresh area, delete old) and have multiple active areas at once (call it uncommitted)\\
 		Or Load areaSummary, modify it in RAM. If RAM runs low or unmount happens, move all but the one with most free space to new Areas and close them.
 	\item Implement additional driver function for copying pages for optimizing.
-	\item Mark active areas upon mounting.
+	\item Implement areaSummary Buffer. Write out only if RAM low or unmount happens.
+	
+	\item Implement Inode and DATA Buffer to speed up everything. Note: Low priority and high effort.
 \end{itemize}

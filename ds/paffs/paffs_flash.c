@@ -90,10 +90,17 @@ unsigned int extractPage(p_addr addr){
 	return page;
 }
 
-PAFFS_RESULT manageActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType areaType){
+PAFFS_RESULT manageActiveAreaFull(p_dev *dev, area_pos_t *area, p_areaType areaType){
 	if(dev->areaMap[*area].areaSummary == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access invalid areaSummary!");
 		return PAFFS_BUG;
+	}
+
+	if(paffs_trace_mask && PAFFS_TRACE_VERIFY_AS){
+		for(unsigned int i = 0; i < dev->param.data_pages_per_area; i++){
+			if(dev->areaMap[*area].areaSummary[i] > DIRTY)
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", *area);
+		}
 	}
 
 	bool isFull = true;
@@ -115,10 +122,11 @@ PAFFS_RESULT manageActiveAreaFull(p_dev *dev, unsigned int *area, p_areaType are
 
 
 //TODO: Add initAreaAs(...) to handle typical areaMap[abc].type = def; initArea(...);
-void initArea(p_dev* dev, unsigned long int area){
+void initArea(p_dev* dev, area_pos_t area){
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %lu (pos %u) as %s.", area, dev->areaMap[area].position, area_names[dev->areaMap[area].type]);
 	//generate the areaSummary in Memory
 	dev->areaMap[area].status = ACTIVE;
+	dev->areaMap[area].isAreaSummaryDirty = false;
 	if(dev->areaMap[area].type == INDEXAREA || dev->areaMap[area].type == DATAAREA){
 		if(dev->areaMap[area].areaSummary == NULL){
 			dev->areaMap[area].areaSummary = malloc(
@@ -141,7 +149,57 @@ void initArea(p_dev* dev, unsigned long int area){
 	}
 }
 
-PAFFS_RESULT writeAreasummary(p_dev *dev, unsigned int area, p_summaryEntry* summary){
+PAFFS_RESULT loadArea(p_dev *dev, area_pos_t area){
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Loading Areasummary of Area %u (pos %u) as %s.", area, dev->areaMap[area].position, area_names[dev->areaMap[area].type]);
+	if(dev->areaMap[area].type != DATAAREA && dev->areaMap[area].type != INDEXAREA){
+		return PAFFS_OK;
+	}
+	if(dev->areaMap[area].areaSummary != NULL){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to load Area with existing areaSummary!");
+		return PAFFS_BUG;
+	}
+
+	if(dev->areaMap[area].isAreaSummaryDirty == true){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to load Area without areaSummary but dirty flag!");
+		return PAFFS_BUG;
+	}
+
+	dev->areaMap[area].isAreaSummaryDirty = true;
+	dev->areaMap[area].areaSummary = malloc(
+			sizeof(p_summaryEntry)
+			* dev->param.blocks_per_area
+			* dev->param.pages_per_block);
+
+	return readAreasummary(dev, area, dev->areaMap[area].areaSummary, true);
+}
+
+PAFFS_RESULT closeArea(p_dev *dev, area_pos_t area){
+	dev->areaMap[area].status = CLOSED;
+
+	if(paffs_trace_mask && PAFFS_TRACE_VERIFY_AS){
+		for(unsigned int i = 0; i < dev->param.data_pages_per_area; i++){
+			if(dev->areaMap[area].areaSummary[i] > DIRTY)
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", area);
+		}
+	}
+
+	//TODO: Suspend areaSummary write until RAM cache runs low
+	if(dev->areaMap[area].type == DATAAREA || dev->areaMap[area].type == INDEXAREA){
+		PAFFS_RESULT r = writeAreasummary(dev, area, dev->areaMap[area].areaSummary);
+		if(r != PAFFS_OK)
+			return r;
+	}
+	//TODO: delete all area summaries if low on RAM
+	if(dev->areaMap[area].type != DATAAREA && dev->areaMap[area].type != INDEXAREA){
+		free(dev->areaMap[area].areaSummary);
+		dev->areaMap[area].areaSummary = NULL;
+	}
+
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Closed %s Area %u at pos. %u.", area_names[dev->areaMap[area].type], area, dev->areaMap[area].position);
+	return PAFFS_OK;
+}
+
+PAFFS_RESULT writeAreasummary(p_dev *dev, area_pos_t area, p_summaryEntry* summary){
 	unsigned int needed_bytes = 1 + dev->param.data_pages_per_area / 8;
 	unsigned int needed_pages = 1 + needed_bytes / dev->param.data_bytes_per_page;
 	if(needed_pages != dev->param.total_pages_per_area - dev->param.data_pages_per_area){
@@ -183,7 +241,7 @@ PAFFS_RESULT writeAreasummary(p_dev *dev, unsigned int area, p_summaryEntry* sum
 }
 
 //FIXME: readAreasummary is untested, b/c areaSummaries remain in RAM during unmount
-PAFFS_RESULT readAreasummary(p_dev *dev, unsigned int area, p_summaryEntry* out_summary, bool complete){
+PAFFS_RESULT readAreasummary(p_dev *dev, area_pos_t area, p_summaryEntry* out_summary, bool complete){
 	unsigned int needed_bytes = 1 + dev->param.data_pages_per_area / 8 /* One bit per entry*/;
 
 	unsigned int needed_pages = 1 + needed_bytes / dev->param.data_bytes_per_page;
@@ -241,20 +299,6 @@ PAFFS_RESULT readAreasummary(p_dev *dev, unsigned int area, p_summaryEntry* out_
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT closeArea(p_dev *dev, unsigned int area){
-
-	dev->areaMap[area].status = CLOSED;
-
-	if(dev->areaMap[area].type == DATAAREA || dev->areaMap[area].type == INDEXAREA){
-		PAFFS_RESULT r = writeAreasummary(dev, area, dev->areaMap[area].areaSummary);
-		if(r != PAFFS_OK)
-			return r;
-	}
-	//TODO: delete areasummary if low on RAM
-
-	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Closed %s Area at pos. %u.", area_names[dev->areaMap[area].type], area);
-	return PAFFS_OK;
-}
 //modifies inode->size and inode->reserved size as well
 PAFFS_RESULT writeInodeData(pInode* inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_written,
@@ -356,6 +400,13 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 			}
 
 			//Mark old pages dirty
+			if(dev->areaMap[oldArea].areaSummary == NULL){
+				PAFFS_RESULT r = loadArea(dev, oldArea);
+				if(r != PAFFS_OK){
+					PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read A/S from CLOSED area!");
+					return r;
+				}
+			}
 			dev->areaMap[oldArea].areaSummary[oldPage] = DIRTY;
 		}else{
 			//we are writing to a new page
@@ -369,7 +420,7 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 		if(misaligned)
 			free(buf);
 
-		PAFFS_DBG(PAFFS_TRACE_WRITE, "DBG: write r.P: %d/%d, phy.P: %llu", page+1, pageTo+1, (long long unsigned int) getPageNumber(pageAddress, dev));
+		PAFFS_DBG_S(PAFFS_TRACE_WRITE, "write r.P: %d/%d, phy.P: %llu", page+1, pageTo+1, (long long unsigned int) getPageNumber(pageAddress, dev));
 		if(res != PAFFS_OK){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "ERR: write returned FAIL at phy.P: %llu", (long long unsigned int) getPageNumber(pageAddress, dev));
 			return PAFFS_FAIL;
@@ -429,23 +480,36 @@ PAFFS_RESULT readInodeData(pInode* inode,
 						(bytes + pageOffs) - page*dev->param.data_bytes_per_page;
 		}
 
-		if(dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])].type != DATAAREA){
+		area_pos_t area = extractLogicalArea(inode->direct[page + pageFrom]);
+		if(dev->areaMap[area].type != DATAAREA){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid area at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
 			return PAFFS_BUG;
 		}
 
-		if(dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])].areaSummary[extractPage(inode->direct[page + pageFrom])] == DIRTY){
-			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of outdated (dirty) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
-			return PAFFS_BUG;
+		PAFFS_RESULT r = PAFFS_OK;
+		if(dev->areaMap[area].areaSummary == NULL){
+			//TODO: This is very expensive. Either build switch "safety mode" that loads complete A/S
+			//		Or just load (everytime) incomplete A/S
+			r = loadArea(dev, area);
+			if(r != PAFFS_OK){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load AreaSummary for safetycheck!");
+			}
 		}
 
-		if(dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])].areaSummary[extractPage(inode->direct[page + pageFrom])] == FREE){
-			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid (FREE) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
-			return PAFFS_BUG;
+		if(r == PAFFS_OK){
+			if(dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])].areaSummary[extractPage(inode->direct[page + pageFrom])] == DIRTY){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of outdated (dirty) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
+				return PAFFS_BUG;
+			}
+
+			if(dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])].areaSummary[extractPage(inode->direct[page + pageFrom])] == FREE){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid (FREE) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
+				return PAFFS_BUG;
+			}
 		}
 
 		unsigned long long addr = getPageNumber(inode->direct[page + pageFrom], dev);
-		PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, addr, buf, btr);
+		r = dev->drv.drv_read_page_fn(dev, addr, buf, btr);
 		if(r != PAFFS_OK){
 			if(misaligned)
 				free (wrap);

@@ -282,6 +282,10 @@ PAFFS_RESULT paffs_getInodeInDir( pInode* outInode, pInode* folder, const char* 
 			pInode_no tmp_no;
 			memcpy(&tmp_no, &buf[p], sizeof(pInode_no));
 			p += sizeof(pInode_no);
+			if(p + dirnamel > folder->size){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "ERROR: foldersize of Inode %u not plausible!", folder->no);
+				return PAFFS_FAIL;
+			}
 			char* tmpname = malloc((dirnamel+1) * sizeof(char));
 			memcpy(tmpname, &buf[p], dirnamel);
 			tmpname[dirnamel] = 0;
