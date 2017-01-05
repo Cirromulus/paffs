@@ -96,7 +96,7 @@ PAFFS_RESULT manageActiveAreaFull(p_dev *dev, area_pos_t *area, p_areaType areaT
 		return PAFFS_BUG;
 	}
 
-	if(paffs_trace_mask && PAFFS_TRACE_VERIFY_AS){
+	if(paffs_trace_mask & PAFFS_TRACE_VERIFY_AS){
 		for(unsigned int i = 0; i < dev->param.data_pages_per_area; i++){
 			if(dev->areaMap[*area].areaSummary[i] > DIRTY)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", *area);
@@ -176,7 +176,7 @@ PAFFS_RESULT loadArea(p_dev *dev, area_pos_t area){
 PAFFS_RESULT closeArea(p_dev *dev, area_pos_t area){
 	dev->areaMap[area].status = CLOSED;
 
-	if(paffs_trace_mask && PAFFS_TRACE_VERIFY_AS){
+	if(paffs_trace_mask & PAFFS_TRACE_VERIFY_AS){
 		for(unsigned int i = 0; i < dev->param.data_pages_per_area; i++){
 			if(dev->areaMap[area].areaSummary[i] > DIRTY)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", area);
