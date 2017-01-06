@@ -1,0 +1,8 @@
+	Area 0 on 0 as SUPERBLOCK from page 0
+	Area 1 on 1 as JOURNAL from page 128
+	Area 2 on 7 as RETIRED from page 896
+	Area 3 on 3 as INDEX from page 384
+	Area 4 on 4 as DATA from page 512
+	Area 5 on 5 as RETIRED from page 640
+	Area 6 on 6 as RETIRED from page 768
+	Area 7 on 2 as RETIRED from page 256
