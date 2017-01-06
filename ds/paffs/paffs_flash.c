@@ -199,6 +199,27 @@ PAFFS_RESULT closeArea(p_dev *dev, area_pos_t area){
 	return PAFFS_OK;
 }
 
+void retireArea(p_dev *dev, area_pos_t area){
+	dev->areaMap[area].status = CLOSED;
+
+	if((dev->areaMap[area].type == DATAAREA || dev->areaMap[area].type == INDEXAREA) && paffs_trace_mask & PAFFS_TRACE_VERIFY_AS){
+		for(unsigned int i = 0; i < dev->param.data_pages_per_area; i++){
+			if(dev->areaMap[area].areaSummary[i] > DIRTY)
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", area);
+		}
+	}
+
+	//TODO: delete all area summaries if low on RAM
+	if(dev->areaMap[area].type != DATAAREA && dev->areaMap[area].type != INDEXAREA){
+		free(dev->areaMap[area].areaSummary);
+		dev->areaMap[area].areaSummary = NULL;
+	}
+
+	dev->areaMap[area].type = RETIRED;
+
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %u at pos. %u.", area, dev->areaMap[area].position);
+}
+
 PAFFS_RESULT writeAreasummary(p_dev *dev, area_pos_t area, p_summaryEntry* summary){
 	unsigned int needed_bytes = 1 + dev->param.data_pages_per_area / 8;
 	unsigned int needed_pages = 1 + needed_bytes / dev->param.data_bytes_per_page;

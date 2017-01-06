@@ -107,8 +107,7 @@ PAFFS_RESULT deleteArea(p_dev* dev, area_pos_t area){
 		PAFFS_RESULT r = dev->drv.drv_erase_fn(dev, dev->areaMap[area].position*dev->param.blocks_per_area + i);
 		if(r != PAFFS_OK){
 			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block n° %u (Area %u)!", dev->areaMap[area].position*dev->param.blocks_per_area + i, area);
-			dev->areaMap[area].type = RETIRED;
-			closeArea(dev, area);
+			retireArea(dev, area);
 			return PAFFS_BADFLASH;
 		}
 	}
@@ -124,8 +123,9 @@ PAFFS_RESULT deleteArea(p_dev* dev, area_pos_t area){
  *
  * Changes active Area to one of the new freed areas.
  */
-PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
+PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType targetType){
 	p_summaryEntry summary[dev->param.data_pages_per_area];
+	memset(summary, 0, dev->param.data_pages_per_area);
 	bool srcAreaContainsData = false;
 	bool desperateMode = dev->activeArea[GARBAGE_BUFFER] == 0;	//If we have no GARBAGE_BUFFER left
 	area_pos_t deletion_target = 0;
@@ -147,23 +147,42 @@ PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 		return PAFFS_NOSP;
 	}
 
-
+	area_pos_t lastDeletionTarget = 0;
 	while(1){
-		deletion_target = findNextBestArea(dev, target, summary, &srcAreaContainsData);
+		deletion_target = findNextBestArea(dev, targetType, summary, &srcAreaContainsData);
 		if(deletion_target == 0){
-			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not find any GC'able pages for type %s!", area_names[target]);
+			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not find any GC'able pages for type %s!", area_names[targetType]);
 
 			if(desperateMode){
 				PAFFS_DBG_S(PAFFS_TRACE_GC, "... and additionally we already gave up GC_BUFFER!");
+				return PAFFS_NOSP;
 			}
 
 			//This happens if we couldn't erase former srcArea which was not empty
 			//The last resort is using our protected GC_BUFFER block...
 			PAFFS_DBG_S(PAFFS_TRACE_GC, "GC did not find next place for GC_BUFFER! Reutilizing BUFFER as last resort.");
 			desperateMode = true;
-			//If lastArea contained data, it is already copied to gc_buffer
 
-			//FIXME: What about A/S? Gone with closeArea in retirement.
+			/* If lastArea contained data, it is already copied to gc_buffer. 'summary' is untouched and valid.
+			 * It it did not contain data (or this is the first round), 'summary' contains {FREE}.
+			 */
+			if(lastDeletionTarget == 0){
+				//this is first round, no possible chunks found.
+				//Just init and return garbageBuffer.
+				dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].type = targetType;
+				initArea(dev, dev->activeArea[GARBAGE_BUFFER]);
+				dev->activeArea[targetType] = dev->activeArea[GARBAGE_BUFFER];
+
+				dev->activeArea[GARBAGE_BUFFER] = 0;	//No GC_BUFFER left
+				return PAFFS_OK;
+			}
+
+			//Resurrect area, fill it with the former summary. In end routine, positions will be swapped.
+			//TODO: former summary may be incomplete...
+			dev->areaMap[lastDeletionTarget].type = targetType;
+			initArea(dev, lastDeletionTarget);
+			memcpy(dev->areaMap[lastDeletionTarget].areaSummary, summary, dev->param.data_pages_per_area);
+			deletion_target = lastDeletionTarget;
 
 			break;
 		}
@@ -182,12 +201,14 @@ PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 			}
 		}
 
-		/*TODO: more Safety switches like comparison of lastDeletion target
+		/*TODO: more Safety switches like comparison of lastDeletion targetType
 
 		if(desperateMode && srcAreaContainsData){
 			PAFFS_DBG(PAFFS_TRACE_GC, "GC cant copy valid data in desperate mode! Giving up.");
 			return PAFFS_NOSP;
 		}*/
+
+		lastDeletionTarget = deletion_target;
 
 		if(srcAreaContainsData){
 			//still some valid data, copy to new area
@@ -204,7 +225,7 @@ PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 			//Copy the updated (no DIRTY pages) summary to the deletion_target (it will be the fresh area!)
 			memcpy(dev->areaMap[deletion_target].areaSummary, summary, dev->param.data_pages_per_area);
 			//Notify for used Pages
-			dev->areaMap[deletion_target].status = ACTIVE;	//Safe, because we can assume deletion target is same Type as we want (from getNextBestArea)
+			dev->areaMap[deletion_target].status = ACTIVE;	//Safe, because we can assume deletion targetType is same Type as we want (from getNextBestArea)
 		}else{
 			//This is not necessary because write function handles empty areas by itself
 			//				memset(dev->areaMap[deletion_target].areaSummary, 0, dev->param.data_pages_per_area);
@@ -219,7 +240,7 @@ PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 			if(paffs_trace_mask && (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
 				printf("Info: \n");
 				for(int i = 0; i < dev->param.areas_no; i++){
-					printf("\tArea %d on %u as %s from page %d\n", i, dev->areaMap[i].position, area_names[dev->areaMap[i].type], dev->areaMap[i].position*dev->param.blocks_per_area*dev->param.pages_per_block);
+					printf("\tArea %d on %u as %10s with %u erases\n", i, dev->areaMap[i].position, area_names[dev->areaMap[i].type], dev->areaMap[i].erasecount);
 				}
 			}
 		}else if(r != PAFFS_OK){
@@ -229,24 +250,36 @@ PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target){
 		}else{
 			//we succeeded
 			//TODO: Maybe delete more available blocks. Mark them as UNSET+EMPTY
-
-			//swap logical position of areas to keep addresses valid
-			area_pos_t tmp = dev->areaMap[deletion_target].position;
-			dev->areaMap[deletion_target].position = dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].position;
-			dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].position = tmp;
-
 			break;
 		}
 	}
 
+
+
+	//swap logical position of areas to keep addresses valid
+	area_pos_t tmp = dev->areaMap[deletion_target].position;
+	dev->areaMap[deletion_target].position = dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].position;
+	dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].position = tmp;
+	//swap erasecounts to let them point to the physical position
+	uint32_t tmp2 = dev->areaMap[deletion_target].erasecount;
+	dev->areaMap[deletion_target].erasecount = dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].erasecount;
+	dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].erasecount = tmp2;
+
 	if(desperateMode){
-		dev->activeArea[target] = dev->activeArea[GARBAGE_BUFFER];
+		//now former retired section became garbage buffer, retire it officially.
+		retireArea(dev, dev->activeArea[GARBAGE_BUFFER]);
 		dev->activeArea[GARBAGE_BUFFER] = 0;
-	}else{
-		dev->activeArea[target] = deletion_target;
+		if(paffs_trace_mask && (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
+			printf("Info: \n");
+			for(int i = 0; i < dev->param.areas_no; i++){
+				printf("\tArea %d on %u as %10s with %u erases\n", i, dev->areaMap[i].position, area_names[dev->areaMap[i].type], dev->areaMap[i].erasecount);
+			}
+		}
 	}
 
-	PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "Garbagecollection erased pos %u and gave area %u pos %u.", dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].position, dev->activeArea[target], dev->areaMap[dev->activeArea[target]].position);
+	dev->activeArea[targetType] = deletion_target;
+
+	PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "Garbagecollection erased pos %u and gave area %u pos %u.", dev->areaMap[dev->activeArea[GARBAGE_BUFFER]].position, dev->activeArea[targetType], dev->areaMap[dev->activeArea[targetType]].position);
 
 	return PAFFS_OK;
 }

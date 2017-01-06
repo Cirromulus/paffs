@@ -32,7 +32,7 @@ PAFFS_RESULT readAreasummary(p_dev *dev, area_pos_t area, p_summaryEntry* out_su
 void initArea(p_dev* dev, area_pos_t area);
 PAFFS_RESULT loadArea(p_dev *dev, area_pos_t area);
 PAFFS_RESULT closeArea(p_dev *dev, area_pos_t area);
-
+void retireArea(p_dev *dev, area_pos_t area);
 
 
 
