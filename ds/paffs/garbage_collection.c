@@ -152,7 +152,7 @@ PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType targetType){
 		deletion_target = findNextBestArea(dev, targetType, summary, &srcAreaContainsData);
 		if(deletion_target == 0){
 			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not find any GC'able pages for type %s!", area_names[targetType]);
-
+return PAFFS_NOSP;
 			if(desperateMode){
 				PAFFS_DBG_S(PAFFS_TRACE_GC, "... and additionally we already gave up GC_BUFFER!");
 				return PAFFS_NOSP;
