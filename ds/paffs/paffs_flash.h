@@ -8,12 +8,12 @@
 #ifndef PAFFS_FLASH_H_
 #define PAFFS_FLASH_H_
 
-#include "paffs.h"
 #include "btree.h"
+#include "paffs.hpp"
 #include "superblock.h"
 
 //Returns same area if there is still writable Space left
-unsigned int findWritableArea(p_areaType areaType, p_dev* dev);
+unsigned int findWritableArea(areaType areaType, p_dev* dev);
 
 PAFFS_RESULT findFirstFreePage(unsigned int* p_out, p_dev* dev, unsigned int area);
 
@@ -23,7 +23,7 @@ p_addr combineAddress(uint32_t logical_area, uint32_t page);
 unsigned int extractLogicalArea(p_addr addr);			//Address-wrapper für einfacheren Garbagecollector
 unsigned int extractPage(p_addr addr);
 
-PAFFS_RESULT manageActiveAreaFull(p_dev *dev, area_pos_t *area, p_areaType areaType);
+PAFFS_RESULT manageActiveAreaFull(p_dev *dev, area_pos_t *area, areaType areaType);
 
 PAFFS_RESULT writeAreasummary(p_dev *dev, area_pos_t area, p_summaryEntry* summary);
 

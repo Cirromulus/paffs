@@ -3,7 +3,6 @@ INCLUDE_DIRECTORIES(
 )
 
 set(SOURCES ${SOURCES}
-    ${CMAKE_CURRENT_SOURCE_DIR}/driver_conf.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/fc_driver.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/simuDriver.cpp
     PARENT_SCOPE
 )

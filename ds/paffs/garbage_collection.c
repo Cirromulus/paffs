@@ -21,7 +21,7 @@ uint32_t countDirtyPages(p_dev* dev, p_summaryEntry* summary){
 	return dirty;
 }
 
-area_pos_t findNextBestArea(p_dev* dev, p_areaType target, p_summaryEntry* out_summary, bool* srcAreaContainsData){
+area_pos_t findNextBestArea(p_dev* dev, areaType target, p_summaryEntry* out_summary, bool* srcAreaContainsData){
 	area_pos_t favourite_area = 0;
 	uint32_t fav_dirty_pages = 0;
 	*srcAreaContainsData = true;
@@ -123,7 +123,7 @@ PAFFS_RESULT deleteArea(p_dev* dev, area_pos_t area){
  *
  * Changes active Area to one of the new freed areas.
  */
-PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType targetType){
+PAFFS_RESULT collectGarbage(p_dev* dev, areaType targetType){
 	p_summaryEntry summary[dev->param.data_pages_per_area];
 	memset(summary, 0, dev->param.data_pages_per_area);
 	bool srcAreaContainsData = false;

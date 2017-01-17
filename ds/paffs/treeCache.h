@@ -8,8 +8,8 @@
 #ifndef TREECACHE_H_
 #define TREECACHE_H_
 
-#include "paffs.h"
 #include "btree.h"
+#include "paffs.hpp"
 
 
 // "private"

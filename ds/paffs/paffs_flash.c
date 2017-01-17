@@ -23,7 +23,7 @@ char* area_names[] = {
 };
 
 
-unsigned int findWritableArea(p_areaType areaType, p_dev* dev){
+unsigned int findWritableArea(areaType areaType, p_dev* dev){
 	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != CLOSED){
 		//current Area has still space left
 		return dev->activeArea[areaType];
@@ -90,7 +90,7 @@ unsigned int extractPage(p_addr addr){
 	return page;
 }
 
-PAFFS_RESULT manageActiveAreaFull(p_dev *dev, area_pos_t *area, p_areaType areaType){
+PAFFS_RESULT manageActiveAreaFull(p_dev *dev, area_pos_t *area, areaType areaType){
 	if(dev->areaMap[*area].areaSummary == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access invalid areaSummary!");
 		return PAFFS_BUG;

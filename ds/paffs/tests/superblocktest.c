@@ -12,9 +12,9 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <time.h>
-#include "paffs.h"
 #include "treeCache.h"
 #include "superblock.h"
+#include "../paffs.hpp"
 
 
 int main( int argc, char ** argv ) {

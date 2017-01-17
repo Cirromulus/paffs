@@ -8,8 +8,8 @@
 #ifndef DS_PAFFS_GARBAGE_COLLECTION_H_
 #define DS_PAFFS_GARBAGE_COLLECTION_H_
 
-#include "paffs.h"
+#include "paffs.hpp"
 
-PAFFS_RESULT collectGarbage(p_dev* dev, p_areaType target);
+PAFFS_RESULT collectGarbage(p_dev* dev, areaType target);
 
 #endif /* DS_PAFFS_GARBAGE_COLLECTION_H_ */

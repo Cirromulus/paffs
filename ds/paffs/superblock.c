@@ -79,7 +79,7 @@ PAFFS_RESULT getAddrOfMostRecentSuperIndex(p_dev* dev, p_addr *out){
 
 PAFFS_RESULT commitSuperIndex(p_dev* dev){
 	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(p_addr) +
-			dev->param.areas_no * (sizeof(p_area) - sizeof(p_summaryEntry*)) + // AreaMap without summaryEntry pointer
+			dev->param.areas_no * (sizeof(p_area) - sizeof(summaryEntry*)) + // AreaMap without summaryEntry pointer
 			2 * dev->param.data_pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed for SuperIndex: %d (%d bytes)", needed_pages, needed_bytes);
@@ -175,7 +175,7 @@ PAFFS_RESULT commitSuperIndex(p_dev* dev){
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT readSuperIndex(p_dev* dev, p_summaryEntry **summary_Containers){
+PAFFS_RESULT readSuperIndex(p_dev* dev, summaryEntry **summary_Containers){
 	p_addr addr;
 	PAFFS_RESULT r = getAddrOfMostRecentSuperIndex(dev, &addr);
 	if(r != PAFFS_OK)

@@ -1,3 +1,4 @@
+
 #ifdef __WIN32__
 #include <io.h>
 #include <windows.h>
@@ -10,7 +11,7 @@
 #include <stdio.h>
 
 #include "btree.h"
-#include "paffs.h"
+#include "../paffs.hpp"
 
 #include "treeCache.h"
 
@@ -25,13 +26,13 @@
 
 
 int main( int argc, char ** argv ) {
-	printf("Branch-Order: %lu, Leaf-Order: %lu\nSpace in Pointers: %lu Byte, Sizeof pInode: %lu Byte\n", BRANCH_ORDER, LEAF_ORDER, BRANCH_ORDER * sizeof(p_addr), sizeof(pInode));
-	printf("Size of TreeNode: %lu\n", sizeof(treeNode));
-	printf("Size of TreeCacheNode: %lu\n", sizeof(treeCacheNode));
+	printf("Branch-Order: %u, Leaf-Order: %u\nSpace in Pointers: %u Byte, Sizeof pInode: %u Byte\n", BRANCH_ORDER, LEAF_ORDER, BRANCH_ORDER * sizeof(p_addr), sizeof(pInode));
+	printf("Size of TreeNode: %u\n", sizeof(treeNode));
+	printf("Size of TreeCacheNode: %u\n", sizeof(treeCacheNode));
 
 	treeNode a;
-	printf("Size of TreeNode.as_branch.keys: %lu\n", sizeof(a.as_branch.keys) / sizeof(pInode_no));
-	printf("Size of TreeNode.as_leaf.keys: %lu\n", sizeof(a.as_leaf.keys) / sizeof(pInode_no));
+	printf("Size of TreeNode.as_branch.keys: %u\n", sizeof(a.as_branch.keys) / sizeof(pInode_no));
+	printf("Size of TreeNode.as_leaf.keys: %u\n", sizeof(a.as_leaf.keys) / sizeof(pInode_no));
 
 	paffs_start_up();
 

@@ -12,7 +12,8 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <time.h>
-#include "paffs.h"
+
+#include "../paffs.hpp"
 #include "btree.h"
 #include "treeCache.h"
 
@@ -106,7 +107,7 @@ int main( int argc, char ** argv ) {
 	paffs_start_up();
 	PAFFS_RESULT r = paffs_mnt("1");
 	print_tree(getDevice());
-	paffs_permission p = PAFFS_R | PAFFS_W;
+	permission p = PAFFS_R | PAFFS_W;
 	printf("Creating directory /a... ");
 	fflush(stdout);
 //	while(getchar() == EOF);

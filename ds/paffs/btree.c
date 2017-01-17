@@ -21,15 +21,15 @@ bool isTreeCacheNodeEqual(treeCacheNode* left, treeCacheNode* right){
 }
 
 
-PAFFS_RESULT insertInode( p_dev* dev, pInode* inode){
+PAFFS_RESULT insertInode( p_dev* dev, Inode* inode){
 	return insert(dev, inode);
 }
 
-PAFFS_RESULT getInode( p_dev* dev, pInode_no number, pInode* outInode){
+PAFFS_RESULT getInode( p_dev* dev, pInode_no number, Inode* outInode){
 	return find(dev, number, outInode);
 }
 
-PAFFS_RESULT updateExistingInode( p_dev* dev, pInode* inode){
+PAFFS_RESULT updateExistingInode( p_dev* dev, Inode* inode){
 	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Update existing inode n° %d", inode->no);
 
 	treeCacheNode *node = NULL;
@@ -57,7 +57,7 @@ PAFFS_RESULT updateExistingInode( p_dev* dev, pInode* inode){
 
 PAFFS_RESULT deleteInode( p_dev* dev, pInode_no number){
 
-	pInode key;
+	Inode key;
 	treeCacheNode* key_leaf;
 
 	PAFFS_RESULT r = find_leaf(dev, number, &key_leaf);
@@ -191,7 +191,7 @@ PAFFS_RESULT find_leaf( p_dev* dev, pInode_no key, treeCacheNode** outtreeCacheN
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT find_in_leaf (treeCacheNode* leaf, pInode_no key, pInode* outInode){
+PAFFS_RESULT find_in_leaf (treeCacheNode* leaf, pInode_no key, Inode* outInode){
 	int i;
     for (i = 0; i < leaf->raw.num_keys; i++)
             if (leaf->raw.as_leaf.keys[i] == key) break;
@@ -204,7 +204,7 @@ PAFFS_RESULT find_in_leaf (treeCacheNode* leaf, pInode_no key, pInode* outInode)
 /* Finds and returns the pinode to which
  * a key refers.
  */
-PAFFS_RESULT find( p_dev* dev, pInode_no key, pInode* outInode){
+PAFFS_RESULT find( p_dev* dev, pInode_no key, Inode* outInode){
     treeCacheNode *c = NULL;
     PAFFS_RESULT r = find_leaf( dev, key, &c);
     if(r != PAFFS_OK)
@@ -247,7 +247,7 @@ int get_left_index(treeCacheNode * parent, treeCacheNode * left) {
  * key into a leaf when it has enough space free.
  * (No further Tree-action Required)
  */
-PAFFS_RESULT insert_into_leaf( p_dev* dev, treeCacheNode * leaf, pInode * newInode ) {
+PAFFS_RESULT insert_into_leaf( p_dev* dev, treeCacheNode * leaf, Inode * newInode ) {
 
         int i, insertion_point;
 
@@ -274,14 +274,14 @@ PAFFS_RESULT insert_into_leaf( p_dev* dev, treeCacheNode * leaf, pInode * newIno
  * the tree's order, causing the leaf to be split
  * in half.
  */
-PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, pInode * newInode) {
+PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, Inode * newInode) {
 
 	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert into leaf after splitting");
 	pInode_no temp_keys[btree_leaf_order+1];
-	pInode temp_pInodes[btree_leaf_order+1];
+	Inode temp_pInodes[btree_leaf_order+1];
 	int insertion_index, split, new_key, i, j;
 	memset(temp_keys, 0, btree_leaf_order+1 * sizeof(pInode_no));
-	memset(temp_pInodes, 0, btree_leaf_order+1 * sizeof(pInode));
+	memset(temp_pInodes, 0, btree_leaf_order+1 * sizeof(Inode));
 
 	treeCacheNode *new_leaf = NULL;
 
@@ -326,11 +326,11 @@ PAFFS_RESULT insert_into_leaf_after_splitting(p_dev* dev, treeCacheNode * leaf, 
 	}
 
 	for (i = leaf->raw.num_keys; i < btree_leaf_order; i++){
-		memset(&leaf->raw.as_leaf.pInodes[i], 0, sizeof(pInode));
+		memset(&leaf->raw.as_leaf.pInodes[i], 0, sizeof(Inode));
 		leaf->raw.as_leaf.keys[i] = 0;
 	}
 	for (i = new_leaf->raw.num_keys; i < btree_leaf_order; i++){
-		memset(&new_leaf->raw.as_leaf.pInodes[i], 0, sizeof(pInode));
+		memset(&new_leaf->raw.as_leaf.pInodes[i], 0, sizeof(Inode));
 		new_leaf->raw.as_leaf.keys[i] = 0;
 	}
 
@@ -548,7 +548,7 @@ PAFFS_RESULT start_new_tree(p_dev* dev) {
  * however necessary to maintain the B+ tree
  * properties.
  */
-PAFFS_RESULT insert( p_dev* dev, pInode* value) {
+PAFFS_RESULT insert( p_dev* dev, Inode* value) {
 
 	treeCacheNode *node = NULL;
 	PAFFS_RESULT r;
@@ -657,7 +657,7 @@ PAFFS_RESULT remove_entry_from_node(p_dev* dev, treeCacheNode * n, pInode_no key
 	// Set the other pointers to NULL for tidiness.
 	if (n->raw.is_leaf)
 		for (i = n->raw.num_keys; i < btree_leaf_order; i++){
-			memset(&n->raw.as_leaf.pInodes[i], 0, sizeof(pInode));
+			memset(&n->raw.as_leaf.pInodes[i], 0, sizeof(Inode));
 			n->raw.as_leaf.keys[i] = 0;
 		}
 	else
@@ -843,7 +843,7 @@ PAFFS_RESULT redistribute_nodes(p_dev* dev, treeCacheNode * n, treeCacheNode * n
 		}
 		else {
 			n->raw.as_leaf.pInodes[0] = neighbor->raw.as_leaf.pInodes[neighbor->raw.num_keys - 1];
-			memset(&neighbor->raw.as_leaf.pInodes[neighbor->raw.num_keys - 1], 0, sizeof(pInode));
+			memset(&neighbor->raw.as_leaf.pInodes[neighbor->raw.num_keys - 1], 0, sizeof(Inode));
 			n->raw.as_leaf.keys[0] = neighbor->raw.as_leaf.keys[neighbor->raw.num_keys - 1];
 			n->parent->raw.as_leaf.keys[k_prime_index] = n->raw.as_leaf.keys[0];
 		}

@@ -3,18 +3,13 @@
  * Author: Pascal Pieper
  */
 
-#include "paffs.h"
+#include "paffs.hpp"
+
 #include "paffs_flash.h"
-#include "paffs_trace.h"
 #include "treeCache.h"
 #include <linux/string.h>
 #include <time.h>
-
-static p_dev* device = NULL;
-
-static p_summaryEntry* summaryEntry_containers[2];
-
-PAFFS_RESULT paffs_lasterr = PAFFS_OK;
+#include "paffs_trace.hpp"
 
 //Dentrys zur schnelleren verfügung
 /*#define DENTRY_BUFSIZE 10
@@ -22,7 +17,24 @@ static pDentry* dentry_buf[DENTRY_BUFSIZE];
 static unsigned char dentrys_buf_used = 0;
 */
 
-static const char* PAFFS_RESULT_MSG[] = {
+namespace paffs{
+
+
+Paffs::Paffs(){
+	//normal startup, load drivers
+	driver = getDriver(0);
+	initialize();
+};
+Paffs::Paffs(void* fc){
+	driver = getDriverSpecial(0, fc);
+	initialize();
+}
+Paffs::~Paffs(){
+	delete driver;
+}
+
+
+static const char* resultMsg[] = {
 		"OK",
 		"Unknown error",
 		"Object not found",
@@ -40,11 +52,11 @@ static const char* PAFFS_RESULT_MSG[] = {
 		"You should not be seeing this..."
 };
 
-const char* paffs_err_msg(PAFFS_RESULT pr){
-	return PAFFS_RESULT_MSG[pr];
+const char* paffs_err_msg(Result pr){
+	return Result_MSG[pr];
 }
 
-PAFFS_RESULT paffs_getLastErr(){
+Result paffs_getLastErr(){
 	return paffs_lasterr;
 }
 
@@ -52,7 +64,7 @@ void paffs_resetLastErr(){
 	paffs_lasterr = PAFFS_OK;
 }
 
-PAFFS_RESULT paffs_initialize(p_dev* dev){
+Result paffs_initialize(p_dev* dev){
 	device = dev;
 	p_param* param = &device->param;
 	param->areas_no = param->blocks / 2;	//For now: 16 b -> 8 Areas
@@ -65,7 +77,7 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 	memset(device->areaMap, 0, sizeof(p_area) * device->param.areas_no);
 	summaryEntry_containers[0] = malloc(sizeof(p_summaryEntry) * param->data_pages_per_area);
 	summaryEntry_containers[1] = malloc(sizeof(p_summaryEntry) * param->data_pages_per_area);
-	PAFFS_RESULT r = device->drv.drv_initialise_fn(dev);
+	Result r = device->drv.drv_initialise_fn(dev);
 	if(r != PAFFS_OK)
 		return r;
 
@@ -81,7 +93,7 @@ PAFFS_RESULT paffs_initialize(p_dev* dev){
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT paffs_format(const char* devicename){
+Result paffs_format(const char* devicename){
 	unsigned char had_areaType = 0;		//Efficiency hack, bc there are less than 2⁸ area types
 	for(int area = 0; area < device->param.areas_no; area++){
 		device->areaMap[area].status = EMPTY;
@@ -115,7 +127,7 @@ PAFFS_RESULT paffs_format(const char* devicename){
 
 	}
 
-	PAFFS_RESULT r = start_new_tree(device);
+	Result r = start_new_tree(device);
 	if(r != PAFFS_OK)
 		return r;
 
@@ -135,12 +147,12 @@ PAFFS_RESULT paffs_format(const char* devicename){
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT paffs_mnt(const char* devicename){
+Result paffs_mnt(const char* devicename){
 	if(strcmp(devicename, device->param.name) != 0){
 		return PAFFS_EINVAL;
 	}
 
-	PAFFS_RESULT r = readSuperIndex(device, summaryEntry_containers);
+	Result r = readSuperIndex(device, summaryEntry_containers);
 	if(r == PAFFS_NF){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Tried mounting a device with an empty superblock!");
 		return r;
@@ -153,7 +165,7 @@ PAFFS_RESULT paffs_mnt(const char* devicename){
 
 	return r;
 }
-PAFFS_RESULT paffs_unmnt(const char* devicename){
+Result paffs_unmnt(const char* devicename){
 	if(strcmp(devicename, device->param.name) != 0){
 		return PAFFS_EINVAL;
 	}
@@ -165,7 +177,7 @@ PAFFS_RESULT paffs_unmnt(const char* devicename){
 		}
 	}
 
-	PAFFS_RESULT r = commitTreeCache(device);
+	Result r = commitTreeCache(device);
 	if(r != PAFFS_OK)
 		return r;
 
@@ -181,11 +193,11 @@ PAFFS_RESULT paffs_unmnt(const char* devicename){
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT paffs_createInode(pInode* outInode, paffs_permission mask){
+Result paffs_createInode(pInode* outInode, paffs_permission mask){
 	memset(outInode, 0, sizeof(pInode));
 
 	//FIXME: is this the best way to find a new number?
-	PAFFS_RESULT r = findFirstFreeNo(device, &outInode->no);
+	Result r = findFirstFreeNo(device, &outInode->no);
 	if(r != PAFFS_OK)
 		return r;
 
@@ -202,11 +214,11 @@ PAFFS_RESULT paffs_createInode(pInode* outInode, paffs_permission mask){
 /**
  * creates DirInode ONLY IN RAM
  */
-PAFFS_RESULT paffs_createDirInode(pInode* outInode, paffs_permission mask){
+Result paffs_createDirInode(pInode* outInode, paffs_permission mask){
 	if(paffs_createInode(outInode, mask) != PAFFS_OK)
 		return PAFFS_BUG;
 	outInode->type = PINODE_DIR;
-	outInode->size = sizeof(dirEntryCount_t);		//to hold directory-entry-count. even if it is not commited to flash
+	outInode->size = sizeof(DirEntryCount);		//to hold directory-entry-count. even if it is not commited to flash
 	outInode->reservedSize = 0;
 	return PAFFS_OK;
 }
@@ -214,7 +226,7 @@ PAFFS_RESULT paffs_createDirInode(pInode* outInode, paffs_permission mask){
 /**
  * creates FilInode ONLY IN RAM
  */
-PAFFS_RESULT paffs_createFilInode(pInode* outInode, paffs_permission mask){
+Result paffs_createFilInode(pInode* outInode, paffs_permission mask){
 	if(paffs_createInode(outInode, mask) != PAFFS_OK){
 		return PAFFS_BUG;
 	}
@@ -227,7 +239,7 @@ void paffs_destroyInode(pInode* node){
 	free(node);
 }
 
-PAFFS_RESULT paffs_getParentDir(const char* fullPath, pInode* parDir, unsigned int *lastSlash){
+Result paffs_getParentDir(const char* fullPath, pInode* parDir, unsigned int *lastSlash){
 	if(fullPath[0] == 0){
 		paffs_lasterr = PAFFS_EINVAL;
 		return PAFFS_EINVAL;
@@ -247,41 +259,41 @@ PAFFS_RESULT paffs_getParentDir(const char* fullPath, pInode* parDir, unsigned i
 	memcpy(pathC, fullPath, *lastSlash);
 	pathC[*lastSlash] = 0;
 
-	PAFFS_RESULT r = paffs_getInodeOfElem(parDir, pathC);
+	Result r = paffs_getInodeOfElem(parDir, pathC);
 	free(pathC);
 	return r;
 }
 
 //Currently Linearer Aufwand
-PAFFS_RESULT paffs_getInodeInDir( pInode* outInode, pInode* folder, const char* name){
+Result paffs_getInodeInDir( pInode* outInode, pInode* folder, const char* name){
 	if(folder->type != PINODE_DIR){
 		return PAFFS_BUG;
 	}
 
-	if(folder->size <= sizeof(dirEntryCount_t)){
+	if(folder->size <= sizeof(DirEntryCount)){
 		//Just contains a zero for "No entrys"
 		return PAFFS_NF;
 	}
 
 	char* buf = malloc(folder->size);
 	unsigned int bytes_read = 0;
-	PAFFS_RESULT r = readInodeData(folder, 0, folder->size, &bytes_read, buf, device);
+	Result r = readInodeData(folder, 0, folder->size, &bytes_read, buf, device);
 	if(r != PAFFS_OK || bytes_read != folder->size){
 		free(buf);
 		return r == PAFFS_OK ? PAFFS_BUG : r;
 	}
 
-	unsigned int p = sizeof(dirEntryCount_t);		//skip directory entry count
+	unsigned int p = sizeof(DirEntryCount);		//skip directory entry count
 	while(p < folder->size){
-			dirEntryLength_t direntryl = buf[p];
-			if(direntryl < sizeof(dirEntryLength_t)){
+			DirEntryLength direntryl = buf[p];
+			if(direntryl < sizeof(DirEntryLength)){
 				return PAFFS_BUG;
 			}
-			unsigned int dirnamel = direntryl - sizeof(dirEntryLength_t) - sizeof(pInode_no);
-			p += sizeof(dirEntryLength_t);
-			pInode_no tmp_no;
-			memcpy(&tmp_no, &buf[p], sizeof(pInode_no));
-			p += sizeof(pInode_no);
+			unsigned int dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
+			p += sizeof(DirEntryLength);
+			InodeNo tmp_no;
+			memcpy(&tmp_no, &buf[p], sizeof(InodeNo));
+			p += sizeof(InodeNo);
 			if(p + dirnamel > folder->size){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "ERROR: foldersize of Inode %u not plausible!", folder->no);
 				return PAFFS_FAIL;
@@ -308,10 +320,10 @@ PAFFS_RESULT paffs_getInodeInDir( pInode* outInode, pInode* folder, const char* 
 
 }
 
-PAFFS_RESULT paffs_getInodeOfElem(pInode* outInode, const char* fullPath){
+Result paffs_getInodeOfElem(pInode* outInode, const char* fullPath){
     pInode root;
     if(getInode(device, 0, &root) != PAFFS_OK){
-    	PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find rootInode! (%s)", PAFFS_RESULT_MSG[paffs_lasterr]);
+    	PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find rootInode! (%s)", Result_MSG[paffs_lasterr]);
 		return PAFFS_FAIL;
     }
     pInode *curr = outInode;
@@ -336,7 +348,7 @@ PAFFS_RESULT paffs_getInodeOfElem(pInode* outInode, const char* fullPath){
             return PAFFS_EINVAL;
         }
 
-        PAFFS_RESULT r;
+        Result r;
         if((r = paffs_getInodeInDir(outInode, curr, fnP)) != PAFFS_OK){
         	free(fullPathC);
             return r;
@@ -351,7 +363,7 @@ PAFFS_RESULT paffs_getInodeOfElem(pInode* outInode, const char* fullPath){
 }
 
 
-PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* newElem){
+Result paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* newElem){
 	if(contDir == NULL){
 		paffs_lasterr = PAFFS_BUG;
 		return PAFFS_BUG;
@@ -364,17 +376,17 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 
 	//TODO: Check if name already exists
 
-	dirEntryLength_t direntryl = sizeof(dirEntryLength_t) + sizeof(pInode_no) + dirnamel;	//Size of the new directory entry
+	DirEntryLength direntryl = sizeof(DirEntryLength) + sizeof(InodeNo) + dirnamel;	//Size of the new directory entry
 
 	unsigned char *buf = (unsigned char*) malloc(direntryl);
 	buf[0] = direntryl;
-	memcpy(&buf[sizeof(dirEntryLength_t)], &newElem->no, sizeof(pInode_no));
+	memcpy(&buf[sizeof(DirEntryLength)], &newElem->no, sizeof(InodeNo));
 
-	memcpy(&buf[sizeof(dirEntryLength_t) + sizeof(pInode_no)], name, dirnamel);
+	memcpy(&buf[sizeof(DirEntryLength) + sizeof(InodeNo)], name, dirnamel);
 
 	char* dirData = malloc(contDir->size +  direntryl);
 	unsigned int bytes = 0;
-	PAFFS_RESULT r;
+	Result r;
 	if(contDir->reservedSize > 0){		//if Directory is not empty
 		r = readInodeData(contDir, 0, contDir->size, &bytes, dirData, device);
 		if(r != PAFFS_OK || bytes != contDir->size){
@@ -390,10 +402,10 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 	//append record
 	memcpy (&dirData[contDir->size], buf, direntryl);
 
-	dirEntryCount_t directoryEntryCount = 0;
-	memcpy (&directoryEntryCount, dirData, sizeof(dirEntryCount_t));
+	DirEntryCount directoryEntryCount = 0;
+	memcpy (&directoryEntryCount, dirData, sizeof(DirEntryCount));
 	directoryEntryCount ++;
-	memcpy (dirData, &directoryEntryCount, sizeof(dirEntryCount_t));
+	memcpy (dirData, &directoryEntryCount, sizeof(DirEntryCount));
 
 	r = writeInodeData(contDir, 0, contDir->size + direntryl, &bytes, dirData, device);
 	free(dirData);
@@ -406,7 +418,7 @@ PAFFS_RESULT paffs_insertInodeInDir(const char* name, pInode* contDir, pInode* n
 
 
 //TODO: mark deleted treeCacheNodes as dirty
-PAFFS_RESULT paffs_removeInodeFromDir(pInode* contDir, pInode* elem){
+Result paffs_removeInodeFromDir(pInode* contDir, pInode* elem){
 	if(contDir == NULL){
 		paffs_lasterr = PAFFS_BUG;
 		return PAFFS_BUG;
@@ -414,7 +426,7 @@ PAFFS_RESULT paffs_removeInodeFromDir(pInode* contDir, pInode* elem){
 
 	char* dirData = malloc(contDir->size);
 	unsigned int bytes = 0;
-	PAFFS_RESULT r;
+	Result r;
 	if(contDir->reservedSize > 0){		//if Directory is not empty
 		r = readInodeData(contDir, 0, contDir->size, &bytes, dirData, device);
 		if(r != PAFFS_OK || bytes != contDir->size){
@@ -427,11 +439,11 @@ PAFFS_RESULT paffs_removeInodeFromDir(pInode* contDir, pInode* elem){
 	}
 
 
-	dirEntryCount_t *entries = (dirEntryCount_t*) &dirData[0];
-	fileSize_t pointer = sizeof(dirEntryCount_t);
+	DirEntryCount *entries = (DirEntryCount*) &dirData[0];
+	FileSize pointer = sizeof(DirEntryCount);
 	while(pointer < contDir->size){
-		dirEntryLength_t entryl = (dirEntryLength_t) dirData[pointer];
-		if(memcmp(&dirData[pointer + sizeof(dirEntryLength_t)], &(elem->no), sizeof(pInode_no)) == 0){
+		DirEntryLength entryl = (DirEntryLength) dirData[pointer];
+		if(memcmp(&dirData[pointer + sizeof(DirEntryLength)], &(elem->no), sizeof(InodeNo)) == 0){
 			//Found
 			unsigned int newSize = contDir->size - entryl;
 			unsigned int restByte = newSize - pointer;
@@ -457,16 +469,16 @@ PAFFS_RESULT paffs_removeInodeFromDir(pInode* contDir, pInode* elem){
 	return PAFFS_NF;
 }
 
-PAFFS_RESULT paffs_mkdir(const char* fullPath, paffs_permission mask){
+Result paffs_mkdir(const char* fullPath, paffs_permission mask){
 	unsigned int lastSlash = 0;
 
 	pInode parDir;
-	PAFFS_RESULT res = paffs_getParentDir(fullPath, &parDir, &lastSlash);
+	Result res = paffs_getParentDir(fullPath, &parDir, &lastSlash);
 	if(res != PAFFS_OK)
 		return res;
 
 	pInode newDir;
-	PAFFS_RESULT r = paffs_createDirInode(&newDir, mask);
+	Result r = paffs_createDirInode(&newDir, mask);
 	if(r != PAFFS_OK)
 		return r;
 	r = insertInode(device, &newDir);
@@ -483,7 +495,7 @@ paffs_dir* paffs_opendir(const char* path){
 	}
 
 	pInode dirPinode;
-	PAFFS_RESULT r = paffs_getInodeOfElem(&dirPinode, path);
+	Result r = paffs_getInodeOfElem(&dirPinode, path);
 	if(r != PAFFS_OK){
 		if(r != PAFFS_NF){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "BUG? '%s'", paffs_err_msg(r));
@@ -515,15 +527,15 @@ paffs_dir* paffs_opendir(const char* path){
 	dir->dirents = malloc(dir->no_entrys * sizeof(paffs_dirent*));
 	dir->pos = 0;
 
-	unsigned int p = sizeof(dirEntryCount_t);
+	unsigned int p = sizeof(DirEntryCount);
 	unsigned int entry;
 	for(entry = 0; p < dirPinode.size; entry++){
 
 		dir->dirents[entry] = malloc (sizeof(paffs_dirent));
 		memset(dir->dirents[entry], 0, sizeof(paffs_dirent));
-		dirEntryLength_t direntryl = dirData[p];
-		unsigned int dirnamel = direntryl - sizeof(dirEntryLength_t) - sizeof(pInode_no);
-		if(dirnamel > 1 << sizeof(dirEntryLength_t) * 8){
+		DirEntryLength direntryl = dirData[p];
+		unsigned int dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
+		if(dirnamel > 1 << sizeof(DirEntryLength) * 8){
 			//We have an error while reading
 			PAFFS_DBG(PAFFS_TRACE_BUG, "Dirname length was bigger than possible (%u)!", dirnamel);
 			for(int i = 0; i <= entry; i++)
@@ -536,10 +548,10 @@ paffs_dir* paffs_opendir(const char* path){
 			paffs_lasterr = PAFFS_BUG;
 			return NULL;
 		}
-		p += sizeof(dirEntryLength_t);
-		memcpy(&dir->dirents[entry]->node_no, &dirData[p], sizeof(pInode_no));
+		p += sizeof(DirEntryLength);
+		memcpy(&dir->dirents[entry]->node_no, &dirData[p], sizeof(InodeNo));
 		dir->dirents[entry]->node = NULL;
-		p += sizeof(pInode_no);
+		p += sizeof(InodeNo);
 		dir->dirents[entry]->name = malloc(dirnamel+2);    //+2 weil 1. Nullbyte und 2. Vielleicht ein Zeichen '/' dazukommt
 		memcpy(dir->dirents[entry]->name, &dirData[p], dirnamel);
 		dir->dirents[entry]->name[dirnamel] = 0;
@@ -557,7 +569,7 @@ paffs_dir* paffs_opendir(const char* path){
 	return dir;
 }
 
-PAFFS_RESULT paffs_closedir(paffs_dir* dir){
+Result paffs_closedir(paffs_dir* dir){
 	if(dir->dirents == NULL)
 		return PAFFS_EINVAL;
     for(int i = 0; i < dir->no_entrys; i++){
@@ -606,7 +618,7 @@ paffs_dirent* paffs_readdir(paffs_dir* dir){
 		return dir->dirents[dir->pos++];
 	}
 	pInode item;
-	PAFFS_RESULT r = getInode(device, dir->dirents[dir->pos]->node_no, &item);
+	Result r = getInode(device, dir->dirents[dir->pos]->node_no, &item);
 	if(r != PAFFS_OK){
 	   paffs_lasterr = PAFFS_BUG;
 	   return NULL;
@@ -631,11 +643,11 @@ void paffs_rewinddir(paffs_dir* dir){
     dir->pos = 0;
 }
 
-PAFFS_RESULT paffs_createFile(pInode* outFile, const char* fullPath, paffs_permission mask){
+Result paffs_createFile(pInode* outFile, const char* fullPath, paffs_permission mask){
 	unsigned int lastSlash = 0;
 
 	pInode parDir;
-	PAFFS_RESULT res = paffs_getParentDir(fullPath, &parDir, &lastSlash);
+	Result res = paffs_getParentDir(fullPath, &parDir, &lastSlash);
 	if(res != PAFFS_OK)
 		return res;
 
@@ -649,9 +661,9 @@ PAFFS_RESULT paffs_createFile(pInode* outFile, const char* fullPath, paffs_permi
 	return paffs_insertInodeInDir(&fullPath[lastSlash], &parDir, outFile);
 }
 
-paffs_obj* paffs_open(const char* path, fileopenmask mask){
+paffs_obj* paffs_open(const char* path, Fileopenmask mask){
 	pInode file;
-	PAFFS_RESULT r = paffs_getInodeOfElem(&file, path);
+	Result r = paffs_getInodeOfElem(&file, path);
 	if(r == PAFFS_NF){
 		//create new file
 		if(mask & PAFFS_FC){
@@ -706,7 +718,7 @@ paffs_obj* paffs_open(const char* path, fileopenmask mask){
 	return obj;
 }
 
-PAFFS_RESULT paffs_close(paffs_obj* obj){
+Result paffs_close(paffs_obj* obj){
 	if(obj == NULL)
 		return PAFFS_EINVAL;
 	paffs_flush(obj);
@@ -718,12 +730,12 @@ PAFFS_RESULT paffs_close(paffs_obj* obj){
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT paffs_touch(const char* path){
+Result paffs_touch(const char* path){
 	pInode file;
-	PAFFS_RESULT r = paffs_getInodeOfElem(&file, path);
+	Result r = paffs_getInodeOfElem(&file, path);
 	if(r == PAFFS_NF){
 		//create new file
-		PAFFS_RESULT r2 = paffs_createFile(&file, path, PAFFS_R | PAFFS_W);
+		Result r2 = paffs_createFile(&file, path, PAFFS_R | PAFFS_W);
 		if(r2 != PAFFS_OK){
 			return r2;
 		}
@@ -738,9 +750,9 @@ PAFFS_RESULT paffs_touch(const char* path){
 }
 
 
-PAFFS_RESULT paffs_getObjInfo(const char *fullPath, paffs_objInfo* nfo){
+Result paffs_getObjInfo(const char *fullPath, paffs_objInfo* nfo){
 	pInode object;
-	PAFFS_RESULT r;
+	Result r;
 	if((r = paffs_getInodeOfElem(&object, fullPath)) != PAFFS_OK){
 		return paffs_lasterr = r;
 	}
@@ -752,7 +764,7 @@ PAFFS_RESULT paffs_getObjInfo(const char *fullPath, paffs_objInfo* nfo){
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT paffs_read(paffs_obj* obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read){
+Result paffs_read(paffs_obj* obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read){
 	if(obj == NULL)
 		return paffs_lasterr = PAFFS_EINVAL;
 
@@ -770,7 +782,7 @@ PAFFS_RESULT paffs_read(paffs_obj* obj, char* buf, unsigned int bytes_to_read, u
 		return PAFFS_OK;
 	}
 
-	PAFFS_RESULT r = readInodeData(obj->dentry->iNode, obj->fp, bytes_to_read, bytes_read, buf, device);
+	Result r = readInodeData(obj->dentry->iNode, obj->fp, bytes_to_read, bytes_read, buf, device);
 	if(r != PAFFS_OK){
 		return r;
 	}
@@ -780,7 +792,7 @@ PAFFS_RESULT paffs_read(paffs_obj* obj, char* buf, unsigned int bytes_to_read, u
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written){
+Result paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written){
 	if(obj == NULL)
 		return PAFFS_EINVAL;
 
@@ -793,7 +805,7 @@ PAFFS_RESULT paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_
 	if((obj->dentry->iNode->perm & PAFFS_W) == 0)
 		return PAFFS_NOPERM;
 
-	PAFFS_RESULT r = writeInodeData(obj->dentry->iNode, obj->fp, bytes_to_write, bytes_written, buf, device);
+	Result r = writeInodeData(obj->dentry->iNode, obj->fp, bytes_to_write, bytes_written, buf, device);
 	if(r != PAFFS_OK){
 		return r;
 	}
@@ -811,7 +823,7 @@ PAFFS_RESULT paffs_write(paffs_obj* obj, const char* buf, unsigned int bytes_to_
 	return updateExistingInode(device, obj->dentry->iNode);
 }
 
-PAFFS_RESULT paffs_seek(paffs_obj* obj, int m, paffs_seekmode mode){
+Result paffs_seek(paffs_obj* obj, int m, paffs_seekmode mode){
 	switch(mode){
 	case PAFFS_SEEK_SET:
 		if(m < 0)
@@ -830,22 +842,22 @@ PAFFS_RESULT paffs_seek(paffs_obj* obj, int m, paffs_seekmode mode){
 }
 
 
-PAFFS_RESULT paffs_flush(paffs_obj* obj){
+Result paffs_flush(paffs_obj* obj){
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT paffs_chmod(const char* path, paffs_permission perm){
+Result paffs_chmod(const char* path, paffs_permission perm){
 	pInode object;
-	PAFFS_RESULT r;
+	Result r;
 	if((r = paffs_getInodeOfElem(&object, path)) != PAFFS_OK){
 		return r;
 	}
 	object.perm = perm;
 	return updateExistingInode(device, &object);
 }
-PAFFS_RESULT paffs_remove(const char* path){
+Result paffs_remove(const char* path){
 	pInode object;
-	PAFFS_RESULT r;
+	Result r;
 	if((r = paffs_getInodeOfElem(&object, path)) != PAFFS_OK)
 		return r;
 
@@ -853,7 +865,7 @@ PAFFS_RESULT paffs_remove(const char* path){
 		return PAFFS_NOPERM;
 
 	if(object.type == PINODE_DIR)
-		if(object.size > sizeof(dirEntryCount_t))
+		if(object.size > sizeof(DirEntryCount))
 			return PAFFS_DIRNOTEMPTY;
 
 	if((r = deleteInodeData(&object, device, 0)) != PAFFS_OK)
@@ -875,3 +887,4 @@ p_dev* getDevice(){
 	return device;
 }
 
+}

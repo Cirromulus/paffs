@@ -9,7 +9,8 @@
 #define DS_PAFFS_SUPERBLOCK_H_
 
 #include <stdint.h>
-#include "paffs.h"
+
+#include "paffs.hpp"
 
 typedef struct anchorEntry{
 	uint32_t no;	//This only has to hold as many numbers as there are pages in superblock area
@@ -37,7 +38,7 @@ PAFFS_RESULT registerRootnode(p_dev* dev, p_addr addr);
 p_addr getRootnodeAddr(p_dev* dev);
 
 //returns PAFFS_NF if no superindex is in flash
-PAFFS_RESULT readSuperIndex(p_dev* dev, p_summaryEntry **summary_Containers);
+PAFFS_RESULT readSuperIndex(p_dev* dev, summaryEntry **summary_Containers);
 PAFFS_RESULT commitSuperIndex(p_dev* dev);
 
 
