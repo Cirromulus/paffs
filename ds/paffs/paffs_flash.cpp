@@ -5,8 +5,8 @@
  *      Author: rooot
  */
 
-#include "paffs_flash.h"
-#include "garbage_collection.h"
+#include "paffs_flash.hpp"
+#include "garbage_collection.hpp"
 #include <stdlib.h>
 #include <string.h>
 

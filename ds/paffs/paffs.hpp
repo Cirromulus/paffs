@@ -137,7 +137,7 @@ struct ObjInfo{
 	Permission perm;
 };
 
-enum class AreaType{
+enum class AreaType : uint8_t{
 	unset = 0,
 	superblockarea,
 	indexarea,
@@ -148,13 +148,13 @@ enum class AreaType{
 	no
 };
 
-enum class AreaStatus{
+enum class AreaStatus : uint8_t{
 	closed = 0,
 	active,
 	empty
 };
 
-enum class __attribute__ ((packed))  summaryEntry{
+enum SummaryEntry : uint8_t{
 	free = 0,
 	used,		//if read from super index, used can mean both free and used to save a bit per entry.
 	dirty
@@ -165,14 +165,14 @@ struct Area{
 	AreaStatus status:2;
 	uint32_t erasecount:17;	//Overflow at 132.000 is acceptable (assuming less than 100k erase cycles)
 	AreaPos position;	//physical position, not logical
-	summaryEntry* areaSummary; //May be invalid if status == closed; Optimizable bitusage
+	SummaryEntry* areaSummary; //May be invalid if status == closed; Optimizable bitusage
 	bool has_areaSummary:1;		//TODO: Check if really necessary for superindex
 	bool isAreaSummaryDirty:1;
 };	//3 + 2 + 17 + 1 + 32 (+64/32) = 55 (119/87) Bit = 6,875 (14,875/10,875) Byte
 
 struct Dev{
 	Param param;
-	AreaPos activeArea[static_cast<int>(AreaType::no)];
+	AreaPos activeArea[AreaType::no];
 	//Automatically filled
 	Obj root_dir;
 	Area* areaMap;
@@ -180,8 +180,8 @@ struct Dev{
 
 class Paffs{
 	Driver *driver;
-	summaryEntry* summaryEntry_containers[2];
-	Result paffs_lasterr = Result::ok;
+	SummaryEntry* summaryEntry_containers[2];
+	Result lasterr = Result::ok;
 
 public:
 	Paffs();

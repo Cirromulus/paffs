@@ -5,12 +5,12 @@ ${CMAKE_CURRENT_SOURCE_DIR}
 
 set(SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/paffs.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/paffs_flash.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/btree.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/treeCache.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/superblock.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/garbage_collection.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/treequeue.c #currently only used for debugging
+    ${CMAKE_CURRENT_SOURCE_DIR}/paffs_flash.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/btree.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/treeCache.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/superblock.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/garbage_collection.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/treequeue.cpp #currently only used for debugging
 )
 
 COMPILE_AS_CXX11()
@@ -20,7 +20,6 @@ add_subdirectory(driver)
 add_library(paffs ${SOURCES})
 target_compile_definitions(paffs 
 	PUBLIC TREENODECACHESIZE=5
-	
 )
 set_target_properties(paffs PROPERTIES
 	COMPILE_FLAGS "-Wall"

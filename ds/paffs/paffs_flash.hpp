@@ -8,9 +8,9 @@
 #ifndef PAFFS_FLASH_H_
 #define PAFFS_FLASH_H_
 
-#include "btree.h"
+#include "btree.hpp"
 #include "paffs.hpp"
-#include "superblock.h"
+#include "superblock.hpp"
 
 //Returns same area if there is still writable Space left
 unsigned int findWritableArea(areaType areaType, p_dev* dev);

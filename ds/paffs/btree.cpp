@@ -3,10 +3,10 @@
  * Author: Pascal Pieper
  */
 
-#include "btree.h"
-#include "paffs_flash.h"
-#include "treequeue.h"
-#include "treeCache.h"
+#include "btree.hpp"
+#include "paffs_flash.hpp"
+#include "treequeue.hpp"
+#include "treeCache.hpp"
 #include <stdio.h>
 #include <stdlib.h> 
 #include <string.h>

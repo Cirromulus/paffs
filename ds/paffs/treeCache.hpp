@@ -8,7 +8,7 @@
 #ifndef TREECACHE_H_
 #define TREECACHE_H_
 
-#include "btree.h"
+#include "btree.hpp"
 #include "paffs.hpp"
 
 
