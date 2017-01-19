@@ -8,11 +8,10 @@
 #pragma once
 
 #include <stddef.h>
+#include "driver.hpp"
 #include "../../../simu/flashCell.h"
 
 namespace paffs{
-enum class Result;
-
 
 class SimuDriver : public Driver{
 	FlashCell *cell;

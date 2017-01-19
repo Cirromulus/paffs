@@ -27,15 +27,15 @@ static const int btree_branch_order = BRANCH_ORDER;
 static const int btree_leaf_order = LEAF_ORDER;
 
 typedef struct treeNode{
-	union {
-		struct as_branch {
+	union as{
+		struct branch {
 			InodeNo keys[BRANCH_ORDER-1];
 			Addr pointers[BRANCH_ORDER];
-		} as_branch;
-		struct as_leaf {
+		};
+		struct leaf {
 			InodeNo keys[LEAF_ORDER];
 			Inode pInodes[LEAF_ORDER];
-		} as_leaf;
+		};
 	};
 	Addr self;	//If '0', it is not committed yet
 	bool is_leaf:1;

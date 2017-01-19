@@ -14,6 +14,8 @@
 
 namespace paffs{
 
+extern const char* area_names[];
+
 //Returns same area if there is still writable Space left
 unsigned int findWritableArea(AreaType areaType, Dev* dev);
 
@@ -64,8 +66,8 @@ Result writeAnchorEntry(Dev* dev, Addr _addr, AnchorEntry* entry);
 Result readAnchorEntry(Dev* dev, Addr addr, AnchorEntry* entry);
 Result deleteAnchorBlock(Dev* dev, uint32_t area, uint8_t block);
 
-Result writeJumpPadEntry(Dev* dev, Addr addr, jumpPadEntry* entry);
-Result readJumpPadEntry(Dev* dev, Addr addr, jumpPadEntry* entry);
+Result writeJumpPadEntry(Dev* dev, Addr addr, JumpPadEntry* entry);
+Result readJumpPadEntry(Dev* dev, Addr addr, JumpPadEntry* entry);
 
 Result writeSuperIndex(Dev* dev, Addr addr, superIndex* entry);
 Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry,  SummaryEntry* summary_Containers[2], bool withAreaMap);

@@ -8,8 +8,9 @@
 #ifndef DS_PAFFS_PAFFS_TRACE_H_
 #define DS_PAFFS_PAFFS_TRACE_H_
 
-
-extern unsigned int paffs_trace_mask;
+namespace paffs{
+	extern unsigned int paffs_trace_mask;
+}
 
 #include <string.h>
 #include <signal.h>

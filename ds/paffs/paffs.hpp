@@ -10,16 +10,18 @@
 
 
 #include "paffs_trace.hpp"
-#include "driver/driverconf.hpp"
+
 
 #define BYTES_PER_PAGE 512
 
 namespace paffs{
 
+class Driver;
+
 extern char* areaNames[];		//Initialized in paffs_flash.c
 extern const char* resultMsg[];		//Initialized in paffs.cpp
 
-enum class Result{
+enum class Result : uint8_t{
 	ok = 0,
 	fail,
 	nf,
