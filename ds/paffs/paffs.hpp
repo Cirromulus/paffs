@@ -5,10 +5,9 @@
 
 #pragma once
 
-#include <stdbool.h>
-#include <stdlib.h>
+
 #include <stdint.h>
-#include <stdio.h>
+
 
 #include "paffs_trace.hpp"
 #include "driver/driverconf.hpp"
@@ -18,7 +17,7 @@
 namespace paffs{
 
 extern char* areaNames[];		//Initialized in paffs_flash.c
-extern char* resultMsg[];		//Initialized in paffs.cpp
+extern const char* resultMsg[];		//Initialized in paffs.cpp
 
 enum class Result{
 	ok = 0,
@@ -38,6 +37,8 @@ enum class Result{
 	num_result
 };
 
+const char* err_msg(Result pr);
+
 typedef char Permission;
 
 static const Permission PAFFS_R = 0x1;
@@ -53,7 +54,7 @@ static const Fileopenmask PAFFS_FA = 0x08;	//file append
 static const Fileopenmask PAFFS_FE = 0x10;	//file open only existing
 static const Fileopenmask PAFFS_FC = 0x20;	//file create
 
-enum class seekmode{
+enum class Seekmode{
 	set = 0,
 	cur,
 	end
@@ -107,12 +108,12 @@ struct Inode{
 struct Dentry{
 	char* name;		//is actually full path
 	Inode* iNode;
-	struct pDentry* parent;
+	struct Dentry* parent;
 };
 
 struct Obj{
 	bool rdnly;
-	pDentry* dentry;
+	Dentry* dentry;
 	unsigned int fp;	//Current filepointer
 };
 
@@ -123,7 +124,7 @@ struct Dirent{
 };
 
 struct Dir{
-	pDentry* dentry;
+	Dentry* dentry;
 	Dirent** dirents;
 	DirEntryCount no_entrys;
 	unsigned int pos;
@@ -137,7 +138,7 @@ struct ObjInfo{
 	Permission perm;
 };
 
-enum class AreaType : uint8_t{
+enum AreaType : uint8_t{
 	unset = 0,
 	superblockarea,
 	indexarea,
@@ -148,13 +149,13 @@ enum class AreaType : uint8_t{
 	no
 };
 
-enum class AreaStatus : uint8_t{
+enum AreaStatus : uint8_t{
 	closed = 0,
 	active,
 	empty
 };
 
-enum SummaryEntry : uint8_t{
+enum class SummaryEntry : uint8_t{
 	free = 0,
 	used,		//if read from super index, used can mean both free and used to save a bit per entry.
 	dirty
@@ -180,6 +181,7 @@ struct Dev{
 
 class Paffs{
 	Driver *driver;
+	Dev* device; 	//TODO: is actually in driver decide where to go with it
 	SummaryEntry* summaryEntry_containers[2];
 	Result lasterr = Result::ok;
 
@@ -193,7 +195,6 @@ public:
 	Result format(const char* devicename);
 	Result mnt(const char* devicename);
 	Result unmnt(const char* devicename);
-	const char* err_msg(Result pr);
 	Result getLastErr();
 	void resetLastErr();
 
@@ -211,7 +212,7 @@ public:
 	Result getObjInfo(const char *fullPath, ObjInfo* nfo);
 	Result read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read);
 	Result write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written);
-	Result seek(Obj* obj, int m, seekmode mode);
+	Result seek(Obj* obj, int m, Seekmode mode);
 	Result flush(Obj* obj);
 	Result truncate(Obj* obj);
 

@@ -19,7 +19,8 @@ class SimuDriver : public Driver{
 	bool selfLoaded = false;
 public:
 	SimuDriver(){
-
+		selfLoaded = true;
+		cell = new FlashCell();
 	}
 	SimuDriver(FlashCell *c) : cell(c){
 

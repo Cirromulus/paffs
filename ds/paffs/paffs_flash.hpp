@@ -12,61 +12,64 @@
 #include "paffs.hpp"
 #include "superblock.hpp"
 
+namespace paffs{
+
 //Returns same area if there is still writable Space left
-unsigned int findWritableArea(areaType areaType, p_dev* dev);
+unsigned int findWritableArea(AreaType areaType, Dev* dev);
 
-PAFFS_RESULT findFirstFreePage(unsigned int* p_out, p_dev* dev, unsigned int area);
+Result findFirstFreePage(unsigned int* p_out, Dev* dev, unsigned int area);
 
-uint64_t getPageNumber(p_addr addr, p_dev *dev);	//Translates p_addr to physical page number in respect to the Area mapping
+uint64_t getPageNumber(Addr addr, Dev *dev);	//Translates Addr to physical page number in respect to the Area mapping
 
-p_addr combineAddress(uint32_t logical_area, uint32_t page);
-unsigned int extractLogicalArea(p_addr addr);			//Address-wrapper für einfacheren Garbagecollector
-unsigned int extractPage(p_addr addr);
+Addr combineAddress(uint32_t logical_area, uint32_t page);
+unsigned int extractLogicalArea(Addr addr);			//Address-wrapper für einfacheren Garbagecollector
+unsigned int extractPage(Addr addr);
 
-PAFFS_RESULT manageActiveAreaFull(p_dev *dev, area_pos_t *area, areaType areaType);
+Result manageActiveAreaFull(Dev *dev, AreaPos *area, AreaType areaType);
 
-PAFFS_RESULT writeAreasummary(p_dev *dev, area_pos_t area, p_summaryEntry* summary);
+Result writeAreasummary(Dev *dev, AreaPos area, SummaryEntry* summary);
 
-PAFFS_RESULT readAreasummary(p_dev *dev, area_pos_t area, p_summaryEntry* out_summary, bool complete);
+Result readAreasummary(Dev *dev, AreaPos area, SummaryEntry* out_summary, bool complete);
 
-void initArea(p_dev* dev, area_pos_t area);
-PAFFS_RESULT loadArea(p_dev *dev, area_pos_t area);
-PAFFS_RESULT closeArea(p_dev *dev, area_pos_t area);
-void retireArea(p_dev *dev, area_pos_t area);
+void initArea(Dev* dev, AreaPos area);
+Result loadArea(Dev *dev, AreaPos area);
+Result closeArea(Dev *dev, AreaPos area);
+void retireArea(Dev *dev, AreaPos area);
 
 
 
 //Updates changes to treeCache as well
-PAFFS_RESULT writeInodeData(pInode* inode,
+Result writeInodeData(Inode* inode,
 					unsigned int offs, unsigned int bytes,unsigned int *bytes_written,
-					const char* data, p_dev* dev);
-PAFFS_RESULT readInodeData(pInode* inode,
+					const char* data, Dev* dev);
+Result readInodeData(Inode* inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_read,
-					char* data, p_dev* dev);
-PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev, unsigned int offs);
+					char* data, Dev* dev);
+Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs);
 
 
 
 
 // TreeNode related
-PAFFS_RESULT writeTreeNode(p_dev* dev, treeNode* node);
-PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node);
-PAFFS_RESULT deleteTreeNode(p_dev* dev, treeNode* node);
+Result writeTreeNode(Dev* dev, treeNode* node);
+Result readTreeNode(Dev* dev, Addr addr, treeNode* node);
+Result deleteTreeNode(Dev* dev, treeNode* node);
 
 
 // Superblock related
-PAFFS_RESULT findFirstFreeEntryInBlock(p_dev* dev, uint32_t area, uint8_t block, uint32_t* out_pos, unsigned int required_pages);
-PAFFS_RESULT findMostRecentEntryInBlock(p_dev* dev, uint32_t area, uint8_t block, uint32_t* out_pos, uint32_t* out_index);
+Result findFirstFreeEntryInBlock(Dev* dev, uint32_t area, uint8_t block, uint32_t* out_pos, unsigned int required_pages);
+Result findMostRecentEntryInBlock(Dev* dev, uint32_t area, uint8_t block, uint32_t* out_pos, uint32_t* out_index);
 
-PAFFS_RESULT writeAnchorEntry(p_dev* dev, p_addr _addr, anchorEntry* entry);
-PAFFS_RESULT readAnchorEntry(p_dev* dev, p_addr addr, anchorEntry* entry);
-PAFFS_RESULT deleteAnchorBlock(p_dev* dev, uint32_t area, uint8_t block);
+Result writeAnchorEntry(Dev* dev, Addr _addr, AnchorEntry* entry);
+Result readAnchorEntry(Dev* dev, Addr addr, AnchorEntry* entry);
+Result deleteAnchorBlock(Dev* dev, uint32_t area, uint8_t block);
 
-PAFFS_RESULT writeJumpPadEntry(p_dev* dev, p_addr addr, jumpPadEntry* entry);
-PAFFS_RESULT readJumpPadEntry(p_dev* dev, p_addr addr, jumpPadEntry* entry);
+Result writeJumpPadEntry(Dev* dev, Addr addr, jumpPadEntry* entry);
+Result readJumpPadEntry(Dev* dev, Addr addr, jumpPadEntry* entry);
 
-PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry);
-PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry,  p_summaryEntry* summary_Containers[2], bool withAreaMap);
+Result writeSuperIndex(Dev* dev, Addr addr, superIndex* entry);
+Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry,  SummaryEntry* summary_Containers[2], bool withAreaMap);
 
+}
 
 #endif /* PAFFS_FLASH_H_ */

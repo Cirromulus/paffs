@@ -12,7 +12,7 @@
 static p_addr rootnode_addr = 0;
 static bool rootnode_dirty = 0;
 
-PAFFS_RESULT registerRootnode(p_dev* dev, p_addr addr){
+Result registerRootnode(Dev* dev, p_addr addr){
 	if(addr == 0)
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Tried to set Rootnode to 0");
 	rootnode_addr = addr;
@@ -20,7 +20,7 @@ PAFFS_RESULT registerRootnode(p_dev* dev, p_addr addr){
 	return PAFFS_OK;
 }
 
-p_addr getRootnodeAddr(p_dev* dev){
+p_addr getRootnodeAddr(Dev* dev){
 	if(rootnode_addr == 0){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "rootnode_address is 0! Maybe device not mounted?");
 	}
@@ -56,15 +56,15 @@ void printSuperIndex(superIndex* ind){
 }
 
 
-PAFFS_RESULT getAddrOfMostRecentSuperIndex(p_dev* dev, p_addr *out){
+Result getAddrOfMostRecentSuperIndex(Dev* dev, p_addr *out){
 
 	uint32_t pos1, index1;
-	PAFFS_RESULT r1 = findMostRecentEntryInBlock(dev, 0, 0, &pos1, &index1);
+	Result r1 = findMostRecentEntryInBlock(dev, 0, 0, &pos1, &index1);
 	if(r1 != PAFFS_OK && r1 != PAFFS_NF)
 		return r1;
 
 	uint32_t pos2, index2;
-	PAFFS_RESULT r2 = findMostRecentEntryInBlock(dev, 0, 1, &pos2, &index2);
+	Result r2 = findMostRecentEntryInBlock(dev, 0, 1, &pos2, &index2);
 	if(r2 != PAFFS_OK && r2 != PAFFS_NF)
 		return r2;
 
@@ -77,7 +77,7 @@ PAFFS_RESULT getAddrOfMostRecentSuperIndex(p_dev* dev, p_addr *out){
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT commitSuperIndex(p_dev* dev){
+Result commitSuperIndex(Dev* dev){
 	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(p_addr) +
 			dev->param.areas_no * (sizeof(p_area) - sizeof(summaryEntry*)) + // AreaMap without summaryEntry pointer
 			2 * dev->param.data_pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
@@ -85,14 +85,14 @@ PAFFS_RESULT commitSuperIndex(p_dev* dev){
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed for SuperIndex: %d (%d bytes)", needed_pages, needed_bytes);
 
 	uint32_t rel_page1 = 0;
-	PAFFS_RESULT r1 = findFirstFreeEntryInBlock(dev, 0, 0, &rel_page1, needed_pages);
+	Result r1 = findFirstFreeEntryInBlock(dev, 0, 0, &rel_page1, needed_pages);
 	if(r1 != PAFFS_OK && r1 != PAFFS_NF){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Error while getting space on first block for new superIndex!");
 		return r1;
 	}
 
 	uint32_t rel_page2 = 0;
-	PAFFS_RESULT r2 = findFirstFreeEntryInBlock(dev, 0, 1, &rel_page2, needed_pages);
+	Result r2 = findFirstFreeEntryInBlock(dev, 0, 1, &rel_page2, needed_pages);
 	if(r2 != PAFFS_OK && r2 != PAFFS_NF){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Error while getting space on second block for new superIndex!");
 		return r2;
@@ -133,7 +133,7 @@ PAFFS_RESULT commitSuperIndex(p_dev* dev){
 	p_addr target = chosen_block == 0 ? combineAddress(0, rel_page1) : combineAddress(0, rel_page2 + dev->param.pages_per_block);
 
 	p_addr lastEntry;
- 	PAFFS_RESULT r = getAddrOfMostRecentSuperIndex(dev, &lastEntry);
+ 	Result r = getAddrOfMostRecentSuperIndex(dev, &lastEntry);
 	if(r != PAFFS_OK && r != PAFFS_NF){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not determine Address of last SuperIndex!");
 		return r;
@@ -175,9 +175,9 @@ PAFFS_RESULT commitSuperIndex(p_dev* dev){
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT readSuperIndex(p_dev* dev, summaryEntry **summary_Containers){
+Result readSuperIndex(Dev* dev, summaryEntry **summary_Containers){
 	p_addr addr;
-	PAFFS_RESULT r = getAddrOfMostRecentSuperIndex(dev, &addr);
+	Result r = getAddrOfMostRecentSuperIndex(dev, &addr);
 	if(r != PAFFS_OK)
 		return r;
 

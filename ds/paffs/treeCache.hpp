@@ -5,50 +5,48 @@
  *      Author: rooot
  */
 
-#ifndef TREECACHE_H_
-#define TREECACHE_H_
-
+#pragma once
 #include "btree.hpp"
 #include "paffs.hpp"
 
-
+namespace paffs{
 // "private"
 
 int16_t findFirstFreeIndex();
 
-int16_t getIndexFromPointer(treeCacheNode* tcn);
+int16_t getIndexFromPointer(TreeCacheNode* tcn);
 
-PAFFS_RESULT addNewCacheNode(treeCacheNode** newTcn);
+Result addNewCacheNode(TreeCacheNode** newTcn);
 
-bool isParentPathClean(treeCacheNode* tcn);
+bool isParentPathClean(TreeCacheNode* tcn);
 
 /**
  * returns true if any sibling is dirty
  * stops at first occurrence.
  */
-bool areSiblingsClean(treeCacheNode* tcn);
+bool areSiblingsClean(TreeCacheNode* tcn);
 
 
 /**
  * Consistency checkers for Treecache
  */
-bool isSubTreeValid(treeCacheNode* node, uint8_t* cache_node_reachable, long keyMin, long keyMax);
+bool isSubTreeValid(TreeCacheNode* node, uint8_t* cache_node_reachable, long keyMin, long keyMax);
 bool isTreeCacheValid();
 
 /**
  * returns true if path contains dirty elements
  * traverses through all paths and marks them
  */
-bool resolveDirtyPaths(treeCacheNode* tcn);
+bool resolveDirtyPaths(TreeCacheNode* tcn);
 
-void markParentPathDirty(treeCacheNode* tcn);
+void markParentPathDirty(TreeCacheNode* tcn);
 
-void deleteFromParent(treeCacheNode* tcn);
+void deleteFromParent(TreeCacheNode* tcn);
 
 /**
  * Builds up cache with Elements in the Path to tcn.
  */
-//PAFFS_RESULT buildUpCacheToNode(p_dev* dev, treeCacheNode* localCopyOfNode, treeCacheNode** cachedOutputNode);
+//Result buildUpCacheToNode(Dev* dev, TreeCacheNode* localCopyOfNode, TreeCacheNode** cachedOutputNode);
 
 /*
  * Just frees clean nodes
@@ -62,7 +60,7 @@ void cleanTreeCacheLeaves();
 /**
  * Commits complete Tree to Flash
  */
-PAFFS_RESULT commitTreeCache(p_dev* dev);
+Result commitTreeCache(Dev* dev);
 
 //--------------------------------------
 
@@ -75,25 +73,25 @@ void initCache();
  * This locks specified treeCache node and its path from Rootnode
  * To prevent Cache GC from deleting it
  */
-PAFFS_RESULT lockTreeCacheNode(p_dev* dev, treeCacheNode* tcn);
+Result lockTreeCacheNode(Dev* dev, TreeCacheNode* tcn);
 
-PAFFS_RESULT unlockTreeCacheNode(p_dev* dev, treeCacheNode* tcn);
+Result unlockTreeCacheNode(Dev* dev, TreeCacheNode* tcn);
 
 /**
  * Possible cache flush. Although rootnode should be at any case in cache.
  */
-PAFFS_RESULT getRootNodeFromCache(p_dev* dev, treeCacheNode** tcn);
+Result getRootNodeFromCache(Dev* dev, TreeCacheNode** tcn);
 /**
  * Possible cache flush. Tree could be empty except for path to child! (and parent, of course)
  */
-PAFFS_RESULT getTreeNodeAtIndexFrom(p_dev* dev, unsigned char index,
-									treeCacheNode* parent, treeCacheNode** child);
+Result getTreeNodeAtIndexFrom(Dev* dev, unsigned char index,
+									TreeCacheNode* parent, TreeCacheNode** child);
 
-PAFFS_RESULT removeCacheNode(p_dev* dev, treeCacheNode* tcn);
+Result removeCacheNode(Dev* dev, TreeCacheNode* tcn);
 
-PAFFS_RESULT setCacheRoot(p_dev* dev, treeCacheNode* rootTcn);
+Result setCacheRoot(Dev* dev, TreeCacheNode* rootTcn);
 
-PAFFS_RESULT addNewCacheNodeWithPossibleFlush(p_dev* dev, treeCacheNode** newTcn);
+Result addNewCacheNodeWithPossibleFlush(Dev* dev, TreeCacheNode** newTcn);
 
 
 //debug
@@ -104,5 +102,4 @@ uint16_t getCacheMisses();
 void deleteTreeCache();
 void printTreeCache();
 
-
-#endif /* TREECACHE_H_ */
+}

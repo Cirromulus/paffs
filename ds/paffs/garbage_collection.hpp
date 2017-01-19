@@ -10,6 +10,6 @@
 
 #include "paffs.hpp"
 
-PAFFS_RESULT collectGarbage(p_dev* dev, areaType target);
+Result collectGarbage(Dev* dev, areaType target);
 
 #endif /* DS_PAFFS_GARBAGE_COLLECTION_H_ */

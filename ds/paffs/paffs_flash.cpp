@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+namespace paffs{
 
 char* area_names[] = {
 		"UNSET",
@@ -23,7 +24,7 @@ char* area_names[] = {
 };
 
 
-unsigned int findWritableArea(areaType areaType, p_dev* dev){
+unsigned int findWritableArea(areaType areaType, Dev* dev){
 	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != CLOSED){
 		//current Area has still space left
 		return dev->activeArea[areaType];
@@ -37,7 +38,7 @@ unsigned int findWritableArea(areaType areaType, p_dev* dev){
 		}
 	}
 
-	PAFFS_RESULT r = collectGarbage(dev, areaType);
+	Result r = collectGarbage(dev, areaType);
 	if(r != PAFFS_OK){
 		paffs_lasterr = r;
 		return 0;
@@ -53,7 +54,7 @@ unsigned int findWritableArea(areaType areaType, p_dev* dev){
 	return 0;
 }
 
-PAFFS_RESULT findFirstFreePage(unsigned int* p_out, p_dev* dev, unsigned int area){
+Result findFirstFreePage(unsigned int* p_out, Dev* dev, unsigned int area){
 
 	for(int i = 0; i < dev->param.data_pages_per_area; i++){
 		if(dev->areaMap[area].areaSummary[i] == FREE){
@@ -64,7 +65,7 @@ PAFFS_RESULT findFirstFreePage(unsigned int* p_out, p_dev* dev, unsigned int are
 	return PAFFS_NOSP;
 }
 
-uint64_t getPageNumber(p_addr addr, p_dev *dev){
+uint64_t getPageNumber(p_addr addr, Dev *dev){
 	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
 								dev->param.total_pages_per_area;
 	page += extractPage(addr);
@@ -90,7 +91,7 @@ unsigned int extractPage(p_addr addr){
 	return page;
 }
 
-PAFFS_RESULT manageActiveAreaFull(p_dev *dev, area_pos_t *area, areaType areaType){
+Result manageActiveAreaFull(Dev *dev, area_pos_t *area, areaType areaType){
 	if(dev->areaMap[*area].areaSummary == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access invalid areaSummary!");
 		return PAFFS_BUG;
@@ -122,7 +123,7 @@ PAFFS_RESULT manageActiveAreaFull(p_dev *dev, area_pos_t *area, areaType areaTyp
 
 
 //TODO: Add initAreaAs(...) to handle typical areaMap[abc].type = def; initArea(...);
-void initArea(p_dev* dev, area_pos_t area){
+void initArea(Dev* dev, area_pos_t area){
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %lu (pos %u) as %s.", area, dev->areaMap[area].position, area_names[dev->areaMap[area].type]);
 	//generate the areaSummary in Memory
 	dev->areaMap[area].status = ACTIVE;
@@ -130,12 +131,12 @@ void initArea(p_dev* dev, area_pos_t area){
 	if(dev->areaMap[area].type == INDEXAREA || dev->areaMap[area].type == DATAAREA){
 		if(dev->areaMap[area].areaSummary == NULL){
 			dev->areaMap[area].areaSummary = malloc(
-					sizeof(p_summaryEntry)
+					sizeof(SummaryEntry)
 					* dev->param.blocks_per_area
 					* dev->param.pages_per_block);
 		}
 		memset(dev->areaMap[area].areaSummary, 0,
-				sizeof(p_summaryEntry)
+				sizeof(SummaryEntry)
 				* dev->param.blocks_per_area
 				* dev->param.pages_per_block);
 		dev->areaMap[area].has_areaSummary = true;
@@ -149,7 +150,7 @@ void initArea(p_dev* dev, area_pos_t area){
 	}
 }
 
-PAFFS_RESULT loadArea(p_dev *dev, area_pos_t area){
+Result loadArea(Dev *dev, area_pos_t area){
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Loading Areasummary of Area %u (pos %u) as %s.", area, dev->areaMap[area].position, area_names[dev->areaMap[area].type]);
 	if(dev->areaMap[area].type != DATAAREA && dev->areaMap[area].type != INDEXAREA){
 		return PAFFS_OK;
@@ -166,14 +167,14 @@ PAFFS_RESULT loadArea(p_dev *dev, area_pos_t area){
 
 	dev->areaMap[area].isAreaSummaryDirty = true;
 	dev->areaMap[area].areaSummary = malloc(
-			sizeof(p_summaryEntry)
+			sizeof(SummaryEntry)
 			* dev->param.blocks_per_area
 			* dev->param.pages_per_block);
 
 	return readAreasummary(dev, area, dev->areaMap[area].areaSummary, true);
 }
 
-PAFFS_RESULT closeArea(p_dev *dev, area_pos_t area){
+Result closeArea(Dev *dev, area_pos_t area){
 	dev->areaMap[area].status = CLOSED;
 
 	if(paffs_trace_mask & PAFFS_TRACE_VERIFY_AS){
@@ -185,7 +186,7 @@ PAFFS_RESULT closeArea(p_dev *dev, area_pos_t area){
 
 	//TODO: Suspend areaSummary write until RAM cache runs low
 	if(dev->areaMap[area].type == DATAAREA || dev->areaMap[area].type == INDEXAREA){
-		PAFFS_RESULT r = writeAreasummary(dev, area, dev->areaMap[area].areaSummary);
+		Result r = writeAreasummary(dev, area, dev->areaMap[area].areaSummary);
 		if(r != PAFFS_OK)
 			return r;
 	}
@@ -199,7 +200,7 @@ PAFFS_RESULT closeArea(p_dev *dev, area_pos_t area){
 	return PAFFS_OK;
 }
 
-void retireArea(p_dev *dev, area_pos_t area){
+void retireArea(Dev *dev, area_pos_t area){
 	dev->areaMap[area].status = CLOSED;
 
 	if((dev->areaMap[area].type == DATAAREA || dev->areaMap[area].type == INDEXAREA) && paffs_trace_mask & PAFFS_TRACE_VERIFY_AS){
@@ -220,7 +221,7 @@ void retireArea(p_dev *dev, area_pos_t area){
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %u at pos. %u.", area, dev->areaMap[area].position);
 }
 
-PAFFS_RESULT writeAreasummary(p_dev *dev, area_pos_t area, p_summaryEntry* summary){
+Result writeAreasummary(Dev *dev, area_pos_t area, SummaryEntry* summary){
 	unsigned int needed_bytes = 1 + dev->param.data_pages_per_area / 8;
 	unsigned int needed_pages = 1 + needed_bytes / dev->param.data_bytes_per_page;
 	if(needed_pages != dev->param.total_pages_per_area - dev->param.data_pages_per_area){
@@ -248,7 +249,7 @@ PAFFS_RESULT writeAreasummary(p_dev *dev, area_pos_t area, p_summaryEntry* summa
 
 	uint32_t pointer = 0;
 	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param.data_pages_per_area), dev);
-	PAFFS_RESULT r;
+	Result r;
 	for(unsigned int page = 0; page < needed_pages; page++){
 		unsigned int btw = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
 							: needed_bytes - pointer;
@@ -262,7 +263,7 @@ PAFFS_RESULT writeAreasummary(p_dev *dev, area_pos_t area, p_summaryEntry* summa
 }
 
 //FIXME: readAreasummary is untested, b/c areaSummaries remain in RAM during unmount
-PAFFS_RESULT readAreasummary(p_dev *dev, area_pos_t area, p_summaryEntry* out_summary, bool complete){
+Result readAreasummary(Dev *dev, area_pos_t area, SummaryEntry* out_summary, bool complete){
 	unsigned int needed_bytes = 1 + dev->param.data_pages_per_area / 8 /* One bit per entry*/;
 
 	unsigned int needed_pages = 1 + needed_bytes / dev->param.data_bytes_per_page;
@@ -275,7 +276,7 @@ PAFFS_RESULT readAreasummary(p_dev *dev, area_pos_t area, p_summaryEntry* out_su
 	memset(buf, 0, needed_bytes);
 	uint32_t pointer = 0;
 	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param.data_pages_per_area), dev);
-	PAFFS_RESULT r;
+	Result r;
 	for(unsigned int page = 0; page < needed_pages; page++){
 		unsigned int btr = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
 							: needed_bytes - pointer;
@@ -321,9 +322,9 @@ PAFFS_RESULT readAreasummary(p_dev *dev, area_pos_t area, p_summaryEntry* out_su
 }
 
 //modifies inode->size and inode->reserved size as well
-PAFFS_RESULT writeInodeData(pInode* inode,
+Result writeInodeData(Inode* inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_written,
-					const char* data, p_dev* dev){
+					const char* data, Dev* dev){
 
 	if(offs+bytes == 0){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Write size 0! Bug?");
@@ -398,7 +399,7 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 				}
 
 				unsigned int bytes_read = 0;
-				PAFFS_RESULT r = readInodeData(inode, (pageFrom+page)*dev->param.data_bytes_per_page, btr, &bytes_read, buf, dev);
+				Result r = readInodeData(inode, (pageFrom+page)*dev->param.data_bytes_per_page, btr, &bytes_read, buf, dev);
 				if(r != PAFFS_OK || bytes_read != btr){
 					free(buf);
 					return PAFFS_BUG;
@@ -422,7 +423,7 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 
 			//Mark old pages dirty
 			if(dev->areaMap[oldArea].areaSummary == NULL){
-				PAFFS_RESULT r = loadArea(dev, oldArea);
+				Result r = loadArea(dev, oldArea);
 				if(r != PAFFS_OK){
 					PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read A/S from CLOSED area!");
 					return r;
@@ -436,7 +437,7 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 		}
 		inode->direct[page+pageFrom] = pageAddress;
 
-		PAFFS_RESULT res = dev->drv.drv_write_page_fn(dev, getPageNumber(pageAddress, dev), buf, btw);
+		Result res = dev->drv.drv_write_page_fn(dev, getPageNumber(pageAddress, dev), buf, btw);
 
 		if(misaligned)
 			free(buf);
@@ -458,9 +459,9 @@ PAFFS_RESULT writeInodeData(pInode* inode,
 
 	return updateExistingInode(dev, inode);
 }
-PAFFS_RESULT readInodeData(pInode* inode,
+Result readInodeData(Inode* inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_read,
-					char* data, p_dev* dev){
+					char* data, Dev* dev){
 
 	if(offs+bytes == 0){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read size 0! Bug?");
@@ -507,7 +508,7 @@ PAFFS_RESULT readInodeData(pInode* inode,
 			return PAFFS_BUG;
 		}
 
-		PAFFS_RESULT r = PAFFS_OK;
+		Result r = PAFFS_OK;
 		if(dev->areaMap[area].areaSummary == NULL){
 			//TODO: This is very expensive. Either build switch "safety mode" that loads complete A/S
 			//		Or just load (everytime) incomplete A/S
@@ -551,7 +552,7 @@ PAFFS_RESULT readInodeData(pInode* inode,
 
 
 //inode->size and inode->reservedSize is altered.
-PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev, unsigned int offs){
+Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs){
 	//TODO: This calculation contains errors in border cases
 	unsigned int pageFrom = offs/dev->param.data_bytes_per_page;
 	unsigned int pageTo = (inode->size - 1) / dev->param.data_bytes_per_page;
@@ -604,7 +605,7 @@ PAFFS_RESULT deleteInodeData(pInode* inode, p_dev* dev, unsigned int offs){
 }
 
 //Does not change addresses in parent Nodes
-PAFFS_RESULT writeTreeNode(p_dev* dev, treeNode* node){
+Result writeTreeNode(Dev* dev, treeNode* node){
 	if(node == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode NULL");
 				return PAFFS_BUG;
@@ -640,7 +641,7 @@ PAFFS_RESULT writeTreeNode(p_dev* dev, treeNode* node){
 
 	dev->areaMap[dev->activeArea[INDEXAREA]].areaSummary[firstFreePage] = USED;
 
-	PAFFS_RESULT r = dev->drv.drv_write_page_fn(dev, getPageNumber(node->self, dev), node, sizeof(treeNode));
+	Result r = dev->drv.drv_write_page_fn(dev, getPageNumber(node->self, dev), node, sizeof(treeNode));
 	if(r != PAFFS_OK)
 		return r;
 
@@ -651,7 +652,7 @@ PAFFS_RESULT writeTreeNode(p_dev* dev, treeNode* node){
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node){
+Result readTreeNode(Dev* dev, p_addr addr, treeNode* node){
 	if(node == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: treeNode NULL");
 		return PAFFS_BUG;
@@ -681,7 +682,7 @@ PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node){
 		}
 	}
 
-	PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), node, sizeof(treeNode));
+	Result r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), node, sizeof(treeNode));
 	if(r != PAFFS_OK)
 		return r;
 
@@ -693,7 +694,7 @@ PAFFS_RESULT readTreeNode(p_dev* dev, p_addr addr, treeNode* node){
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT deleteTreeNode(p_dev* dev, treeNode* node){
+Result deleteTreeNode(Dev* dev, treeNode* node){
 	dev->areaMap[extractLogicalArea(node->self)].areaSummary[extractPage(node->self)] = DIRTY;
 	return PAFFS_OK;
 }
@@ -701,13 +702,13 @@ PAFFS_RESULT deleteTreeNode(p_dev* dev, treeNode* node){
 
 // Superblock related
 
-PAFFS_RESULT findFirstFreeEntryInBlock(p_dev* dev, uint32_t area, uint8_t block, uint32_t* out_pos, unsigned int required_pages){
+Result findFirstFreeEntryInBlock(Dev* dev, uint32_t area, uint8_t block, uint32_t* out_pos, unsigned int required_pages){
 	unsigned int in_a_row = 0;
 	uint64_t page_offs = dev->param.pages_per_block * block;
 	for(unsigned int i = 0; i < dev->param.pages_per_block; i++) {
 		p_addr addr = combineAddress(area, i + page_offs);
 		uint32_t no;
-		PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), &no, sizeof(uint32_t));
+		Result r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), &no, sizeof(uint32_t));
 		if(r != PAFFS_OK)
 			return r;
 		if(no != 0xFFFFFFFF){
@@ -726,7 +727,7 @@ PAFFS_RESULT findFirstFreeEntryInBlock(p_dev* dev, uint32_t area, uint8_t block,
 	return PAFFS_NF;
 }
 
-PAFFS_RESULT findMostRecentEntryInBlock(p_dev* dev, uint32_t area, uint8_t block, uint32_t* out_pos, uint32_t* out_index){
+Result findMostRecentEntryInBlock(Dev* dev, uint32_t area, uint8_t block, uint32_t* out_pos, uint32_t* out_index){
 	uint32_t* maximum = out_index;
 	*maximum = 0;
 	*out_pos = 0;
@@ -734,7 +735,7 @@ PAFFS_RESULT findMostRecentEntryInBlock(p_dev* dev, uint32_t area, uint8_t block
 	for(unsigned int i = 0; i < dev->param.pages_per_block; i++) {
 		p_addr addr = combineAddress(area, i + page_offs);
 		uint32_t no;
-		PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), &no, sizeof(uint32_t));
+		Result r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), &no, sizeof(uint32_t));
 		if(r != PAFFS_OK)
 			return r;
 		if(no == 0xFFFFFFFF){
@@ -754,16 +755,16 @@ PAFFS_RESULT findMostRecentEntryInBlock(p_dev* dev, uint32_t area, uint8_t block
 }
 
 
-PAFFS_RESULT writeAnchorEntry(p_dev* dev, p_addr addr, anchorEntry* entry){
+Result writeAnchorEntry(Dev* dev, p_addr addr, AnchorEntry* entry){
 	//Currently not implemented to simplify Find-Strategy
 	return PAFFS_NIMPL;
 }
-PAFFS_RESULT readAnchorEntry(p_dev* dev, p_addr addr, anchorEntry* entry){
+Result readAnchorEntry(Dev* dev, p_addr addr, AnchorEntry* entry){
 	//Currently not implemented to simplify Find-Strategy
 	return PAFFS_NIMPL;
 }
 
-PAFFS_RESULT deleteAnchorBlock(p_dev* dev, uint32_t area, uint8_t block) {
+Result deleteAnchorBlock(Dev* dev, uint32_t area, uint8_t block) {
 	if(dev->areaMap[area].type != SUPERBLOCKAREA){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete Block outside of SUPARBLCOKAREA");
 		return PAFFS_BUG;
@@ -772,26 +773,26 @@ PAFFS_RESULT deleteAnchorBlock(p_dev* dev, uint32_t area, uint8_t block) {
 	return dev->drv.drv_erase_fn(dev, block_offs + block);
 }
 
-PAFFS_RESULT writeJumpPadEntry(p_dev* dev, p_addr addr, jumpPadEntry* entry){
+Result writeJumpPadEntry(Dev* dev, p_addr addr, jumpPadEntry* entry){
 	//Currently not implemented to simplify Find-Strategy
 	return PAFFS_NIMPL;
 }
 
-PAFFS_RESULT readJumpPadEntry(p_dev* dev, p_addr addr, jumpPadEntry* entry){
+Result readJumpPadEntry(Dev* dev, p_addr addr, jumpPadEntry* entry){
 	//Currently not implemented to simplify Find-Strategy
 	return PAFFS_NIMPL;
 }
 
 
 //Make sure that free space is sufficient!
-PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry){
+Result writeSuperIndex(Dev* dev, p_addr addr, superIndex* entry){
 	if(dev->areaMap[extractLogicalArea(addr)].type != SUPERBLOCKAREA){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
 		return PAFFS_BUG;
 	}
 
 	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(p_addr) +
-		dev->param.areas_no * (sizeof(p_area) - sizeof(p_summaryEntry*))+ // AreaMap without summaryEntry pointer
+		dev->param.areas_no * (sizeof(p_area) - sizeof(SummaryEntry*))+ // AreaMap without summaryEntry pointer
 		2 * dev->param.data_pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
 
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
@@ -816,9 +817,9 @@ PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry){
 			entry->areaMap[i].has_areaSummary = false;
 		}
 
-		memcpy(&buf[pointer], &entry->areaMap[i], sizeof(p_area) - sizeof(p_summaryEntry*));
+		memcpy(&buf[pointer], &entry->areaMap[i], sizeof(p_area) - sizeof(SummaryEntry*));
 		//TODO: Optimize bitusage, currently wasting 1,25 Bytes per Entry
-		pointer += sizeof(p_area) - sizeof(p_summaryEntry*);
+		pointer += sizeof(p_area) - sizeof(SummaryEntry*);
 	}
 
 	for(unsigned int i = 0; i < 2; i++){
@@ -835,7 +836,7 @@ PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry){
 
 	pointer = 0;
 	uint64_t page_offs = getPageNumber(addr, dev);
-	PAFFS_RESULT r;
+	Result r;
 	for(unsigned page = 0; page < needed_pages; page++){
 		unsigned int btw = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
 							: needed_bytes - pointer;
@@ -849,7 +850,7 @@ PAFFS_RESULT writeSuperIndex(p_dev* dev, p_addr addr, superIndex* entry){
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, p_summaryEntry* summary_Containers[2], bool withAreaMap){
+Result readSuperPageIndex(Dev* dev, p_addr addr, superIndex* entry, SummaryEntry* summary_Containers[2], bool withAreaMap){
 	if(!withAreaMap)
 		 return dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), entry, sizeof(uint32_t) + sizeof(p_addr));
 
@@ -859,7 +860,7 @@ PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, p_su
 	unsigned int summary_Container_count = 0;
 
 	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(p_addr) +
-		dev->param.areas_no * (sizeof(p_area) - sizeof(p_summaryEntry*))+ // AreaMap without summaryEntry pointer
+		dev->param.areas_no * (sizeof(p_area) - sizeof(SummaryEntry*))+ // AreaMap without summaryEntry pointer
 		16 * dev->param.data_pages_per_area / 8 /* One bit per entry, two entries for INDEX and DATA section. Others dont have summaries*/;
 
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
@@ -868,7 +869,7 @@ PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, p_su
 	memset(buf, 0, needed_bytes);
 	uint32_t pointer = 0;
 	uint64_t page_offs = getPageNumber(addr, dev);
-	PAFFS_RESULT r;
+	Result r;
 	for(unsigned page = 0; page < needed_pages; page++){
 		unsigned int btr = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
 							: needed_bytes - pointer;
@@ -891,8 +892,8 @@ PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, p_su
 	areaSummaryPositions[1] = -1;
 	unsigned char pospos = 0;	//Stupid name
 	for(unsigned int i = 0; i < dev->param.areas_no; i++){
-		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(p_area) - sizeof(p_summaryEntry*));
-		pointer += sizeof(p_area) - sizeof(p_summaryEntry*);
+		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(p_area) - sizeof(SummaryEntry*));
+		pointer += sizeof(p_area) - sizeof(SummaryEntry*);
 		if(entry->areaMap[i].has_areaSummary)
 			areaSummaryPositions[pospos++] = i;
 	}
@@ -933,5 +934,5 @@ PAFFS_RESULT readSuperPageIndex(p_dev* dev, p_addr addr, superIndex* entry, p_su
 	return PAFFS_OK;
 }
 
-
+}
 

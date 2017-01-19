@@ -12,7 +12,7 @@
  * It could be possible that closed area contains free pages which count as
  * dirty in this case.
  */
-uint32_t countDirtyPages(p_dev* dev, p_summaryEntry* summary){
+uint32_t countDirtyPages(Dev* dev, SummaryEntry* summary){
 	uint32_t dirty = 0;
 	for(uint32_t i = 0; i < dev->param.data_pages_per_area; i++){
 		if(summary[i] != USED)
@@ -21,18 +21,18 @@ uint32_t countDirtyPages(p_dev* dev, p_summaryEntry* summary){
 	return dirty;
 }
 
-area_pos_t findNextBestArea(p_dev* dev, areaType target, p_summaryEntry* out_summary, bool* srcAreaContainsData){
+area_pos_t findNextBestArea(Dev* dev, areaType target, SummaryEntry* out_summary, bool* srcAreaContainsData){
 	area_pos_t favourite_area = 0;
 	uint32_t fav_dirty_pages = 0;
 	*srcAreaContainsData = true;
-	p_summaryEntry tmp[dev->param.data_pages_per_area];
-	p_summaryEntry* curr = out_summary;
+	SummaryEntry tmp[dev->param.data_pages_per_area];
+	SummaryEntry* curr = out_summary;
 
 	//Look for the most dirty block
 	for(area_pos_t i = 0; i < dev->param.areas_no; i++){
 		if(dev->areaMap[i].status == CLOSED && (dev->areaMap[i].type == DATAAREA || dev->areaMap[i].type == INDEXAREA)){
 			if(dev->areaMap[i].areaSummary == NULL){
-				PAFFS_RESULT r = readAreasummary(dev, i, tmp, false);
+				Result r = readAreasummary(dev, i, tmp, false);
 				if(r != PAFFS_OK){
 					PAFFS_DBG(PAFFS_TRACE_BUG,"Could not read areaSummary for GC!");
 					paffs_lasterr = r;
@@ -78,14 +78,14 @@ area_pos_t findNextBestArea(p_dev* dev, areaType target, p_summaryEntry* out_sum
 /**
  * @param summary is input and output (with changed DIRTY to FREE)
  */
-PAFFS_RESULT moveValidDataToNewArea(p_dev* dev, area_pos_t srcArea, area_pos_t dstArea, p_summaryEntry* summary){
+Result moveValidDataToNewArea(Dev* dev, area_pos_t srcArea, area_pos_t dstArea, SummaryEntry* summary){
 	for(unsigned long page = 0; page < dev->param.data_pages_per_area; page++){
 		if(summary[page] == USED){
 			uint64_t src = dev->areaMap[srcArea].position * dev->param.total_pages_per_area + page;
 			uint64_t dst = dev->areaMap[dstArea].position * dev->param.total_pages_per_area + page;
 
 			char buf[dev->param.total_bytes_per_page];
-			PAFFS_RESULT r = dev->drv.drv_read_page_fn(dev, src, buf, dev->param.total_bytes_per_page);
+			Result r = dev->drv.drv_read_page_fn(dev, src, buf, dev->param.total_bytes_per_page);
 			if(r != PAFFS_OK){
 				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not read page n° %lu!", src);
 				return r;
@@ -102,9 +102,9 @@ PAFFS_RESULT moveValidDataToNewArea(p_dev* dev, area_pos_t srcArea, area_pos_t d
 	return PAFFS_OK;
 }
 
-PAFFS_RESULT deleteArea(p_dev* dev, area_pos_t area){
+Result deleteArea(Dev* dev, area_pos_t area){
 	for(int i = 0; i < dev->param.blocks_per_area; i++){
-		PAFFS_RESULT r = dev->drv.drv_erase_fn(dev, dev->areaMap[area].position*dev->param.blocks_per_area + i);
+		Result r = dev->drv.drv_erase_fn(dev, dev->areaMap[area].position*dev->param.blocks_per_area + i);
 		if(r != PAFFS_OK){
 			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block n° %u (Area %u)!", dev->areaMap[area].position*dev->param.blocks_per_area + i, area);
 			retireArea(dev, area);
@@ -123,13 +123,13 @@ PAFFS_RESULT deleteArea(p_dev* dev, area_pos_t area){
  *
  * Changes active Area to one of the new freed areas.
  */
-PAFFS_RESULT collectGarbage(p_dev* dev, areaType targetType){
-	p_summaryEntry summary[dev->param.data_pages_per_area];
+Result collectGarbage(Dev* dev, areaType targetType){
+	SummaryEntry summary[dev->param.data_pages_per_area];
 	memset(summary, 0, dev->param.data_pages_per_area);
 	bool srcAreaContainsData = false;
 	bool desperateMode = dev->activeArea[GARBAGE_BUFFER] == 0;	//If we have no GARBAGE_BUFFER left
 	area_pos_t deletion_target = 0;
-	PAFFS_RESULT r;
+	Result r;
 
 	if(paffs_trace_mask & PAFFS_TRACE_VERIFY_AS){
 		memset(summary, 0xFF, dev->param.data_pages_per_area);
