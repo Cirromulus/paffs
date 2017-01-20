@@ -622,6 +622,19 @@ Result writeTreeNode(Dev* dev, TreeNode* node){
 
 	if(node->self != 0){
 		//We have to invalidate former position first
+
+		if(dev->areaMap[extractLogicalArea(node->self)].areaSummary == NULL){
+			PAFFS_DBG_S(PAFFS_TRACE_BUG, "Tried to invalidate Page in (probably) committed areaSummary.\n"
+					"This is not fully supported, so expect bugs.");
+			//It is Ok, if whole Area gets GC'ed before unmounting. Otherwise it will
+			//generate karteileichen
+			Result r = loadArea(dev, extractLogicalArea(node->self));
+			if(r != Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read AreaSummary on area %d!"
+						" Trying to move on, but expect errors...", extractLogicalArea(node->self));
+			}
+		}
+
 		dev->areaMap[extractLogicalArea(node->self)].areaSummary[extractPage(node->self)] = SummaryEntry::dirty;
 	}
 
@@ -676,6 +689,11 @@ Result readTreeNode(Dev* dev, Addr addr, TreeNode* node){
 		PAFFS_DBG_S(PAFFS_TRACE_SCAN, "READ operation on indexarea without areaSummary!");
 		//TODO: Could be safer if areaSummary would be read from flash for safety
 	}else{
+		if(dev->areaMap[extractLogicalArea(addr)].areaSummary == NULL){
+			Result r = loadArea(dev, extractLogicalArea(addr));
+			if(r != Result::ok)
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load AreaSum. on %d! Trying to move on, but expect errors...", extractLogicalArea(addr));
+		}
 		if(dev->areaMap[extractLogicalArea(addr)].areaSummary[extractPage(addr)] == SummaryEntry::dirty){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "READ operation of obsoleted data at %X:%X", extractLogicalArea(addr), extractPage(addr));
 			return Result::bug;

@@ -46,7 +46,7 @@ void listDir(const char* path){
 		printf("\"%s\"\n", dir->name);
 	}
 	if(fs->getLastErr() != Result::ok)
-		//printf("Error reading Dir: %s\n", err_msg(fs->getLastErr()));
+		printf("Error reading Dir: %s\n", err_msg(fs->getLastErr()));
 	fs->closeDir(rewt);
 }
 

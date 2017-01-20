@@ -126,6 +126,7 @@ Result Paffs::destroyDevice(const char* devicename){
 		}
 	}
 	delete[] device.areaMap;
+	device.areaMap = 0;
 	delete[] summaryEntry_containers[0];
 	delete[] summaryEntry_containers[1];
 	return Result::ok;
@@ -229,7 +230,7 @@ Result Paffs::unmnt(const char* devicename){
 	if(trace_mask && PAFFS_TRACE_AREA){
 		printf("Info: \n");
 		for(unsigned int i = 0; i < device.param->areas_no; i++){
-			printf("\tArea %d on %u as %s from page %d\n", i, device.areaMap[i].position, area_names[device.areaMap[i].type], device.areaMap[i].position*device.param->blocks_per_area*device.param->pages_per_block);
+			printf("\tArea %d on %u as %10s from page %d\n", i, device.areaMap[i].position, area_names[device.areaMap[i].type], device.areaMap[i].position*device.param->blocks_per_area*device.param->pages_per_block);
 		}
 	}
 
@@ -518,6 +519,7 @@ Result Paffs::removeInodeFromDir(Inode* contDir, Inode* elem){
 			memcpy(&dirData[pointer], &dirData[pointer + entryl], restByte);
 
 			unsigned int bw = 0;
+			free(dirData);
 			return writeInodeData(contDir, 0, newSize, &bw, dirData, &device);
 		}
 		pointer += entryl;

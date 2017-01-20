@@ -18,6 +18,11 @@ Result SimuDriver::writePage(uint64_t page_no,
 	if(!cell)
 		return Result::fail;
 
+	if(data_len > param.total_bytes_per_page){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write %u Bytes to a page of %u!", data_len, param.total_bytes_per_page);
+		return Result::fail;
+	}
+
 
 	if(param.total_bytes_per_page != data_len){
 		memset(buf, 0xFF, param.total_bytes_per_page);
