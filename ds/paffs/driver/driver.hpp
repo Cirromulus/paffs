@@ -11,14 +11,10 @@ namespace paffs{
 
 	class Driver {
 	protected:
-		Dev dev;
+		Param param;
 	public:
-		Driver(){};
-		virtual ~Driver();
-
-		Dev* getDev(){
-			return &dev;
-		}
+		Driver(Param p) : param(p){};
+		virtual ~Driver(){};
 
 		virtual Result writePage (uint64_t page_no,
 				void* data, unsigned int data_len) = 0;

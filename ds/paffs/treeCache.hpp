@@ -30,7 +30,7 @@ bool areSiblingsClean(TreeCacheNode* tcn);
 /**
  * Consistency checkers for Treecache
  */
-bool isSubTreeValid(TreeCacheNode* node, uint8_t* cache_node_reachable, long keyMin, long keyMax);
+bool isSubTreeValid(TreeCacheNode* node, uint8_t* cache_node_reachable, InodeNo keyMin, InodeNo keyMax);
 bool isTreeCacheValid();
 
 /**

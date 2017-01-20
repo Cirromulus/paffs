@@ -58,21 +58,23 @@ const char* resultMsg[] = {
 		"You should not be seeing this..."
 };
 
+Result lasterr = Result::ok;
+
 const char* err_msg(Result pr){
 	return resultMsg[static_cast<int>(pr)];
 }
 
 Paffs::Paffs(){
 	//normal startup, load drivers
-	driver = getDriver(0);
+	device.driver = getDriver(0);
 	initialize();
 };
 Paffs::Paffs(void* fc){
-	driver = getDriverSpecial(0, fc);
+	device.driver = getDriverSpecial(0, fc);
 	initialize();
 }
 Paffs::~Paffs(){
-	delete driver;
+	delete device.driver;
 }
 
 
@@ -85,24 +87,23 @@ void Paffs::resetLastErr(){
 }
 
 Result Paffs::initialize(){
-	device = driver->getDev();
-	memset(device, 0, sizeof(Dev));
-	Param* param = &device->param;
+	memset(&device, 0, sizeof(Dev));
+	Param* param = &device.param;
 	param->areas_no = param->blocks / 2;	//For now: 16 b -> 8 Areas
 	param->blocks_per_area = param->blocks / param->areas_no;
 	param->data_bytes_per_page = param->total_bytes_per_page - param->oob_bytes_per_page;
 	param->total_pages_per_area = param->pages_per_block * param->blocks_per_area;
 	unsigned int needed_pages_for_AS = 1;	//Todo: actually calculate
 	param->data_pages_per_area = param->total_pages_per_area - needed_pages_for_AS;
-	device->areaMap = (Area*)malloc(sizeof(Area) * device->param.areas_no);
-	memset(device->areaMap, 0, sizeof(Area) * device->param.areas_no);
+	device.areaMap = (Area*)malloc(sizeof(Area) * device.param.areas_no);
+	memset(device.areaMap, 0, sizeof(Area) * device.param.areas_no);
 	summaryEntry_containers[0] = (SummaryEntry*) malloc(sizeof(SummaryEntry) * param->data_pages_per_area);
 	summaryEntry_containers[1] = (SummaryEntry*) malloc(sizeof(SummaryEntry) * param->data_pages_per_area);
 
-	device->activeArea[AreaType::superblockarea] = 0;
-	device->activeArea[AreaType::indexarea] = 0;
-	device->activeArea[AreaType::journalarea] = 0;
-	device->activeArea[AreaType::dataarea] = 0;
+	device.activeArea[AreaType::superblockarea] = 0;
+	device.activeArea[AreaType::indexarea] = 0;
+	device.activeArea[AreaType::journalarea] = 0;
+	device.activeArea[AreaType::dataarea] = 0;
 
 	if(param->blocks_per_area < 2){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device too small, at least 12 Blocks are needed!");
@@ -113,39 +114,39 @@ Result Paffs::initialize(){
 
 Result Paffs::format(const char* devicename){
 	unsigned char had_areaType = 0;		//Efficiency hack, bc there are less than 2⁸ area types
-	for(unsigned int area = 0; area < device->param.areas_no; area++){
-		device->areaMap[area].status = AreaStatus::empty;
-		device->areaMap[area].erasecount = 0;
-		device->areaMap[area].position = area;
+	for(unsigned int area = 0; area < device.param.areas_no; area++){
+		device.areaMap[area].status = AreaStatus::empty;
+		device.areaMap[area].erasecount = 0;
+		device.areaMap[area].position = area;
 
 		if(!(had_areaType & 1 << AreaType::superblockarea)){
-			device->activeArea[AreaType::superblockarea] = area;
-			device->areaMap[area].type = AreaType::superblockarea;
-			initArea(device, area);
+			device.activeArea[AreaType::superblockarea] = area;
+			device.areaMap[area].type = AreaType::superblockarea;
+			initArea(&device, area);
 			had_areaType |= 1 << AreaType::superblockarea;
 			continue;
 		}
 		if(!(had_areaType & 1 << AreaType::journalarea)){
-			device->activeArea[AreaType::journalarea] = area;
-			device->areaMap[area].type = AreaType::journalarea;
-			initArea(device, area);
+			device.activeArea[AreaType::journalarea] = area;
+			device.areaMap[area].type = AreaType::journalarea;
+			initArea(&device, area);
 			had_areaType |= 1 << AreaType::journalarea;
 			continue;
 		}
 
 		if(!(had_areaType & 1 << AreaType::garbage_buffer)){
-			device->activeArea[AreaType::garbage_buffer] = area;
-			device->areaMap[area].type = AreaType::garbage_buffer;
-			initArea(device, area);
+			device.activeArea[AreaType::garbage_buffer] = area;
+			device.areaMap[area].type = AreaType::garbage_buffer;
+			initArea(&device, area);
 			had_areaType |= 1 << AreaType::garbage_buffer;
 			continue;
 		}
 
-		device->areaMap[area].type = AreaType::unset;
+		device.areaMap[area].type = AreaType::unset;
 
 	}
 
-	Result r = start_new_tree(device);
+	Result r = start_new_tree(&device);
 	if(r != Result::ok)
 		return r;
 
@@ -154,15 +155,15 @@ Result Paffs::format(const char* devicename){
 	if(r != Result::ok){
 		return r;
 	}
-	r = insertInode(device, &rootDir);
+	r = insertInode(&device, &rootDir);
 	if(r != Result::ok){
 		return r;
 	}
-	r = commitTreeCache(device);
+	r = commitTreeCache(&device);
 	if(r != Result::ok){
 		return r;
 	}
-	r = commitSuperIndex(device);
+	r = commitSuperIndex(&device);
 	if(r != Result::ok){
 		return r;
 	}
@@ -171,45 +172,45 @@ Result Paffs::format(const char* devicename){
 }
 
 Result Paffs::mnt(const char* devicename){
-	if(strcmp(devicename, device->param.name) != 0){
+	if(strcmp(devicename, device.param.name) != 0){
 		return Result::einval;
 	}
 
-	Result r = readSuperIndex(device, summaryEntry_containers);
+	Result r = readSuperIndex(&device, summaryEntry_containers);
 	if(r == Result::nf){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Tried mounting a device with an empty superblock!");
 		return r;
 	}
 
 	//TODO: mark activeAreas
-	for(unsigned long i = 0; i < device->param.areas_no; i++){
-		//if(device->areaMap[i].type != AreaType::dataarea)
+	for(unsigned long i = 0; i < device.param.areas_no; i++){
+		//if(device.areaMap[i].type != AreaType::dataarea)
 	}
 
 	return r;
 }
 Result Paffs::unmnt(const char* devicename){
-	if(strcmp(devicename, device->param.name) != 0){
+	if(strcmp(devicename, device.param.name) != 0){
 		return Result::einval;
 	}
 
 	if(trace_mask && PAFFS_TRACE_AREA){
 		printf("Info: \n");
-		for(unsigned int i = 0; i < device->param.areas_no; i++){
-			printf("\tArea %d on %u as %s from page %d\n", i, device->areaMap[i].position, area_names[device->areaMap[i].type], device->areaMap[i].position*device->param.blocks_per_area*device->param.pages_per_block);
+		for(unsigned int i = 0; i < device.param.areas_no; i++){
+			printf("\tArea %d on %u as %s from page %d\n", i, device.areaMap[i].position, area_names[device.areaMap[i].type], device.areaMap[i].position*device.param.blocks_per_area*device.param.pages_per_block);
 		}
 	}
 
-	Result r = commitTreeCache(device);
+	Result r = commitTreeCache(&device);
 	if(r != Result::ok)
 		return r;
 
-	r = commitSuperIndex(device);
+	r = commitSuperIndex(&device);
 	if(r != Result::ok)
 		return r;
 
 	//just for cleanup & tests
-	memset(device->areaMap, 0, sizeof(Area) * device->param.areas_no);
+	memset(device.areaMap, 0, sizeof(Area) * device.param.areas_no);
 	//TODO: Add memset of activeareas
 	deleteTreeCache();
 
@@ -220,7 +221,7 @@ Result Paffs::createInode(Inode* outInode, Permission mask){
 	memset(outInode, 0, sizeof(Inode));
 
 	//FIXME: is this the best way to find a new number?
-	Result r = findFirstFreeNo(device, &outInode->no);
+	Result r = findFirstFreeNo(&device, &outInode->no);
 	if(r != Result::ok)
 		return r;
 
@@ -258,7 +259,7 @@ Result Paffs::createFilInode(Inode* outInode, Permission mask){
 }
 
 void Paffs::destroyInode(Inode* node){
-	deleteInodeData(node, device, 0);
+	deleteInodeData(node, &device, 0);
 	free(node);
 }
 
@@ -300,7 +301,7 @@ Result Paffs::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 
 	char* buf = (char*) malloc(folder->size);
 	unsigned int bytes_read = 0;
-	Result r = readInodeData(folder, 0, folder->size, &bytes_read, buf, device);
+	Result r = readInodeData(folder, 0, folder->size, &bytes_read, buf, &device);
 	if(r != Result::ok || bytes_read != folder->size){
 		free(buf);
 		return r == Result::ok ? Result::bug : r;
@@ -327,7 +328,7 @@ Result Paffs::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 			p += dirnamel;
 			if(strcmp(name, tmpname) == 0){
 				//Eintrag gefunden
-				if(getInode(device, tmp_no, outInode) != Result::ok){
+				if(getInode(&device, tmp_no, outInode) != Result::ok){
 					PAFFS_DBG(PAFFS_TRACE_BUG, "Result::bug: Found Element '%s' in dir, but did not find its Inode (No. %d) in Index!", tmpname, tmp_no);
 					free(tmpname);
 					return Result::bug;
@@ -345,7 +346,7 @@ Result Paffs::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 
 Result Paffs::getInodeOfElem(Inode* outInode, const char* fullPath){
     Inode root;
-    if(getInode(device, 0, &root) != Result::ok){
+    if(getInode(&device, 0, &root) != Result::ok){
     	PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find rootInode! (%s)", resultMsg[static_cast<int>(lasterr)]);
 		return Result::fail;
     }
@@ -411,7 +412,7 @@ Result Paffs::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem)
 	unsigned int bytes = 0;
 	Result r;
 	if(contDir->reservedSize > 0){		//if Directory is not empty
-		r = readInodeData(contDir, 0, contDir->size, &bytes, dirData, device);
+		r = readInodeData(contDir, 0, contDir->size, &bytes, dirData, &device);
 		if(r != Result::ok || bytes != contDir->size){
 			lasterr = r;
 			free(dirData);
@@ -430,7 +431,7 @@ Result Paffs::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem)
 	directoryEntryCount ++;
 	memcpy (dirData, &directoryEntryCount, sizeof(DirEntryCount));
 
-	r = writeInodeData(contDir, 0, contDir->size + direntryl, &bytes, dirData, device);
+	r = writeInodeData(contDir, 0, contDir->size + direntryl, &bytes, dirData, &device);
 	free(dirData);
 	free(buf);
 	if(bytes != contDir->size)
@@ -451,7 +452,7 @@ Result Paffs::removeInodeFromDir(Inode* contDir, Inode* elem){
 	unsigned int bytes = 0;
 	Result r;
 	if(contDir->reservedSize > 0){		//if Directory is not empty
-		r = readInodeData(contDir, 0, contDir->size, &bytes, dirData, device);
+		r = readInodeData(contDir, 0, contDir->size, &bytes, dirData, &device);
 		if(r != Result::ok || bytes != contDir->size){
 			lasterr = r;
 			free(dirData);
@@ -471,7 +472,7 @@ Result Paffs::removeInodeFromDir(Inode* contDir, Inode* elem){
 			unsigned int newSize = contDir->size - entryl;
 			unsigned int restByte = newSize - pointer;
 
-			if((r = deleteInodeData(contDir, device, newSize)) != Result::ok)
+			if((r = deleteInodeData(contDir, &device, newSize)) != Result::ok)
 				return r;
 
 			if(restByte > 0 && restByte < 4)	//should either be 0 (no entries left) or bigger than 4 (minimum size for one entry)
@@ -484,7 +485,7 @@ Result Paffs::removeInodeFromDir(Inode* contDir, Inode* elem){
 			memcpy(&dirData[pointer], &dirData[pointer + entryl], restByte);
 
 			unsigned int bw = 0;
-			return writeInodeData(contDir, 0, newSize, &bw, dirData, device);
+			return writeInodeData(contDir, 0, newSize, &bw, dirData, &device);
 		}
 		pointer += entryl;
 	}
@@ -504,7 +505,7 @@ Result Paffs::mkDir(const char* fullPath, Permission mask){
 	Result r = createDirInode(&newDir, mask);
 	if(r != Result::ok)
 		return r;
-	r = insertInode(device, &newDir);
+	r = insertInode(&device, &newDir);
 	if(r != Result::ok)
 		return r;
 
@@ -530,7 +531,7 @@ Dir* Paffs::openDir(const char* path){
 	char* dirData = (char*) malloc(dirPinode.size);
 	unsigned int br = 0;
 	if(dirPinode.reservedSize > 0){
-		r = readInodeData(&dirPinode, 0, dirPinode.size, &br, dirData, device);
+		r = readInodeData(&dirPinode, 0, dirPinode.size, &br, dirData, &device);
 		if(r != Result::ok || br != dirPinode.size){
 			lasterr = r;
 			return NULL;
@@ -641,7 +642,7 @@ Dirent* Paffs::readDir(Dir* dir){
 		return dir->dirents[dir->pos++];
 	}
 	Inode item;
-	Result r = getInode(device, dir->dirents[dir->pos]->node_no, &item);
+	Result r = getInode(&device, dir->dirents[dir->pos]->node_no, &item);
 	if(r != Result::ok){
 	   lasterr = Result::bug;
 	   return NULL;
@@ -677,7 +678,7 @@ Result Paffs::createFile(Inode* outFile, const char* fullPath, Permission mask){
 	if(createFilInode(outFile, mask) != Result::ok){
 		return Result::bug;
 	}
-	res = insertInode(device, outFile);
+	res = insertInode(&device, outFile);
 	if(res != Result::ok)
 		return res;
 
@@ -767,7 +768,7 @@ Result Paffs::touch(const char* path){
 		if(r != Result::ok)
 			return r;
 		file.mod = time(0);
-		return updateExistingInode(device, &file);
+		return updateExistingInode(&device, &file);
 	}
 
 }
@@ -805,7 +806,7 @@ Result Paffs::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned int
 		return Result::ok;
 	}
 
-	Result r = readInodeData(obj->dentry->iNode, obj->fp, bytes_to_read, bytes_read, buf, device);
+	Result r = readInodeData(obj->dentry->iNode, obj->fp, bytes_to_read, bytes_read, buf, &device);
 	if(r != Result::ok){
 		return r;
 	}
@@ -828,7 +829,7 @@ Result Paffs::write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsi
 	if((obj->dentry->iNode->perm & PAFFS_W) == 0)
 		return Result::noperm;
 
-	Result r = writeInodeData(obj->dentry->iNode, obj->fp, bytes_to_write, bytes_written, buf, device);
+	Result r = writeInodeData(obj->dentry->iNode, obj->fp, bytes_to_write, bytes_written, buf, &device);
 	if(r != Result::ok){
 		return r;
 	}
@@ -843,7 +844,7 @@ Result Paffs::write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsi
 			return Result::bug;
 		}
 	}
-	return updateExistingInode(device, obj->dentry->iNode);
+	return updateExistingInode(&device, obj->dentry->iNode);
 }
 
 Result Paffs::seek(Obj* obj, int m, Seekmode mode){
@@ -876,7 +877,7 @@ Result Paffs::chmod(const char* path, Permission perm){
 		return r;
 	}
 	object.perm = perm;
-	return updateExistingInode(device, &object);
+	return updateExistingInode(&device, &object);
 }
 Result Paffs::remove(const char* path){
 	Inode object;
@@ -891,7 +892,7 @@ Result Paffs::remove(const char* path){
 		if(object.size > sizeof(DirEntryCount))
 			return Result::dirnotempty;
 
-	if((r = deleteInodeData(&object, device, 0)) != Result::ok)
+	if((r = deleteInodeData(&object, &device, 0)) != Result::ok)
 		return r;
 
 	Inode parentDir;
@@ -901,13 +902,13 @@ Result Paffs::remove(const char* path){
 
 	if((r = removeInodeFromDir(&parentDir, &object)) != Result::ok)
 		return r;
-	return deleteInode(device, object.no);
+	return deleteInode(&device, object.no);
 }
 
 
 //ONLY FOR DEBUG
 Dev* Paffs::getDevice(){
-	return device;
+	return &device;
 }
 
 }

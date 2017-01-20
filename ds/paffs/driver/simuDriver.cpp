@@ -17,12 +17,11 @@ namespace paffs{
 Result SimuDriver::writePage(uint64_t page_no,
 								void* data, unsigned int data_len){
 	if(!cell)
-		return PAFFS_FAIL;
+		return Result::fail;
 
-	void* buf = malloc(dev->param.total_bytes_per_page );
 
-	if(dev->param.total_bytes_per_page != data_len){
-		memset(buf, 0xFF, dev->param.total_bytes_per_page);
+	if(param.total_bytes_per_page != data_len){
+		memset(buf, 0xFF, param.total_bytes_per_page);
 	}
 	memcpy(buf, data, data_len);
 
@@ -30,42 +29,40 @@ Result SimuDriver::writePage(uint64_t page_no,
 
 	NANDADRESS d = translatePageToAddress(page_no, cell);
 
-	if(fc->writePage(d.plane, d.block, d.page, (unsigned char*)buf) < 0){
+	if(cell->writePage(d.plane, d.block, d.page, (unsigned char*)buf) < 0){
 		free(buf);
-		return PAFFS_FAIL;
+		return Result::fail;
 	}
-	free(buf);
-	return PAFFS_OK;
+	return Result::ok;
 }
 Result SimuDriver::readPage(uint64_t page_no,
 								void* data, unsigned int data_len){
 	if(!cell)
-		return PAFFS_FAIL;
+		return Result::fail;
 
-	unsigned char buf [dev->param.total_bytes_per_page];
 
 	NANDADRESS d = translatePageToAddress(page_no, cell);
 
-	if(fc->readPage(d.plane, d.block, d.page, (unsigned char*)buf) < 0){
-		return PAFFS_FAIL;
+	if(cell->readPage(d.plane, d.block, d.page, (unsigned char*)buf) < 0){
+		return Result::fail;
 	}
 	memcpy(data, buf, data_len);
-	return PAFFS_OK;
+	return Result::ok;
 }
 Result SimuDriver::eraseBlock(uint32_t block_no){
 	if(!cell)
-		return PAFFS_FAIL;
+		return Result::fail;
 
 	NANDADRESS d = translateBlockToAddress(block_no, cell);
 
-	return fc->eraseBlock(d.plane, d.block) == 0 ? PAFFS_OK : PAFFS_FAIL;
+	return cell->eraseBlock(d.plane, d.block) == 0 ? Result::ok : Result::fail;
 }
 Result SimuDriver::markBad(uint32_t block_no){
-	return PAFFS_NIMPL;
+	return Result::nimpl;
 }
 
 Result SimuDriver::checkBad(uint32_t block_no){
-	return PAFFS_NIMPL;
+	return Result::nimpl;
 }
 
 NANDADRESS SimuDriver::translatePageToAddress(uint64_t page, FlashCell* fc){
@@ -82,6 +79,12 @@ NANDADRESS SimuDriver::translateBlockToAddress(uint32_t block, FlashCell* fc){
 	r.block = block % fc->planeSize;
 	r.page = 0;
 	return r;
+}
+
+void SimuDriver::init(){
+	buf = malloc(param.total_bytes_per_page);
+	//Configure parameters of flash
+
 }
 
 }

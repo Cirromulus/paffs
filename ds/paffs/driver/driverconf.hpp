@@ -19,7 +19,11 @@ namespace paffs {
 	}
 
 	Driver* getDriverSpecial(unsigned int number, void* fc){
-		return new SimuDriver((FlashCell*)fc);
+		if(fc == NULL){
+			std::cerr << "Invalid flashCell pointer given!" << std::endl;
+			return NULL;
+		}
+		return new SimuDriver(fc);
 	}
 
 }

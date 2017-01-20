@@ -6,6 +6,7 @@
  */
 
 #include "paffs_flash.hpp"
+#include "driver/driver.hpp"
 #include "garbage_collection.hpp"
 #include <stdlib.h>
 #include <string.h>
@@ -25,13 +26,13 @@ const char* area_names[] = {
 
 
 unsigned int findWritableArea(AreaType areaType, Dev* dev){
-	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != CLOSED){
+	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != AreaStatus::closed){
 		//current Area has still space left
 		return dev->activeArea[areaType];
 	}
 
 	for(unsigned int area = 0; area < dev->param.areas_no; area++){
-		if(dev->areaMap[area].type == UNSET){
+		if(dev->areaMap[area].type == AreaType::unset){
 			dev->areaMap[area].type = areaType;
 			initArea(dev, area);
 			return area;
@@ -40,29 +41,29 @@ unsigned int findWritableArea(AreaType areaType, Dev* dev){
 
 	Result r = collectGarbage(dev, areaType);
 	if(r != Result::ok){
-		paffs_lasterr = r;
+		lasterr = r;
 		return 0;
 	}
 
-	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != CLOSED){
+	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != AreaStatus::closed){
 		return dev->activeArea[areaType];
 	}
 
 	//If we arrive here, something buggy must have happened
 	PAFFS_DBG(PAFFS_TRACE_BUG, "Garbagecollection pointed to invalid area!");
-	paffs_lasterr = Result::bug;
+	lasterr = Result::bug;
 	return 0;
 }
 
 Result findFirstFreePage(unsigned int* p_out, Dev* dev, unsigned int area){
 
-	for(int i = 0; i < dev->param.data_pages_per_area; i++){
+	for(unsigned int i = 0; i < dev->param.data_pages_per_area; i++){
 		if(dev->areaMap[area].areaSummary[i] == SummaryEntry::free){
 			*p_out = i;
 			return Result::ok;
 		}
 	}
-	return PAFFS_NOSP;
+	return Result::nosp;
 }
 
 uint64_t getPageNumber(Addr addr, Dev *dev){
@@ -91,13 +92,13 @@ unsigned int extractPage(Addr addr){
 	return page;
 }
 
-Result manageActiveAreaFull(Dev *dev, area_pos_t *area, areaType areaType){
+Result manageActiveAreaFull(Dev *dev, AreaPos *area, AreaType areaType){
 	if(dev->areaMap[*area].areaSummary == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access invalid areaSummary!");
 		return Result::bug;
 	}
 
-	if(paffs_trace_mask & PAFFS_TRACE_VERIFY_AS){
+	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
 		for(unsigned int i = 0; i < dev->param.data_pages_per_area; i++){
 			if(dev->areaMap[*area].areaSummary[i] > SummaryEntry::dirty)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", *area);
@@ -105,7 +106,7 @@ Result manageActiveAreaFull(Dev *dev, area_pos_t *area, areaType areaType){
 	}
 
 	bool isFull = true;
-	for(int i = 0; i < dev->param.data_pages_per_area; i++){
+	for(unsigned int i = 0; i < dev->param.data_pages_per_area; i++){
 		if(dev->areaMap[*area].areaSummary[i] == SummaryEntry::free) {
 			isFull = false;
 			break;
@@ -123,14 +124,14 @@ Result manageActiveAreaFull(Dev *dev, area_pos_t *area, areaType areaType){
 
 
 //TODO: Add initAreaAs(...) to handle typical areaMap[abc].type = def; initArea(...);
-void initArea(Dev* dev, area_pos_t area){
-	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %lu (pos %u) as %s.", area, dev->areaMap[area].position, area_names[dev->areaMap[area].type]);
+void initArea(Dev* dev, AreaPos area){
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %u (pos %u) as %s.", (unsigned int)area, (unsigned int)dev->areaMap[area].position, area_names[dev->areaMap[area].type]);
 	//generate the areaSummary in Memory
-	dev->areaMap[area].status = ACTIVE;
+	dev->areaMap[area].status = AreaStatus::active;
 	dev->areaMap[area].isAreaSummaryDirty = false;
 	if(dev->areaMap[area].type == AreaType::indexarea || dev->areaMap[area].type == AreaType::dataarea){
 		if(dev->areaMap[area].areaSummary == NULL){
-			dev->areaMap[area].areaSummary = malloc(
+			dev->areaMap[area].areaSummary = (SummaryEntry*) malloc(
 					sizeof(SummaryEntry)
 					* dev->param.blocks_per_area
 					* dev->param.pages_per_block);
@@ -150,7 +151,7 @@ void initArea(Dev* dev, area_pos_t area){
 	}
 }
 
-Result loadArea(Dev *dev, area_pos_t area){
+Result loadArea(Dev *dev, AreaPos area){
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Loading Areasummary of Area %u (pos %u) as %s.", area, dev->areaMap[area].position, area_names[dev->areaMap[area].type]);
 	if(dev->areaMap[area].type != AreaType::dataarea && dev->areaMap[area].type != AreaType::indexarea){
 		return Result::ok;
@@ -166,7 +167,7 @@ Result loadArea(Dev *dev, area_pos_t area){
 	}
 
 	dev->areaMap[area].isAreaSummaryDirty = true;
-	dev->areaMap[area].areaSummary = malloc(
+	dev->areaMap[area].areaSummary = (SummaryEntry*) malloc(
 			sizeof(SummaryEntry)
 			* dev->param.blocks_per_area
 			* dev->param.pages_per_block);
@@ -174,10 +175,10 @@ Result loadArea(Dev *dev, area_pos_t area){
 	return readAreasummary(dev, area, dev->areaMap[area].areaSummary, true);
 }
 
-Result closeArea(Dev *dev, area_pos_t area){
-	dev->areaMap[area].status = CLOSED;
+Result closeArea(Dev *dev, AreaPos area){
+	dev->areaMap[area].status = AreaStatus::closed;
 
-	if(paffs_trace_mask & PAFFS_TRACE_VERIFY_AS){
+	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
 		for(unsigned int i = 0; i < dev->param.data_pages_per_area; i++){
 			if(dev->areaMap[area].areaSummary[i] > SummaryEntry::dirty)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", area);
@@ -200,10 +201,10 @@ Result closeArea(Dev *dev, area_pos_t area){
 	return Result::ok;
 }
 
-void retireArea(Dev *dev, area_pos_t area){
-	dev->areaMap[area].status = CLOSED;
+void retireArea(Dev *dev, AreaPos area){
+	dev->areaMap[area].status = AreaStatus::closed;
 
-	if((dev->areaMap[area].type == AreaType::dataarea || dev->areaMap[area].type == AreaType::indexarea) && paffs_trace_mask & PAFFS_TRACE_VERIFY_AS){
+	if((dev->areaMap[area].type == AreaType::dataarea || dev->areaMap[area].type == AreaType::indexarea) && trace_mask & PAFFS_TRACE_VERIFY_AS){
 		for(unsigned int i = 0; i < dev->param.data_pages_per_area; i++){
 			if(dev->areaMap[area].areaSummary[i] > SummaryEntry::dirty)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", area);
@@ -216,17 +217,17 @@ void retireArea(Dev *dev, area_pos_t area){
 		dev->areaMap[area].areaSummary = NULL;
 	}
 
-	dev->areaMap[area].type = RETIRED;
+	dev->areaMap[area].type = AreaType::retired;
 
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %u at pos. %u.", area, dev->areaMap[area].position);
 }
 
-Result writeAreasummary(Dev *dev, area_pos_t area, SummaryEntry* summary){
+Result writeAreasummary(Dev *dev, AreaPos area, SummaryEntry* summary){
 	unsigned int needed_bytes = 1 + dev->param.data_pages_per_area / 8;
 	unsigned int needed_pages = 1 + needed_bytes / dev->param.data_bytes_per_page;
 	if(needed_pages != dev->param.total_pages_per_area - dev->param.data_pages_per_area){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
-		return PAFFS_FAIL;
+		return Result::fail;
 	}
 
 	char buf[needed_bytes];
@@ -253,7 +254,7 @@ Result writeAreasummary(Dev *dev, area_pos_t area, SummaryEntry* summary){
 	for(unsigned int page = 0; page < needed_pages; page++){
 		unsigned int btw = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
 							: needed_bytes - pointer;
-		r = dev->drv.drv_write_page_fn(dev, page_offs + page, &buf[pointer], btw);
+		r = dev->driver->writePage(page_offs + page, &buf[pointer], btw);
 		if(r != Result::ok)
 			return r;
 
@@ -263,13 +264,13 @@ Result writeAreasummary(Dev *dev, area_pos_t area, SummaryEntry* summary){
 }
 
 //FIXME: readAreasummary is untested, b/c areaSummaries remain in RAM during unmount
-Result readAreasummary(Dev *dev, area_pos_t area, SummaryEntry* out_summary, bool complete){
+Result readAreasummary(Dev *dev, AreaPos area, SummaryEntry* out_summary, bool complete){
 	unsigned int needed_bytes = 1 + dev->param.data_pages_per_area / 8 /* One bit per entry*/;
 
 	unsigned int needed_pages = 1 + needed_bytes / dev->param.data_bytes_per_page;
 	if(needed_pages != dev->param.total_pages_per_area - dev->param.data_pages_per_area){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
-		return PAFFS_FAIL;
+		return Result::fail;
 	}
 
 	char buf[needed_bytes];
@@ -280,7 +281,7 @@ Result readAreasummary(Dev *dev, area_pos_t area, SummaryEntry* out_summary, boo
 	for(unsigned int page = 0; page < needed_pages; page++){
 		unsigned int btr = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
 							: needed_bytes - pointer;
-		r = dev->drv.drv_read_page_fn(dev, page_offs + page, &buf[pointer], btr);
+		r = dev->driver->readPage(page_offs + page, &buf[pointer], btr);
 		if(r != Result::ok)
 			return r;
 
@@ -295,11 +296,11 @@ Result readAreasummary(Dev *dev, area_pos_t area, SummaryEntry* out_summary, boo
 			if(complete){
 				unsigned char pagebuf[BYTES_PER_PAGE];
 				Addr tmp = combineAddress(area, j);
-				r = dev->drv.drv_read_page_fn(dev, getPageNumber(tmp, dev), pagebuf, dev->param.data_bytes_per_page);
+				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dev->param.data_bytes_per_page);
 				if(r != Result::ok)
 					return r;
 				bool contains_data = false;
-				for(int byte = 0; byte < dev->param.data_bytes_per_page; byte++){
+				for(unsigned int byte = 0; byte < dev->param.data_bytes_per_page; byte++){
 					if(pagebuf[byte] != 0xFF){
 						contains_data = true;
 						break;
@@ -328,7 +329,7 @@ Result writeInodeData(Inode* inode,
 
 	if(offs+bytes == 0){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Write size 0! Bug?");
-		return paffs_lasterr = Result::einval;
+		return lasterr = Result::einval;
 	}
 
 	unsigned int pageFrom = offs/dev->param.data_bytes_per_page;
@@ -337,28 +338,28 @@ Result writeInodeData(Inode* inode,
 	if(pageTo - pageFrom > 11){
 		//Would use first indirection Layer
 		PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Write would use first indirection layer, too big!");
-		return paffs_lasterr = Result::nimpl;
+		return lasterr = Result::nimpl;
 	}
 
 	unsigned int pageOffs = offs % dev->param.data_bytes_per_page;
 	*bytes_written = 0;
 
-	for(int page = 0; page <= pageTo - pageFrom; page++){
+	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
 		bool misaligned = false;
 		dev->activeArea[AreaType::dataarea] = findWritableArea(AreaType::dataarea, dev);
-		if(paffs_lasterr != Result::ok){
-			return paffs_lasterr;
+		if(lasterr != Result::ok){
+			return lasterr;
 		}
 
 		//Handle Areas
-		if(dev->areaMap[dev->activeArea[AreaType::dataarea]].status == EMPTY){
+		if(dev->areaMap[dev->activeArea[AreaType::dataarea]].status == AreaStatus::empty){
 			//We'll have to use a fresh area,
 			//so generate the areaSummary in Memory
 			initArea(dev, dev->activeArea[AreaType::dataarea]);
 		}
 		unsigned int firstFreePage = 0;
-		if(findFirstFreePage(&firstFreePage, dev, dev->activeArea[AreaType::dataarea]) == PAFFS_NOSP){
-			PAFFS_DBG(Result::bug, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::dataarea]);
+		if(findFirstFreePage(&firstFreePage, dev, dev->activeArea[AreaType::dataarea]) == Result::nosp){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::dataarea]);
 			return Result::bug;
 		}
 		Addr pageAddress = combineAddress(dev->activeArea[AreaType::dataarea], firstFreePage);
@@ -437,7 +438,7 @@ Result writeInodeData(Inode* inode,
 		}
 		inode->direct[page+pageFrom] = pageAddress;
 
-		Result res = dev->drv.drv_write_page_fn(dev, getPageNumber(pageAddress, dev), buf, btw);
+		Result res = dev->driver->writePage(getPageNumber(pageAddress, dev), buf, btw);
 
 		if(misaligned)
 			free(buf);
@@ -445,7 +446,7 @@ Result writeInodeData(Inode* inode,
 		PAFFS_DBG_S(PAFFS_TRACE_WRITE, "write r.P: %d/%d, phy.P: %llu", page+1, pageTo+1, (long long unsigned int) getPageNumber(pageAddress, dev));
 		if(res != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "ERR: write returned FAIL at phy.P: %llu", (long long unsigned int) getPageNumber(pageAddress, dev));
-			return PAFFS_FAIL;
+			return Result::fail;
 		}
 
 		res = manageActiveAreaFull(dev, &dev->activeArea[AreaType::dataarea], AreaType::dataarea);
@@ -465,7 +466,7 @@ Result readInodeData(Inode* inode,
 
 	if(offs+bytes == 0){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read size 0! Bug?");
-		return paffs_lasterr = Result::einval;
+		return lasterr = Result::einval;
 	}
 
 	*bytes_read = 0;
@@ -489,10 +490,10 @@ Result readInodeData(Inode* inode,
 	bool misaligned = false;
 	if(pageOffs > 0){
 		misaligned = true;
-		wrap = malloc(bytes + offs);
+		wrap = (char*) malloc(bytes + offs);
 	}
 
-	for(int page = 0; page <= pageTo - pageFrom; page++){
+	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
 		char* buf = &wrap[page*dev->param.data_bytes_per_page];
 
 		unsigned int btr = bytes + pageOffs - *bytes_read;
@@ -502,7 +503,7 @@ Result readInodeData(Inode* inode,
 						(bytes + pageOffs) - page*dev->param.data_bytes_per_page;
 		}
 
-		area_pos_t area = extractLogicalArea(inode->direct[page + pageFrom]);
+		AreaPos area = extractLogicalArea(inode->direct[page + pageFrom]);
 		if(dev->areaMap[area].type != AreaType::dataarea){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid area at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
 			return Result::bug;
@@ -531,11 +532,11 @@ Result readInodeData(Inode* inode,
 		}
 
 		unsigned long long addr = getPageNumber(inode->direct[page + pageFrom], dev);
-		r = dev->drv.drv_read_page_fn(dev, addr, buf, btr);
+		r = dev->driver->readPage(addr, buf, btr);
 		if(r != Result::ok){
 			if(misaligned)
 				free (wrap);
-			return paffs_lasterr = r;
+			return lasterr = r;
 		}
 		*bytes_read += btr;
 
@@ -578,7 +579,7 @@ Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs){
 		return Result::ok;
 
 
-	for(int page = 0; page <= pageTo - pageFrom; page++){
+	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
 
 		unsigned int area = extractLogicalArea(inode->direct[page + pageFrom]);
 		unsigned int relPage = extractPage(inode->direct[page + pageFrom]);
@@ -611,7 +612,7 @@ Result writeTreeNode(Dev* dev, TreeNode* node){
 				return Result::bug;
 	}
 	if(sizeof(TreeNode) > dev->param.data_bytes_per_page){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page (Was %lu, should %u)", sizeof(TreeNode), dev->param.data_bytes_per_page);
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page (Was %u, should %u)", sizeof(TreeNode), dev->param.data_bytes_per_page);
 		return Result::bug;
 	}
 
@@ -620,10 +621,10 @@ Result writeTreeNode(Dev* dev, TreeNode* node){
 		dev->areaMap[extractLogicalArea(node->self)].areaSummary[extractPage(node->self)] = SummaryEntry::dirty;
 	}
 
-	paffs_lasterr = Result::ok;
+	lasterr = Result::ok;
 	dev->activeArea[AreaType::indexarea] = findWritableArea(AreaType::indexarea, dev);
-	if(paffs_lasterr != Result::ok){
-		return paffs_lasterr;
+	if(lasterr != Result::ok){
+		return lasterr;
 	}
 
 	if(dev->activeArea[AreaType::indexarea] == 0){
@@ -632,16 +633,16 @@ Result writeTreeNode(Dev* dev, TreeNode* node){
 	}
 
 	unsigned int firstFreePage = 0;
-	if(findFirstFreePage(&firstFreePage, dev, dev->activeArea[AreaType::indexarea]) == PAFFS_NOSP){
+	if(findFirstFreePage(&firstFreePage, dev, dev->activeArea[AreaType::indexarea]) == Result::nosp){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::indexarea]);
-		return paffs_lasterr = Result::bug;
+		return lasterr = Result::bug;
 	}
 	Addr addr = combineAddress(dev->activeArea[AreaType::indexarea], firstFreePage);
 	node->self = addr;
 
 	dev->areaMap[dev->activeArea[AreaType::indexarea]].areaSummary[firstFreePage] = SummaryEntry::used;
 
-	Result r = dev->drv.drv_write_page_fn(dev, getPageNumber(node->self, dev), node, sizeof(TreeNode));
+	Result r = dev->driver->writePage(getPageNumber(node->self, dev), node, sizeof(TreeNode));
 	if(r != Result::ok)
 		return r;
 
@@ -658,7 +659,7 @@ Result readTreeNode(Dev* dev, Addr addr, TreeNode* node){
 		return Result::bug;
 	}
 	if(sizeof(TreeNode) > dev->param.data_bytes_per_page){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page (Was %lu, should %u)", sizeof(TreeNode), dev->param.data_bytes_per_page);
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page (Was %u, should %u)", sizeof(TreeNode), dev->param.data_bytes_per_page);
 		return Result::bug;
 	}
 
@@ -682,7 +683,7 @@ Result readTreeNode(Dev* dev, Addr addr, TreeNode* node){
 		}
 	}
 
-	Result r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), node, sizeof(TreeNode));
+	Result r = dev->driver->readPage(getPageNumber(addr, dev), node, sizeof(TreeNode));
 	if(r != Result::ok)
 		return r;
 
@@ -708,7 +709,7 @@ Result findFirstFreeEntryInBlock(Dev* dev, uint32_t area, uint8_t block, uint32_
 	for(unsigned int i = 0; i < dev->param.pages_per_block; i++) {
 		Addr addr = combineAddress(area, i + page_offs);
 		uint32_t no;
-		Result r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), &no, sizeof(uint32_t));
+		Result r = dev->driver->readPage(getPageNumber(addr, dev), &no, sizeof(uint32_t));
 		if(r != Result::ok)
 			return r;
 		if(no != 0xFFFFFFFF){
@@ -735,7 +736,7 @@ Result findMostRecentEntryInBlock(Dev* dev, uint32_t area, uint8_t block, uint32
 	for(unsigned int i = 0; i < dev->param.pages_per_block; i++) {
 		Addr addr = combineAddress(area, i + page_offs);
 		uint32_t no;
-		Result r = dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), &no, sizeof(uint32_t));
+		Result r = dev->driver->readPage(getPageNumber(addr, dev), &no, sizeof(uint32_t));
 		if(r != Result::ok)
 			return r;
 		if(no == 0xFFFFFFFF){
@@ -770,7 +771,7 @@ Result deleteAnchorBlock(Dev* dev, uint32_t area, uint8_t block) {
 		return Result::bug;
 	}
 	uint32_t block_offs = dev->areaMap[area].position * dev->param.blocks_per_area;
-	return dev->drv.drv_erase_fn(dev, block_offs + block);
+	return dev->driver->eraseBlock(block_offs + block);
 }
 
 Result writeJumpPadEntry(Dev* dev, Addr addr, JumpPadEntry* entry){
@@ -810,7 +811,7 @@ Result writeSuperIndex(Dev* dev, Addr addr, superIndex* entry){
 	unsigned char pospos = 0;	//Stupid name
 
 	for(unsigned int i = 0; i < dev->param.areas_no; i++){
-		if((entry->areaMap[i].type == AreaType::indexarea || entry->areaMap[i].type == AreaType::dataarea) && entry->areaMap[i].status == ACTIVE){
+		if((entry->areaMap[i].type == AreaType::indexarea || entry->areaMap[i].type == AreaType::dataarea) && entry->areaMap[i].status == AreaStatus::active){
 			areaSummaryPositions[pospos++] = i;
 			entry->areaMap[i].has_areaSummary = true;
 		}else{
@@ -840,7 +841,7 @@ Result writeSuperIndex(Dev* dev, Addr addr, superIndex* entry){
 	for(unsigned page = 0; page < needed_pages; page++){
 		unsigned int btw = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
 							: needed_bytes - pointer;
-		r = dev->drv.drv_write_page_fn(dev, page_offs + page, &buf[pointer], btw);
+		r = dev->driver->writePage(page_offs + page, &buf[pointer], btw);
 		if(r != Result::ok)
 			return r;
 
@@ -852,7 +853,7 @@ Result writeSuperIndex(Dev* dev, Addr addr, superIndex* entry){
 
 Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, SummaryEntry* summary_Containers[2], bool withAreaMap){
 	if(!withAreaMap)
-		 return dev->drv.drv_read_page_fn(dev, getPageNumber(addr, dev), entry, sizeof(uint32_t) + sizeof(Addr));
+		 return dev->driver->readPage(getPageNumber(addr, dev), entry, sizeof(uint32_t) + sizeof(Addr));
 
 	if(entry->areaMap == 0)
 		return Result::einval;
@@ -873,7 +874,7 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, SummaryEntry* 
 	for(unsigned page = 0; page < needed_pages; page++){
 		unsigned int btr = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
 							: needed_bytes - pointer;
-		r = dev->drv.drv_read_page_fn(dev, page_offs + page, &buf[pointer], btr);
+		r = dev->driver->readPage(page_offs + page, &buf[pointer], btr);
 		if(r != Result::ok)
 			return r;
 
@@ -910,11 +911,11 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, SummaryEntry* 
 			if(buf[pointer + j/8] & 1 << j%8){
 				//TODO: Normally, we would check in the OOB for a Checksum or so, which is present all the time
 				Addr tmp = combineAddress(areaSummaryPositions[i], j);
-				r = dev->drv.drv_read_page_fn(dev, getPageNumber(tmp, dev), pagebuf, dev->param.data_bytes_per_page);
+				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dev->param.data_bytes_per_page);
 				if(r != Result::ok)
 					return r;
 				bool contains_data = false;
-				for(int byte = 0; byte < dev->param.data_bytes_per_page; byte++){
+				for(unsigned int byte = 0; byte < dev->param.data_bytes_per_page; byte++){
 					if(pagebuf[byte] != 0xFF){
 						contains_data = true;
 						break;

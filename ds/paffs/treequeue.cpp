@@ -4,7 +4,7 @@
  *  Created on: 29.08.2016
  *      Author: rooot
  */
-#include "treequeue.h"
+#include "treequeue.hpp"
 #include <stdlib.h>
 #include <string.h>
 
@@ -34,11 +34,11 @@ int queue_empty(queue_s *queue) {
 }
 
 queue_s *queue_new(void) {
-  queue_s *queue = malloc(sizeof(*queue));
+  queue_s *queue = (queue_s*) malloc(sizeof(*queue));
   if (queue == NULL) {
     return NULL;
   }
-  if ((queue->data = malloc(QUEUE_INIT_SIZE*sizeof(*(queue->data)))) == NULL) {
+  if ((queue->data = (void**) malloc(QUEUE_INIT_SIZE*sizeof(*(queue->data)))) == NULL) {
     free(queue);
     return NULL;
   }
@@ -73,7 +73,7 @@ void *queue_dequeue(queue_s *queue) {
       memmove(queue->data+(new_size - off), queue->data+queue->front, off*sizeof(*(queue->data)));
       queue->front = new_size - off;
     }
-    queue->data = realloc(queue->data, new_size*sizeof(*(queue->data)));
+    queue->data = (void**) realloc(queue->data, new_size*sizeof(*(queue->data)));
     queue->size = new_size;
   }
   return data;
@@ -87,7 +87,7 @@ int queue_enqueue(queue_s *queue, void *data) {
   queue->back = (queue->back + 1)%queue->size;
   if (queue->back == queue->front) {
     size_t new_size = queue->size + QUEUE_GROW_SIZE;
-    void **new_data = realloc(queue->data, new_size*sizeof(*(queue->data)));
+    void **new_data = (void**) realloc(queue->data, new_size*sizeof(*(queue->data)));
     if (new_data == NULL) {
       queue->back = (queue->size + queue->back - 1) % queue->size;
       return ERR_NOMEM;

@@ -5,10 +5,7 @@
 
 #pragma once
 
-
 #include <stdint.h>
-
-
 #include "paffs_trace.hpp"
 
 
@@ -17,9 +14,6 @@
 namespace paffs{
 
 class Driver;
-
-extern char* areaNames[];		//Initialized in paffs_flash.c
-extern const char* resultMsg[];		//Initialized in paffs.cpp
 
 enum class Result : uint8_t{
 	ok = 0,
@@ -39,6 +33,9 @@ enum class Result : uint8_t{
 	num_result
 };
 
+extern char* areaNames[];		//Initialized in paffs_flash.c
+extern const char* resultMsg[];		//Initialized in paffs.cpp
+extern Result lasterr;
 const char* err_msg(Result pr);
 
 typedef char Permission;
@@ -94,7 +91,7 @@ enum class InodeType{
 
 struct Inode{
 	InodeNo no;
-	InodeType type:3;
+	InodeType type:2;
 	Permission perm:3;
 	Date crea;
 	Date mod;
@@ -179,17 +176,16 @@ struct Dev{
 	//Automatically filled
 	Obj root_dir;
 	Area* areaMap;
+	Driver *driver;
 };
 
 class Paffs{
-	Driver *driver;
-	Dev* device; 	//TODO: is actually in driver decide where to go with it
+	Dev device;
 	SummaryEntry* summaryEntry_containers[2];
-	Result lasterr = Result::ok;
 
 public:
 	Paffs();
-	Paffs(void* fc),
+	Paffs(void* fc);
 	~Paffs();
 
 

@@ -26,21 +26,21 @@ set_target_properties(paffs PROPERTIES
 )
 
 
-add_executable(dir_test tests/dirtest.c)
+add_executable(dir_test tests/dirtest.cpp)
 target_link_libraries(dir_test paffs simu)
 set_target_properties(dir_test PROPERTIES
 	COMPILE_FLAGS "-Wall"
 )
 
-add_executable(tree_test ${SOURCES} tests/tree.c)
-target_link_libraries(tree_test paffs simu)
-set_target_properties(tree_test PROPERTIES
-	COMPILE_FLAGS "-Wall"
-)
+#add_executable(tree_test ${SOURCES} tests/tree.cpp)
+#target_link_libraries(tree_test paffs simu)
+#set_target_properties(tree_test PROPERTIES
+#	COMPILE_FLAGS "-Wall"
+#)
 
-add_executable(sindex_test ${SOURCES} tests/superblocktest.c)
-target_link_libraries(sindex_test paffs simu)
-set_target_properties(sindex_test PROPERTIES
-	COMPILE_FLAGS "-Wall"
-)
+#add_executable(sindex_test ${SOURCES} tests/superblocktest.cpp)
+#target_link_libraries(sindex_test paffs simu)
+#set_target_properties(sindex_test PROPERTIES
+#	COMPILE_FLAGS "-Wall"
+#)
 

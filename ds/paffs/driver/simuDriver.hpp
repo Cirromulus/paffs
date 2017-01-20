@@ -16,18 +16,22 @@ namespace paffs{
 class SimuDriver : public Driver{
 	FlashCell *cell;
 	bool selfLoaded = false;
+	void* buf;
 public:
-	SimuDriver(){
+	SimuDriver() : Driver(){
 		selfLoaded = true;
 		cell = new FlashCell();
+		init();
 	}
-	SimuDriver(FlashCell *c) : cell(c){
-
+	SimuDriver(void *c) : Driver(p){
+		cell = (FlashCell*) c;
+		init();
 	};
 
 	~SimuDriver(){
 		if(selfLoaded)
 			delete cell;
+		free(buf);
 	}
 
 	//See paffs.h struct p_drv

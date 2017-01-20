@@ -47,6 +47,8 @@ Result commitSuperIndex(Dev* dev);
 //returns PAFFS_NF if no superindex is in flash
 Result getAddrOfMostRecentSuperIndex(Dev* dev, Addr *out);
 
+void printSuperIndex(Dev* dev, superIndex* ind);
+
 }
 
 #endif /* DS_PAFFS_SUPERBLOCK_H_ */

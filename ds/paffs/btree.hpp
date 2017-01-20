@@ -26,17 +26,17 @@ namespace paffs{
 static const int btree_branch_order = BRANCH_ORDER;
 static const int btree_leaf_order = LEAF_ORDER;
 
-typedef struct treeNode{
-	union as{
-		struct branch {
+typedef struct TreeNode{
+	union As{
+		struct Branch {
 			InodeNo keys[BRANCH_ORDER-1];
 			Addr pointers[BRANCH_ORDER];
-		};
-		struct leaf {
+		} branch;
+		struct Leaf {
 			InodeNo keys[LEAF_ORDER];
 			Inode pInodes[LEAF_ORDER];
-		};
-	};
+		} leaf;
+	}as;
 	Addr self;	//If '0', it is not committed yet
 	bool is_leaf:1;
 	unsigned char num_keys:7; //If leaf: Number of pInodes
@@ -44,7 +44,7 @@ typedef struct treeNode{
 } treeNode;
 
 struct TreeCacheNode{
-	treeNode raw;
+	TreeNode raw;
 	struct TreeCacheNode* parent;	//Parent either points to parent or to node itself if is root. Special case: NULL if node is invalid.
 	struct TreeCacheNode* pointers[BRANCH_ORDER];
 	bool dirty:1;
@@ -68,7 +68,7 @@ Result updateExistingInode( Dev* dev, Inode* inode);
 Result deleteInode( Dev* dev, InodeNo number);
 Result findFirstFreeNo(Dev* dev, InodeNo* outNumber);
 
-bool isEqual(TreeCacheNode* left, TreeCacheNode* right);
+//bool isEqual(TreeCacheNode* left, TreeCacheNode* right);
 int height( Dev* dev, TreeCacheNode * root );
 //Length is number of Kanten, not Knoten
 int length_to_root( Dev* dev, TreeCacheNode * child );

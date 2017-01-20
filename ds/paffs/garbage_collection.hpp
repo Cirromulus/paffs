@@ -5,11 +5,12 @@
  *      Author: urinator
  */
 
-#ifndef DS_PAFFS_GARBAGE_COLLECTION_H_
-#define DS_PAFFS_GARBAGE_COLLECTION_H_
+#pragma once
 
 #include "paffs.hpp"
 
-Result collectGarbage(Dev* dev, areaType target);
+namespace paffs {
 
-#endif /* DS_PAFFS_GARBAGE_COLLECTION_H_ */
+Result collectGarbage(Dev* dev, AreaType target);
+
+}

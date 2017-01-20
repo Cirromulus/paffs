@@ -53,9 +53,9 @@ Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs);
 
 
 // TreeNode related
-Result writeTreeNode(Dev* dev, treeNode* node);
-Result readTreeNode(Dev* dev, Addr addr, treeNode* node);
-Result deleteTreeNode(Dev* dev, treeNode* node);
+Result writeTreeNode(Dev* dev, TreeNode* node);
+Result readTreeNode(Dev* dev, Addr addr, TreeNode* node);
+Result deleteTreeNode(Dev* dev, TreeNode* node);
 
 
 // Superblock related
