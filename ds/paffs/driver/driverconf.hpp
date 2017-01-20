@@ -12,18 +12,21 @@
 
 namespace paffs {
 
-//TODO: getDriver(std::string)
 
-	Driver* getDriver(unsigned int number){
-		return new SimuDriver();
+	Driver* getDriver(const char* devicename){
+		Driver* out = new SimuDriver();
+		out->param.name = devicename;
+		return out;
 	}
 
-	Driver* getDriverSpecial(unsigned int number, void* fc){
+	Driver* getDriverSpecial(const char* devicename, void* fc){
 		if(fc == NULL){
 			std::cerr << "Invalid flashCell pointer given!" << std::endl;
 			return NULL;
 		}
-		return new SimuDriver(fc);
+		Driver* out = new SimuDriver(fc);
+		out->param.name = devicename;
+		return out;
 	}
 
 }

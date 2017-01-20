@@ -7,7 +7,6 @@
 #include "simuDriver.hpp"
 
 #include "../paffs.hpp"
-#include <string.h>
 
 
 
@@ -43,7 +42,7 @@ Result SimuDriver::readPage(uint64_t page_no,
 
 	NANDADRESS d = translatePageToAddress(page_no, cell);
 
-	if(cell->readPage(d.plane, d.block, d.page, (unsigned char*)buf) < 0){
+	if(cell->readPage(d.plane, d.block, d.page, buf) < 0){
 		return Result::fail;
 	}
 	memcpy(data, buf, data_len);
@@ -82,9 +81,14 @@ NANDADRESS SimuDriver::translateBlockToAddress(uint32_t block, FlashCell* fc){
 }
 
 void SimuDriver::init(){
-	buf = malloc(param.total_bytes_per_page);
-	//TODO: Configure parameters of flash
+	//Configure parameters of flash
+    param.total_bytes_per_page = cell->pageSize;
+    param.oob_bytes_per_page = cell->pageSize - cell->pageDataSize;
+    param.pages_per_block = cell->blockSize;
+    param.blocks = cell->planeSize * cell->cellSize;
 
+	buf = new unsigned char[param.total_bytes_per_page];
+	memset(buf, 0xFF, param.total_bytes_per_page);
 }
 
 }

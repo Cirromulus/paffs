@@ -10,10 +10,10 @@
 namespace paffs{
 
 	class Driver {
-	protected:
-		Param param;
 	public:
-		Driver(Param p) : param(p){};
+		Param param;
+
+		Driver(){};
 		virtual ~Driver(){};
 
 		virtual Result writePage (uint64_t page_no,

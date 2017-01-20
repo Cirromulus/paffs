@@ -17,7 +17,7 @@ namespace paffs{
  */
 uint32_t countDirtyPages(Dev* dev, SummaryEntry* summary){
 	uint32_t dirty = 0;
-	for(uint32_t i = 0; i < dev->param.data_pages_per_area; i++){
+	for(uint32_t i = 0; i < dev->param->data_pages_per_area; i++){
 		if(summary[i] != SummaryEntry::used)
 			dirty++;
 	}
@@ -28,11 +28,11 @@ AreaPos findNextBestArea(Dev* dev, AreaType target, SummaryEntry* out_summary, b
 	AreaPos favourite_area = 0;
 	uint32_t fav_dirty_pages = 0;
 	*srcAreaContainsData = true;
-	SummaryEntry tmp[dev->param.data_pages_per_area];
+	SummaryEntry tmp[dev->param->data_pages_per_area];
 	SummaryEntry* curr = out_summary;
 
 	//Look for the most dirty block
-	for(AreaPos i = 0; i < dev->param.areas_no; i++){
+	for(AreaPos i = 0; i < dev->param->areas_no; i++){
 		if(dev->areaMap[i].status == AreaStatus::closed && (dev->areaMap[i].type == AreaType::dataarea || dev->areaMap[i].type == AreaType::indexarea)){
 			if(dev->areaMap[i].areaSummary == NULL){
 				Result r = readAreasummary(dev, i, tmp, false);
@@ -47,19 +47,19 @@ AreaPos findNextBestArea(Dev* dev, AreaType target, SummaryEntry* out_summary, b
 			}
 
 			if(trace_mask & PAFFS_TRACE_VERIFY_AS){
-				for(unsigned int j = 0; j < dev->param.data_pages_per_area; j++){
+				for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
 					if(curr[j] > SummaryEntry::dirty)
 						PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", j);
 				}
 			}
 
 			uint32_t dirty_pages = countDirtyPages(dev, curr);
-			if (dirty_pages == dev->param.data_pages_per_area){
+			if (dirty_pages == dev->param->data_pages_per_area){
 				//We can't find a block with more dirty pages in it
 				favourite_area = i;
 				//fav_dirty_pages = dirty_pages; not needed
 				*srcAreaContainsData = false;
-				memcpy(out_summary, curr, dev->param.data_pages_per_area);
+				memcpy(out_summary, curr, dev->param->data_pages_per_area);
 				break;
 			}
 
@@ -69,7 +69,7 @@ AreaPos findNextBestArea(Dev* dev, AreaType target, SummaryEntry* out_summary, b
 			if(dirty_pages > fav_dirty_pages){
 				favourite_area = i;
 				fav_dirty_pages = dirty_pages;
-				memcpy(out_summary, curr, dev->param.data_pages_per_area);
+				memcpy(out_summary, curr, dev->param->data_pages_per_area);
 			}
 
 		}
@@ -82,18 +82,18 @@ AreaPos findNextBestArea(Dev* dev, AreaType target, SummaryEntry* out_summary, b
  * @param summary is input and output (with changed SummaryEntry::dirty to SummaryEntry::free)
  */
 Result moveValidDataToNewArea(Dev* dev, AreaPos srcArea, AreaPos dstArea, SummaryEntry* summary){
-	for(unsigned long page = 0; page < dev->param.data_pages_per_area; page++){
+	for(unsigned long page = 0; page < dev->param->data_pages_per_area; page++){
 		if(summary[page] == SummaryEntry::used){
-			uint64_t src = dev->areaMap[srcArea].position * dev->param.total_pages_per_area + page;
-			uint64_t dst = dev->areaMap[dstArea].position * dev->param.total_pages_per_area + page;
+			uint64_t src = dev->areaMap[srcArea].position * dev->param->total_pages_per_area + page;
+			uint64_t dst = dev->areaMap[dstArea].position * dev->param->total_pages_per_area + page;
 
-			char buf[dev->param.total_bytes_per_page];
-			Result r = dev->driver->readPage(src, buf, dev->param.total_bytes_per_page);
+			char buf[dev->param->total_bytes_per_page];
+			Result r = dev->driver->readPage(src, buf, dev->param->total_bytes_per_page);
 			if(r != Result::ok){
 				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not read page n° %lu!", (long unsigned) src);
 				return r;
 			}
-			r = dev->driver->writePage(dst, buf, dev->param.total_bytes_per_page);
+			r = dev->driver->writePage(dst, buf, dev->param->total_bytes_per_page);
 			if(r != Result::ok){
 				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not write page n° %lu!", (long unsigned) dst);
 				return Result::badflash;
@@ -106,10 +106,10 @@ Result moveValidDataToNewArea(Dev* dev, AreaPos srcArea, AreaPos dstArea, Summar
 }
 
 Result deleteArea(Dev* dev, AreaPos area){
-	for(unsigned int i = 0; i < dev->param.blocks_per_area; i++){
-		Result r = dev->driver->eraseBlock(dev->areaMap[area].position*dev->param.blocks_per_area + i);
+	for(unsigned int i = 0; i < dev->param->blocks_per_area; i++){
+		Result r = dev->driver->eraseBlock(dev->areaMap[area].position*dev->param->blocks_per_area + i);
 		if(r != Result::ok){
-			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block n° %u (Area %u)!", dev->areaMap[area].position*dev->param.blocks_per_area + i, area);
+			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block n° %u (Area %u)!", dev->areaMap[area].position*dev->param->blocks_per_area + i, area);
 			retireArea(dev, area);
 			return Result::badflash;
 		}
@@ -127,15 +127,15 @@ Result deleteArea(Dev* dev, AreaPos area){
  * Changes active Area to one of the new freed areas.
  */
 Result collectGarbage(Dev* dev, AreaType targetType){
-	SummaryEntry summary[dev->param.data_pages_per_area];
-	memset(summary, 0, dev->param.data_pages_per_area);
+	SummaryEntry summary[dev->param->data_pages_per_area];
+	memset(summary, 0, dev->param->data_pages_per_area);
 	bool srcAreaContainsData = false;
 	bool desperateMode = dev->activeArea[AreaType::garbage_buffer] == 0;	//If we have no AreaType::garbage_buffer left
 	AreaPos deletion_target = 0;
 	Result r;
 
 	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
-		memset(summary, 0xFF, dev->param.data_pages_per_area);
+		memset(summary, 0xFF, dev->param->data_pages_per_area);
 	}
 
 	if(desperateMode){
@@ -185,7 +185,7 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 			//TODO: former summary may be incomplete...
 			dev->areaMap[lastDeletionTarget].type = targetType;
 			initArea(dev, lastDeletionTarget);
-			memcpy(dev->areaMap[lastDeletionTarget].areaSummary, summary, dev->param.data_pages_per_area);
+			memcpy(dev->areaMap[lastDeletionTarget].areaSummary, summary, dev->param->data_pages_per_area);
 			deletion_target = lastDeletionTarget;
 
 			break;
@@ -193,13 +193,13 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 
 		if(trace_mask & PAFFS_TRACE_VERIFY_AS){
 			//Just for debug, in production AS might be invalid and summary may be incomplete
-			if(memcmp(summary, dev->areaMap[deletion_target].areaSummary, dev->param.data_pages_per_area) != 0){
+			if(memcmp(summary, dev->areaMap[deletion_target].areaSummary, dev->param->data_pages_per_area) != 0){
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of findNextBestArea is different to actual areaSummary");
 			}
 		}
 
 		if(trace_mask & PAFFS_TRACE_VERIFY_AS){
-			for(unsigned int j = 0; j < dev->param.data_pages_per_area; j++){
+			for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
 				if(summary[j] > SummaryEntry::dirty)
 					PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", j);
 			}
@@ -227,12 +227,12 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 				return r;
 			}
 			//Copy the updated (no SummaryEntry::dirty pages) summary to the deletion_target (it will be the fresh area!)
-			memcpy(dev->areaMap[deletion_target].areaSummary, summary, dev->param.data_pages_per_area);
+			memcpy(dev->areaMap[deletion_target].areaSummary, summary, dev->param->data_pages_per_area);
 			//Notify for used Pages
 			dev->areaMap[deletion_target].status = AreaStatus::active;	//Safe, because we can assume deletion targetType is same Type as we want (from getNextBestArea)
 		}else{
 			//This is not necessary because write function handles empty areas by itself
-			//				memset(dev->areaMap[deletion_target].areaSummary, 0, dev->param.data_pages_per_area);
+			//				memset(dev->areaMap[deletion_target].areaSummary, 0, dev->param->data_pages_per_area);
 			dev->areaMap[deletion_target].status = AreaStatus::empty;
 		}
 
@@ -243,7 +243,7 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block in area %u on position %u! Retiring Area...", deletion_target, dev->areaMap[deletion_target].position);
 			if(trace_mask && (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
 				printf("Info: \n");
-				for(unsigned int i = 0; i < dev->param.areas_no; i++){
+				for(unsigned int i = 0; i < dev->param->areas_no; i++){
 					printf("\tArea %d on %u as %10s with %u erases\n", i, dev->areaMap[i].position, area_names[dev->areaMap[i].type], dev->areaMap[i].erasecount);
 				}
 			}
@@ -275,7 +275,7 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 		dev->activeArea[AreaType::garbage_buffer] = 0;
 		if(trace_mask && (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
 			printf("Info: \n");
-			for(unsigned int i = 0; i < dev->param.areas_no; i++){
+			for(unsigned int i = 0; i < dev->param->areas_no; i++){
 				printf("\tArea %d on %u as %10s with %u erases\n", i, dev->areaMap[i].position, area_names[dev->areaMap[i].type], dev->areaMap[i].erasecount);
 			}
 		}

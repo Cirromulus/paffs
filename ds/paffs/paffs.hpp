@@ -160,6 +160,9 @@ enum class SummaryEntry : uint8_t{
 	dirty
 };
 
+//#pragma warning( push )
+//#pragma warning( disable : "narrowing-conversion")
+
 struct Area{
 	AreaType type:4;
 	AreaStatus status:2;
@@ -170,8 +173,10 @@ struct Area{
 	bool isAreaSummaryDirty:1;
 };	//3 + 2 + 17 + 1 + 32 (+64/32) = 55 (119/87) Bit = 6,875 (14,875/10,875) Byte
 
+//#pragma warning( pop )
+
 struct Dev{
-	Param param;
+	Param* param;
 	AreaPos activeArea[AreaType::no];
 	//Automatically filled
 	Obj root_dir;
@@ -180,7 +185,7 @@ struct Dev{
 };
 
 class Paffs{
-	Dev device;
+	Dev device = {0};
 	SummaryEntry* summaryEntry_containers[2];
 
 public:
@@ -221,7 +226,8 @@ public:
 	Dev* getDevice();
 
 private:
-	Result initialize();
+	Result initializeDevice(const char* devicename);
+	Result destroyDevice(const char* devicename);
 
 	Result createInode(Inode* outInode, Permission mask);
 	Result createDirInode(Inode* outInode, Permission mask);

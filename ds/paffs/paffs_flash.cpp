@@ -31,7 +31,7 @@ unsigned int findWritableArea(AreaType areaType, Dev* dev){
 		return dev->activeArea[areaType];
 	}
 
-	for(unsigned int area = 0; area < dev->param.areas_no; area++){
+	for(unsigned int area = 0; area < dev->param->areas_no; area++){
 		if(dev->areaMap[area].type == AreaType::unset){
 			dev->areaMap[area].type = areaType;
 			initArea(dev, area);
@@ -57,7 +57,7 @@ unsigned int findWritableArea(AreaType areaType, Dev* dev){
 
 Result findFirstFreePage(unsigned int* p_out, Dev* dev, unsigned int area){
 
-	for(unsigned int i = 0; i < dev->param.data_pages_per_area; i++){
+	for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
 		if(dev->areaMap[area].areaSummary[i] == SummaryEntry::free){
 			*p_out = i;
 			return Result::ok;
@@ -68,8 +68,12 @@ Result findFirstFreePage(unsigned int* p_out, Dev* dev, unsigned int area){
 
 uint64_t getPageNumber(Addr addr, Dev *dev){
 	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
-								dev->param.total_pages_per_area;
+								dev->param->total_pages_per_area;
 	page += extractPage(addr);
+	if(page > dev->param->areas_no * dev->param->total_pages_per_area){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "calculated Page number out of range!");
+		return 0;
+	}
 	return page;
 }
 
@@ -99,14 +103,14 @@ Result manageActiveAreaFull(Dev *dev, AreaPos *area, AreaType areaType){
 	}
 
 	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
-		for(unsigned int i = 0; i < dev->param.data_pages_per_area; i++){
+		for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
 			if(dev->areaMap[*area].areaSummary[i] > SummaryEntry::dirty)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", *area);
 		}
 	}
 
 	bool isFull = true;
-	for(unsigned int i = 0; i < dev->param.data_pages_per_area; i++){
+	for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
 		if(dev->areaMap[*area].areaSummary[i] == SummaryEntry::free) {
 			isFull = false;
 			break;
@@ -133,13 +137,13 @@ void initArea(Dev* dev, AreaPos area){
 		if(dev->areaMap[area].areaSummary == NULL){
 			dev->areaMap[area].areaSummary = (SummaryEntry*) malloc(
 					sizeof(SummaryEntry)
-					* dev->param.blocks_per_area
-					* dev->param.pages_per_block);
+					* dev->param->blocks_per_area
+					* dev->param->pages_per_block);
 		}
 		memset(dev->areaMap[area].areaSummary, 0,
 				sizeof(SummaryEntry)
-				* dev->param.blocks_per_area
-				* dev->param.pages_per_block);
+				* dev->param->blocks_per_area
+				* dev->param->pages_per_block);
 		dev->areaMap[area].has_areaSummary = true;
 	}else{
 		if(dev->areaMap[area].areaSummary != NULL){
@@ -169,8 +173,8 @@ Result loadArea(Dev *dev, AreaPos area){
 	dev->areaMap[area].isAreaSummaryDirty = true;
 	dev->areaMap[area].areaSummary = (SummaryEntry*) malloc(
 			sizeof(SummaryEntry)
-			* dev->param.blocks_per_area
-			* dev->param.pages_per_block);
+			* dev->param->blocks_per_area
+			* dev->param->pages_per_block);
 
 	return readAreasummary(dev, area, dev->areaMap[area].areaSummary, true);
 }
@@ -179,7 +183,7 @@ Result closeArea(Dev *dev, AreaPos area){
 	dev->areaMap[area].status = AreaStatus::closed;
 
 	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
-		for(unsigned int i = 0; i < dev->param.data_pages_per_area; i++){
+		for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
 			if(dev->areaMap[area].areaSummary[i] > SummaryEntry::dirty)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", area);
 		}
@@ -205,7 +209,7 @@ void retireArea(Dev *dev, AreaPos area){
 	dev->areaMap[area].status = AreaStatus::closed;
 
 	if((dev->areaMap[area].type == AreaType::dataarea || dev->areaMap[area].type == AreaType::indexarea) && trace_mask & PAFFS_TRACE_VERIFY_AS){
-		for(unsigned int i = 0; i < dev->param.data_pages_per_area; i++){
+		for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
 			if(dev->areaMap[area].areaSummary[i] > SummaryEntry::dirty)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", area);
 		}
@@ -223,9 +227,9 @@ void retireArea(Dev *dev, AreaPos area){
 }
 
 Result writeAreasummary(Dev *dev, AreaPos area, SummaryEntry* summary){
-	unsigned int needed_bytes = 1 + dev->param.data_pages_per_area / 8;
-	unsigned int needed_pages = 1 + needed_bytes / dev->param.data_bytes_per_page;
-	if(needed_pages != dev->param.total_pages_per_area - dev->param.data_pages_per_area){
+	unsigned int needed_bytes = 1 + dev->param->data_pages_per_area / 8;
+	unsigned int needed_pages = 1 + needed_bytes / dev->param->data_bytes_per_page;
+	if(needed_pages != dev->param->total_pages_per_area - dev->param->data_pages_per_area){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
 		return Result::fail;
 	}
@@ -243,16 +247,16 @@ Result writeAreasummary(Dev *dev, AreaPos area, SummaryEntry* summary){
 	 *		Thought 2: GC just cares if dirty or not. Areasummary says exactly that.
 	 *		Win.
 	 */
-	for(unsigned int j = 0; j < dev->param.data_pages_per_area; j++){
+	for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
 		if(summary[j] != SummaryEntry::dirty)
 			buf[j/8] |= 1 << j%8;
 	}
 
 	uint32_t pointer = 0;
-	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param.data_pages_per_area), dev);
+	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param->data_pages_per_area), dev);
 	Result r;
 	for(unsigned int page = 0; page < needed_pages; page++){
-		unsigned int btw = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
+		unsigned int btw = pointer + dev->param->data_bytes_per_page < needed_bytes ? dev->param->data_bytes_per_page
 							: needed_bytes - pointer;
 		r = dev->driver->writePage(page_offs + page, &buf[pointer], btw);
 		if(r != Result::ok)
@@ -265,10 +269,10 @@ Result writeAreasummary(Dev *dev, AreaPos area, SummaryEntry* summary){
 
 //FIXME: readAreasummary is untested, b/c areaSummaries remain in RAM during unmount
 Result readAreasummary(Dev *dev, AreaPos area, SummaryEntry* out_summary, bool complete){
-	unsigned int needed_bytes = 1 + dev->param.data_pages_per_area / 8 /* One bit per entry*/;
+	unsigned int needed_bytes = 1 + dev->param->data_pages_per_area / 8 /* One bit per entry*/;
 
-	unsigned int needed_pages = 1 + needed_bytes / dev->param.data_bytes_per_page;
-	if(needed_pages != dev->param.total_pages_per_area - dev->param.data_pages_per_area){
+	unsigned int needed_pages = 1 + needed_bytes / dev->param->data_bytes_per_page;
+	if(needed_pages != dev->param->total_pages_per_area - dev->param->data_pages_per_area){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
 		return Result::fail;
 	}
@@ -276,10 +280,10 @@ Result readAreasummary(Dev *dev, AreaPos area, SummaryEntry* out_summary, bool c
 	char buf[needed_bytes];
 	memset(buf, 0, needed_bytes);
 	uint32_t pointer = 0;
-	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param.data_pages_per_area), dev);
+	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param->data_pages_per_area), dev);
 	Result r;
 	for(unsigned int page = 0; page < needed_pages; page++){
-		unsigned int btr = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
+		unsigned int btr = pointer + dev->param->data_bytes_per_page < needed_bytes ? dev->param->data_bytes_per_page
 							: needed_bytes - pointer;
 		r = dev->driver->readPage(page_offs + page, &buf[pointer], btr);
 		if(r != Result::ok)
@@ -291,16 +295,16 @@ Result readAreasummary(Dev *dev, AreaPos area, SummaryEntry* out_summary, bool c
 	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "SuperIndex Buffer was filled with %u Bytes.", pointer);
 
 
-	for(unsigned int j = 0; j < dev->param.data_pages_per_area; j++){
+	for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
 		if(buf[j/8] & 1 << j%8){
 			if(complete){
 				unsigned char pagebuf[BYTES_PER_PAGE];
 				Addr tmp = combineAddress(area, j);
-				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dev->param.data_bytes_per_page);
+				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dev->param->data_bytes_per_page);
 				if(r != Result::ok)
 					return r;
 				bool contains_data = false;
-				for(unsigned int byte = 0; byte < dev->param.data_bytes_per_page; byte++){
+				for(unsigned int byte = 0; byte < dev->param->data_bytes_per_page; byte++){
 					if(pagebuf[byte] != 0xFF){
 						contains_data = true;
 						break;
@@ -332,8 +336,8 @@ Result writeInodeData(Inode* inode,
 		return lasterr = Result::einval;
 	}
 
-	unsigned int pageFrom = offs/dev->param.data_bytes_per_page;
-	unsigned int pageTo = (offs + bytes - 1) / dev->param.data_bytes_per_page;
+	unsigned int pageFrom = offs/dev->param->data_bytes_per_page;
+	unsigned int pageTo = (offs + bytes - 1) / dev->param->data_bytes_per_page;
 
 	if(pageTo - pageFrom > 11){
 		//Would use first indirection Layer
@@ -341,7 +345,7 @@ Result writeInodeData(Inode* inode,
 		return lasterr = Result::nimpl;
 	}
 
-	unsigned int pageOffs = offs % dev->param.data_bytes_per_page;
+	unsigned int pageOffs = offs % dev->param->data_bytes_per_page;
 	*bytes_written = 0;
 
 	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
@@ -367,12 +371,12 @@ Result writeInodeData(Inode* inode,
 		dev->areaMap[dev->activeArea[AreaType::dataarea]].areaSummary[firstFreePage] = SummaryEntry::used;
 
 		//Prepare buffer and calculate bytes to write
-		char* buf = &((char*)data)[page*dev->param.data_bytes_per_page];
+		char* buf = &((char*)data)[page*dev->param->data_bytes_per_page];
 		unsigned int btw = bytes - *bytes_written;
-		if((bytes+pageOffs) > dev->param.data_bytes_per_page){
-			btw = (bytes+pageOffs) > (page+1)*dev->param.data_bytes_per_page ?
-						dev->param.data_bytes_per_page - pageOffs :
-						bytes - page*dev->param.data_bytes_per_page;
+		if((bytes+pageOffs) > dev->param->data_bytes_per_page){
+			btw = (bytes+pageOffs) > (page+1)*dev->param->data_bytes_per_page ?
+						dev->param->data_bytes_per_page - pageOffs :
+						bytes - page*dev->param->data_bytes_per_page;
 		}
 
 
@@ -384,23 +388,23 @@ Result writeInodeData(Inode* inode,
 			unsigned long oldPage = extractPage(inode->direct[page+pageFrom]);
 
 
-			if((btw + pageOffs < dev->param.data_bytes_per_page &&
-				page*dev->param.data_bytes_per_page + btw < inode->size) ||  //End Misaligned
+			if((btw + pageOffs < dev->param->data_bytes_per_page &&
+				page*dev->param->data_bytes_per_page + btw < inode->size) ||  //End Misaligned
 				(pageOffs > 0 && page == 0)){				//Start Misaligned
 
 				//fill write buffer with valid Data
 				misaligned = true;
-				buf = (char*)malloc(dev->param.data_bytes_per_page);
-				memset(buf, 0xFF, dev->param.data_bytes_per_page);
+				buf = (char*)malloc(dev->param->data_bytes_per_page);
+				memset(buf, 0xFF, dev->param->data_bytes_per_page);
 
-				unsigned int btr = dev->param.data_bytes_per_page;
+				unsigned int btr = dev->param->data_bytes_per_page;
 
-				if((pageFrom+1+page)*dev->param.data_bytes_per_page > inode->size){
-					btr = inode->size - (pageFrom+page) * dev->param.data_bytes_per_page;
+				if((pageFrom+1+page)*dev->param->data_bytes_per_page > inode->size){
+					btr = inode->size - (pageFrom+page) * dev->param->data_bytes_per_page;
 				}
 
 				unsigned int bytes_read = 0;
-				Result r = readInodeData(inode, (pageFrom+page)*dev->param.data_bytes_per_page, btr, &bytes_read, buf, dev);
+				Result r = readInodeData(inode, (pageFrom+page)*dev->param->data_bytes_per_page, btr, &bytes_read, buf, dev);
 				if(r != Result::ok || bytes_read != btr){
 					free(buf);
 					return Result::bug;
@@ -434,7 +438,7 @@ Result writeInodeData(Inode* inode,
 		}else{
 			//we are writing to a new page
 			*bytes_written += btw;
-			inode->reservedSize += dev->param.data_bytes_per_page;
+			inode->reservedSize += dev->param->data_bytes_per_page;
 		}
 		inode->direct[page+pageFrom] = pageAddress;
 
@@ -470,9 +474,9 @@ Result readInodeData(Inode* inode,
 	}
 
 	*bytes_read = 0;
-	unsigned int pageFrom = offs/dev->param.data_bytes_per_page;
-	unsigned int pageTo = (offs + bytes - 1) / dev->param.data_bytes_per_page;
-	unsigned int pageOffs = offs % dev->param.data_bytes_per_page;
+	unsigned int pageFrom = offs/dev->param->data_bytes_per_page;
+	unsigned int pageTo = (offs + bytes - 1) / dev->param->data_bytes_per_page;
+	unsigned int pageOffs = offs % dev->param->data_bytes_per_page;
 
 
 	if(offs + bytes > inode->size){
@@ -494,13 +498,13 @@ Result readInodeData(Inode* inode,
 	}
 
 	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
-		char* buf = &wrap[page*dev->param.data_bytes_per_page];
+		char* buf = &wrap[page*dev->param->data_bytes_per_page];
 
 		unsigned int btr = bytes + pageOffs - *bytes_read;
-		if(btr > dev->param.data_bytes_per_page){
-			btr = (bytes + pageOffs) > (page+1)*dev->param.data_bytes_per_page ?
-						dev->param.data_bytes_per_page :
-						(bytes + pageOffs) - page*dev->param.data_bytes_per_page;
+		if(btr > dev->param->data_bytes_per_page){
+			btr = (bytes + pageOffs) > (page+1)*dev->param->data_bytes_per_page ?
+						dev->param->data_bytes_per_page :
+						(bytes + pageOffs) - page*dev->param->data_bytes_per_page;
 		}
 
 		AreaPos area = extractLogicalArea(inode->direct[page + pageFrom]);
@@ -555,8 +559,8 @@ Result readInodeData(Inode* inode,
 //inode->size and inode->reservedSize is altered.
 Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs){
 	//TODO: This calculation contains errors in border cases
-	unsigned int pageFrom = offs/dev->param.data_bytes_per_page;
-	unsigned int pageTo = (inode->size - 1) / dev->param.data_bytes_per_page;
+	unsigned int pageFrom = offs/dev->param->data_bytes_per_page;
+	unsigned int pageTo = (inode->size - 1) / dev->param->data_bytes_per_page;
 
 	if(inode->size < offs){
 		//Offset bigger than actual filesize
@@ -574,7 +578,7 @@ Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs){
 	if(inode->reservedSize == 0)
 		return Result::ok;
 
-	if(inode->size >= inode->reservedSize - dev->param.data_bytes_per_page)
+	if(inode->size >= inode->reservedSize - dev->param->data_bytes_per_page)
 		//doesn't leave a whole page blank
 		return Result::ok;
 
@@ -597,7 +601,7 @@ Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs){
 		//Mark old pages dirty
 		dev->areaMap[area].areaSummary[relPage] = SummaryEntry::dirty;
 
-		inode->reservedSize -= dev->param.data_bytes_per_page;
+		inode->reservedSize -= dev->param->data_bytes_per_page;
 		inode->direct[page+pageFrom] = 0;
 
 	}
@@ -611,8 +615,8 @@ Result writeTreeNode(Dev* dev, TreeNode* node){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode NULL");
 				return Result::bug;
 	}
-	if(sizeof(TreeNode) > dev->param.data_bytes_per_page){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page (Was %u, should %u)", sizeof(TreeNode), dev->param.data_bytes_per_page);
+	if(sizeof(TreeNode) > dev->param->data_bytes_per_page){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page (Was %u, should %u)", sizeof(TreeNode), dev->param->data_bytes_per_page);
 		return Result::bug;
 	}
 
@@ -658,8 +662,8 @@ Result readTreeNode(Dev* dev, Addr addr, TreeNode* node){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode NULL");
 		return Result::bug;
 	}
-	if(sizeof(TreeNode) > dev->param.data_bytes_per_page){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page (Was %u, should %u)", sizeof(TreeNode), dev->param.data_bytes_per_page);
+	if(sizeof(TreeNode) > dev->param->data_bytes_per_page){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page (Was %u, should %u)", sizeof(TreeNode), dev->param->data_bytes_per_page);
 		return Result::bug;
 	}
 
@@ -705,8 +709,8 @@ Result deleteTreeNode(Dev* dev, TreeNode* node){
 
 Result findFirstFreeEntryInBlock(Dev* dev, uint32_t area, uint8_t block, uint32_t* out_pos, unsigned int required_pages){
 	unsigned int in_a_row = 0;
-	uint64_t page_offs = dev->param.pages_per_block * block;
-	for(unsigned int i = 0; i < dev->param.pages_per_block; i++) {
+	uint64_t page_offs = dev->param->pages_per_block * block;
+	for(unsigned int i = 0; i < dev->param->pages_per_block; i++) {
 		Addr addr = combineAddress(area, i + page_offs);
 		uint32_t no;
 		Result r = dev->driver->readPage(getPageNumber(addr, dev), &no, sizeof(uint32_t));
@@ -732,8 +736,8 @@ Result findMostRecentEntryInBlock(Dev* dev, uint32_t area, uint8_t block, uint32
 	uint32_t* maximum = out_index;
 	*maximum = 0;
 	*out_pos = 0;
-	uint32_t page_offs = dev->param.pages_per_block * block;
-	for(unsigned int i = 0; i < dev->param.pages_per_block; i++) {
+	uint32_t page_offs = dev->param->pages_per_block * block;
+	for(unsigned int i = 0; i < dev->param->pages_per_block; i++) {
 		Addr addr = combineAddress(area, i + page_offs);
 		uint32_t no;
 		Result r = dev->driver->readPage(getPageNumber(addr, dev), &no, sizeof(uint32_t));
@@ -770,7 +774,7 @@ Result deleteAnchorBlock(Dev* dev, uint32_t area, uint8_t block) {
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete Block outside of SUPARBLCOKAREA");
 		return Result::bug;
 	}
-	uint32_t block_offs = dev->areaMap[area].position * dev->param.blocks_per_area;
+	uint32_t block_offs = dev->areaMap[area].position * dev->param->blocks_per_area;
 	return dev->driver->eraseBlock(block_offs + block);
 }
 
@@ -793,8 +797,8 @@ Result writeSuperIndex(Dev* dev, Addr addr, superIndex* entry){
 	}
 
 	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(Addr) +
-		dev->param.areas_no * (sizeof(Area) - sizeof(SummaryEntry*))+ // AreaMap without summaryEntry pointer
-		2 * dev->param.data_pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
+		dev->param->areas_no * (sizeof(Area) - sizeof(SummaryEntry*))+ // AreaMap without summaryEntry pointer
+		2 * dev->param->data_pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
 
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 
@@ -810,7 +814,7 @@ Result writeSuperIndex(Dev* dev, Addr addr, superIndex* entry){
 	areaSummaryPositions[1] = -1;
 	unsigned char pospos = 0;	//Stupid name
 
-	for(unsigned int i = 0; i < dev->param.areas_no; i++){
+	for(unsigned int i = 0; i < dev->param->areas_no; i++){
 		if((entry->areaMap[i].type == AreaType::indexarea || entry->areaMap[i].type == AreaType::dataarea) && entry->areaMap[i].status == AreaStatus::active){
 			areaSummaryPositions[pospos++] = i;
 			entry->areaMap[i].has_areaSummary = true;
@@ -826,11 +830,11 @@ Result writeSuperIndex(Dev* dev, Addr addr, superIndex* entry){
 	for(unsigned int i = 0; i < 2; i++){
 		if(areaSummaryPositions[i] < 0)
 			continue;
-		for(unsigned int j = 0; j < dev->param.data_pages_per_area; j++){
+		for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
 			if(entry->areaMap[areaSummaryPositions[i]].areaSummary[j] != SummaryEntry::dirty)
 				buf[pointer + j/8] |= 1 << j%8;
 		}
-		pointer += dev->param.data_pages_per_area / 8;
+		pointer += dev->param->data_pages_per_area / 8;
 	}
 
 	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "%u bytes have been written to Buffer", pointer);
@@ -839,7 +843,7 @@ Result writeSuperIndex(Dev* dev, Addr addr, superIndex* entry){
 	uint64_t page_offs = getPageNumber(addr, dev);
 	Result r;
 	for(unsigned page = 0; page < needed_pages; page++){
-		unsigned int btw = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
+		unsigned int btw = pointer + dev->param->data_bytes_per_page < needed_bytes ? dev->param->data_bytes_per_page
 							: needed_bytes - pointer;
 		r = dev->driver->writePage(page_offs + page, &buf[pointer], btw);
 		if(r != Result::ok)
@@ -861,8 +865,8 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, SummaryEntry* 
 	unsigned int summary_Container_count = 0;
 
 	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(Addr) +
-		dev->param.areas_no * (sizeof(Area) - sizeof(SummaryEntry*))+ // AreaMap without summaryEntry pointer
-		16 * dev->param.data_pages_per_area / 8 /* One bit per entry, two entries for INDEX and DATA section. Others dont have summaries*/;
+		dev->param->areas_no * (sizeof(Area) - sizeof(SummaryEntry*))+ // AreaMap without summaryEntry pointer
+		16 * dev->param->data_pages_per_area / 8 /* One bit per entry, two entries for INDEX and DATA section. Others dont have summaries*/;
 
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 
@@ -872,7 +876,7 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, SummaryEntry* 
 	uint64_t page_offs = getPageNumber(addr, dev);
 	Result r;
 	for(unsigned page = 0; page < needed_pages; page++){
-		unsigned int btr = pointer + dev->param.data_bytes_per_page < needed_bytes ? dev->param.data_bytes_per_page
+		unsigned int btr = pointer + dev->param->data_bytes_per_page < needed_bytes ? dev->param->data_bytes_per_page
 							: needed_bytes - pointer;
 		r = dev->driver->readPage(page_offs + page, &buf[pointer], btr);
 		if(r != Result::ok)
@@ -892,7 +896,7 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, SummaryEntry* 
 	areaSummaryPositions[0] = -1;
 	areaSummaryPositions[1] = -1;
 	unsigned char pospos = 0;	//Stupid name
-	for(unsigned int i = 0; i < dev->param.areas_no; i++){
+	for(unsigned int i = 0; i < dev->param->areas_no; i++){
 		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(Area) - sizeof(SummaryEntry*));
 		pointer += sizeof(Area) - sizeof(SummaryEntry*);
 		if(entry->areaMap[i].has_areaSummary)
@@ -907,15 +911,15 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, SummaryEntry* 
 			entry->areaMap[areaSummaryPositions[i]].areaSummary = summary_Containers[summary_Container_count++];
 		}
 
-		for(unsigned int j = 0; j < dev->param.data_pages_per_area; j++){
+		for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
 			if(buf[pointer + j/8] & 1 << j%8){
 				//TODO: Normally, we would check in the OOB for a Checksum or so, which is present all the time
 				Addr tmp = combineAddress(areaSummaryPositions[i], j);
-				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dev->param.data_bytes_per_page);
+				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dev->param->data_bytes_per_page);
 				if(r != Result::ok)
 					return r;
 				bool contains_data = false;
-				for(unsigned int byte = 0; byte < dev->param.data_bytes_per_page; byte++){
+				for(unsigned int byte = 0; byte < dev->param->data_bytes_per_page; byte++){
 					if(pagebuf[byte] != 0xFF){
 						contains_data = true;
 						break;
@@ -929,7 +933,7 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, SummaryEntry* 
 				entry->areaMap[areaSummaryPositions[i]].areaSummary[j] = SummaryEntry::dirty;
 			}
 		}
-		pointer += dev->param.data_pages_per_area / 8;
+		pointer += dev->param->data_pages_per_area / 8;
 	}
 
 	return Result::ok;

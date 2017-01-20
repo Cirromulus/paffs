@@ -66,14 +66,19 @@ const char* err_msg(Result pr){
 
 Paffs::Paffs(){
 	//normal startup, load drivers
-	device.driver = getDriver(0);
-	initialize();
+	device.driver = getDriver("1");
 };
 Paffs::Paffs(void* fc){
-	device.driver = getDriverSpecial(0, fc);
-	initialize();
+	device.driver = getDriverSpecial("1", fc);
 }
 Paffs::~Paffs(){
+	if(device.areaMap != NULL){
+		std::cerr << "Destroyed FS-Object without unmouning! "
+				"This will most likely destroy "
+				"the filesystem on flash." << std::endl;
+		destroyDevice("1");
+		//todo: If we handle multiple devices, this has to be changed as well
+	}
 	delete device.driver;
 }
 
@@ -86,19 +91,20 @@ void Paffs::resetLastErr(){
 	lasterr = Result::ok;
 }
 
-Result Paffs::initialize(){
-	memset(&device, 0, sizeof(Dev));
-	Param* param = &device.param;
+Result Paffs::initializeDevice(const char* devicename){
+	device.param = &device.driver->param;
+
+	Param* param = device.param;
 	param->areas_no = param->blocks / 2;	//For now: 16 b -> 8 Areas
 	param->blocks_per_area = param->blocks / param->areas_no;
 	param->data_bytes_per_page = param->total_bytes_per_page - param->oob_bytes_per_page;
 	param->total_pages_per_area = param->pages_per_block * param->blocks_per_area;
 	unsigned int needed_pages_for_AS = 1;	//Todo: actually calculate
 	param->data_pages_per_area = param->total_pages_per_area - needed_pages_for_AS;
-	device.areaMap = (Area*)malloc(sizeof(Area) * device.param.areas_no);
-	memset(device.areaMap, 0, sizeof(Area) * device.param.areas_no);
-	summaryEntry_containers[0] = (SummaryEntry*) malloc(sizeof(SummaryEntry) * param->data_pages_per_area);
-	summaryEntry_containers[1] = (SummaryEntry*) malloc(sizeof(SummaryEntry) * param->data_pages_per_area);
+	device.areaMap = new Area[param->areas_no];
+	memset(device.areaMap, 0, sizeof(Area) * param->areas_no);
+	summaryEntry_containers[0] = new SummaryEntry [param->data_pages_per_area];
+	summaryEntry_containers[1] = new SummaryEntry [param->data_pages_per_area];
 
 	device.activeArea[AreaType::superblockarea] = 0;
 	device.activeArea[AreaType::indexarea] = 0;
@@ -112,9 +118,26 @@ Result Paffs::initialize(){
 	return Result::ok;
 }
 
+Result Paffs::destroyDevice(const char* devicename){
+	for(unsigned int i = 0; i < device.param->areas_no; i++){
+		if(device.areaMap[i].areaSummary != NULL){
+			free(device.areaMap[i].areaSummary);
+			device.areaMap[i].areaSummary = 0;
+		}
+	}
+	delete[] device.areaMap;
+	delete[] summaryEntry_containers[0];
+	delete[] summaryEntry_containers[1];
+	return Result::ok;
+}
+
 Result Paffs::format(const char* devicename){
+	Result r = initializeDevice(devicename);
+	if(r != Result::ok)
+		return r;
+
 	unsigned char had_areaType = 0;		//Efficiency hack, bc there are less than 2⁸ area types
-	for(unsigned int area = 0; area < device.param.areas_no; area++){
+	for(unsigned int area = 0; area < device.param->areas_no; area++){
 		device.areaMap[area].status = AreaStatus::empty;
 		device.areaMap[area].erasecount = 0;
 		device.areaMap[area].position = area;
@@ -146,58 +169,67 @@ Result Paffs::format(const char* devicename){
 
 	}
 
-	Result r = start_new_tree(&device);
+	r = start_new_tree(&device);
 	if(r != Result::ok)
 		return r;
 
 	Inode rootDir = {0};
 	r = createDirInode(&rootDir, PAFFS_R | PAFFS_W | PAFFS_X);
+
 	if(r != Result::ok){
+		destroyDevice(devicename);
 		return r;
 	}
 	r = insertInode(&device, &rootDir);
 	if(r != Result::ok){
+		destroyDevice(devicename);
 		return r;
 	}
 	r = commitTreeCache(&device);
 	if(r != Result::ok){
+		destroyDevice(devicename);
 		return r;
 	}
 	r = commitSuperIndex(&device);
 	if(r != Result::ok){
+		destroyDevice(devicename);
 		return r;
 	}
-
+	destroyDevice(devicename);
 	return Result::ok;
 }
 
 Result Paffs::mnt(const char* devicename){
-	if(strcmp(devicename, device.param.name) != 0){
+	if(strcmp(devicename, device.param->name) != 0){
 		return Result::einval;
 	}
 
-	Result r = readSuperIndex(&device, summaryEntry_containers);
+	Result r = initializeDevice(devicename);
+	if(r != Result::ok)
+		return r;
+
+	r = readSuperIndex(&device, summaryEntry_containers);
 	if(r == Result::nf){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Tried mounting a device with an empty superblock!");
 		return r;
 	}
 
 	//TODO: mark activeAreas
-	for(unsigned long i = 0; i < device.param.areas_no; i++){
+	for(unsigned long i = 0; i < device.param->areas_no; i++){
 		//if(device.areaMap[i].type != AreaType::dataarea)
 	}
 
 	return r;
 }
 Result Paffs::unmnt(const char* devicename){
-	if(strcmp(devicename, device.param.name) != 0){
+	if(strcmp(devicename, device.param->name) != 0){
 		return Result::einval;
 	}
 
 	if(trace_mask && PAFFS_TRACE_AREA){
 		printf("Info: \n");
-		for(unsigned int i = 0; i < device.param.areas_no; i++){
-			printf("\tArea %d on %u as %s from page %d\n", i, device.areaMap[i].position, area_names[device.areaMap[i].type], device.areaMap[i].position*device.param.blocks_per_area*device.param.pages_per_block);
+		for(unsigned int i = 0; i < device.param->areas_no; i++){
+			printf("\tArea %d on %u as %s from page %d\n", i, device.areaMap[i].position, area_names[device.areaMap[i].type], device.areaMap[i].position*device.param->blocks_per_area*device.param->pages_per_block);
 		}
 	}
 
@@ -209,9 +241,9 @@ Result Paffs::unmnt(const char* devicename){
 	if(r != Result::ok)
 		return r;
 
+	destroyDevice(devicename);
+
 	//just for cleanup & tests
-	memset(device.areaMap, 0, sizeof(Area) * device.param.areas_no);
-	//TODO: Add memset of activeareas
 	deleteTreeCache();
 
 	return Result::ok;
@@ -459,6 +491,7 @@ Result Paffs::removeInodeFromDir(Inode* contDir, Inode* elem){
 			return r;
 		}
 	}else{
+		free(dirData);
 		return Result::nf;	//did not find directory entry, because dir is empty
 	}
 
@@ -489,7 +522,7 @@ Result Paffs::removeInodeFromDir(Inode* contDir, Inode* elem){
 		}
 		pointer += entryl;
 	}
-
+	free(dirData);
 	return Result::nf;
 }
 
@@ -540,8 +573,7 @@ Dir* Paffs::openDir(const char* path){
 		memset(dirData, 0, dirPinode.size);
 	}
 
-
-	Dir* dir = (Dir*) malloc(sizeof(dir));
+	Dir* dir = (Dir*) malloc(sizeof(Dir));
 	dir->dentry = (Dentry*) malloc(sizeof(Dentry));
 	dir->dentry->name = (char*) "not_impl.";
 	dir->dentry->iNode = (Inode*) malloc(sizeof(Inode));
@@ -596,17 +628,17 @@ Dir* Paffs::openDir(const char* path){
 Result Paffs::closeDir(Dir* dir){
 	if(dir->dirents == NULL)
 		return Result::einval;
-    for(int i = 0; i < dir->no_entrys; i++){
-        free(dir->dirents[i]->name);
-        if(dir->dirents[i]->node != NULL)
-        	free(dir->dirents[i]->node);
-        free(dir->dirents[i]);
-    }
-    free(dir->dirents);
-    free(dir->dentry->iNode);
-    free(dir->dentry);
-    free(dir);
-    return Result::ok;
+	for(int i = 0; i < dir->no_entrys; i++){
+		free(dir->dirents[i]->name);
+		if(dir->dirents[i]->node != NULL)
+			free(dir->dirents[i]->node);
+		free(dir->dirents[i]);
+	}
+	free(dir->dirents);
+	free(dir->dentry->iNode);
+	free(dir->dentry);
+	free(dir);
+	return Result::ok;
 }
 
 /**
@@ -722,7 +754,7 @@ Obj* Paffs::open(const char* path, Fileopenmask mask){
 		return NULL;
 	}
 
-	Obj* obj = (Obj*) malloc(sizeof(obj));
+	Obj* obj = (Obj*) malloc(sizeof(Obj));
 	obj->dentry = (Dentry*) malloc(sizeof(Dentry));
 	obj->dentry->name = (char*) malloc(strlen(path));
 	obj->dentry->iNode = (Inode*) malloc(sizeof(Inode));

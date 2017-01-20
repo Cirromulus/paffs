@@ -14,21 +14,21 @@
 #include <time.h>
 
 #include "../paffs.hpp"
-#include "btree.hpp"
-#include "treeCache.hpp"
+#include "../btree.hpp"
+#include "../treeCache.hpp"
 
 using namespace paffs;
-Paffs fs;
+Paffs* fs;
 
 void listDir(const char* path){
-	printf("Opening Dir '%s'.\n", path);
-	Dir* rewt = fs.openDir(path);
+	printf("opening Dir '%s'.\n", path);
+	Dir* rewt = fs->openDir(path);
 	if(rewt == NULL){
-		printf("Opendir: Result %s\n", err_msg(fs.getLastErr()));
+		printf("Opendir: Result %s\n", err_msg(fs->getLastErr()));
 		return;
 	}
 	Dirent* dir;
-	while((dir = fs.readDir(rewt)) != NULL){
+	while((dir = fs->readDir(rewt)) != NULL){
 		printf("\tFound ");
 		switch(dir->node->type){
 		case InodeType::file:
@@ -45,9 +45,9 @@ void listDir(const char* path){
 		}
 		printf("\"%s\"\n", dir->name);
 	}
-	if(fs.getLastErr() != Result::ok)
-		//printf("Error reading Dir: %s\n", err_msg(fs.getLastErr()));
-	fs.closeDir(rewt);
+	if(fs->getLastErr() != Result::ok)
+		//printf("Error reading Dir: %s\n", err_msg(fs->getLastErr()));
+	fs->closeDir(rewt);
 }
 
 void printInfo(ObjInfo* obj){
@@ -68,25 +68,25 @@ void printInfo(ObjInfo* obj){
 }
 
 void printFile(unsigned int offs, unsigned int bytes, const char* path){
-	Obj *fil = fs.open(path, PAFFS_FR);
+	Obj *fil = fs->open(path, PAFFS_FR);
 
 	unsigned int bytesread = 0;
 	char* out = (char*) malloc (bytes + 1);
 	memset(out, 0, bytes + 1);
 
-	Result r = fs.seek(fil, offs, Seekmode::set);
+	Result r = fs->seek(fil, offs, Seekmode::set);
 	if(r != Result::ok){
 		free(out);
 		printf("%s\n", err_msg(r));
 		return;
 	}
-	r  = fs.read(fil, out, bytes, &bytesread);
+	r  = fs->read(fil, out, bytes, &bytesread);
 	if(r != Result::ok){
 		free(out);
 		printf("%s\n", err_msg(r));
 		return;
 	}
-	fs.close(fil);
+	fs->close(fil);
 
 	out[bytesread] = 0;
 	printf("Read '%s': %s\n", path, out);
@@ -95,7 +95,7 @@ void printFile(unsigned int offs, unsigned int bytes, const char* path){
 
 void printWholeFile(const char* path){
 	ObjInfo fileInfo = {0};
-	Result r = fs.getObjInfo(path, &fileInfo);
+	Result r = fs->getObjInfo(path, &fileInfo);
 	if(r != Result::ok){
 		printf("%s\n", err_msg(r));
 		return;
@@ -105,38 +105,43 @@ void printWholeFile(const char* path){
 }
 
 int main( int argc, char ** argv ) {
-	fs = Paffs();
+	fs = new Paffs();
 	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
 	printf("Cache size: %u Bytes\n", getCacheSize() * sizeof(TreeCacheNode));
-	Result r = fs.mnt("1");
-	print_tree(fs.getDevice());
+	Result r = fs->format("1");
+	if(r != Result::ok)
+		return -1;
+	r = fs->mnt("1");
+	if(r != Result::ok)
+		return -1;
+	print_tree(fs->getDevice());
 	Permission p = PAFFS_R | PAFFS_W;
 	printf("Creating directory /a... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
-	printf("%s\n", err_msg(fs.mkDir("/a", p)));
+	printf("%s\n", err_msg(fs->mkDir("/a", p)));
 	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
-	print_tree(fs.getDevice());
+	print_tree(fs->getDevice());
 //	while(getchar() == EOF);
 	printf("Creating directory /b... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
-	printf("%s\n", err_msg(fs.mkDir("/b", p)));
+	printf("%s\n", err_msg(fs->mkDir("/b", p)));
 	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
-	print_tree(fs.getDevice());
+	print_tree(fs->getDevice());
 //	while(getchar() == EOF);
 	printf("Creating directory /b/foo... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
-	printf("%s\n", err_msg(fs.mkDir("/b/foo", p)));
+	printf("%s\n", err_msg(fs->mkDir("/b/foo", p)));
 	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
-	print_tree(fs.getDevice());
+	print_tree(fs->getDevice());
 	printf("Touching file /b/file ... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
-	printf("%s\n", err_msg(fs.touch ("/b/file")));
+	printf("%s\n", err_msg(fs->touch ("/b/file")));
 	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
-	print_tree(fs.getDevice());
+	print_tree(fs->getDevice());
 
 	listDir("/");
 
@@ -147,9 +152,9 @@ int main( int argc, char ** argv ) {
 	printf("opening file /b/file ...");
 	fflush(stdout);
 
-	Obj *fil = fs.open("/b/file", PAFFS_FW);
+	Obj *fil = fs->open("/b/file", PAFFS_FW);
 
-	printf("%s\n", err_msg(fs.getLastErr()));
+	printf("%s\n", err_msg(fs->getLastErr()));
 	if(fil == NULL)
 		return -1;
 
@@ -174,7 +179,7 @@ int main( int argc, char ** argv ) {
 
 
 	unsigned int bytes = 0;
-	r = fs.write(fil, tl, strlen(tl), &bytes);
+	r = fs->write(fil, tl, strlen(tl), &bytes);
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok)
 		return -1;
@@ -187,14 +192,14 @@ int main( int argc, char ** argv ) {
 
 	//read misaligned ---
 	ObjInfo fileInfo = {0};
-	r = fs.seek(fil, 9, Seekmode::set);
-	r = fs.getObjInfo("/b/file", &fileInfo);
+	r = fs->seek(fil, 9, Seekmode::set);
+	r = fs->getObjInfo("/b/file", &fileInfo);
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok)
 		return -1;
 
 	char* out = (char*) malloc(fileInfo.size - 8);
-	r = fs.read(fil, out, fileInfo.size - 9, &bytes);
+	r = fs->read(fil, out, fileInfo.size - 9, &bytes);
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok)
 		return -1;
@@ -216,7 +221,7 @@ int main( int argc, char ** argv ) {
 	//write misaligned - over Size----
 	printf("write misaligned - over Size... ");
 	fflush(stdout);
-	r = fs.seek(fil, -5, Seekmode::end);
+	r = fs->seek(fil, -5, Seekmode::end);
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok)
 		return -1;
@@ -224,7 +229,7 @@ int main( int argc, char ** argv ) {
 	char testlauf[] = "---Testlauf---";
 
 
-	r = fs.write(fil, testlauf, strlen(testlauf), &bytes);
+	r = fs->write(fil, testlauf, strlen(testlauf), &bytes);
 	if(r != Result::ok){
 		printf("%s\n", err_msg(r));
 		return -1;
@@ -237,13 +242,13 @@ int main( int argc, char ** argv ) {
 	//TODO: test with memcmp
 	//write misaligned - end misaligned ----
 	printf("write misaligned - last page misaligned\n");
-	r = fs.seek(fil, -11, Seekmode::end);
+	r = fs->seek(fil, -11, Seekmode::end);
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok)
 		return -1;
 
 	char kurz[] = "kurz";
-	r = fs.write(fil, kurz, strlen(kurz), &bytes);
+	r = fs->write(fil, kurz, strlen(kurz), &bytes);
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok)
 		return -1;
@@ -254,12 +259,12 @@ int main( int argc, char ** argv ) {
 
 	//write misaligned - write over page boundaries ----
 	printf("write misaligned - over page boundaries\n");
-	r = fs.seek(fil, 508, Seekmode::set);
+	r = fs->seek(fil, 508, Seekmode::set);
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok)
 		return -1;
 
-	r = fs.write(fil, testlauf, strlen(testlauf), &bytes);
+	r = fs->write(fil, testlauf, strlen(testlauf), &bytes);
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok)
 		return -1;
@@ -270,13 +275,13 @@ int main( int argc, char ** argv ) {
 
 	//write misaligned - write inside not start/end page ----
 	printf("write misaligned - write inside non start/end page\n");
-	r = fs.seek(fil, 530, Seekmode::set);
+	r = fs->seek(fil, 530, Seekmode::set);
 
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok)
 		return -1;
 
-	r = fs.write(fil, testlauf, strlen(testlauf), &bytes);
+	r = fs->write(fil, testlauf, strlen(testlauf), &bytes);
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok)
 		return -1;
@@ -286,17 +291,17 @@ int main( int argc, char ** argv ) {
 	printWholeFile("/b/file");
 //	while(getchar() == EOF);
 
-	r = fs.getObjInfo("/b/file", &fileInfo);
+	r = fs->getObjInfo("/b/file", &fileInfo);
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok)
 		return -1;
 
 	printInfo(&fileInfo);
 
-	print_tree(fs.getDevice());
+	print_tree(fs->getDevice());
 	printf("Flushing Cache ... ");
 	fflush(stdout);
-	r = commitTreeCache(fs.getDevice());
+	r = commitTreeCache(fs->getDevice());
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok)
 		return -1;
@@ -307,12 +312,12 @@ int main( int argc, char ** argv ) {
 //	while(getchar() == EOF);
 	printf("Changing permissions of /b/file to 0... ");
 	fflush(stdout);
-	r = fs.chmod("/b/file", 0);
+	r = fs->chmod("/b/file", 0);
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok)
 		return -1;
 
-	r = fs.getObjInfo("/b/file", &fileInfo);
+	r = fs->getObjInfo("/b/file", &fileInfo);
 	if(r != Result::ok){
 		printf("%s\n", err_msg(r));
 		return -1;
@@ -322,7 +327,7 @@ int main( int argc, char ** argv ) {
 //	while(getchar() == EOF);
 	printf("Changing permissions of /b/file to rwx... ");
 	fflush(stdout);
-	r = fs.chmod("/b/file", PAFFS_R | PAFFS_W | PAFFS_X);
+	r = fs->chmod("/b/file", PAFFS_R | PAFFS_W | PAFFS_X);
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok){
 		return -1;
@@ -330,7 +335,7 @@ int main( int argc, char ** argv ) {
 
 	printf("Removing /b/file... ");
 	fflush(stdout);
-	r = fs.remove("/b/file");
+	r = fs->remove("/b/file");
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok){
 		return -1;
@@ -342,7 +347,7 @@ int main( int argc, char ** argv ) {
 
 	printf("Trying to remove /b/... ");
 	fflush(stdout);
-	r = fs.remove("/b/");
+	r = fs->remove("/b/");
 	printf("%s\n", err_msg(r));
 	if(r != Result::dirnotempty){
 		return -1;
@@ -352,7 +357,7 @@ int main( int argc, char ** argv ) {
 
 	printf("Removing /b/foo... ");
 	fflush(stdout);
-	r = fs.remove("/b/foo");
+	r = fs->remove("/b/foo");
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok){
 		return -1;
@@ -365,7 +370,7 @@ int main( int argc, char ** argv ) {
 
 	printf("Removing /b/... ");
 	fflush(stdout);
-	r = fs.remove("/b/");
+	r = fs->remove("/b/");
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok){
 		return -1;
@@ -374,7 +379,7 @@ int main( int argc, char ** argv ) {
 	listDir("/");
 
 	free (tl);
-	fs.close(fil);
+	fs->close(fil);
 
 	printf("Success.\n");
 
@@ -382,6 +387,9 @@ int main( int argc, char ** argv ) {
 			getCacheHits(), getCacheMisses(),
 			100*((float)getCacheHits())/(getCacheHits()+getCacheMisses()));
 //	while(getchar() == EOF);
-
+	r = fs->unmnt("1");
+	if(r != Result::ok)
+		return -1;
+	delete fs;
 	return 0;
 }

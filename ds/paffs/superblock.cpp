@@ -39,7 +39,7 @@ void printSuperIndex(Dev* dev, superIndex* ind){
 		printf("\tType: %s\n", area_names[ind->areaMap[i].type]);
 		if(ind->areaMap[i].has_areaSummary){
 			unsigned int free = 0, used = 0, dirty = 0;
-			for(unsigned int j = 0; j < dev->param.total_pages_per_area; j++){
+			for(unsigned int j = 0; j < dev->param->total_pages_per_area; j++){
 				if(ind->areaMap[i].areaSummary[j] == SummaryEntry::free)
 					free++;
 				if(ind->areaMap[i].areaSummary[j] == SummaryEntry::used)
@@ -79,8 +79,8 @@ Result getAddrOfMostRecentSuperIndex(Dev* dev, Addr *out){
 
 Result commitSuperIndex(Dev* dev){
 	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(Addr) +
-			dev->param.areas_no * (sizeof(Area) - sizeof(SummaryEntry*)) + // AreaMap without SummaryEntry pointer
-			2 * dev->param.data_pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
+			dev->param->areas_no * (sizeof(Area) - sizeof(SummaryEntry*)) + // AreaMap without SummaryEntry pointer
+			2 * dev->param->data_pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed for SuperIndex: %d (%d bytes)", needed_pages, needed_bytes);
 
@@ -130,7 +130,7 @@ Result commitSuperIndex(Dev* dev){
 		return Result::bug;
 	}
 
-	Addr target = chosen_block == 0 ? combineAddress(0, rel_page1) : combineAddress(0, rel_page2 + dev->param.pages_per_block);
+	Addr target = chosen_block == 0 ? combineAddress(0, rel_page1) : combineAddress(0, rel_page2 + dev->param->pages_per_block);
 
 	Addr lastEntry;
  	Result r = getAddrOfMostRecentSuperIndex(dev, &lastEntry);
