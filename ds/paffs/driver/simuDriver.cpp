@@ -83,7 +83,7 @@ NANDADRESS SimuDriver::translateBlockToAddress(uint32_t block, FlashCell* fc){
 
 void SimuDriver::init(){
 	buf = malloc(param.total_bytes_per_page);
-	//Configure parameters of flash
+	//TODO: Configure parameters of flash
 
 }
 

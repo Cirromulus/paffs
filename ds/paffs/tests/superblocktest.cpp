@@ -12,8 +12,8 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <time.h>
-#include "treeCache.h"
-#include "superblock.h"
+#include "treeCache.hpp"
+#include "superblock.hpp"
 #include "../paffs.hpp"
 
 

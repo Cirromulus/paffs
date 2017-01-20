@@ -14,27 +14,30 @@
 #include <time.h>
 
 #include "../paffs.hpp"
-#include "btree.h"
-#include "treeCache.h"
+#include "btree.hpp"
+#include "treeCache.hpp"
+
+using namespace paffs;
+Paffs fs;
 
 void listDir(const char* path){
 	printf("Opening Dir '%s'.\n", path);
-	paffs_dir* rewt = paffs_opendir(path);
+	Dir* rewt = fs.openDir(path);
 	if(rewt == NULL){
-		printf("Opendir: Result %s\n", paffs_err_msg(paffs_getLastErr()));
+		printf("Opendir: Result %s\n", err_msg(fs.getLastErr()));
 		return;
 	}
-	paffs_dirent* dir;
-	while((dir = paffs_readdir(rewt)) != NULL){
+	Dirent* dir;
+	while((dir = fs.readDir(rewt)) != NULL){
 		printf("\tFound ");
 		switch(dir->node->type){
-		case PINODE_FILE:
+		case InodeType::file:
 			printf("file: ");
 			break;
-		case PINODE_DIR:
+		case InodeType::dir:
 			printf("dir : ");
 			break;
-		case PINODE_LNK:
+		case InodeType::lnk:	//FIXME: Warning, -2 ??
 			printf("link: ");
 			break;
 		default:
@@ -42,12 +45,12 @@ void listDir(const char* path){
 		}
 		printf("\"%s\"\n", dir->name);
 	}
-	if(paffs_getLastErr() != PAFFS_OK)
-		//printf("Error reading Dir: %s\n", paffs_err_msg(paffs_getLastErr()));
-	paffs_closedir(rewt);
+	if(fs.getLastErr() != Result::ok)
+		//printf("Error reading Dir: %s\n", err_msg(fs.getLastErr()));
+	fs.closeDir(rewt);
 }
 
-void printInfo(paffs_objInfo* obj){
+void printInfo(ObjInfo* obj){
 	if(obj == NULL){
 		printf("invalid object!");
 		return;
@@ -65,25 +68,25 @@ void printInfo(paffs_objInfo* obj){
 }
 
 void printFile(unsigned int offs, unsigned int bytes, const char* path){
-	paffs_obj *fil = paffs_open(path, PAFFS_FR);
+	Obj *fil = fs.open(path, PAFFS_FR);
 
 	unsigned int bytesread = 0;
-	char* out = malloc (bytes + 1);
+	char* out = (char*) malloc (bytes + 1);
 	memset(out, 0, bytes + 1);
 
-	PAFFS_RESULT r = paffs_seek(fil, offs, PAFFS_SEEK_SET);
-	if(r != PAFFS_OK){
+	Result r = fs.seek(fil, offs, Seekmode::set);
+	if(r != Result::ok){
 		free(out);
-		printf("%s\n", paffs_err_msg(r));
+		printf("%s\n", err_msg(r));
 		return;
 	}
-	r  = paffs_read(fil, out, bytes, &bytesread);
-	if(r != PAFFS_OK){
+	r  = fs.read(fil, out, bytes, &bytesread);
+	if(r != Result::ok){
 		free(out);
-		printf("%s\n", paffs_err_msg(r));
+		printf("%s\n", err_msg(r));
 		return;
 	}
-	paffs_close(fil);
+	fs.close(fil);
 
 	out[bytesread] = 0;
 	printf("Read '%s': %s\n", path, out);
@@ -91,10 +94,10 @@ void printFile(unsigned int offs, unsigned int bytes, const char* path){
 }
 
 void printWholeFile(const char* path){
-	paffs_objInfo fileInfo = {0};
-	PAFFS_RESULT r = paffs_getObjInfo(path, &fileInfo);
-	if(r != PAFFS_OK){
-		printf("%s\n", paffs_err_msg(r));
+	ObjInfo fileInfo = {0};
+	Result r = fs.getObjInfo(path, &fileInfo);
+	if(r != Result::ok){
+		printf("%s\n", err_msg(r));
 		return;
 	}
 	printFile(0, fileInfo.size, path);
@@ -102,38 +105,38 @@ void printWholeFile(const char* path){
 }
 
 int main( int argc, char ** argv ) {
+	fs = Paffs();
 	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
-	printf("Cache size: %lu Bytes\n", getCacheSize() * sizeof(treeCacheNode));
-	paffs_start_up();
-	PAFFS_RESULT r = paffs_mnt("1");
-	print_tree(getDevice());
-	permission p = PAFFS_R | PAFFS_W;
+	printf("Cache size: %u Bytes\n", getCacheSize() * sizeof(TreeCacheNode));
+	Result r = fs.mnt("1");
+	print_tree(fs.getDevice());
+	Permission p = PAFFS_R | PAFFS_W;
 	printf("Creating directory /a... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
-	printf("%s\n", paffs_err_msg(paffs_mkdir("/a", p)));
+	printf("%s\n", err_msg(fs.mkDir("/a", p)));
 	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
-	print_tree(getDevice());
+	print_tree(fs.getDevice());
 //	while(getchar() == EOF);
 	printf("Creating directory /b... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
-	printf("%s\n", paffs_err_msg(paffs_mkdir("/b", p)));
+	printf("%s\n", err_msg(fs.mkDir("/b", p)));
 	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
-	print_tree(getDevice());
+	print_tree(fs.getDevice());
 //	while(getchar() == EOF);
 	printf("Creating directory /b/foo... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
-	printf("%s\n", paffs_err_msg(paffs_mkdir("/b/foo", p)));
+	printf("%s\n", err_msg(fs.mkDir("/b/foo", p)));
 	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
-	print_tree(getDevice());
+	print_tree(fs.getDevice());
 	printf("Touching file /b/file ... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
-	printf("%s\n", paffs_err_msg(paffs_touch ("/b/file")));
+	printf("%s\n", err_msg(fs.touch ("/b/file")));
 	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
-	print_tree(getDevice());
+	print_tree(fs.getDevice());
 
 	listDir("/");
 
@@ -144,9 +147,9 @@ int main( int argc, char ** argv ) {
 	printf("opening file /b/file ...");
 	fflush(stdout);
 
-	paffs_obj *fil = paffs_open("/b/file", PAFFS_FW);
+	Obj *fil = fs.open("/b/file", PAFFS_FW);
 
-	printf("%s\n", paffs_err_msg(paffs_getLastErr()));
+	printf("%s\n", err_msg(fs.getLastErr()));
 	if(fil == NULL)
 		return -1;
 
@@ -171,9 +174,9 @@ int main( int argc, char ** argv ) {
 
 
 	unsigned int bytes = 0;
-	r = paffs_write(fil, tl, strlen(tl), &bytes);
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK)
+	r = fs.write(fil, tl, strlen(tl), &bytes);
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok)
 		return -1;
 	printf("Wrote content  '%s' 25 times to file\n", t);
 	// ----- first write
@@ -183,17 +186,17 @@ int main( int argc, char ** argv ) {
 //	while(getchar() == EOF);
 
 	//read misaligned ---
-	paffs_objInfo fileInfo = {0};
-	r = paffs_seek(fil, 9, PAFFS_SEEK_SET);
-	r = paffs_getObjInfo("/b/file", &fileInfo);
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK)
+	ObjInfo fileInfo = {0};
+	r = fs.seek(fil, 9, Seekmode::set);
+	r = fs.getObjInfo("/b/file", &fileInfo);
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok)
 		return -1;
 
-	char* out = malloc(fileInfo.size - 8);
-	r = paffs_read(fil, out, fileInfo.size - 9, &bytes);
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK)
+	char* out = (char*) malloc(fileInfo.size - 8);
+	r = fs.read(fil, out, fileInfo.size - 9, &bytes);
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok)
 		return -1;
 
 	out[fileInfo.size - 9] = 0;
@@ -213,17 +216,17 @@ int main( int argc, char ** argv ) {
 	//write misaligned - over Size----
 	printf("write misaligned - over Size... ");
 	fflush(stdout);
-	r = paffs_seek(fil, -5, PAFFS_SEEK_END);
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK)
+	r = fs.seek(fil, -5, Seekmode::end);
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok)
 		return -1;
 
 	char testlauf[] = "---Testlauf---";
 
 
-	r = paffs_write(fil, testlauf, strlen(testlauf), &bytes);
-	if(r != PAFFS_OK){
-		printf("%s\n", paffs_err_msg(r));
+	r = fs.write(fil, testlauf, strlen(testlauf), &bytes);
+	if(r != Result::ok){
+		printf("%s\n", err_msg(r));
 		return -1;
 	}
 	// ---- write misaligned 1
@@ -234,15 +237,15 @@ int main( int argc, char ** argv ) {
 	//TODO: test with memcmp
 	//write misaligned - end misaligned ----
 	printf("write misaligned - last page misaligned\n");
-	r = paffs_seek(fil, -11, PAFFS_SEEK_END);
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK)
+	r = fs.seek(fil, -11, Seekmode::end);
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok)
 		return -1;
 
 	char kurz[] = "kurz";
-	r = paffs_write(fil, kurz, strlen(kurz), &bytes);
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK)
+	r = fs.write(fil, kurz, strlen(kurz), &bytes);
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok)
 		return -1;
 	// ---- write misaligned 2
 
@@ -251,14 +254,14 @@ int main( int argc, char ** argv ) {
 
 	//write misaligned - write over page boundaries ----
 	printf("write misaligned - over page boundaries\n");
-	r = paffs_seek(fil, 508, PAFFS_SEEK_SET);
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK)
+	r = fs.seek(fil, 508, Seekmode::set);
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok)
 		return -1;
 
-	r = paffs_write(fil, testlauf, strlen(testlauf), &bytes);
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK)
+	r = fs.write(fil, testlauf, strlen(testlauf), &bytes);
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok)
 		return -1;
 	// ---- write misaligned 2
 
@@ -267,15 +270,15 @@ int main( int argc, char ** argv ) {
 
 	//write misaligned - write inside not start/end page ----
 	printf("write misaligned - write inside non start/end page\n");
-	r = paffs_seek(fil, 530, PAFFS_SEEK_SET);
+	r = fs.seek(fil, 530, Seekmode::set);
 
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK)
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok)
 		return -1;
 
-	r = paffs_write(fil, testlauf, strlen(testlauf), &bytes);
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK)
+	r = fs.write(fil, testlauf, strlen(testlauf), &bytes);
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok)
 		return -1;
 	// ---- write misaligned 3
 
@@ -283,19 +286,19 @@ int main( int argc, char ** argv ) {
 	printWholeFile("/b/file");
 //	while(getchar() == EOF);
 
-	r = paffs_getObjInfo("/b/file", &fileInfo);
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK)
+	r = fs.getObjInfo("/b/file", &fileInfo);
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok)
 		return -1;
 
 	printInfo(&fileInfo);
 
-	print_tree(getDevice());
+	print_tree(fs.getDevice());
 	printf("Flushing Cache ... ");
 	fflush(stdout);
-	r = commitTreeCache(getDevice());
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK)
+	r = commitTreeCache(fs.getDevice());
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok)
 		return -1;
 
 	listDir("/");
@@ -304,14 +307,14 @@ int main( int argc, char ** argv ) {
 //	while(getchar() == EOF);
 	printf("Changing permissions of /b/file to 0... ");
 	fflush(stdout);
-	r = paffs_chmod("/b/file", 0);
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK)
+	r = fs.chmod("/b/file", 0);
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok)
 		return -1;
 
-	r = paffs_getObjInfo("/b/file", &fileInfo);
-	if(r != PAFFS_OK){
-		printf("%s\n", paffs_err_msg(r));
+	r = fs.getObjInfo("/b/file", &fileInfo);
+	if(r != Result::ok){
+		printf("%s\n", err_msg(r));
 		return -1;
 	}
 	printInfo(&fileInfo);
@@ -319,17 +322,17 @@ int main( int argc, char ** argv ) {
 //	while(getchar() == EOF);
 	printf("Changing permissions of /b/file to rwx... ");
 	fflush(stdout);
-	r = paffs_chmod("/b/file", PAFFS_R | PAFFS_W | PAFFS_X);
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK){
+	r = fs.chmod("/b/file", PAFFS_R | PAFFS_W | PAFFS_X);
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok){
 		return -1;
 	}
 
 	printf("Removing /b/file... ");
 	fflush(stdout);
-	r = paffs_remove("/b/file");
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK){
+	r = fs.remove("/b/file");
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok){
 		return -1;
 	}
 
@@ -339,9 +342,9 @@ int main( int argc, char ** argv ) {
 
 	printf("Trying to remove /b/... ");
 	fflush(stdout);
-	r = paffs_remove("/b/");
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_DIRNOTEMPTY){
+	r = fs.remove("/b/");
+	printf("%s\n", err_msg(r));
+	if(r != Result::dirnotempty){
 		return -1;
 	}
 
@@ -349,9 +352,9 @@ int main( int argc, char ** argv ) {
 
 	printf("Removing /b/foo... ");
 	fflush(stdout);
-	r = paffs_remove("/b/foo");
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK){
+	r = fs.remove("/b/foo");
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok){
 		return -1;
 	}
 
@@ -362,16 +365,16 @@ int main( int argc, char ** argv ) {
 
 	printf("Removing /b/... ");
 	fflush(stdout);
-	r = paffs_remove("/b/");
-	printf("%s\n", paffs_err_msg(r));
-	if(r != PAFFS_OK){
+	r = fs.remove("/b/");
+	printf("%s\n", err_msg(r));
+	if(r != Result::ok){
 		return -1;
 	}
 
 	listDir("/");
 
 	free (tl);
-	paffs_close(fil);
+	fs.close(fil);
 
 	printf("Success.\n");
 

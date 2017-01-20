@@ -23,7 +23,7 @@ public:
 		cell = new FlashCell();
 		init();
 	}
-	SimuDriver(void *c) : Driver(p){
+	SimuDriver(void *c) : Driver(){
 		cell = (FlashCell*) c;
 		init();
 	};
