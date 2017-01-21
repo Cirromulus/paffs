@@ -519,8 +519,9 @@ Result Paffs::removeInodeFromDir(Inode* contDir, Inode* elem){
 			memcpy(&dirData[pointer], &dirData[pointer + entryl], restByte);
 
 			unsigned int bw = 0;
+			r = writeInodeData(contDir, 0, newSize, &bw, dirData, &device);
 			free(dirData);
-			return writeInodeData(contDir, 0, newSize, &bw, dirData, &device);
+			return r;
 		}
 		pointer += entryl;
 	}

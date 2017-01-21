@@ -292,7 +292,7 @@ Result readAreasummary(Dev *dev, AreaPos area, SummaryEntry* out_summary, bool c
 		pointer += btr;
 	}
 	//buffer ready
-	PAFFS_DBG_S(PAFFS_TRACE_READ, "SuperIndex Buffer was filled with %u Bytes.", pointer);
+	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "SuperIndex Buffer was filled with %u Bytes.", pointer);
 
 
 	for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
