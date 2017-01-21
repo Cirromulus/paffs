@@ -1066,6 +1066,8 @@ void print_queued_keys_r(Dev* dev, queue_s* q){
 	queue_destroy(q);
 	if(!queue_empty(new_q))
 		print_queued_keys_r(dev, new_q);
+	else
+		queue_destroy(new_q);
 }
 
 void print_keys(Dev* dev, TreeCacheNode* c){

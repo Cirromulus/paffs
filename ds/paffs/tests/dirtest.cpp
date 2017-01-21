@@ -104,7 +104,7 @@ void printWholeFile(const char* path){
 
 }
 
-int main( int argc, char ** argv ) {
+int main(int argc, char** argv){
 	fs = new Paffs();
 	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
 	printf("Cache size: %u Bytes\n", getCacheSize() * sizeof(TreeCacheNode));
