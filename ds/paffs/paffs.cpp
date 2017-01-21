@@ -26,7 +26,7 @@ static unsigned char dentrys_buf_used = 0;
 namespace paffs{
 
 unsigned int trace_mask =
-	PAFFS_TRACE_AREA |
+	//PAFFS_TRACE_AREA |
 	PAFFS_TRACE_ERROR |
 	PAFFS_TRACE_BUG |
 	//PAFFS_TRACE_TREE |

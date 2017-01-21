@@ -29,8 +29,6 @@ Result SimuDriver::writePage(uint64_t page_no,
 	}
 	memcpy(buf, data, data_len);
 
-
-
 	NANDADRESS d = translatePageToAddress(page_no, cell);
 
 	if(cell->writePage(d.plane, d.block, d.page, (unsigned char*)buf) < 0){
