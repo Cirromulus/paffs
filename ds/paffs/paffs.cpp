@@ -26,7 +26,7 @@ static unsigned char dentrys_buf_used = 0;
 namespace paffs{
 
 unsigned int trace_mask =
-	//PAFFS_TRACE_AREA |
+	PAFFS_TRACE_AREA |
 	PAFFS_TRACE_ERROR |
 	PAFFS_TRACE_BUG |
 	//PAFFS_TRACE_TREE |
@@ -378,45 +378,45 @@ Result Paffs::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 }
 
 Result Paffs::getInodeOfElem(Inode* outInode, const char* fullPath){
-    Inode root;
-    if(getInode(&device, 0, &root) != Result::ok){
-    	PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find rootInode! (%s)", resultMsg[static_cast<int>(lasterr)]);
+	Inode root;
+	if(getInode(&device, 0, &root) != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find rootInode! (%s)", resultMsg[static_cast<int>(lasterr)]);
 		return Result::fail;
-    }
-    Inode *curr = outInode;
-    *curr = root;
-    
-    unsigned int fpLength = strlen(fullPath);
-    char* fullPathC = (char*) malloc(fpLength * sizeof(char) +1);
-    memcpy(fullPathC, fullPath, fpLength * sizeof(char));
-    fullPathC[fpLength] = 0;
-    
-    char delimiter[] = "/"; 
-    char *fnP;
-    fnP = strtok(fullPathC, delimiter);
-    
-    while(fnP != NULL){
-        if(strlen(fnP) == 0){   //is first '/'
-            continue;
-        }
+	}
+	Inode *curr = outInode;
+	*curr = root;
 
-        if(curr->type != InodeType::dir){
-            free(fullPathC);
-            return Result::einval;
-        }
+	unsigned int fpLength = strlen(fullPath);
+	char* fullPathC = (char*) malloc(fpLength * sizeof(char) +1);
+	memcpy(fullPathC, fullPath, fpLength * sizeof(char));
+	fullPathC[fpLength] = 0;
 
-        Result r;
-        if((r = getInodeInDir(outInode, curr, fnP)) != Result::ok){
-        	free(fullPathC);
-            return r;
-        }
-        curr = outInode;
-        //todo: Dentry cachen
-        fnP = strtok(NULL, delimiter);
-    }
-    
-    free(fullPathC);
-    return Result::ok;
+	char delimiter[] = "/";
+	char *fnP;
+	fnP = strtok(fullPathC, delimiter);
+
+	while(fnP != NULL){
+		if(strlen(fnP) == 0){   //is first '/'
+			continue;
+		}
+
+		if(curr->type != InodeType::dir){
+			free(fullPathC);
+			return Result::einval;
+		}
+
+		Result r;
+		if((r = getInodeInDir(outInode, curr, fnP)) != Result::ok){
+			free(fullPathC);
+			return r;
+		}
+		curr = outInode;
+		//todo: Dentry cachen
+		fnP = strtok(NULL, delimiter);
+	}
+
+	free(fullPathC);
+	return Result::ok;
 }
 
 

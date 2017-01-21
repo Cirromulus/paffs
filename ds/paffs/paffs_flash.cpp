@@ -292,7 +292,7 @@ Result readAreasummary(Dev *dev, AreaPos area, SummaryEntry* out_summary, bool c
 		pointer += btr;
 	}
 	//buffer ready
-	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "SuperIndex Buffer was filled with %u Bytes.", pointer);
+	PAFFS_DBG_S(PAFFS_TRACE_READ, "SuperIndex Buffer was filled with %u Bytes.", pointer);
 
 
 	for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
@@ -687,7 +687,7 @@ Result readTreeNode(Dev* dev, Addr addr, TreeNode* node){
 
 	if(dev->areaMap[extractLogicalArea(addr)].areaSummary == 0){
 		PAFFS_DBG_S(PAFFS_TRACE_SCAN, "READ operation on indexarea without areaSummary!");
-		//TODO: Could be safer if areaSummary would be read from flash for safety
+		//TODO: Could be safer if areaSummary would be read from flash
 	}else{
 		if(dev->areaMap[extractLogicalArea(addr)].areaSummary == NULL){
 			Result r = loadArea(dev, extractLogicalArea(addr));
@@ -841,6 +841,7 @@ Result writeSuperIndex(Dev* dev, Addr addr, superIndex* entry){
 		}
 
 		memcpy(&buf[pointer], &entry->areaMap[i], sizeof(Area) - sizeof(SummaryEntry*));
+		((Area*)&buf[pointer])->areaSummary = 0;		//Pointer to old memory should be invalid
 		//TODO: Optimize bitusage, currently wasting 1,25 Bytes per Entry
 		pointer += sizeof(Area) - sizeof(SummaryEntry*);
 	}
@@ -877,7 +878,7 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, SummaryEntry* 
 	if(!withAreaMap)
 		 return dev->driver->readPage(getPageNumber(addr, dev), entry, sizeof(uint32_t) + sizeof(Addr));
 
-	if(entry->areaMap == 0)
+	if(entry->areaMap == NULL)
 		return Result::einval;
 
 	unsigned int summary_Container_count = 0;
@@ -917,6 +918,7 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, SummaryEntry* 
 	for(unsigned int i = 0; i < dev->param->areas_no; i++){
 		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(Area) - sizeof(SummaryEntry*));
 		pointer += sizeof(Area) - sizeof(SummaryEntry*);
+		entry->areaMap[i].areaSummary = 0;		//Do not take invalid pointer from old state with us
 		if(entry->areaMap[i].has_areaSummary)
 			areaSummaryPositions[pospos++] = i;
 	}
