@@ -107,7 +107,7 @@ struct Inode{
 struct Dentry{
 	char* name;		//is actually full path
 	Inode* iNode;
-	struct Dentry* parent;
+	Dentry* parent;
 };
 
 struct Obj{
@@ -160,9 +160,6 @@ enum class SummaryEntry : uint8_t{
 	dirty
 };
 
-//#pragma warning( push )
-//#pragma warning( disable : "narrowing-conversion")
-
 struct Area{
 	AreaType type:4;
 	AreaStatus status:2;
@@ -173,20 +170,20 @@ struct Area{
 	bool isAreaSummaryDirty:1;
 };	//3 + 2 + 17 + 1 + 32 (+64/32) = 55 (119/87) Bit = 6,875 (14,875/10,875) Byte
 
-//#pragma warning( pop )
-
 struct Dev{
 	Param* param;
 	AreaPos activeArea[AreaType::no];
-	//Automatically filled
 	Obj root_dir;
 	Area* areaMap;
 	Driver *driver;
 };
 
+Addr combineAddress(uint32_t logical_area, uint32_t page);
+unsigned int extractLogicalArea(Addr addr);
+unsigned int extractPage(Addr addr);
+
 class Paffs{
 	Dev device = {0};
-	SummaryEntry* summaryEntry_containers[2];
 
 public:
 	Paffs();

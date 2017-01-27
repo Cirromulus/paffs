@@ -6,10 +6,10 @@
  */
 
 #include "treeCache.hpp"
-#include "paffs_flash.hpp"
 #include "superblock.hpp"
 #include "btree.hpp"
 #include <string.h>
+#include "dataIO.hpp"
 
 namespace paffs{
 

@@ -4,13 +4,13 @@
  */
 
 #include "btree.hpp"
-#include "paffs_flash.hpp"
 #include "treequeue.hpp"
 #include "treeCache.hpp"
 #include <stdio.h>
 #include <stdlib.h> 
 #include <string.h>
 #include <inttypes.h>
+#include "dataIO.hpp"
 
 namespace paffs{
 

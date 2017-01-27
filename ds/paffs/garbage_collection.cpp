@@ -6,7 +6,8 @@
  */
 
 #include "garbage_collection.hpp"
-#include "paffs_flash.hpp"
+#include "area.hpp"
+#include "dataIO.hpp"
 #include "driver/driver.hpp"
 
 namespace paffs{

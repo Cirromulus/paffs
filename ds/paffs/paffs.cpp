@@ -5,7 +5,7 @@
 
 #include "paffs.hpp"
 
-#include "paffs_flash.hpp"
+#include "area.hpp"
 #include "treeCache.hpp"
 #include "paffs_trace.hpp"
 
@@ -15,6 +15,7 @@
 #include <linux/string.h>
 #include <time.h>
 #include <stdlib.h>
+#include "dataIO.hpp"
 
 
 //Dentrys zur schnelleren verfügung
@@ -64,6 +65,25 @@ const char* err_msg(Result pr){
 	return resultMsg[static_cast<int>(pr)];
 }
 
+Addr combineAddress(uint32_t logical_area, uint32_t page){
+	Addr addr = 0;
+	memcpy(&addr, &logical_area, sizeof(uint32_t));
+	memcpy(&((char*)&addr)[sizeof(uint32_t)], &page, sizeof(uint32_t));
+
+	return addr;
+}
+
+unsigned int extractLogicalArea(Addr addr){
+	unsigned int area = 0;
+	memcpy(&area, &addr, sizeof(uint32_t));
+	return area;
+}
+unsigned int extractPage(Addr addr){
+	unsigned int page = 0;
+	memcpy(&page, &((char*)&addr)[sizeof(uint32_t)], sizeof(uint32_t));
+	return page;
+}
+
 Paffs::Paffs(){
 	//normal startup, load drivers
 	device.driver = getDriver("1");
@@ -103,8 +123,6 @@ Result Paffs::initializeDevice(const char* devicename){
 	param->data_pages_per_area = param->total_pages_per_area - needed_pages_for_AS;
 	device.areaMap = new Area[param->areas_no];
 	memset(device.areaMap, 0, sizeof(Area) * param->areas_no);
-	summaryEntry_containers[0] = new SummaryEntry [param->data_pages_per_area];
-	summaryEntry_containers[1] = new SummaryEntry [param->data_pages_per_area];
 
 	device.activeArea[AreaType::superblockarea] = 0;
 	device.activeArea[AreaType::indexarea] = 0;
@@ -127,8 +145,6 @@ Result Paffs::destroyDevice(const char* devicename){
 	}
 	delete[] device.areaMap;
 	device.areaMap = 0;
-	delete[] summaryEntry_containers[0];
-	delete[] summaryEntry_containers[1];
 	return Result::ok;
 }
 
@@ -209,7 +225,7 @@ Result Paffs::mnt(const char* devicename){
 	if(r != Result::ok)
 		return r;
 
-	r = readSuperIndex(&device, summaryEntry_containers);
+	r = readSuperIndex(&device);
 	if(r == Result::nf){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Tried mounting a device with an empty superblock!");
 		return r;
