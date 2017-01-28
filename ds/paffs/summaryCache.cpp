@@ -54,12 +54,6 @@ Result loadAreaSummaries(Dev* dev){
 
 	//todo: Now load index into cache
 
-	//register PageFunctions
-	for(AreaPos a = 0; a < dev->param->blocks_per_area; a++){
-		dev->areaMap[a].getPageStatus = std::bind(getPageStatus, dev, a, std::placeholders::_1, std::placeholders::_2);
-		dev->areaMap[a].setPageStatus = std::bind(setPageStatus, dev, a, std::placeholders::_1, std::placeholders::_2);
-	}
-
 	return Result::nimpl;
 }
 

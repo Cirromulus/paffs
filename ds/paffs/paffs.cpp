@@ -134,6 +134,12 @@ Result Paffs::initializeDevice(const char* devicename){
 		return Result::einval;
 	}
 
+	//register PageFunctions
+	for(AreaPos a = 0; a < device.param->areas_no; a++){
+		device.areaMap[a].getPageStatus = std::bind(getPageStatus, &device, a, std::placeholders::_1, std::placeholders::_2);
+		device.areaMap[a].setPageStatus = std::bind(setPageStatus, &device, a, std::placeholders::_1, std::placeholders::_2);
+	}
+
 	return Result::ok;
 }
 

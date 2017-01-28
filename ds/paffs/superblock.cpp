@@ -317,11 +317,15 @@ Result writeSuperPageIndex(Dev* dev, Addr addr, superIndex* entry){
 			entry->asPositions[pospos++] = i;
 		}
 
-		memcpy(&buf[pointer], &entry->areaMap[i], sizeof(Area) - sizeof(SummaryEntry*));
+		memcpy(&buf[pointer], &entry->areaMap[i], sizeof(Area)
+				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
+				- sizeof(std::function<Result(uint8_t,SummaryEntry)>));
 		((Area*)&buf[pointer])->getPageStatus = 0;
 		((Area*)&buf[pointer])->setPageStatus = 0;
 		//TODO: Optimize bitusage, currently wasting many Bytes per Entry
-		pointer += sizeof(Area) - sizeof(SummaryEntry*);
+		pointer += sizeof(Area)
+				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
+				- sizeof(std::function<Result(uint8_t,SummaryEntry)>);
 	}
 
 	for(unsigned int i = 0; i < 2; i++){
@@ -391,8 +395,12 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, bool withAreaM
 	entry->asPositions[1] = 0;
 	unsigned char pospos = 0;	//Stupid name
 	for(unsigned int i = 0; i < dev->param->areas_no; i++){
-		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(Area) - sizeof(SummaryEntry*));
-		pointer += sizeof(Area) - sizeof(SummaryEntry*);
+		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(Area)
+				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
+				- sizeof(std::function<Result(uint8_t,SummaryEntry)>));
+		pointer += sizeof(Area)
+				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
+				- sizeof(std::function<Result(uint8_t,SummaryEntry)>);
 		if(entry->areaMap[i].status == AreaStatus::active)
 			entry->asPositions[pospos++] = i;
 	}
