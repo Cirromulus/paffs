@@ -34,14 +34,16 @@ typedef struct superIndex{
 					//Values Zero and 0xFF... are reserved.
 	Addr rootNode;
 	Area* areaMap;	//Size can be calculated via dev->param
+	AreaPos asPositions[2];
+	SummaryEntry* areaSummary[2];
 } superIndex;
 
 Result registerRootnode(Dev* dev, Addr addr);
 Addr getRootnodeAddr(Dev* dev);
 
 //returns PAFFS_NF if no superindex is in flash
-Result readSuperIndex(Dev* dev);
-Result commitSuperIndex(Dev* dev);
+Result readSuperIndex(Dev* dev, superIndex* index);
+Result commitSuperIndex(Dev* dev, superIndex* index);
 
 
 //returns PAFFS_NF if no superindex is in flash
@@ -60,7 +62,7 @@ Result deleteAnchorBlock(Dev* dev, uint32_t area, uint8_t block);
 Result writeJumpPadEntry(Dev* dev, Addr addr, JumpPadEntry* entry);
 Result readJumpPadEntry(Dev* dev, Addr addr, JumpPadEntry* entry);
 
-Result writeSuperIndex(Dev* dev, Addr addr, superIndex* entry);
+Result writeSuperPageIndex(Dev* dev, Addr addr, superIndex* entry);
 Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, bool withAreaMap);
 
 

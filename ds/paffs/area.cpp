@@ -6,6 +6,7 @@
  */
 #include "area.hpp"
 #include "garbage_collection.hpp"
+#include "summaryCache.hpp"
 #include "driver/driver.hpp"
 #include <stdlib.h>
 namespace paffs {
@@ -53,12 +54,14 @@ unsigned int findWritableArea(AreaType areaType, Dev* dev){
 }
 
 Result findFirstFreePage(unsigned int* p_out, Dev* dev, unsigned int area){
-
+	Result r;
 	for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
-		if(dev->areaMap[area].areaSummary[i] == SummaryEntry::free){
+		if(dev->areaMap[area].getPageStatus(i,&r) == SummaryEntry::free){
 			*p_out = i;
 			return Result::ok;
 		}
+		if(r != Result::ok)
+			return r;
 	}
 	return Result::nosp;
 }
@@ -75,24 +78,22 @@ uint64_t getPageNumber(Addr addr, Dev *dev){
 }
 
 Result manageActiveAreaFull(Dev *dev, AreaPos *area, AreaType areaType){
-	if(dev->areaMap[*area].areaSummary == NULL){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access invalid areaSummary!");
-		return Result::bug;
-	}
-
+	Result r;
 	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
 		for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
-			if(dev->areaMap[*area].areaSummary[i] > SummaryEntry::dirty)
-				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", *area);
+			if(dev->areaMap[*area].getPageStatus(i,&r) > SummaryEntry::dirty)
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries (%s)!", *area, resultMsg[(int)r]);
 		}
 	}
 
 	bool isFull = true;
 	for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
-		if(dev->areaMap[*area].areaSummary[i] == SummaryEntry::free) {
+		if(dev->areaMap[*area].getPageStatus(i,&r) == SummaryEntry::free) {
 			isFull = false;
 			break;
 		}
+		if(r != Result::ok)
+			return r;
 	}
 
 	if(isFull){
@@ -108,76 +109,19 @@ Result manageActiveAreaFull(Dev *dev, AreaPos *area, AreaType areaType){
 //TODO: Add initAreaAs(...) to handle typical areaMap[abc].type = def; initArea(...);
 void initArea(Dev* dev, AreaPos area){
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %u (pos %u) as %s.", (unsigned int)area, (unsigned int)dev->areaMap[area].position, area_names[dev->areaMap[area].type]);
-	//generate the areaSummary in Memory
 	dev->areaMap[area].status = AreaStatus::active;
-	dev->areaMap[area].isAreaSummaryDirty = false;
-	if(dev->areaMap[area].type == AreaType::indexarea || dev->areaMap[area].type == AreaType::dataarea){
-		if(dev->areaMap[area].areaSummary == NULL){
-			dev->areaMap[area].areaSummary = (SummaryEntry*) malloc(
-					sizeof(SummaryEntry)
-					* dev->param->blocks_per_area
-					* dev->param->pages_per_block);
-		}
-		memset(dev->areaMap[area].areaSummary, 0,
-				sizeof(SummaryEntry)
-				* dev->param->blocks_per_area
-				* dev->param->pages_per_block);
-		dev->areaMap[area].has_areaSummary = true;
-	}else{
-		if(dev->areaMap[area].areaSummary != NULL){
-			//Former areatype had summary
-			free(dev->areaMap[area].areaSummary);
-			dev->areaMap[area].areaSummary = NULL;
-		}
-		dev->areaMap[area].has_areaSummary = false;
-	}
 }
 
-Result loadArea(Dev *dev, AreaPos area){
+/*Result loadArea(Dev *dev, AreaPos area){
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Loading Areasummary of Area %u (pos %u) as %s.", area, dev->areaMap[area].position, area_names[dev->areaMap[area].type]);
 	if(dev->areaMap[area].type != AreaType::dataarea && dev->areaMap[area].type != AreaType::indexarea){
 		return Result::ok;
 	}
-	if(dev->areaMap[area].areaSummary != NULL){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to load Area with existing areaSummary!");
-		return Result::bug;
-	}
-
-	if(dev->areaMap[area].isAreaSummaryDirty == true){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to load Area without areaSummary but dirty flag!");
-		return Result::bug;
-	}
-
-	dev->areaMap[area].isAreaSummaryDirty = true;
-	dev->areaMap[area].areaSummary = (SummaryEntry*) malloc(
-			sizeof(SummaryEntry)
-			* dev->param->blocks_per_area
-			* dev->param->pages_per_block);
-
 	return readAreasummary(dev, area, dev->areaMap[area].areaSummary, true);
-}
+}*/
 
 Result closeArea(Dev *dev, AreaPos area){
 	dev->areaMap[area].status = AreaStatus::closed;
-
-	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
-		for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
-			if(dev->areaMap[area].areaSummary[i] > SummaryEntry::dirty)
-				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", area);
-		}
-	}
-
-	//TODO: Suspend areaSummary write until RAM cache runs low
-	if(dev->areaMap[area].type == AreaType::dataarea || dev->areaMap[area].type == AreaType::indexarea){
-		Result r = writeAreasummary(dev, area, dev->areaMap[area].areaSummary);
-		if(r != Result::ok)
-			return r;
-	}
-	//TODO: delete all area summaries if low on RAM
-	if(dev->areaMap[area].type != AreaType::dataarea && dev->areaMap[area].type != AreaType::indexarea){
-		free(dev->areaMap[area].areaSummary);
-		dev->areaMap[area].areaSummary = NULL;
-	}
 
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Closed %s Area %u at pos. %u.", area_names[dev->areaMap[area].type], area, dev->areaMap[area].position);
 	return Result::ok;
@@ -186,17 +130,9 @@ Result closeArea(Dev *dev, AreaPos area){
 void retireArea(Dev *dev, AreaPos area){
 	dev->areaMap[area].status = AreaStatus::closed;
 
-	if((dev->areaMap[area].type == AreaType::dataarea || dev->areaMap[area].type == AreaType::indexarea) && trace_mask & PAFFS_TRACE_VERIFY_AS){
-		for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
-			if(dev->areaMap[area].areaSummary[i] > SummaryEntry::dirty)
-				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", area);
-		}
-	}
-
-	//TODO: delete all area summaries if low on RAM
-	if(dev->areaMap[area].type != AreaType::dataarea && dev->areaMap[area].type != AreaType::indexarea){
-		free(dev->areaMap[area].areaSummary);
-		dev->areaMap[area].areaSummary = NULL;
+	Result r = removeAreaSummary(dev, area);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete AreaSummary of retired Area %d!", area);
 	}
 
 	dev->areaMap[area].type = AreaType::retired;

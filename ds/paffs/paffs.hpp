@@ -6,6 +6,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <functional>
 #include "paffs_trace.hpp"
 
 
@@ -157,7 +158,8 @@ enum AreaStatus : uint8_t{
 enum class SummaryEntry : uint8_t{
 	free = 0,
 	used,		//if read from super index, used can mean both free and used to save a bit per entry.
-	dirty
+	dirty,
+	error
 };
 
 struct Area{
@@ -165,15 +167,14 @@ struct Area{
 	AreaStatus status:2;
 	uint32_t erasecount:17;	//Overflow at 132.000 is acceptable (assuming less than 100k erase cycles)
 	AreaPos position;	//physical position, not logical
-	SummaryEntry* areaSummary; //May be invalid if status == closed; Optimizable bitusage
-	bool has_areaSummary:1;		//TODO: Check if really necessary for superindex
-	bool isAreaSummaryDirty:1;
+	std::function<SummaryEntry(uint8_t,Result*)> getPageStatus;
+	std::function<Result(uint8_t,SummaryEntry)> setPageStatus;
 };	//3 + 2 + 17 + 1 + 32 (+64/32) = 55 (119/87) Bit = 6,875 (14,875/10,875) Byte
 
 struct Dev{
 	Param* param;
 	AreaPos activeArea[AreaType::no];
-	Obj root_dir;
+	Obj rootDir;
 	Area* areaMap;
 	Driver *driver;
 };

@@ -37,6 +37,8 @@ Result writeInodeData(Inode* inode,
 	unsigned int pageOffs = offs % dev->param->data_bytes_per_page;
 	*bytes_written = 0;
 
+	Result res;
+
 	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
 		bool misaligned = false;
 		dev->activeArea[AreaType::dataarea] = findWritableArea(AreaType::dataarea, dev);
@@ -57,7 +59,10 @@ Result writeInodeData(Inode* inode,
 		}
 		Addr pageAddress = combineAddress(dev->activeArea[AreaType::dataarea], firstFreePage);
 
-		dev->areaMap[dev->activeArea[AreaType::dataarea]].areaSummary[firstFreePage] = SummaryEntry::used;
+		res = dev->areaMap[dev->activeArea[AreaType::dataarea]].setPageStatus(firstFreePage, SummaryEntry::used);
+		if(res != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[(int)res]);
+		}
 
 		//Prepare buffer and calculate bytes to write
 		char* buf = &((char*)data)[page*dev->param->data_bytes_per_page];
@@ -116,14 +121,11 @@ Result writeInodeData(Inode* inode,
 			}
 
 			//Mark old pages dirty
-			if(dev->areaMap[oldArea].areaSummary == NULL){
-				Result r = loadArea(dev, oldArea);
-				if(r != Result::ok){
-					PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read A/S from CLOSED area!");
-					return r;
-				}
+			res = dev->areaMap[oldArea].setPageStatus(oldPage, SummaryEntry::dirty);
+			if(res != Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[(int)res]);
 			}
-			dev->areaMap[oldArea].areaSummary[oldPage] = SummaryEntry::dirty;
+
 		}else{
 			//we are writing to a new page
 			*bytes_written += btw;
@@ -131,7 +133,7 @@ Result writeInodeData(Inode* inode,
 		}
 		inode->direct[page+pageFrom] = pageAddress;
 
-		Result res = dev->driver->writePage(getPageNumber(pageAddress, dev), buf, btw);
+		res = dev->driver->writePage(getPageNumber(pageAddress, dev), buf, btw);
 
 		if(misaligned)
 			free(buf);
@@ -201,26 +203,26 @@ Result readInodeData(Inode* inode,
 			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid area at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
 			return Result::bug;
 		}
-
-		Result r = Result::ok;
-		if(dev->areaMap[area].areaSummary == NULL){
-			//TODO: This is very expensive. Either build switch "safety mode" that loads complete A/S
-			//		Or just load (everytime) incomplete A/S
-			r = loadArea(dev, area);
+		Result r;
+		if(trace_mask && PAFFS_TRACE_VERIFY_AS){
+			SummaryEntry e = dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])]
+										  .getPageStatus(extractPage(inode->direct[page + pageFrom]), &r);
 			if(r != Result::ok){
-				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load AreaSummary for safetycheck!");
-			}
-		}
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load AreaSummary of area %d for verification!", extractLogicalArea(inode->direct[page + pageFrom]));
+			}else{
+				if(e == SummaryEntry::dirty){
+					PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of outdated (dirty) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
+					return Result::bug;
+				}
 
-		if(r == Result::ok){
-			if(dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])].areaSummary[extractPage(inode->direct[page + pageFrom])] == SummaryEntry::dirty){
-				PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of outdated (dirty) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
-				return Result::bug;
-			}
+				if(e == SummaryEntry::free){
+					PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid (SummaryEntry::free) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
+					return Result::bug;
+				}
 
-			if(dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])].areaSummary[extractPage(inode->direct[page + pageFrom])] == SummaryEntry::free){
-				PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid (SummaryEntry::free) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
-				return Result::bug;
+				if(e >= SummaryEntry::error){
+					PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of data with invalid AreaSummary at area %d!", extractLogicalArea(inode->direct[page + pageFrom]));
+				}
 			}
 		}
 
@@ -278,17 +280,32 @@ Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs){
 		unsigned int relPage = extractPage(inode->direct[page + pageFrom]);
 
 		if(dev->areaMap[area].type != AreaType::dataarea){
-			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of invalid area at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
+			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of invalid area at %d:%d",
+					extractLogicalArea(inode->direct[page + pageFrom]),
+					extractPage(inode->direct[page + pageFrom]));
 			return Result::bug;
 		}
 
-		if(dev->areaMap[area].areaSummary[relPage] == SummaryEntry::dirty){
-			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of outdated (dirty) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
+		Result r;
+		if(dev->areaMap[area].getPageStatus(relPage, &r) == SummaryEntry::dirty){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of outdated (dirty)"
+					" data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),
+					extractPage(inode->direct[page + pageFrom]));
 			return Result::bug;
+		}
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load AreaSummary for area %d,"
+					" so no invalidation of data!", area);
+			return r;
 		}
 
 		//Mark old pages dirty
-		dev->areaMap[area].areaSummary[relPage] = SummaryEntry::dirty;
+		r = dev->areaMap[area].setPageStatus(relPage, SummaryEntry::dirty);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write AreaSummary for area %d,"
+					" so no invalidation of data!", area);
+			return r;
+		}
 
 		inode->reservedSize -= dev->param->data_bytes_per_page;
 		inode->direct[page+pageFrom] = 0;
@@ -305,26 +322,18 @@ Result writeTreeNode(Dev* dev, TreeNode* node){
 				return Result::bug;
 	}
 	if(sizeof(TreeNode) > dev->param->data_bytes_per_page){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page (Was %u, should %u)", sizeof(TreeNode), dev->param->data_bytes_per_page);
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page"
+				" (Was %u, should %u)", sizeof(TreeNode), dev->param->data_bytes_per_page);
 		return Result::bug;
 	}
 
 	if(node->self != 0){
 		//We have to invalidate former position first
-
-		if(dev->areaMap[extractLogicalArea(node->self)].areaSummary == NULL){
-			PAFFS_DBG_S(PAFFS_TRACE_BUG, "Tried to invalidate Page in (probably) committed areaSummary.\n"
-					"This is not fully supported, so expect bugs.");
-			//It is Ok, if whole Area gets GC'ed before unmounting. Otherwise it will
-			//generate karteileichen
-			Result r = loadArea(dev, extractLogicalArea(node->self));
-			if(r != Result::ok){
-				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read AreaSummary on area %d!"
-						" Trying to move on, but expect errors...", extractLogicalArea(node->self));
-			}
+		Result r = dev->areaMap[extractLogicalArea(node->self)].setPageStatus(extractPage(node->self), SummaryEntry::dirty);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate old Page!");
+			return r;
 		}
-
-		dev->areaMap[extractLogicalArea(node->self)].areaSummary[extractPage(node->self)] = SummaryEntry::dirty;
 	}
 
 	lasterr = Result::ok;
@@ -346,9 +355,15 @@ Result writeTreeNode(Dev* dev, TreeNode* node){
 	Addr addr = combineAddress(dev->activeArea[AreaType::indexarea], firstFreePage);
 	node->self = addr;
 
-	dev->areaMap[dev->activeArea[AreaType::indexarea]].areaSummary[firstFreePage] = SummaryEntry::used;
+	//Mark Page as used
+	Result r = dev->areaMap[dev->activeArea[AreaType::indexarea]].setPageStatus(firstFreePage, SummaryEntry::used);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
+		return r;
+	}
 
-	Result r = dev->driver->writePage(getPageNumber(node->self, dev), node, sizeof(TreeNode));
+
+	r = dev->driver->writePage(getPageNumber(node->self, dev), node, sizeof(TreeNode));
 	if(r != Result::ok)
 		return r;
 
@@ -374,27 +389,24 @@ Result readTreeNode(Dev* dev, Addr addr, TreeNode* node){
 		return Result::bug;
 	}
 
-	if(dev->areaMap[extractLogicalArea(addr)].areaSummary == 0){
-		PAFFS_DBG_S(PAFFS_TRACE_SCAN, "READ operation on indexarea without areaSummary!");
-		//TODO: Could be safer if areaSummary would be read from flash
-	}else{
-		if(dev->areaMap[extractLogicalArea(addr)].areaSummary == NULL){
-			Result r = loadArea(dev, extractLogicalArea(addr));
-			if(r != Result::ok)
-				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load AreaSum. on %d! Trying to move on, but expect errors...", extractLogicalArea(addr));
-		}
-		if(dev->areaMap[extractLogicalArea(addr)].areaSummary[extractPage(addr)] == SummaryEntry::dirty){
+	if(extractLogicalArea(addr) == 0){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ TREE NODE operation on (log.) first Area at %X:%X", extractLogicalArea(addr), extractPage(addr));
+		return Result::bug;
+	}
+
+
+	Result r;
+	if(trace_mask && PAFFS_TRACE_VERIFY_AS){
+		if(dev->areaMap[extractLogicalArea(addr)].getPageStatus(extractPage(addr),&r) == SummaryEntry::dirty){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "READ operation of obsoleted data at %X:%X", extractLogicalArea(addr), extractPage(addr));
 			return Result::bug;
 		}
-
-		if(extractLogicalArea(addr) == 0){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "READ TREE NODE operation on (log.) first Area at %X:%X", extractLogicalArea(addr), extractPage(addr));
-			return Result::bug;
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not verify Page status!");
 		}
 	}
 
-	Result r = dev->driver->readPage(getPageNumber(addr, dev), node, sizeof(TreeNode));
+	r = dev->driver->readPage(getPageNumber(addr, dev), node, sizeof(TreeNode));
 	if(r != Result::ok)
 		return r;
 
@@ -407,8 +419,7 @@ Result readTreeNode(Dev* dev, Addr addr, TreeNode* node){
 }
 
 Result deleteTreeNode(Dev* dev, TreeNode* node){
-	dev->areaMap[extractLogicalArea(node->self)].areaSummary[extractPage(node->self)] = SummaryEntry::dirty;
-	return Result::ok;
+	return dev->areaMap[extractLogicalArea(node->self)].setPageStatus(extractPage(node->self), SummaryEntry::dirty);
 }
 
 

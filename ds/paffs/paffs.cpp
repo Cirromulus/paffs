@@ -6,16 +6,16 @@
 #include "paffs.hpp"
 
 #include "area.hpp"
+#include "dataIO.hpp"
 #include "treeCache.hpp"
 #include "paffs_trace.hpp"
-
+#include "summaryCache.hpp"
 #include "driver/driverconf.hpp"
 
 #include <stdio.h>
 #include <linux/string.h>
 #include <time.h>
 #include <stdlib.h>
-#include "dataIO.hpp"
 
 
 //Dentrys zur schnelleren verfügung
@@ -133,16 +133,11 @@ Result Paffs::initializeDevice(const char* devicename){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device too small, at least 12 Blocks are needed!");
 		return Result::einval;
 	}
+
 	return Result::ok;
 }
 
 Result Paffs::destroyDevice(const char* devicename){
-	for(unsigned int i = 0; i < device.param->areas_no; i++){
-		if(device.areaMap[i].areaSummary != NULL){
-			free(device.areaMap[i].areaSummary);
-			device.areaMap[i].areaSummary = 0;
-		}
-	}
 	delete[] device.areaMap;
 	device.areaMap = 0;
 	return Result::ok;
@@ -192,7 +187,6 @@ Result Paffs::format(const char* devicename){
 
 	Inode rootDir = {0};
 	r = createDirInode(&rootDir, PAFFS_R | PAFFS_W | PAFFS_X);
-
 	if(r != Result::ok){
 		destroyDevice(devicename);
 		return r;
@@ -207,7 +201,7 @@ Result Paffs::format(const char* devicename){
 		destroyDevice(devicename);
 		return r;
 	}
-	r = commitSuperIndex(&device);
+	r = commitAreaSummaries(&device);
 	if(r != Result::ok){
 		destroyDevice(devicename);
 		return r;
@@ -225,16 +219,17 @@ Result Paffs::mnt(const char* devicename){
 	if(r != Result::ok)
 		return r;
 
-	r = readSuperIndex(&device);
+	r = loadAreaSummaries(&device);
 	if(r == Result::nf){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Tried mounting a device with an empty superblock!");
+		destroyDevice(devicename);
 		return r;
 	}
 
 	//TODO: mark activeAreas
-	for(unsigned long i = 0; i < device.param->areas_no; i++){
+	//for(unsigned long i = 0; i < device.param->areas_no; i++){
 		//if(device.areaMap[i].type != AreaType::dataarea)
-	}
+	//}
 
 	return r;
 }
@@ -254,7 +249,7 @@ Result Paffs::unmnt(const char* devicename){
 	if(r != Result::ok)
 		return r;
 
-	r = commitSuperIndex(&device);
+	r = commitAreaSummaries(&device);
 	if(r != Result::ok)
 		return r;
 

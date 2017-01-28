@@ -24,9 +24,7 @@ Result writeAreasummary(Dev *dev, AreaPos area, SummaryEntry* summary);
 Result readAreasummary(Dev *dev, AreaPos area, SummaryEntry* out_summary, bool complete);
 
 void initArea(Dev* dev, AreaPos area);
-Result loadArea(Dev *dev, AreaPos area);
+//Result loadArea(Dev *dev, AreaPos area);
 Result closeArea(Dev *dev, AreaPos area);
 void retireArea(Dev *dev, AreaPos area);
-
-
 }  // namespace paffs

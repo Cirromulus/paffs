@@ -7,6 +7,7 @@
 
 #include "garbage_collection.hpp"
 #include "area.hpp"
+#include "summaryCache.hpp"
 #include "dataIO.hpp"
 #include "driver/driver.hpp"
 
@@ -16,11 +17,15 @@ namespace paffs{
  * It could be possible that closed area contains free pages which count as
  * dirty in this case.
  */
-uint32_t countDirtyPages(Dev* dev, SummaryEntry* summary){
+uint32_t countDirtyPages(Dev* dev, Area* area){
 	uint32_t dirty = 0;
+	Result r;
 	for(uint32_t i = 0; i < dev->param->data_pages_per_area; i++){
-		if(summary[i] != SummaryEntry::used)
+		if(area->getPageStatus(i, &r) != SummaryEntry::used)
 			dirty++;
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not determine Pagestatus for Garbagecollection!");
+		}
 	}
 	return dirty;
 }
@@ -29,32 +34,13 @@ AreaPos findNextBestArea(Dev* dev, AreaType target, SummaryEntry* out_summary, b
 	AreaPos favourite_area = 0;
 	uint32_t fav_dirty_pages = 0;
 	*srcAreaContainsData = true;
-	SummaryEntry tmp[dev->param->data_pages_per_area];
 	SummaryEntry* curr = out_summary;
 
 	//Look for the most dirty block
 	for(AreaPos i = 0; i < dev->param->areas_no; i++){
 		if(dev->areaMap[i].status == AreaStatus::closed && (dev->areaMap[i].type == AreaType::dataarea || dev->areaMap[i].type == AreaType::indexarea)){
-			if(dev->areaMap[i].areaSummary == NULL){
-				Result r = readAreasummary(dev, i, tmp, false);
-				if(r != Result::ok){
-					PAFFS_DBG(PAFFS_TRACE_BUG,"Could not read areaSummary for GC!");
-					lasterr = r;
-					return (AreaPos)0;
-				}
-				curr = tmp;
-			}else{
-				curr = dev->areaMap[i].areaSummary;
-			}
 
-			if(trace_mask & PAFFS_TRACE_VERIFY_AS){
-				for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
-					if(curr[j] > SummaryEntry::dirty)
-						PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", j);
-				}
-			}
-
-			uint32_t dirty_pages = countDirtyPages(dev, curr);
+			uint32_t dirty_pages = countDirtyPages(dev, &dev->areaMap[i]);
 			if (dirty_pages == dev->param->data_pages_per_area){
 				//We can't find a block with more dirty pages in it
 				favourite_area = i;
@@ -183,18 +169,24 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 			}
 
 			//Resurrect area, fill it with the former summary. In end routine, positions will be swapped.
-			//TODO: former summary may be incomplete...
 			dev->areaMap[lastDeletionTarget].type = targetType;
 			initArea(dev, lastDeletionTarget);
-			memcpy(dev->areaMap[lastDeletionTarget].areaSummary, summary, dev->param->data_pages_per_area);
+			r = setSummaryStatus(dev, lastDeletionTarget, summary);
+			if(r != Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not move former Summary to area %d!", lastDeletionTarget);
+				return r;
+			}
 			deletion_target = lastDeletionTarget;
-
 			break;
 		}
 
 		if(trace_mask & PAFFS_TRACE_VERIFY_AS){
 			//Just for debug, in production AS might be invalid and summary may be incomplete
-			if(memcmp(summary, dev->areaMap[deletion_target].areaSummary, dev->param->data_pages_per_area) != 0){
+			SummaryEntry *tmp = getSummaryStatus(dev, deletion_target, &r);
+			if(tmp == NULL || r != Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_VERIFY_AS, "Could not verify AreaSummary of area %d!", deletion_target);
+			}
+			if(memcmp(summary, tmp, dev->param->data_pages_per_area) != 0){
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of findNextBestArea is different to actual areaSummary");
 			}
 		}
@@ -228,7 +220,11 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 				return r;
 			}
 			//Copy the updated (no SummaryEntry::dirty pages) summary to the deletion_target (it will be the fresh area!)
-			memcpy(dev->areaMap[deletion_target].areaSummary, summary, dev->param->data_pages_per_area);
+			r = setSummaryStatus(dev, deletion_target, summary);
+			if(r != Result::ok){
+				PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not remove dirty entries in AS of area %d", deletion_target);
+				return r;
+			}
 			//Notify for used Pages
 			dev->areaMap[deletion_target].status = AreaStatus::active;	//Safe, because we can assume deletion targetType is same Type as we want (from getNextBestArea)
 		}else{

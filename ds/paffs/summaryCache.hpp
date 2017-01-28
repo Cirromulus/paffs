@@ -11,10 +11,21 @@ namespace paffs {
 
 extern SummaryEntry* summaryCache[];
 
-Result setState(Dev* dev, AreaPos area, uint8_t page, SummaryEntry state);
+Result setPageStatus(Dev* dev, AreaPos area, uint8_t page, SummaryEntry state);
 
-SummaryEntry getState(Dev* dev, AreaPos area, uint8_t page, Result *result);
+SummaryEntry getPageStatus(Dev* dev, AreaPos area, uint8_t page, Result *result);
 
-Result flushAreaSummaries(Dev* dev);
+Result setSummaryStatus(Dev* dev, AreaPos area, SummaryEntry* summary);
+
+SummaryEntry* getSummaryStatus(Dev* dev, AreaPos area, Result *result);
+
+Result loadAreaSummaries(Dev* dev);
+
+Result commitAreaSummaries(Dev* dev);
+
+//If Area is retired, it has to be deleted.
+Result removeAreaSummary(Dev* dev, AreaPos area);
+
+
 
 }  // namespace paffs

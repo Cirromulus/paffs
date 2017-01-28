@@ -13,6 +13,8 @@
 
 namespace paffs{
 
+
+//TODO: Move this to SummaryCache
 static Addr rootnode_addr = 0;
 static bool rootnode_dirty = 0;
 
@@ -37,20 +39,22 @@ void printSuperIndex(Dev* dev, superIndex* ind){
 	printf("No:\t\t%d\n", ind->no);
 	printf("Roonode addr.: \t%u:%u\n", extractLogicalArea(ind->rootNode), extractPage(ind->rootNode));
 	printf("areaMap: (first eight entrys)\n");
-	for(int i = 0; i < 8; i ++){
+	AreaPos asOffs = 0;
+	for(AreaPos i = 0; i < 8; i ++){
 		printf("\t%d->%d\n", i, ind->areaMap[i].position);
 		printf("\tType: %s\n", area_names[ind->areaMap[i].type]);
-		if(ind->areaMap[i].has_areaSummary){
+		if(asOffs < 2 && i == ind->asPositions[asOffs]){
 			unsigned int free = 0, used = 0, dirty = 0;
 			for(unsigned int j = 0; j < dev->param->total_pages_per_area; j++){
-				if(ind->areaMap[i].areaSummary[j] == SummaryEntry::free)
+				if(ind->areaSummary[asOffs][j] == SummaryEntry::free)
 					free++;
-				if(ind->areaMap[i].areaSummary[j] == SummaryEntry::used)
+				if(ind->areaSummary[asOffs][j] == SummaryEntry::used)
 					used++;
-				if(ind->areaMap[i].areaSummary[j] == SummaryEntry::dirty)
+				if(ind->areaSummary[asOffs][j] == SummaryEntry::dirty)
 					dirty++;
 			}
 			printf("\tFree/Used/Dirty Pages: %u/%u/%u\n", free, used, dirty);
+			asOffs++;
 		}else{
 			printf("\tSummary not present.\n");
 		}
@@ -80,7 +84,7 @@ Result getAddrOfMostRecentSuperIndex(Dev* dev, Addr *out){
 	return Result::ok;
 }
 
-Result commitSuperIndex(Dev* dev){
+Result commitSuperIndex(Dev* dev, superIndex *newIndex){
 	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(Addr) +
 			dev->param->areas_no * (sizeof(Area) - sizeof(SummaryEntry*)) + // AreaMap without SummaryEntry pointer
 			2 * dev->param->data_pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
@@ -150,17 +154,16 @@ Result commitSuperIndex(Dev* dev){
 			return r;
 	}
 
-	superIndex new_entry = {0};
-	new_entry.no = lastIndex.no+1;
-	new_entry.rootNode = rootnode_addr;
-	new_entry.areaMap = dev->areaMap;
+	newIndex->no = lastIndex.no+1;
+	newIndex->rootNode = rootnode_addr;
+	newIndex->areaMap = dev->areaMap;	//This should already be done in cachefunction
 
 	if(trace_mask & PAFFS_TRACE_SUPERBLOCK){
 		printf("write Super Index:\n");
-		printSuperIndex(dev, &new_entry);
+		printSuperIndex(dev, newIndex);
 	}
 
-	r = writeSuperIndex(dev, target, &new_entry);
+	r = writeSuperPageIndex(dev, target, newIndex);
 	if(r != Result::ok)
 		return r;
 
@@ -178,7 +181,7 @@ Result commitSuperIndex(Dev* dev){
 	return Result::ok;
 }
 
-Result readSuperIndex(Dev* dev){
+Result readSuperIndex(Dev* dev, superIndex* index){
 	Addr addr;
 	Result r = getAddrOfMostRecentSuperIndex(dev, &addr);
 	if(r != Result::ok)
@@ -186,10 +189,7 @@ Result readSuperIndex(Dev* dev){
 
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found Super Index at %u:%u\n", extractLogicalArea(addr), extractPage(addr));
 
-	superIndex index = {0};
-	index.areaMap = dev->areaMap;
-
-	r = readSuperPageIndex(dev, addr, &index, true);
+	r = readSuperPageIndex(dev, addr, index, true);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read Super Index!");
 		return r;
@@ -197,10 +197,10 @@ Result readSuperIndex(Dev* dev){
 
 	if(trace_mask & PAFFS_TRACE_SUPERBLOCK){
 		printf("Read Super Index:\n");
-		printSuperIndex(dev, &index);
+		printSuperIndex(dev, index);
 	}
 
-	rootnode_addr = index.rootNode;
+	rootnode_addr = index->rootNode;
 	rootnode_dirty = false;
 	return Result::ok;
 }
@@ -290,8 +290,8 @@ Result readJumpPadEntry(Dev* dev, Addr addr, JumpPadEntry* entry){
 }
 
 
-//Make sure that free space is sufficient!
-Result writeSuperIndex(Dev* dev, Addr addr, superIndex* entry){
+//todo: Make sure that free space is sufficient!
+Result writeSuperPageIndex(Dev* dev, Addr addr, superIndex* entry){
 	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::superblockarea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
 		return Result::bug;
@@ -310,30 +310,25 @@ Result writeSuperIndex(Dev* dev, Addr addr, superIndex* entry){
 	pointer += sizeof(uint32_t);
 	memcpy(&buf[pointer], &entry->rootNode, sizeof(Addr));
 	pointer += sizeof(Addr);
-	long areaSummaryPositions[2];
-	areaSummaryPositions[0] = -1;
-	areaSummaryPositions[1] = -1;
 	unsigned char pospos = 0;	//Stupid name
 
 	for(unsigned int i = 0; i < dev->param->areas_no; i++){
 		if((entry->areaMap[i].type == AreaType::indexarea || entry->areaMap[i].type == AreaType::dataarea) && entry->areaMap[i].status == AreaStatus::active){
-			areaSummaryPositions[pospos++] = i;
-			entry->areaMap[i].has_areaSummary = true;
-		}else{
-			entry->areaMap[i].has_areaSummary = false;
+			entry->asPositions[pospos++] = i;
 		}
 
 		memcpy(&buf[pointer], &entry->areaMap[i], sizeof(Area) - sizeof(SummaryEntry*));
-		((Area*)&buf[pointer])->areaSummary = 0;		//Pointer to old memory should be invalid
-		//TODO: Optimize bitusage, currently wasting 1,25 Bytes per Entry
+		((Area*)&buf[pointer])->getPageStatus = 0;
+		((Area*)&buf[pointer])->setPageStatus = 0;
+		//TODO: Optimize bitusage, currently wasting many Bytes per Entry
 		pointer += sizeof(Area) - sizeof(SummaryEntry*);
 	}
 
 	for(unsigned int i = 0; i < 2; i++){
-		if(areaSummaryPositions[i] < 0)
+		if(entry->asPositions[i] <= 0)
 			continue;
 		for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
-			if(entry->areaMap[areaSummaryPositions[i]].areaSummary[j] != SummaryEntry::dirty)
+			if(entry->areaSummary[i][j] != SummaryEntry::dirty)
 				buf[pointer + j/8] |= 1 << j%8;
 		}
 		pointer += dev->param->data_pages_per_area / 8;
@@ -392,33 +387,25 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, bool withAreaM
 	pointer += sizeof(uint32_t);
 	memcpy(&entry->rootNode, &buf[pointer], sizeof(Addr));
 	pointer += sizeof(Addr);
-	long areaSummaryPositions[2];
-	areaSummaryPositions[0] = -1;
-	areaSummaryPositions[1] = -1;
+	entry->asPositions[0] = 0;
+	entry->asPositions[1] = 0;
 	unsigned char pospos = 0;	//Stupid name
 	for(unsigned int i = 0; i < dev->param->areas_no; i++){
 		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(Area) - sizeof(SummaryEntry*));
 		pointer += sizeof(Area) - sizeof(SummaryEntry*);
-		entry->areaMap[i].areaSummary = 0;		//Do not take invalid pointer from old state with us
-		if(entry->areaMap[i].has_areaSummary)
-			areaSummaryPositions[pospos++] = i;
+		if(entry->areaMap[i].status == AreaStatus::active)
+			entry->asPositions[pospos++] = i;
 	}
 
 	unsigned char pagebuf[BYTES_PER_PAGE];
 	for(unsigned int i = 0; i < 2; i++){
-		if(areaSummaryPositions[i] < 0)
+		if(entry->asPositions[i] <= 0)
 			continue;
-		if(entry->areaMap[areaSummaryPositions[i]].areaSummary == 0){
-			entry->areaMap[areaSummaryPositions[i]].areaSummary = (SummaryEntry*) malloc(
-					sizeof(SummaryEntry)
-					* dev->param->blocks_per_area
-					* dev->param->pages_per_block);
-		}
 
 		for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
 			if(buf[pointer + j/8] & 1 << j%8){
 				//TODO: Normally, we would check in the OOB for a Checksum or so, which is present all the time
-				Addr tmp = combineAddress(areaSummaryPositions[i], j);
+				Addr tmp = combineAddress(entry->asPositions[i], j);
 				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dev->param->data_bytes_per_page);
 				if(r != Result::ok)
 					return r;
@@ -430,11 +417,11 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, bool withAreaM
 					}
 				}
 				if(contains_data)
-					entry->areaMap[areaSummaryPositions[i]].areaSummary[j] = SummaryEntry::used;
+					entry->areaSummary[i][j] = SummaryEntry::used;
 				else
-					entry->areaMap[areaSummaryPositions[i]].areaSummary[j] = SummaryEntry::free;
+					entry->areaSummary[i][j] = SummaryEntry::free;
 			}else{
-				entry->areaMap[areaSummaryPositions[i]].areaSummary[j] = SummaryEntry::dirty;
+				entry->areaSummary[i][j] = SummaryEntry::dirty;
 			}
 		}
 		pointer += dev->param->data_pages_per_area / 8;
