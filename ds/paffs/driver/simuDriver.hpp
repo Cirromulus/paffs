@@ -7,9 +7,9 @@
 
 #pragma once
 
+#include "../../../simu/flashCell.h"
 #include <stddef.h>
 #include "driver.hpp"
-#include "../../../simu/flashCell.h"
 
 namespace paffs{
 

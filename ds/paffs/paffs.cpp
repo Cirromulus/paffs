@@ -192,7 +192,7 @@ Result Paffs::format(const char* devicename){
 		return r;
 
 	Inode rootDir = {0};
-	r = createDirInode(&rootDir, PAFFS_R | PAFFS_W | PAFFS_X);
+	r = createDirInode(&rootDir, R | W | X);
 	if(r != Result::ok){
 		destroyDevice(devicename);
 		return r;
@@ -275,9 +275,9 @@ Result Paffs::createInode(Inode* outInode, Permission mask){
 	if(r != Result::ok)
 		return r;
 
-	outInode->perm = (mask & PAFFS_PERM_MASK);
-	if(mask & PAFFS_W)
-		outInode->perm |= PAFFS_R;
+	outInode->perm = (mask & PERM_MASK);
+	if(mask & W)
+		outInode->perm |= R;
 	outInode->size = 0;
 	outInode->reservedSize = 0;
 	outInode->crea = time(0);
@@ -699,7 +699,7 @@ Dirent* Paffs::readDir(Dir* dir){
 	   lasterr = Result::bug;
 	   return NULL;
 	}
-	if((item.perm & PAFFS_R) == 0){
+	if((item.perm & R) == 0){
 		lasterr = Result::noperm;
 		return NULL;
 	}
@@ -742,7 +742,7 @@ Obj* Paffs::open(const char* path, Fileopenmask mask){
 	Result r = getInodeOfElem(&file, path);
 	if(r == Result::nf){
 		//create new file
-		if(mask & PAFFS_FC){
+		if(mask & FC){
 			r = createFile(&file, path, mask);
 			if(r != Result::ok){
 				lasterr = r;
@@ -769,7 +769,7 @@ Obj* Paffs::open(const char* path, Fileopenmask mask){
 		return NULL;
 	}
 
-	if((file.perm & (mask & PAFFS_PERM_MASK)) != (mask & PAFFS_PERM_MASK)){
+	if((file.perm & (mask & PERM_MASK)) != (mask & PERM_MASK)){
 		lasterr = Result::noperm;
 		return NULL;
 	}
@@ -783,13 +783,13 @@ Obj* Paffs::open(const char* path, Fileopenmask mask){
 
 	memcpy((void*)obj->dentry->name, path, strlen(path));
 
-	if(mask & PAFFS_FA){
+	if(mask & FA){
 		obj->fp = file.size;
 	}else{
 		obj->fp = 0;
 	}
 
-	obj->rdnly = ! (mask & PAFFS_FW);
+	obj->rdnly = ! (mask & FW);
 
 	return obj;
 }
@@ -811,7 +811,7 @@ Result Paffs::touch(const char* path){
 	Result r = getInodeOfElem(&file, path);
 	if(r == Result::nf){
 		//create new file
-		Result r2 = createFile(&file, path, PAFFS_R | PAFFS_W);
+		Result r2 = createFile(&file, path, R | W);
 		if(r2 != Result::ok){
 			return r2;
 		}
@@ -850,7 +850,7 @@ Result Paffs::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned int
 	if(obj->dentry->iNode->type == InodeType::lnk){
 		return lasterr = Result::nimpl;
 	}
-	if((obj->dentry->iNode->perm & PAFFS_R) == 0)
+	if((obj->dentry->iNode->perm & R) == 0)
 		return Result::noperm;
 
 	if(obj->dentry->iNode->size == 0){
@@ -878,7 +878,7 @@ Result Paffs::write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsi
 	if(obj->dentry->iNode->type == InodeType::lnk){
 		return Result::nimpl;
 	}
-	if((obj->dentry->iNode->perm & PAFFS_W) == 0)
+	if((obj->dentry->iNode->perm & W) == 0)
 		return Result::noperm;
 
 	Result r = writeInodeData(obj->dentry->iNode, obj->fp, bytes_to_write, bytes_written, buf, &device);
@@ -937,7 +937,7 @@ Result Paffs::remove(const char* path){
 	if((r = getInodeOfElem(&object, path)) != Result::ok)
 		return r;
 
-	if(!(object.perm & PAFFS_W))
+	if(!(object.perm & W))
 		return Result::noperm;
 
 	if(object.type == InodeType::dir)

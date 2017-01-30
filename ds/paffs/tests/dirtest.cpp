@@ -31,13 +31,13 @@ void listDir(const char* path){
 	while((dir = fs->readDir(rewt)) != NULL){
 		printf("\tFound ");
 		switch(dir->node->type){
-		case InodeType::file:
+		case (int) InodeType::file:
 			printf("file: ");
 			break;
-		case InodeType::dir:
+		case (int) InodeType::dir:
 			printf("dir : ");
 			break;
-		case InodeType::lnk:	//FIXME: Warning, -2 ??
+		case (int) InodeType::lnk:	//FIXME: Warning, -2 ??
 			printf("link: ");
 			break;
 		default:
@@ -64,11 +64,11 @@ void printInfo(ObjInfo* obj){
 	rawtime = obj->modified;
 	strftime(buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&rawtime));
 	printf("\t modified: %s\n", buff);
-	printf("\t Permission rwx: %d%d%d\n", (obj->perm & PAFFS_R) != 0, (obj->perm & PAFFS_W) != 0, (obj->perm & PAFFS_X) != 0);
+	printf("\t Permission rwx: %d%d%d\n", (obj->perm & R) != 0, (obj->perm & W) != 0, (obj->perm & X) != 0);
 }
 
 void printFile(unsigned int offs, unsigned int bytes, const char* path){
-	Obj *fil = fs->open(path, PAFFS_FR);
+	Obj *fil = fs->open(path, FR);
 
 	unsigned int bytesread = 0;
 	char* out = (char*) malloc (bytes + 1);
@@ -115,7 +115,7 @@ int main(int argc, char** argv){
 	if(r != Result::ok)
 		return -1;
 	print_tree(fs->getDevice());
-	Permission p = PAFFS_R | PAFFS_W;
+	Permission p = R | W;
 	printf("Creating directory /a... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
@@ -152,7 +152,7 @@ int main(int argc, char** argv){
 	printf("opening file /b/file ...");
 	fflush(stdout);
 
-	Obj *fil = fs->open("/b/file", PAFFS_FW);
+	Obj *fil = fs->open("/b/file", FW);
 
 	printf("%s\n", err_msg(fs->getLastErr()));
 	if(fil == NULL)
@@ -327,7 +327,7 @@ int main(int argc, char** argv){
 //	while(getchar() == EOF);
 	printf("Changing permissions of /b/file to rwx... ");
 	fflush(stdout);
-	r = fs->chmod("/b/file", PAFFS_R | PAFFS_W | PAFFS_X);
+	r = fs->chmod("/b/file", R | W | X);
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok){
 		return -1;

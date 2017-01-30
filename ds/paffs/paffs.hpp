@@ -39,20 +39,20 @@ extern const char* resultMsg[];		//Initialized in paffs.cpp
 extern Result lasterr;
 const char* err_msg(Result pr);
 
-typedef char Permission;
+typedef uint8_t Permission;
 
-static const Permission PAFFS_R = 0x1;
-static const Permission PAFFS_W = 0x2;
-static const Permission PAFFS_X = 0x4;
-static const Permission PAFFS_PERM_MASK = 0b111;
+static const Permission R = 0x1;
+static const Permission W = 0x2;
+static const Permission X = 0x4;
+static const Permission PERM_MASK = 0b111;
 
 typedef char Fileopenmask;
-static const Fileopenmask PAFFS_FR = 0x01;	//file read
-static const Fileopenmask PAFFS_FW = 0x02;	//file write
-static const Fileopenmask PAFFS_FEX= 0x04;	//file execute
-static const Fileopenmask PAFFS_FA = 0x08;	//file append
-static const Fileopenmask PAFFS_FE = 0x10;	//file open only existing
-static const Fileopenmask PAFFS_FC = 0x20;	//file create
+static const Fileopenmask FR = 0x01;	//file read
+static const Fileopenmask FW = 0x02;	//file write
+static const Fileopenmask FEX= 0x04;	//file execute
+static const Fileopenmask FA = 0x08;	//file append
+static const Fileopenmask FE = 0x10;	//file open only existing
+static const Fileopenmask FC = 0x20;	//file create
 
 enum class Seekmode{
 	set = 0,
@@ -84,7 +84,7 @@ typedef uint32_t InodeNo;		  //~ 4 Million files
 typedef uint16_t DirEntryCount; //65,535 Entries per Directory
 typedef uint8_t  DirEntryLength; //255 characters per Directory entry
 
-enum class InodeType{
+enum class InodeType : uint8_t{
     file,
     dir,
     lnk
