@@ -18,10 +18,10 @@
 #include <stdlib.h>
 
 
-//Dentrys zur schnelleren verfügung
-/*#define DENTRY_BUFSIZE 10
-static Dentry* dentry_buf[DENTRY_BUFSIZE];
-static unsigned char dentrys_buf_used = 0;
+//Dirents zur schnelleren verfügung
+/*#define Dirent_BUFSIZE 10
+static Dirent* Dirent_buf[Dirent_BUFSIZE];
+static unsigned char Dirents_buf_used = 0;
 */
 
 namespace paffs{
@@ -124,10 +124,10 @@ Result Paffs::initializeDevice(const char* devicename){
 	device.areaMap = new Area[param->areas_no];
 	memset(device.areaMap, 0, sizeof(Area) * param->areas_no);
 
-	device.activeArea[AreaType::superblockarea] = 0;
-	device.activeArea[AreaType::indexarea] = 0;
-	device.activeArea[AreaType::journalarea] = 0;
-	device.activeArea[AreaType::dataarea] = 0;
+	device.activeArea[AreaType::superblock] = 0;
+	device.activeArea[AreaType::index] = 0;
+	device.activeArea[AreaType::journal] = 0;
+	device.activeArea[AreaType::data] = 0;
 
 	if(param->blocks_per_area < 2){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device too small, at least 12 Blocks are needed!");
@@ -160,26 +160,26 @@ Result Paffs::format(const char* devicename){
 		device.areaMap[area].erasecount = 0;
 		device.areaMap[area].position = area;
 
-		if(!(had_areaType & 1 << AreaType::superblockarea)){
-			device.activeArea[AreaType::superblockarea] = area;
-			device.areaMap[area].type = AreaType::superblockarea;
+		if(!(had_areaType & 1 << AreaType::superblock)){
+			device.activeArea[AreaType::superblock] = area;
+			device.areaMap[area].type = AreaType::superblock;
 			initArea(&device, area);
-			had_areaType |= 1 << AreaType::superblockarea;
+			had_areaType |= 1 << AreaType::superblock;
 			continue;
 		}
-		if(!(had_areaType & 1 << AreaType::journalarea)){
-			device.activeArea[AreaType::journalarea] = area;
-			device.areaMap[area].type = AreaType::journalarea;
+		if(!(had_areaType & 1 << AreaType::journal)){
+			device.activeArea[AreaType::journal] = area;
+			device.areaMap[area].type = AreaType::journal;
 			initArea(&device, area);
-			had_areaType |= 1 << AreaType::journalarea;
+			had_areaType |= 1 << AreaType::journal;
 			continue;
 		}
 
-		if(!(had_areaType & 1 << AreaType::garbage_buffer)){
-			device.activeArea[AreaType::garbage_buffer] = area;
-			device.areaMap[area].type = AreaType::garbage_buffer;
+		if(!(had_areaType & 1 << AreaType::garbageBuffer)){
+			device.activeArea[AreaType::garbageBuffer] = area;
+			device.areaMap[area].type = AreaType::garbageBuffer;
 			initArea(&device, area);
-			had_areaType |= 1 << AreaType::garbage_buffer;
+			had_areaType |= 1 << AreaType::garbageBuffer;
 			continue;
 		}
 
@@ -329,6 +329,7 @@ Result Paffs::getParentDir(const char* fullPath, Inode* parDir, unsigned int *la
 		p++;
 	}
 
+
 	char* pathC = (char*) malloc(*lastSlash+1);
 	memcpy(pathC, fullPath, *lastSlash);
 	pathC[*lastSlash] = 0;
@@ -428,7 +429,7 @@ Result Paffs::getInodeOfElem(Inode* outInode, const char* fullPath){
 			return r;
 		}
 		curr = outInode;
-		//todo: Dentry cachen
+		//todo: Dirent cachen
 		fnP = strtok(NULL, delimiter);
 	}
 
@@ -594,43 +595,43 @@ Dir* Paffs::openDir(const char* path){
 	}
 
 	Dir* dir = (Dir*) malloc(sizeof(Dir));
-	dir->dentry = (Dentry*) malloc(sizeof(Dentry));
-	dir->dentry->name = (char*) "not_impl.";
-	dir->dentry->iNode = (Inode*) malloc(sizeof(Inode));
-	*dir->dentry->iNode = dirPinode;
-	dir->dentry->parent = NULL;
+	dir->self = (Dirent*) malloc(sizeof(Dirent));
+	dir->self->name = (char*) "not_impl.";
+	dir->self->node = (Inode*) malloc(sizeof(Inode));
+	*dir->self->node = dirPinode;
+	dir->self->parent = NULL;
 	dir->no_entrys = dirData[0];
-	dir->dirents = (Dirent**) malloc(dir->no_entrys * sizeof(Dirent*));
+	dir->childs = (Dirent**) malloc(dir->no_entrys * sizeof(Dirent*));
 	dir->pos = 0;
 
 	unsigned int p = sizeof(DirEntryCount);
 	unsigned int entry;
 	for(entry = 0; p < dirPinode.size; entry++){
 
-		dir->dirents[entry] = (Dirent*) malloc (sizeof(Dirent));
-		memset(dir->dirents[entry], 0, sizeof(Dirent));
+		dir->childs[entry] = (Dirent*) malloc (sizeof(Dirent));
+		memset(dir->childs[entry], 0, sizeof(Dirent));
 		DirEntryLength direntryl = dirData[p];
 		unsigned int dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
 		if(dirnamel > 1 << sizeof(DirEntryLength) * 8){
 			//We have an error while reading
 			PAFFS_DBG(PAFFS_TRACE_BUG, "Dirname length was bigger than possible (%u)!", dirnamel);
 			for(unsigned int i = 0; i <= entry; i++)
-				free(dir->dirents[i]);
-			free(dir->dirents);
+				free(dir->childs[i]);
+			free(dir->childs);
 			free(dirData);
-			free(dir->dentry);
-			free(dir->dentry->iNode);
+			free(dir->self);
+			free(dir->self->node);
 			free(dir);
 			lasterr = Result::bug;
 			return NULL;
 		}
 		p += sizeof(DirEntryLength);
-		memcpy(&dir->dirents[entry]->node_no, &dirData[p], sizeof(InodeNo));
-		dir->dirents[entry]->node = NULL;
+		memcpy(&dir->childs[entry]->node->no, &dirData[p], sizeof(InodeNo));
+		dir->childs[entry]->node = NULL;
 		p += sizeof(InodeNo);
-		dir->dirents[entry]->name = (char*) malloc(dirnamel+2);    //+2 weil 1. Nullbyte und 2. Vielleicht ein Zeichen '/' dazukommt
-		memcpy(dir->dirents[entry]->name, &dirData[p], dirnamel);
-		dir->dirents[entry]->name[dirnamel] = 0;
+		dir->childs[entry]->name = (char*) malloc(dirnamel+2);    //+2 weil 1. Nullbyte und 2. Vielleicht ein Zeichen '/' dazukommt
+		memcpy(dir->childs[entry]->name, &dirData[p], dirnamel);
+		dir->childs[entry]->name[dirnamel] = 0;
 		p += dirnamel;
 	}
 
@@ -646,17 +647,17 @@ Dir* Paffs::openDir(const char* path){
 }
 
 Result Paffs::closeDir(Dir* dir){
-	if(dir->dirents == NULL)
+	if(dir->childs == NULL)
 		return Result::einval;
 	for(int i = 0; i < dir->no_entrys; i++){
-		free(dir->dirents[i]->name);
-		if(dir->dirents[i]->node != NULL)
-			free(dir->dirents[i]->node);
-		free(dir->dirents[i]);
+		free(dir->childs[i]->name);
+		if(dir->childs[i]->node != NULL)
+			free(dir->childs[i]->node);
+		free(dir->childs[i]);
 	}
-	free(dir->dirents);
-	free(dir->dentry->iNode);
-	free(dir->dentry);
+	free(dir->childs);
+	free(dir->self->node);
+	free(dir->self);
 	free(dir);
 	return Result::ok;
 }
@@ -672,7 +673,7 @@ Dirent* Paffs::readDir(Dir* dir){
 		return NULL;
 	}
 
-	if(dir->dirents == NULL){
+	if(dir->childs == NULL){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ DIR on dir with NULL dirents");
 		lasterr = Result::bug;
 		return NULL;
@@ -684,17 +685,17 @@ Dirent* Paffs::readDir(Dir* dir){
 		return NULL;
 	}
 
-	if(dir->dirents[dir->pos] == NULL){
+	if(dir->childs[dir->pos] == NULL){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ DIR on dir with NULL Dirent no. %d", dir->pos);
 		lasterr = Result::bug;
 		return NULL;
 	}
 
-	if(dir->dirents[dir->pos]->node != NULL){
-		return dir->dirents[dir->pos++];
+	if(dir->childs[dir->pos]->node != NULL){
+		return dir->childs[dir->pos++];
 	}
 	Inode item;
-	Result r = getInode(&device, dir->dirents[dir->pos]->node_no, &item);
+	Result r = getInode(&device, dir->childs[dir->pos]->node->no, &item);
 	if(r != Result::ok){
 	   lasterr = Result::bug;
 	   return NULL;
@@ -705,14 +706,14 @@ Dirent* Paffs::readDir(Dir* dir){
 	}
 
 
-	dir->dirents[dir->pos]->node = (Inode*) malloc(sizeof(Inode));
-	*dir->dirents[dir->pos]->node = item;
-	if(dir->dirents[dir->pos]->node->type == InodeType::dir){
-		int namel = strlen(dir->dirents[dir->pos]->name);
-		dir->dirents[dir->pos]->name[namel] = '/';
-		dir->dirents[dir->pos]->name[namel+1] = 0;
+	dir->childs[dir->pos]->node = (Inode*) malloc(sizeof(Inode));
+	*dir->childs[dir->pos]->node = item;
+	if(dir->childs[dir->pos]->node->type == InodeType::dir){
+		int namel = strlen(dir->childs[dir->pos]->name);
+		dir->childs[dir->pos]->name[namel] = '/';
+		dir->childs[dir->pos]->name[namel+1] = 0;
 	}
-	return dir->dirents[dir->pos++];
+	return dir->childs[dir->pos++];
 }
 
 void Paffs::rewindDir(Dir* dir){
@@ -775,13 +776,13 @@ Obj* Paffs::open(const char* path, Fileopenmask mask){
 	}
 
 	Obj* obj = (Obj*) malloc(sizeof(Obj));
-	obj->dentry = (Dentry*) malloc(sizeof(Dentry));
-	obj->dentry->name = (char*) malloc(strlen(path));
-	obj->dentry->iNode = (Inode*) malloc(sizeof(Inode));
-	*obj->dentry->iNode = file;
-	obj->dentry->parent = NULL;		//TODO: Sollte aus cache gesucht werden, erstellt in "getInodeOfElem(path))" ?
+	obj->dirent = (Dirent*) malloc(sizeof(Dirent));
+	obj->dirent->name = (char*) malloc(strlen(path));
+	obj->dirent->node = (Inode*) malloc(sizeof(Inode));
+	*obj->dirent->node = file;
+	obj->dirent->parent = NULL;		//TODO: Sollte aus cache gesucht werden, erstellt in "getInodeOfElem(path))" ?
 
-	memcpy((void*)obj->dentry->name, path, strlen(path));
+	memcpy((void*)obj->dirent->name, path, strlen(path));
 
 	if(mask & FA){
 		obj->fp = file.size;
@@ -798,9 +799,9 @@ Result Paffs::close(Obj* obj){
 	if(obj == NULL)
 		return Result::einval;
 	flush(obj);
-	free(obj->dentry->iNode);
-	free((void*)obj->dentry->name);
-	free(obj->dentry);
+	free(obj->dirent->node);
+	free((void*)obj->dirent->name);
+	free(obj->dirent);
 	free(obj);
 
 	return Result::ok;
@@ -844,21 +845,21 @@ Result Paffs::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned int
 	if(obj == NULL)
 		return lasterr = Result::einval;
 
-	if(obj->dentry->iNode->type == InodeType::dir){
+	if(obj->dirent->node->type == InodeType::dir){
 		return lasterr = Result::einval;
 	}
-	if(obj->dentry->iNode->type == InodeType::lnk){
+	if(obj->dirent->node->type == InodeType::lnk){
 		return lasterr = Result::nimpl;
 	}
-	if((obj->dentry->iNode->perm & R) == 0)
+	if((obj->dirent->node->perm & R) == 0)
 		return Result::noperm;
 
-	if(obj->dentry->iNode->size == 0){
+	if(obj->dirent->node->size == 0){
 		*bytes_read = 0;
 		return Result::ok;
 	}
 
-	Result r = readInodeData(obj->dentry->iNode, obj->fp, bytes_to_read, bytes_read, buf, &device);
+	Result r = readInodeData(obj->dirent->node, obj->fp, bytes_to_read, bytes_read, buf, &device);
 	if(r != Result::ok){
 		return r;
 	}
@@ -872,31 +873,31 @@ Result Paffs::write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsi
 	if(obj == NULL)
 		return Result::einval;
 
-	if(obj->dentry->iNode->type == InodeType::dir){
+	if(obj->dirent->node->type == InodeType::dir){
 		return Result::einval;
 	}
-	if(obj->dentry->iNode->type == InodeType::lnk){
+	if(obj->dirent->node->type == InodeType::lnk){
 		return Result::nimpl;
 	}
-	if((obj->dentry->iNode->perm & W) == 0)
+	if((obj->dirent->node->perm & W) == 0)
 		return Result::noperm;
 
-	Result r = writeInodeData(obj->dentry->iNode, obj->fp, bytes_to_write, bytes_written, buf, &device);
+	Result r = writeInodeData(obj->dirent->node, obj->fp, bytes_to_write, bytes_written, buf, &device);
 	if(r != Result::ok){
 		return r;
 	}
 
-	obj->dentry->iNode->mod = time(0);
+	obj->dirent->node->mod = time(0);
 
 	obj->fp += *bytes_written;
-	if(obj->fp > obj->dentry->iNode->size){
+	if(obj->fp > obj->dirent->node->size){
 		//size was increased
-		if(obj->dentry->iNode->reservedSize < obj->fp){
+		if(obj->dirent->node->reservedSize < obj->fp){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "Reserved size is smaller than actual size?!");
 			return Result::bug;
 		}
 	}
-	return updateExistingInode(&device, obj->dentry->iNode);
+	return updateExistingInode(&device, obj->dirent->node);
 }
 
 Result Paffs::seek(Obj* obj, int m, Seekmode mode){
@@ -907,7 +908,7 @@ Result Paffs::seek(Obj* obj, int m, Seekmode mode){
 		obj->fp = m;
 		break;
 	case Seekmode::end :
-		obj->fp = obj->dentry->iNode->size + m;
+		obj->fp = obj->dirent->node->size + m;
 		break;
 	case Seekmode::cur :
 		obj->fp += m;

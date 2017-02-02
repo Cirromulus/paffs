@@ -104,34 +104,29 @@ struct Inode{
 	Addr t_indir;
 };
 
-
-struct Dentry{
-	char* name;		//is actually full path
-	Inode* iNode;
-	Dentry* parent;
-};
-
-struct Obj{
-	bool rdnly;
-	Dentry* dentry;
-	unsigned int fp;	//Current filepointer
-};
-
+//could be later used for caching file paths
 struct Dirent{
-	InodeNo node_no;
 	Inode* node;
+	Dirent* parent;
 	char* name;
 };
 
+//An object can be a file, directory or link
+struct Obj{
+	bool rdnly;
+	Dirent* dirent;
+	unsigned int fp;	//Current filepointer
+};
+
 struct Dir{
-	Dentry* dentry;
-	Dirent** dirents;
+	Dirent* self;
+	Dirent** childs;
 	DirEntryCount no_entrys;
-	unsigned int pos;
+	DirEntryCount pos;
 };
 
 struct ObjInfo{
-	unsigned int size;
+	FileSize size;
 	Date created;
 	Date modified;
 	bool isDir;
@@ -140,11 +135,11 @@ struct ObjInfo{
 
 enum AreaType : uint8_t{
 	unset = 0,
-	superblockarea,
-	indexarea,
-	journalarea,
-	dataarea,
-	garbage_buffer,
+	superblock,
+	index,
+	journal,
+	data,
+	garbageBuffer,
 	retired,
 	no
 };
@@ -174,7 +169,6 @@ struct Area{
 struct Dev{
 	Param* param;
 	AreaPos activeArea[AreaType::no];
-	Obj rootDir;
 	Area* areaMap;
 	Driver *driver;
 };
@@ -215,7 +209,7 @@ public:
 	Result write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written);
 	Result seek(Obj* obj, int m, Seekmode mode);
 	Result flush(Obj* obj);
-	Result truncate(Obj* obj);
+	Result truncate(Dirent* obj);
 
 	Result chmod(const char* path, Permission perm);
 	Result remove(const char* path);

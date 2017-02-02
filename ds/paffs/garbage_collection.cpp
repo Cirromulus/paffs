@@ -38,7 +38,7 @@ AreaPos findNextBestArea(Dev* dev, AreaType target, SummaryEntry* out_summary, b
 
 	//Look for the most dirty block
 	for(AreaPos i = 0; i < dev->param->areas_no; i++){
-		if(dev->areaMap[i].status == AreaStatus::closed && (dev->areaMap[i].type == AreaType::dataarea || dev->areaMap[i].type == AreaType::indexarea)){
+		if(dev->areaMap[i].status == AreaStatus::closed && (dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)){
 
 			uint32_t dirty_pages = countDirtyPages(dev, &dev->areaMap[i]);
 			if (dirty_pages == dev->param->data_pages_per_area){
@@ -117,7 +117,7 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 	SummaryEntry summary[dev->param->data_pages_per_area];
 	memset(summary, 0, dev->param->data_pages_per_area);
 	bool srcAreaContainsData = false;
-	bool desperateMode = dev->activeArea[AreaType::garbage_buffer] == 0;	//If we have no AreaType::garbage_buffer left
+	bool desperateMode = dev->activeArea[AreaType::garbageBuffer] == 0;	//If we have no AreaType::garbage_buffer left
 	AreaPos deletion_target = 0;
 	Result r;
 
@@ -160,11 +160,11 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 			if(lastDeletionTarget == 0){
 				//this is first round, no possible chunks found.
 				//Just init and return garbageBuffer.
-				dev->areaMap[dev->activeArea[AreaType::garbage_buffer]].type = targetType;
-				initArea(dev, dev->activeArea[AreaType::garbage_buffer]);
-				dev->activeArea[targetType] = dev->activeArea[AreaType::garbage_buffer];
+				dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].type = targetType;
+				initArea(dev, dev->activeArea[AreaType::garbageBuffer]);
+				dev->activeArea[targetType] = dev->activeArea[AreaType::garbageBuffer];
 
-				dev->activeArea[AreaType::garbage_buffer] = 0;	//No GC_BUFFER left
+				dev->activeArea[AreaType::garbageBuffer] = 0;	//No GC_BUFFER left
 				return Result::ok;
 			}
 
@@ -211,10 +211,10 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 			//still some valid data, copy to new area
 			PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "GC found just partially clean area %u on pos %u", deletion_target, dev->areaMap[deletion_target].position);
 
-			r = moveValidDataToNewArea(dev, deletion_target, dev->activeArea[AreaType::garbage_buffer], summary);
+			r = moveValidDataToNewArea(dev, deletion_target, dev->activeArea[AreaType::garbageBuffer], summary);
 			//while(getchar() == EOF);
 			if(r != Result::ok){
-				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not copy valid pages from area %u to %u!", deletion_target, dev->activeArea[AreaType::garbage_buffer]);
+				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not copy valid pages from area %u to %u!", deletion_target, dev->activeArea[AreaType::garbageBuffer]);
 				//TODO: Handle something, maybe put area in ReadOnly or copy somewhere else..
 				//TODO: Maybe copy rest of Pages before quitting
 				return r;
@@ -259,17 +259,17 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 
 	//swap logical position of areas to keep addresses valid
 	AreaPos tmp = dev->areaMap[deletion_target].position;
-	dev->areaMap[deletion_target].position = dev->areaMap[dev->activeArea[AreaType::garbage_buffer]].position;
-	dev->areaMap[dev->activeArea[AreaType::garbage_buffer]].position = tmp;
+	dev->areaMap[deletion_target].position = dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].position;
+	dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].position = tmp;
 	//swap erasecounts to let them point to the physical position
 	uint32_t tmp2 = dev->areaMap[deletion_target].erasecount;
-	dev->areaMap[deletion_target].erasecount = dev->areaMap[dev->activeArea[AreaType::garbage_buffer]].erasecount;
-	dev->areaMap[dev->activeArea[AreaType::garbage_buffer]].erasecount = tmp2;
+	dev->areaMap[deletion_target].erasecount = dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].erasecount;
+	dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].erasecount = tmp2;
 
 	if(desperateMode){
 		//now former retired section became garbage buffer, retire it officially.
-		retireArea(dev, dev->activeArea[AreaType::garbage_buffer]);
-		dev->activeArea[AreaType::garbage_buffer] = 0;
+		retireArea(dev, dev->activeArea[AreaType::garbageBuffer]);
+		dev->activeArea[AreaType::garbageBuffer] = 0;
 		if(trace_mask && (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
 			printf("Info: \n");
 			for(unsigned int i = 0; i < dev->param->areas_no; i++){
@@ -280,7 +280,7 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 
 	dev->activeArea[targetType] = deletion_target;
 
-	PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "Garbagecollection erased pos %u and gave area %u pos %u.", dev->areaMap[dev->activeArea[AreaType::garbage_buffer]].position, dev->activeArea[targetType], dev->areaMap[dev->activeArea[targetType]].position);
+	PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "Garbagecollection erased pos %u and gave area %u pos %u.", dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].position, dev->activeArea[targetType], dev->areaMap[dev->activeArea[targetType]].position);
 
 	return Result::ok;
 }

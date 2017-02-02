@@ -41,25 +41,25 @@ Result writeInodeData(Inode* inode,
 
 	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
 		bool misaligned = false;
-		dev->activeArea[AreaType::dataarea] = findWritableArea(AreaType::dataarea, dev);
+		dev->activeArea[AreaType::data] = findWritableArea(AreaType::data, dev);
 		if(lasterr != Result::ok){
 			return lasterr;
 		}
 
 		//Handle Areas
-		if(dev->areaMap[dev->activeArea[AreaType::dataarea]].status == AreaStatus::empty){
+		if(dev->areaMap[dev->activeArea[AreaType::data]].status == AreaStatus::empty){
 			//We'll have to use a fresh area,
 			//so generate the areaSummary in Memory
-			initArea(dev, dev->activeArea[AreaType::dataarea]);
+			initArea(dev, dev->activeArea[AreaType::data]);
 		}
 		unsigned int firstFreePage = 0;
-		if(findFirstFreePage(&firstFreePage, dev, dev->activeArea[AreaType::dataarea]) == Result::nosp){
-			PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::dataarea]);
+		if(findFirstFreePage(&firstFreePage, dev, dev->activeArea[AreaType::data]) == Result::nosp){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::data]);
 			return Result::bug;
 		}
-		Addr pageAddress = combineAddress(dev->activeArea[AreaType::dataarea], firstFreePage);
+		Addr pageAddress = combineAddress(dev->activeArea[AreaType::data], firstFreePage);
 
-		res = dev->areaMap[dev->activeArea[AreaType::dataarea]].setPageStatus(firstFreePage, SummaryEntry::used);
+		res = dev->areaMap[dev->activeArea[AreaType::data]].setPageStatus(firstFreePage, SummaryEntry::used);
 		if(res != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[(int)res]);
 		}
@@ -144,7 +144,7 @@ Result writeInodeData(Inode* inode,
 			return Result::fail;
 		}
 
-		res = manageActiveAreaFull(dev, &dev->activeArea[AreaType::dataarea], AreaType::dataarea);
+		res = manageActiveAreaFull(dev, &dev->activeArea[AreaType::data], AreaType::data);
 		if(res != Result::ok)
 			return res;
 
@@ -199,7 +199,7 @@ Result readInodeData(Inode* inode,
 		}
 
 		AreaPos area = extractLogicalArea(inode->direct[page + pageFrom]);
-		if(dev->areaMap[area].type != AreaType::dataarea){
+		if(dev->areaMap[area].type != AreaType::data){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid area at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
 			return Result::bug;
 		}
@@ -279,7 +279,7 @@ Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs){
 		unsigned int area = extractLogicalArea(inode->direct[page + pageFrom]);
 		unsigned int relPage = extractPage(inode->direct[page + pageFrom]);
 
-		if(dev->areaMap[area].type != AreaType::dataarea){
+		if(dev->areaMap[area].type != AreaType::data){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of invalid area at %d:%d",
 					extractLogicalArea(inode->direct[page + pageFrom]),
 					extractPage(inode->direct[page + pageFrom]));
@@ -337,26 +337,26 @@ Result writeTreeNode(Dev* dev, TreeNode* node){
 	}
 
 	lasterr = Result::ok;
-	dev->activeArea[AreaType::indexarea] = findWritableArea(AreaType::indexarea, dev);
+	dev->activeArea[AreaType::index] = findWritableArea(AreaType::index, dev);
 	if(lasterr != Result::ok){
 		return lasterr;
 	}
 
-	if(dev->activeArea[AreaType::indexarea] == 0){
+	if(dev->activeArea[AreaType::index] == 0){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "WRITE TREE NODE findWritableArea returned 0");
 		return Result::bug;
 	}
 
 	unsigned int firstFreePage = 0;
-	if(findFirstFreePage(&firstFreePage, dev, dev->activeArea[AreaType::indexarea]) == Result::nosp){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::indexarea]);
+	if(findFirstFreePage(&firstFreePage, dev, dev->activeArea[AreaType::index]) == Result::nosp){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::index]);
 		return lasterr = Result::bug;
 	}
-	Addr addr = combineAddress(dev->activeArea[AreaType::indexarea], firstFreePage);
+	Addr addr = combineAddress(dev->activeArea[AreaType::index], firstFreePage);
 	node->self = addr;
 
 	//Mark Page as used
-	Result r = dev->areaMap[dev->activeArea[AreaType::indexarea]].setPageStatus(firstFreePage, SummaryEntry::used);
+	Result r = dev->areaMap[dev->activeArea[AreaType::index]].setPageStatus(firstFreePage, SummaryEntry::used);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
 		return r;
@@ -367,7 +367,7 @@ Result writeTreeNode(Dev* dev, TreeNode* node){
 	if(r != Result::ok)
 		return r;
 
-	r = manageActiveAreaFull(dev, &dev->activeArea[AreaType::indexarea], AreaType::indexarea);
+	r = manageActiveAreaFull(dev, &dev->activeArea[AreaType::index], AreaType::index);
 	if(r != Result::ok)
 		return r;
 
@@ -384,7 +384,7 @@ Result readTreeNode(Dev* dev, Addr addr, TreeNode* node){
 		return Result::bug;
 	}
 
-	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::indexarea){
+	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::index){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ TREEENODE operation on %s!", area_names[dev->areaMap[extractLogicalArea(addr)].type]);
 		return Result::bug;
 	}

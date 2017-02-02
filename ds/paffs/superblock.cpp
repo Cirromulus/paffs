@@ -270,7 +270,7 @@ Result readAnchorEntry(Dev* dev, Addr addr, AnchorEntry* entry){
 }
 
 Result deleteAnchorBlock(Dev* dev, uint32_t area, uint8_t block) {
-	if(dev->areaMap[area].type != AreaType::superblockarea){
+	if(dev->areaMap[area].type != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete Block outside of SUPARBLCOKAREA");
 		return Result::bug;
 	}
@@ -292,7 +292,7 @@ Result readJumpPadEntry(Dev* dev, Addr addr, JumpPadEntry* entry){
 
 //todo: Make sure that free space is sufficient!
 Result writeSuperPageIndex(Dev* dev, Addr addr, superIndex* entry){
-	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::superblockarea){
+	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
 		return Result::bug;
 	}
@@ -313,7 +313,7 @@ Result writeSuperPageIndex(Dev* dev, Addr addr, superIndex* entry){
 	unsigned char pospos = 0;	//Stupid name
 
 	for(unsigned int i = 0; i < dev->param->areas_no; i++){
-		if((entry->areaMap[i].type == AreaType::indexarea || entry->areaMap[i].type == AreaType::dataarea) && entry->areaMap[i].status == AreaStatus::active){
+		if((entry->areaMap[i].type == AreaType::index || entry->areaMap[i].type == AreaType::data) && entry->areaMap[i].status == AreaStatus::active){
 			entry->asPositions[pospos++] = i;
 		}
 
