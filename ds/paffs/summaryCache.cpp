@@ -12,15 +12,39 @@
 namespace paffs {
 
 //TODO: Reduce Memory usage by packing Sum.enties
-SummaryEntry* summaryCache[AREASUMMARYCACHESIZE];
-AreaPos summaryPosition[AREASUMMARYCACHESIZE];
+SummaryEntry* summaryCache[AREASUMMARYCACHESIZE] = {NULL};
 
 Result setPageStatus(Dev* dev, AreaPos area, uint8_t page, SummaryEntry state){
-	return Result::nimpl;
+	if(AREASUMMARYCACHESIZE < area){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
+		return Result::nimpl;
+	}
+	if(summaryCache[area] == 0){
+		summaryCache[area] = (SummaryEntry*) malloc(dev->param->data_pages_per_area*sizeof(SummaryEntry));
+		memset(summaryCache[area], 0, dev->param->data_pages_per_area*sizeof(SummaryEntry));
+		PAFFS_DBG(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
+	}
+	if(page > dev->param->data_pages_per_area){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dev->param->data_pages_per_area);
+	}
+	summaryCache[area][page] = state;
+	return Result::ok;
 }
 
 SummaryEntry getPageStatus(Dev* dev, AreaPos area, uint8_t page, Result *result){
-	*result = Result::nimpl;
+	if(AREASUMMARYCACHESIZE < area){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
+		*result = Result::nimpl;
+		return SummaryEntry::dirty;
+	}
+	if(summaryCache[area] == 0){
+		summaryCache[area] = (SummaryEntry*) malloc(dev->param->data_pages_per_area*sizeof(SummaryEntry));
+		memset(summaryCache[area], 0, dev->param->data_pages_per_area*sizeof(SummaryEntry));
+		PAFFS_DBG(PAFFS_TRACE_CACHE, "Created cache entry for area %d (Which is bad as we are in a GET function)", area);
+	}
+	if(page > dev->param->data_pages_per_area){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dev->param->data_pages_per_area);
+	}
 /*
 	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
 		for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
@@ -30,16 +54,37 @@ SummaryEntry getPageStatus(Dev* dev, AreaPos area, uint8_t page, Result *result)
 	}
 */
 
-	return SummaryEntry::dirty;
+	*result = Result::ok;
+	return summaryCache[area][page];
 }
 
 SummaryEntry* getSummaryStatus(Dev* dev, AreaPos area, Result *result){
-	*result = Result::nimpl;
-	return NULL;
+	if(AREASUMMARYCACHESIZE < area){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
+		*result = Result::nimpl;
+		return NULL;
+	}
+	if(summaryCache[area] == 0){
+		summaryCache[area] = (SummaryEntry*) malloc(dev->param->data_pages_per_area*sizeof(SummaryEntry));
+		memset(summaryCache[area], 0, dev->param->data_pages_per_area*sizeof(SummaryEntry));
+		PAFFS_DBG(PAFFS_TRACE_CACHE, "Created cache entry for area %d (Which is bad as we are in a GET function)", area);
+	}
+	*result = Result::ok;
+	return summaryCache[area];
 }
 
 Result setSummaryStatus(Dev* dev, AreaPos area, SummaryEntry* summary){
-	return Result::nimpl;
+	if(AREASUMMARYCACHESIZE < area){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
+		return Result::nimpl;
+	}
+	if(summaryCache[area] == 0){
+		summaryCache[area] = (SummaryEntry*) malloc(dev->param->data_pages_per_area*sizeof(SummaryEntry));
+		memset(summaryCache[area], 0, dev->param->data_pages_per_area*sizeof(SummaryEntry));
+		PAFFS_DBG(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
+	}
+	memcpy(summaryCache[area], summary, dev->param->data_pages_per_area*sizeof(SummaryEntry));
+	return Result::ok;
 }
 
 Result loadAreaSummaries(Dev* dev){

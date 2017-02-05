@@ -19,6 +19,7 @@ Result setSummaryStatus(Dev* dev, AreaPos area, SummaryEntry* summary);
 
 SummaryEntry* getSummaryStatus(Dev* dev, AreaPos area, Result *result);
 
+//Loads all unclosed AreaSummaries in RAM upon Mount
 Result loadAreaSummaries(Dev* dev);
 
 Result commitAreaSummaries(Dev* dev);
