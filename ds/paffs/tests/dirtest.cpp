@@ -31,13 +31,13 @@ void listDir(const char* path){
 	while((dir = fs->readDir(rewt)) != NULL){
 		printf("\tFound ");
 		switch(dir->node->type){
-		case (int) InodeType::file:
+		case InodeType::file:
 			printf("file: ");
 			break;
-		case (int) InodeType::dir:
+		case InodeType::dir:
 			printf("dir : ");
 			break;
-		case (int) InodeType::lnk:	//FIXME: Warning, -2 ??
+		case InodeType::lnk:	//FIXME: Warning, -2 ??
 			printf("link: ");
 			break;
 		default:

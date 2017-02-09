@@ -85,9 +85,9 @@ typedef uint16_t DirEntryCount; //65,535 Entries per Directory
 typedef uint8_t  DirEntryLength; //255 characters per Directory entry
 
 enum class InodeType : uint8_t{
-    file,
-    dir,
-    lnk
+	file,
+	dir,
+	lnk
 };
 
 struct Inode{
