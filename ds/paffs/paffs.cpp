@@ -34,7 +34,7 @@ unsigned int trace_mask =
 	PAFFS_TRACE_CACHE |
 	//PAFFS_TRACE_SCAN |
 	//PAFFS_TRACE_WRITE |
-	//PAFFS_TRACE_SUPERBLOCK |
+	PAFFS_TRACE_SUPERBLOCK |
 	//PAFFS_TRACE_ALLOCATE |
 	PAFFS_TRACE_VERIFY_AS |
 	PAFFS_TRACE_GC |
@@ -146,6 +146,7 @@ Result Paffs::initializeDevice(const char* devicename){
 Result Paffs::destroyDevice(const char* devicename){
 	delete[] device.areaMap;
 	device.areaMap = 0;
+	memset(device.activeArea, 0, sizeof(AreaPos)*AreaType::no);
 	return Result::ok;
 }
 
@@ -247,7 +248,10 @@ Result Paffs::unmnt(const char* devicename){
 	if(trace_mask && PAFFS_TRACE_AREA){
 		printf("Info: \n");
 		for(unsigned int i = 0; i < device.param->areas_no; i++){
-			printf("\tArea %d on %u as %10s from page %d\n", i, device.areaMap[i].position, area_names[device.areaMap[i].type], device.areaMap[i].position*device.param->blocks_per_area*device.param->pages_per_block);
+			printf("\tArea %d on %u as %10s from page %4d %s\n"
+					, i, device.areaMap[i].position, area_names[device.areaMap[i].type]
+					, device.areaMap[i].position*device.param->blocks_per_area*device.param->pages_per_block
+					, areaStatusNames[device.areaMap[i].status]);
 		}
 	}
 
@@ -626,7 +630,7 @@ Dir* Paffs::openDir(const char* path){
 			return NULL;
 		}
 		p += sizeof(DirEntryLength);
-		memcpy(&dir->childs[entry]->node->no, &dirData[p], sizeof(InodeNo));
+		memcpy(&dir->childs[entry]->no, &dirData[p], sizeof(InodeNo));
 		dir->childs[entry]->node = NULL;
 		p += sizeof(InodeNo);
 		dir->childs[entry]->name = (char*) malloc(dirnamel+2);    //+2 weil 1. Nullbyte und 2. Vielleicht ein Zeichen '/' dazukommt
@@ -695,7 +699,7 @@ Dirent* Paffs::readDir(Dir* dir){
 		return dir->childs[dir->pos++];
 	}
 	Inode item;
-	Result r = getInode(&device, dir->childs[dir->pos]->node->no, &item);
+	Result r = getInode(&device, dir->childs[dir->pos]->no, &item);
 	if(r != Result::ok){
 	   lasterr = Result::bug;
 	   return NULL;

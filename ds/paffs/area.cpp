@@ -7,7 +7,6 @@
 #include "area.hpp"
 #include "garbage_collection.hpp"
 #include "summaryCache.hpp"
-#include "driver/driver.hpp"
 #include <stdlib.h>
 namespace paffs {
 
@@ -22,12 +21,27 @@ const char* area_names[] = {
 		"YOUSHOULDNOTBESEEINGTHIS"
 };
 
+const char* areaStatusNames[] = {
+		"CLOSED",
+		"ACTIVE",
+		"EMPTY "
+};
+
 
 unsigned int findWritableArea(AreaType areaType, Dev* dev){
 	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != AreaStatus::closed){
 		//current Area has still space left
 		return dev->activeArea[areaType];
 	}
+
+	/* This is now done by SummaryCache
+	//Look for active Areas loaded from Superblock
+	for(unsigned int area = 0; area < dev->param->areas_no; area++){
+		if(dev->areaMap[area].type == areaType && dev->areaMap[area].status == AreaStatus::active){
+			PAFFS_DBG_S(PAFFS_TRACE_AREA, "Active Area %d is chosen for new Target.", area);
+			return area;
+		}
+	}*/
 
 	for(unsigned int area = 0; area < dev->param->areas_no; area++){
 		if(dev->areaMap[area].type == AreaType::unset){
@@ -64,17 +78,6 @@ Result findFirstFreePage(unsigned int* p_out, Dev* dev, unsigned int area){
 			return r;
 	}
 	return Result::nosp;
-}
-
-uint64_t getPageNumber(Addr addr, Dev *dev){
-	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
-								dev->param->total_pages_per_area;
-	page += extractPage(addr);
-	if(page > dev->param->areas_no * dev->param->total_pages_per_area){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "calculated Page number out of range!");
-		return 0;
-	}
-	return page;
 }
 
 Result manageActiveAreaFull(Dev *dev, AreaPos *area, AreaType areaType){
@@ -138,106 +141,6 @@ void retireArea(Dev *dev, AreaPos area){
 	dev->areaMap[area].type = AreaType::retired;
 
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %u at pos. %u.", area, dev->areaMap[area].position);
-}
-
-Result writeAreasummary(Dev *dev, AreaPos area, SummaryEntry* summary){
-	unsigned int needed_bytes = 1 + dev->param->data_pages_per_area / 8;
-	unsigned int needed_pages = 1 + needed_bytes / dev->param->data_bytes_per_page;
-	if(needed_pages != dev->param->total_pages_per_area - dev->param->data_pages_per_area){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
-		return Result::fail;
-	}
-
-	char buf[needed_bytes];
-	memset(buf, 0, needed_bytes);
-
-	/*Is it really necessary to save 16 bit while slowing down garbage collection?
-	 *TODO: Check how cost reduction scales with bigger flashes.
-	 *		AreaSummary is without optimization 2 bit per page. 2 Kib per Page would
-	 *		allow roughly 1000 pages per Area. Usually big pages come with big Blocks,
-	 *		so a Block would be ~500 pages, so an area would be limited to two Blocks.
-	 *		Not good.
-	 *
-	 *		Thought 2: GC just cares if dirty or not. Areasummary says exactly that.
-	 *		Win.
-	 */
-	for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
-		if(summary[j] != SummaryEntry::dirty)
-			buf[j/8] |= 1 << j%8;
-	}
-
-	uint32_t pointer = 0;
-	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param->data_pages_per_area), dev);
-	Result r;
-	for(unsigned int page = 0; page < needed_pages; page++){
-		unsigned int btw = pointer + dev->param->data_bytes_per_page < needed_bytes ? dev->param->data_bytes_per_page
-							: needed_bytes - pointer;
-		r = dev->driver->writePage(page_offs + page, &buf[pointer], btw);
-		if(r != Result::ok)
-			return r;
-
-		pointer += btw;
-	}
-	return Result::ok;
-}
-
-//FIXME: readAreasummary is untested, b/c areaSummaries remain in RAM during unmount
-Result readAreasummary(Dev *dev, AreaPos area, SummaryEntry* out_summary, bool complete){
-	unsigned int needed_bytes = 1 + dev->param->data_pages_per_area / 8 /* One bit per entry*/;
-
-	unsigned int needed_pages = 1 + needed_bytes / dev->param->data_bytes_per_page;
-	if(needed_pages != dev->param->total_pages_per_area - dev->param->data_pages_per_area){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
-		return Result::fail;
-	}
-
-	char buf[needed_bytes];
-	memset(buf, 0, needed_bytes);
-	uint32_t pointer = 0;
-	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param->data_pages_per_area), dev);
-	Result r;
-	for(unsigned int page = 0; page < needed_pages; page++){
-		unsigned int btr = pointer + dev->param->data_bytes_per_page < needed_bytes ? dev->param->data_bytes_per_page
-							: needed_bytes - pointer;
-		r = dev->driver->readPage(page_offs + page, &buf[pointer], btr);
-		if(r != Result::ok)
-			return r;
-
-		pointer += btr;
-	}
-	//buffer ready
-	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "SuperIndex Buffer was filled with %u Bytes.", pointer);
-
-
-	for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
-		if(buf[j/8] & 1 << j%8){
-			if(complete){
-				unsigned char pagebuf[BYTES_PER_PAGE];
-				Addr tmp = combineAddress(area, j);
-				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dev->param->data_bytes_per_page);
-				if(r != Result::ok)
-					return r;
-				bool contains_data = false;
-				for(unsigned int byte = 0; byte < dev->param->data_bytes_per_page; byte++){
-					if(pagebuf[byte] != 0xFF){
-						contains_data = true;
-						break;
-					}
-				}
-				if(contains_data)
-					out_summary[j] = SummaryEntry::used;
-				else
-					out_summary[j] = SummaryEntry::free;
-			}else{
-				//This is just a guess b/c we are in incomplete mode.
-				out_summary[j] = SummaryEntry::used;
-			}
-		}else{
-			out_summary[j] = SummaryEntry::dirty;
-		}
-	}
-
-	return Result::ok;
 }
 
 }  // namespace paffs

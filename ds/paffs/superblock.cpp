@@ -85,9 +85,11 @@ Result getAddrOfMostRecentSuperIndex(Dev* dev, Addr *out){
 }
 
 Result commitSuperIndex(Dev* dev, superIndex *newIndex){
-	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(Addr) +
-			dev->param->areas_no * (sizeof(Area) - sizeof(SummaryEntry*)) + // AreaMap without SummaryEntry pointer
-			2 * dev->param->data_pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
+	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
+		dev->param->areas_no * (sizeof(Area)
+				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
+				- sizeof(std::function<Result(uint8_t,SummaryEntry)>))
+				+ 2 * dev->param->data_pages_per_area / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed for SuperIndex: %d (%d bytes)", needed_pages, needed_bytes);
 
@@ -297,17 +299,26 @@ Result writeSuperPageIndex(Dev* dev, Addr addr, superIndex* entry){
 		return Result::bug;
 	}
 
-	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(Addr) +
-		dev->param->areas_no * (sizeof(Area) - sizeof(SummaryEntry*))+ // AreaMap without summaryEntry pointer
-		2 * dev->param->data_pages_per_area / 8 /* One bit per entry, two entrys for INDEX and DATA section*/;
+	unsigned int neededASes = 0;
+	for(unsigned int i = 0; i < 2; i++){
+		if(entry->asPositions[i] > 0)
+			neededASes++;
+	}
+
+	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
+		dev->param->areas_no * (sizeof(Area)
+				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
+				- sizeof(std::function<Result(uint8_t,SummaryEntry)>))
+				+ neededASes * dev->param->data_pages_per_area / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
 
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
+	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed to write SuperIndex: %d (%d bytes, %d AS'es)", needed_pages, needed_bytes, neededASes);
 
 	unsigned int pointer = 0;
 	char buf[needed_bytes];
 	memset(buf, 0, needed_bytes);
-	memcpy(buf, &entry->no, sizeof(uint32_t));
-	pointer += sizeof(uint32_t);
+	memcpy(buf, &entry->no, sizeof(SerialNo));
+	pointer += sizeof(SerialNo);
 	memcpy(&buf[pointer], &entry->rootNode, sizeof(Addr));
 	pointer += sizeof(Addr);
 	unsigned char pospos = 0;	//Stupid name
@@ -320,9 +331,6 @@ Result writeSuperPageIndex(Dev* dev, Addr addr, superIndex* entry){
 		memcpy(&buf[pointer], &entry->areaMap[i], sizeof(Area)
 				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
 				- sizeof(std::function<Result(uint8_t,SummaryEntry)>));
-		((Area*)&buf[pointer])->getPageStatus = 0;
-		((Area*)&buf[pointer])->setPageStatus = 0;
-		//TODO: Optimize bitusage, currently wasting many Bytes per Entry
 		pointer += sizeof(Area)
 				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
 				- sizeof(std::function<Result(uint8_t,SummaryEntry)>);
@@ -338,7 +346,7 @@ Result writeSuperPageIndex(Dev* dev, Addr addr, superIndex* entry){
 		pointer += dev->param->data_pages_per_area / 8;
 	}
 
-	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "%u bytes have been written to Buffer", pointer);
+	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "%u bytes have been written to Buffer", pointer);
 
 	pointer = 0;
 	uint64_t page_offs = getPageNumber(addr, dev);
@@ -363,11 +371,14 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, bool withAreaM
 	if(entry->areaMap == NULL)
 		return Result::einval;
 
-	unsigned int needed_bytes = sizeof(uint32_t) + sizeof(Addr) +
-		dev->param->areas_no * (sizeof(Area) - sizeof(SummaryEntry*))+ // AreaMap without summaryEntry pointer
-		16 * dev->param->data_pages_per_area / 8 /* One bit per entry, two entries for INDEX and DATA section. Others dont have summaries*/;
+	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
+		dev->param->areas_no * (sizeof(Area)
+				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
+				- sizeof(std::function<Result(uint8_t,SummaryEntry)>))
+				+ 2 * dev->param->data_pages_per_area / 8; /* One bit per entry, two entries for INDEX and DATA section. Others dont have summaries*/
 
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
+	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Maximum Pages needed to read SuperIndex: %d (%d bytes, 2 AS'es)", needed_pages, needed_bytes);
 
 	char buf[needed_bytes];
 	memset(buf, 0, needed_bytes);
@@ -387,8 +398,8 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, bool withAreaM
 	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "SuperIndex Buffer was filled with %u Bytes.", pointer);
 
 	pointer = 0;
-	memcpy(&entry->no, buf, sizeof(uint32_t));
-	pointer += sizeof(uint32_t);
+	memcpy(&entry->no, buf, sizeof(SerialNo));
+	pointer += sizeof(SerialNo);
 	memcpy(&entry->rootNode, &buf[pointer], sizeof(Addr));
 	pointer += sizeof(Addr);
 	entry->asPositions[0] = 0;
@@ -401,7 +412,8 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, bool withAreaM
 		pointer += sizeof(Area)
 				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
 				- sizeof(std::function<Result(uint8_t,SummaryEntry)>);
-		if(entry->areaMap[i].status == AreaStatus::active)
+		if((dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)
+				&& entry->areaMap[i].status == AreaStatus::active)
 			entry->asPositions[pospos++] = i;
 	}
 

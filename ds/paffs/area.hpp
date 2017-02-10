@@ -9,6 +9,7 @@
 namespace paffs {
 
 extern const char* area_names[];
+extern const char* areaStatusNames[];
 
 //Returns same area if there is still writable Space left
 unsigned int findWritableArea(AreaType areaType, Dev* dev);

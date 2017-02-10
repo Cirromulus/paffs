@@ -14,8 +14,10 @@
 
 namespace paffs{
 
+typedef uint32_t SerialNo;
+
 typedef struct AnchorEntry{
-	uint32_t no;	//This only has to hold as many numbers as there are pages in superblock area
+	SerialNo no;	//This only has to hold as many numbers as there are pages in superblock area
 					//Value Zero and 0xFF... is reserved.
 	uint8_t fs_version;
 	Param param;
@@ -24,13 +26,13 @@ typedef struct AnchorEntry{
 } anchorEntry;
 
 typedef struct JumpPadEntry{
-	uint32_t no;	//This only has to hold as many numbers as there are pages in superblock area
+	SerialNo no;	//This only has to hold as many numbers as there are pages in superblock area
 					//Value Zero and 0xFF... is reserved.
 	uint32_t nextArea;
 } jumpPadEntry;
 
 typedef struct superIndex{
-	uint32_t no;	//This only has to hold as many numbers as there are pages in superblock area.
+	SerialNo no;	//This only has to hold as many numbers as there are pages in superblock area.
 					//Values Zero and 0xFF... are reserved.
 	Addr rootNode;
 	Area* areaMap;	//Size can be calculated via dev->param

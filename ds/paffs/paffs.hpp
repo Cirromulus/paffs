@@ -106,7 +106,8 @@ struct Inode{
 
 //could be later used for caching file paths
 struct Dirent{
-	Inode* node;
+	InodeNo no; //This is used for lazy loading of Inode
+	Inode* node; //can be NULL if not loadet yet
 	Dirent* parent;
 	char* name;
 };
@@ -164,7 +165,7 @@ struct Area{
 	AreaPos position;	//physical position, not logical
 	std::function<SummaryEntry(uint8_t,Result*)> getPageStatus;
 	std::function<Result(uint8_t,SummaryEntry)> setPageStatus;
-};	//3 + 2 + 17 + 1 + 32 (+64/32) = 55 (119/87) Bit = 6,875 (14,875/10,875) Byte
+};	//4 + 2 + 17 + 32 (+2*64) = 55 (183) Bit = 7 (23) Byte
 
 struct Dev{
 	Param* param;
