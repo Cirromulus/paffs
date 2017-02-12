@@ -70,7 +70,7 @@ unsigned int findWritableArea(AreaType areaType, Dev* dev){
 Result findFirstFreePage(unsigned int* p_out, Dev* dev, unsigned int area){
 	Result r;
 	for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
-		if(dev->areaMap[area].getPageStatus(i,&r) == SummaryEntry::free){
+		if(getPageStatus(dev, area, i,&r) == SummaryEntry::free){
 			*p_out = i;
 			return Result::ok;
 		}
@@ -84,14 +84,14 @@ Result manageActiveAreaFull(Dev *dev, AreaPos *area, AreaType areaType){
 	Result r;
 	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
 		for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
-			if(dev->areaMap[*area].getPageStatus(i,&r) > SummaryEntry::dirty)
+			if(getPageStatus(dev, *area, i,&r) > SummaryEntry::dirty)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries (%s)!", *area, resultMsg[(int)r]);
 		}
 	}
 
 	bool isFull = true;
 	for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
-		if(dev->areaMap[*area].getPageStatus(i,&r) == SummaryEntry::free) {
+		if(getPageStatus(dev, *area, i,&r) == SummaryEntry::free) {
 			isFull = false;
 			break;
 		}
@@ -133,7 +133,7 @@ Result closeArea(Dev *dev, AreaPos area){
 void retireArea(Dev *dev, AreaPos area){
 	dev->areaMap[area].status = AreaStatus::closed;
 
-	Result r = removeAreaSummary(dev, area);
+	Result r = deleteSummary(dev, area);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete AreaSummary of retired Area %d!", area);
 	}

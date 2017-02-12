@@ -17,11 +17,11 @@ namespace paffs{
  * It could be possible that closed area contains free pages which count as
  * dirty in this case.
  */
-uint32_t countDirtyPages(Dev* dev, Area* area){
+uint32_t countDirtyPages(Dev* dev, AreaPos area){
 	uint32_t dirty = 0;
 	Result r;
 	for(uint32_t i = 0; i < dev->param->data_pages_per_area; i++){
-		if(area->getPageStatus(i, &r) != SummaryEntry::used)
+		if(getPageStatus(dev, area, i, &r) != SummaryEntry::used)
 			dirty++;
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not determine Pagestatus for Garbagecollection!");
@@ -34,17 +34,23 @@ AreaPos findNextBestArea(Dev* dev, AreaType target, SummaryEntry* out_summary, b
 	AreaPos favourite_area = 0;
 	uint32_t fav_dirty_pages = 0;
 	*srcAreaContainsData = true;
-	SummaryEntry* curr = out_summary;
+	SummaryEntry* curr = NULL;
 
 	//Look for the most dirty block
 	for(AreaPos i = 0; i < dev->param->areas_no; i++){
-		if(dev->areaMap[i].status == AreaStatus::closed && (dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)){
+		if(dev->areaMap[i].status == AreaStatus::closed &&
+				(dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)){
 
-			uint32_t dirty_pages = countDirtyPages(dev, &dev->areaMap[i]);
+			uint32_t dirty_pages = countDirtyPages(dev, i);
+			Result r;
+			curr = getSummaryStatus(dev, i, &r);
+			if(r != Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Could not load Summary of Area %d for Garbage collection!", i);
+				return 0;
+			}
 			if (dirty_pages == dev->param->data_pages_per_area){
 				//We can't find a block with more dirty pages in it
 				favourite_area = i;
-				//fav_dirty_pages = dirty_pages; not needed
 				*srcAreaContainsData = false;
 				memcpy(out_summary, curr, dev->param->data_pages_per_area);
 				break;
@@ -101,6 +107,14 @@ Result deleteArea(Dev* dev, AreaPos area){
 			return Result::badflash;
 		}
 	}
+	dev->areaMap[area].erasecount++;
+	Result r;
+	SummaryEntry* as = getSummaryStatus(dev, area, &r);
+	if(r != Result::ok || as == NULL){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not free Areasummary after deletion of Area %d!", area);
+		return r;
+	}
+	memset(as, (char) SummaryEntry::free, dev->param->data_pages_per_area);
 	return Result::ok;
 }
 
@@ -235,9 +249,8 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 
 		//Delete old area
 		r = deleteArea(dev, deletion_target);
-		dev->areaMap[deletion_target].erasecount++;
 		if(r == Result::badflash){
-			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block in area %u on position %u! Retiring Area...", deletion_target, dev->areaMap[deletion_target].position);
+			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block in area %u on position %u! Retired Area.", deletion_target, dev->areaMap[deletion_target].position);
 			if(trace_mask && (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
 				printf("Info: \n");
 				for(unsigned int i = 0; i < dev->param->areas_no; i++){
@@ -254,8 +267,6 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 			break;
 		}
 	}
-
-
 
 	//swap logical position of areas to keep addresses valid
 	AreaPos tmp = dev->areaMap[deletion_target].position;

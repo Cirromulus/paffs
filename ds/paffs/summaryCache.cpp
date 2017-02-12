@@ -12,7 +12,6 @@
 
 namespace paffs {
 
-//TODO: Reduce Memory usage by packing Sum.enties
 SummaryEntry* summaryCache[AREASUMMARYCACHESIZE] = {NULL};
 //FIXME Translation needs to be as big as there are Areas. This is bad.
 //TODO: Use Linked List or comparable.
@@ -125,6 +124,22 @@ Result setSummaryStatus(Dev* dev, AreaPos area, SummaryEntry* summary){
 	return Result::ok;
 }
 
+Result deleteSummary(Dev* dev, AreaPos area){
+	if(AREASUMMARYCACHESIZE < area){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
+		return Result::nimpl;
+	}
+	if(translation[area] <= -1){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete nonexisting Area %d", area);
+		return Result::einval;
+	}
+	free(summaryCache[translation[area]]);
+	summaryCache[translation[area]] = 0;
+	translation[area] = -1;
+	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Deleted cache entry of area %d", area);
+	return Result::ok;
+}
+
 Result loadAreaSummaries(Dev* dev){
 	for(AreaPos i = 0; i < 2; i++){
 		if(summaryCache[i] == NULL)
@@ -172,13 +187,13 @@ Result commitAreaSummaries(Dev* dev){
 			}
 			index.asPositions[pos] = i;
 			index.areaSummary[pos++] = summaryCache[translation[i]];
+			if(summaryCache[translation[i]] == NULL){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of area %d is NULL even though marked as ACTIVE!", i);
+				return Result::bug;
+			}
 		}
 	}
 	return commitSuperIndex(dev, &index);
-}
-
-Result removeAreaSummary(Dev* dev, AreaPos area){
-	return Result::nimpl;
 }
 
 uint64_t getPageNumber(Addr addr, Dev *dev){

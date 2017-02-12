@@ -163,9 +163,7 @@ struct Area{
 	AreaStatus status:2;
 	uint32_t erasecount:17;	//Overflow at 132.000 is acceptable (assuming less than 100k erase cycles)
 	AreaPos position;	//physical position, not logical
-	std::function<SummaryEntry(uint8_t,Result*)> getPageStatus;
-	std::function<Result(uint8_t,SummaryEntry)> setPageStatus;
-};	//4 + 2 + 17 + 32 (+2*64) = 55 (183) Bit = 7 (23) Byte
+};	//4 + 2 + 17 + 32 = 55 Bit = 7 Byte
 
 struct Dev{
 	Param* param;

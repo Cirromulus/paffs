@@ -44,7 +44,7 @@ This area map grows linear in size with area count which is by itself depended b
 The size of an area is a trade-off between low RAM usage (big areas) and a more efficient garbage collection (small areas). In this test environment, an area size of two erase blocks is chosen\footnote{Which should be the minimum size, because the anchor area has to be two blocks in size.}. With a normal 2GB flash chip\footnote{2048 Byte user data per page, 1024 pages per block, $\approx 2^21$ blocks.}, this configuration would use $(3+2+16+32+32) / 8 * 2^{21} / 2 = 11141120$ Byte $= 10,625$ MB RAM. Increasing the size of an area to 8 erase blocks would result in 2,65 MB usage, which would suit the requirements better.
 
 \paragraph{Area summary}
-The area map also contains a pointer to an area summary, which is an array of the per-page information if it was \texttt{free}, \texttt{used} or \texttt{dirty}. This area summary completely in RAM if the area is active, but is written to the first page in an area when it is getting closed. It is being used as information where to find the next free page and for the garbage collector to copy only valid chunks. The reference may only be valid if area status is active.
+The area map also contains a pointer to an area summary, which is an array of the per-page information if it was \texttt{free}, \texttt{used} or \texttt{dirty}. This area summary completely in RAM if the area is active, but is written to the first page in an area when it is getting closed. It is being used as information where to find the next free page and for the garbage collector to copy only valid chunks. This procedure is cached in an \texttt{AreaSummaryCache}. The current implementation is just a placeholder for future work, using \texttt{malloc}s instead of static buffers, and exposing a bug.
 
 \subsection{Garbage collection}
 \paragraph{Functionality}
@@ -127,15 +127,15 @@ This section is under development since the filesystem is unfinished. Meanwhile 
 \appendix
 \section{TODOS}
 \begin{itemize}
-	\item GC: Static Wear levelling, keep deletioncount in mind. Get deletioncount in function of physical position, not logical.
+	\item GC: Static Wear levelling, keep deletioncount in mind.
 	\item CRC and ECC. How will a broken FS be transferred into a safe state?
 	\item TreeCache - full commit from time to time. (Maybe 'used' marker?)
 	\item Area Summary in closed Area. If file gets outdated, areaSummary needs to be (re)written to flash. Possible solutions: 
 		Immediately set Area active (move used contents to fresh area, delete old) and have multiple active areas at once (call it uncommitted)\\
 		Or Load areaSummary, modify it in RAM. If RAM runs low or unmount happens, move all but the one with most free space to new Areas and close them.
 	\item Implement additional driver function for copying pages for optimizing.
-	\item Implement areaSummary Buffer. Write out only if RAM low or unmount happens.
-	\item AreaSummary is written after format, although it is not needed (put AS in SuperPage!)
+	\item AreaSummaryBuffer: Be able to commit and reload Area Summaries.
+	\item AreaSummaryBuffer: Modify existing committed Area Summaries.\textbf{}
 	
 	\item Use Inode pointer space for very small files to speed up access and save space.
 	\item Implement Inode and DATA Buffer to speed up everything. Note: Low priority and high effort.

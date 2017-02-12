@@ -37,15 +37,15 @@ Addr getRootnodeAddr(Dev* dev){
 
 void printSuperIndex(Dev* dev, superIndex* ind){
 	printf("No:\t\t%d\n", ind->no);
-	printf("Roonode addr.: \t%u:%u\n", extractLogicalArea(ind->rootNode), extractPage(ind->rootNode));
-	printf("areaMap: (first eight entrys)\n");
+	printf("Rootnode addr.: \t%u:%u\n", extractLogicalArea(ind->rootNode), extractPage(ind->rootNode));
+	printf("areaMap:\n");
 	AreaPos asOffs = 0;
 	for(AreaPos i = 0; i < 8; i ++){
 		printf("\t%d->%d\n", i, ind->areaMap[i].position);
 		printf("\tType: %s\n", area_names[ind->areaMap[i].type]);
 		if(asOffs < 2 && i == ind->asPositions[asOffs]){
 			unsigned int free = 0, used = 0, dirty = 0;
-			for(unsigned int j = 0; j < dev->param->total_pages_per_area; j++){
+			for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
 				if(ind->areaSummary[asOffs][j] == SummaryEntry::free)
 					free++;
 				if(ind->areaSummary[asOffs][j] == SummaryEntry::used)
@@ -86,9 +86,7 @@ Result getAddrOfMostRecentSuperIndex(Dev* dev, Addr *out){
 
 Result commitSuperIndex(Dev* dev, superIndex *newIndex){
 	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
-		dev->param->areas_no * (sizeof(Area)
-				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
-				- sizeof(std::function<Result(uint8_t,SummaryEntry)>))
+				dev->param->areas_no * sizeof(Area)
 				+ 2 * dev->param->data_pages_per_area / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed for SuperIndex: %d (%d bytes)", needed_pages, needed_bytes);
@@ -306,10 +304,8 @@ Result writeSuperPageIndex(Dev* dev, Addr addr, superIndex* entry){
 	}
 
 	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
-		dev->param->areas_no * (sizeof(Area)
-				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
-				- sizeof(std::function<Result(uint8_t,SummaryEntry)>))
-				+ neededASes * dev->param->data_pages_per_area / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
+		dev->param->areas_no * sizeof(Area)
+		+ neededASes * dev->param->data_pages_per_area / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
 
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed to write SuperIndex: %d (%d bytes, %d AS'es)", needed_pages, needed_bytes, neededASes);
@@ -328,12 +324,8 @@ Result writeSuperPageIndex(Dev* dev, Addr addr, superIndex* entry){
 			entry->asPositions[pospos++] = i;
 		}
 
-		memcpy(&buf[pointer], &entry->areaMap[i], sizeof(Area)
-				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
-				- sizeof(std::function<Result(uint8_t,SummaryEntry)>));
-		pointer += sizeof(Area)
-				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
-				- sizeof(std::function<Result(uint8_t,SummaryEntry)>);
+		memcpy(&buf[pointer], &entry->areaMap[i], sizeof(Area));
+		pointer += sizeof(Area);
 	}
 
 	for(unsigned int i = 0; i < 2; i++){
@@ -372,10 +364,8 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, bool withAreaM
 		return Result::einval;
 
 	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
-		dev->param->areas_no * (sizeof(Area)
-				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
-				- sizeof(std::function<Result(uint8_t,SummaryEntry)>))
-				+ 2 * dev->param->data_pages_per_area / 8; /* One bit per entry, two entries for INDEX and DATA section. Others dont have summaries*/
+		dev->param->areas_no * sizeof(Area)
+		+ 2 * dev->param->data_pages_per_area / 8; /* One bit per entry, two entries for INDEX and DATA section. Others dont have summaries*/
 
 	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Maximum Pages needed to read SuperIndex: %d (%d bytes, 2 AS'es)", needed_pages, needed_bytes);
@@ -406,12 +396,8 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, bool withAreaM
 	entry->asPositions[1] = 0;
 	unsigned char pospos = 0;	//Stupid name
 	for(unsigned int i = 0; i < dev->param->areas_no; i++){
-		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(Area)
-				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
-				- sizeof(std::function<Result(uint8_t,SummaryEntry)>));
-		pointer += sizeof(Area)
-				- sizeof(std::function<SummaryEntry(uint8_t,Result*)>)
-				- sizeof(std::function<Result(uint8_t,SummaryEntry)>);
+		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(Area));
+		pointer += sizeof(Area);
 		if((dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)
 				&& entry->areaMap[i].status == AreaStatus::active)
 			entry->asPositions[pospos++] = i;

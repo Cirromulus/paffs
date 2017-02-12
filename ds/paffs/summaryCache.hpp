@@ -19,14 +19,13 @@ Result setSummaryStatus(Dev* dev, AreaPos area, SummaryEntry* summary);
 
 SummaryEntry* getSummaryStatus(Dev* dev, AreaPos area, Result *result);
 
+//for retired or unused Areas
+Result deleteSummary(Dev* dev, AreaPos area);
+
 //Loads all unclosed AreaSummaries in RAM upon Mount
 Result loadAreaSummaries(Dev* dev);
 
 Result commitAreaSummaries(Dev* dev);
-
-//If Area is retired, it has to be deleted.
-Result removeAreaSummary(Dev* dev, AreaPos area);
-
 
 
 }  // namespace paffs

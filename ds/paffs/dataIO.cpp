@@ -7,6 +7,7 @@
 
 #include "driver/driver.hpp"
 #include "area.hpp"
+#include "summaryCache.hpp"
 #include <stdlib.h>
 #include <string.h>
 #include "dataIO.hpp"
@@ -59,7 +60,7 @@ Result writeInodeData(Inode* inode,
 		}
 		Addr pageAddress = combineAddress(dev->activeArea[AreaType::data], firstFreePage);
 
-		res = dev->areaMap[dev->activeArea[AreaType::data]].setPageStatus(firstFreePage, SummaryEntry::used);
+		res = setPageStatus(dev, dev->activeArea[AreaType::data], firstFreePage, SummaryEntry::used);
 		if(res != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[(int)res]);
 		}
@@ -121,7 +122,7 @@ Result writeInodeData(Inode* inode,
 			}
 
 			//Mark old pages dirty
-			res = dev->areaMap[oldArea].setPageStatus(oldPage, SummaryEntry::dirty);
+			res = setPageStatus(dev, oldArea, oldPage, SummaryEntry::dirty);
 			if(res != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[(int)res]);
 			}
@@ -205,8 +206,8 @@ Result readInodeData(Inode* inode,
 		}
 		Result r;
 		if(trace_mask && PAFFS_TRACE_VERIFY_AS){
-			SummaryEntry e = dev->areaMap[extractLogicalArea(inode->direct[page + pageFrom])]
-										  .getPageStatus(extractPage(inode->direct[page + pageFrom]), &r);
+			SummaryEntry e = getPageStatus(dev, extractLogicalArea(inode->direct[page + pageFrom])
+					,extractPage(inode->direct[page + pageFrom]), &r);
 			if(r != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load AreaSummary of area %d for verification!", extractLogicalArea(inode->direct[page + pageFrom]));
 			}else{
@@ -287,7 +288,7 @@ Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs){
 		}
 
 		Result r;
-		if(dev->areaMap[area].getPageStatus(relPage, &r) == SummaryEntry::dirty){
+		if(getPageStatus(dev, area, relPage, &r) == SummaryEntry::dirty){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of outdated (dirty)"
 					" data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),
 					extractPage(inode->direct[page + pageFrom]));
@@ -300,7 +301,7 @@ Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs){
 		}
 
 		//Mark old pages dirty
-		r = dev->areaMap[area].setPageStatus(relPage, SummaryEntry::dirty);
+		r = setPageStatus(dev, area, relPage, SummaryEntry::dirty);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write AreaSummary for area %d,"
 					" so no invalidation of data!", area);
@@ -329,7 +330,7 @@ Result writeTreeNode(Dev* dev, TreeNode* node){
 
 	if(node->self != 0){
 		//We have to invalidate former position first
-		Result r = dev->areaMap[extractLogicalArea(node->self)].setPageStatus(extractPage(node->self), SummaryEntry::dirty);
+		Result r = setPageStatus(dev, extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate old Page!");
 			return r;
@@ -356,7 +357,7 @@ Result writeTreeNode(Dev* dev, TreeNode* node){
 	node->self = addr;
 
 	//Mark Page as used
-	Result r = dev->areaMap[dev->activeArea[AreaType::index]].setPageStatus(firstFreePage, SummaryEntry::used);
+	Result r = setPageStatus(dev, dev->activeArea[AreaType::index], firstFreePage, SummaryEntry::used);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
 		return r;
@@ -397,7 +398,7 @@ Result readTreeNode(Dev* dev, Addr addr, TreeNode* node){
 
 	Result r;
 	if(trace_mask && PAFFS_TRACE_VERIFY_AS){
-		if(dev->areaMap[extractLogicalArea(addr)].getPageStatus(extractPage(addr),&r) == SummaryEntry::dirty){
+		if(getPageStatus(dev, extractLogicalArea(addr), extractPage(addr),&r) == SummaryEntry::dirty){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "READ operation of obsoleted data at %X:%X", extractLogicalArea(addr), extractPage(addr));
 			return Result::bug;
 		}
@@ -419,7 +420,7 @@ Result readTreeNode(Dev* dev, Addr addr, TreeNode* node){
 }
 
 Result deleteTreeNode(Dev* dev, TreeNode* node){
-	return dev->areaMap[extractLogicalArea(node->self)].setPageStatus(extractPage(node->self), SummaryEntry::dirty);
+	return setPageStatus(dev, extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);
 }
 
 

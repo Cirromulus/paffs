@@ -134,12 +134,6 @@ Result Paffs::initializeDevice(const char* devicename){
 		return Result::einval;
 	}
 
-	//register PageFunctions
-	for(AreaPos a = 0; a < device.param->areas_no; a++){
-		device.areaMap[a].getPageStatus = std::bind(getPageStatus, &device, a, std::placeholders::_1, std::placeholders::_2);
-		device.areaMap[a].setPageStatus = std::bind(setPageStatus, &device, a, std::placeholders::_1, std::placeholders::_2);
-	}
-
 	return Result::ok;
 }
 
@@ -233,10 +227,14 @@ Result Paffs::mnt(const char* devicename){
 		return r;
 	}
 
-	//TODO: mark activeAreas
-	//for(unsigned long i = 0; i < device.param->areas_no; i++){
-		//if(device.areaMap[i].type != AreaType::dataarea)
-	//}
+
+	for(AreaPos i = 0; i < device.param->areas_no; i++){
+		if(device.areaMap[i].type == AreaType::garbageBuffer){
+			device.activeArea[AreaType::garbageBuffer] = i;
+		}
+		//Superblock do not need an active Area,
+		//data and index active areas are extracted by areaSummaryCache
+	}
 
 	return r;
 }
