@@ -2,7 +2,7 @@
  * driverconf.hpp
  *
  *  Created on: 17.01.2017
- *      Author: rooot
+ *      Author: Pascal Pieper
  */
 
 #pragma once

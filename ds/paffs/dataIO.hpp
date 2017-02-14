@@ -2,7 +2,7 @@
  * paffs_flash.h
  *
  *  Created on: 30.06.2016
- *      Author: rooot
+ *      Author: Pascal Pieper
  */
 
 #ifndef PAFFS_FLASH_H_

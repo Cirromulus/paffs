@@ -2,7 +2,7 @@
  * superblock.c
  *
  *  Created on: 19.10.2016
- *      Author: rooot
+ *      Author: Pascal Pieper
  */
 
 #include "superblock.hpp"
@@ -89,7 +89,7 @@ Result commitSuperIndex(Dev* dev, superIndex *newIndex){
 				dev->param->areasNo * sizeof(Area)
 				+ 2 * dev->param->dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
 	unsigned int needed_pages = needed_bytes / dataBytesPerPage + 1;
-	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed for SuperIndex: %d (%d bytes)", needed_pages, needed_bytes);
+	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed to read former SuperIndex: %d (%d bytes, 2 AS'es)", needed_pages, needed_bytes);
 
 	uint32_t rel_page1 = 0;
 	Result r1 = findFirstFreeEntryInBlock(dev, 0, 0, &rel_page1, needed_pages);

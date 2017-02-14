@@ -2,7 +2,7 @@
  * treequeue.c
  *
  *  Created on: 29.08.2016
- *      Author: rooot
+ *      Author: Pascal Pieper
  */
 #include "treequeue.hpp"
 #include <stdlib.h>

@@ -2,7 +2,7 @@
  * paffs_flash.c
  *
  *  Created on: 30.06.2016
- *      Author: rooot
+ *      Author: Pascal Pieper
  */
 
 #include "driver/driver.hpp"

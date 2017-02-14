@@ -2,7 +2,7 @@
  * summaryCache.hpp
  *
  *  Created on: 27 Jan 2017
- *      Author: rooot
+ *      Author: Pascal Pieper
  */
 
 #pragma once

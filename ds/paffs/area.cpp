@@ -2,7 +2,7 @@
  * area.cpp
  *
  *  Created on: 27 Jan 2017
- *      Author: rooot
+ *      Author: Pascal Pieper
  */
 #include "area.hpp"
 #include "garbage_collection.hpp"

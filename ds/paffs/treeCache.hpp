@@ -2,7 +2,7 @@
  * treeCache.h
  *
  *  Created on: 21.09.2016
- *      Author: rooot
+ *      Author: Pascal Pieper
  */
 
 #pragma once
