@@ -12,14 +12,21 @@
 
 namespace paffs {
 
-SummaryEntry* summaryCache[areaSummaryCacheSize] = {NULL};
+SummaryEntry summaryCache[areaSummaryCacheSize][dataPagesPerArea];
 //FIXME Translation needs to be as big as there are Areas. This is bad.
-//TODO: Use Linked List or comparable.
-int8_t translation[areaSummaryCacheSize] = {-1,-1,-1,-1,-1,-1,-1,-1};
+//TODO: Use Linked List or HashMap.
+//Translates from areaPosition to summaryCachePosition
+int16_t translation[areaSummaryCacheSize] = {-1,-1,-1,-1,-1,-1,-1,-1};
 
 int findNextFreeCacheEntry(){
+	//from summaryCache to AreaPosition
+	bool used[areaSummaryCacheSize] = {0};
 	for(int i = 0; i < areaSummaryCacheSize; i++){
-		if(summaryCache[i] == 0)
+		if(translation[i] >= 0)
+			used[translation[i]] = true;
+	}
+	for(int i = 0; i < areaSummaryCacheSize; i++){
+		if(!used[i])
 			return i;
 	}
 	return -1;
@@ -37,7 +44,6 @@ Result setPageStatus(Dev* dev, AreaPos area, uint8_t page, SummaryEntry state){
 					"and flush is not supported yet");
 			return Result::nimpl;
 		}
-		summaryCache[translation[area]] = (SummaryEntry*) malloc(dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
@@ -62,7 +68,6 @@ SummaryEntry getPageStatus(Dev* dev, AreaPos area, uint8_t page, Result *result)
 			*result = Result::nimpl;
 			return SummaryEntry::dirty;
 		}
-		summaryCache[translation[area]] = (SummaryEntry*) malloc(dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
@@ -96,7 +101,6 @@ SummaryEntry* getSummaryStatus(Dev* dev, AreaPos area, Result *result){
 			*result = Result::nimpl;
 			return NULL;
 		}
-		summaryCache[translation[area]] = (SummaryEntry*) malloc(dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
@@ -116,7 +120,6 @@ Result setSummaryStatus(Dev* dev, AreaPos area, SummaryEntry* summary){
 					"and flush is not supported yet");
 			return Result::nimpl;
 		}
-		summaryCache[translation[area]] = (SummaryEntry*) malloc(dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
@@ -133,8 +136,7 @@ Result deleteSummary(Dev* dev, AreaPos area){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete nonexisting Area %d", area);
 		return Result::einval;
 	}
-	free(summaryCache[translation[area]]);
-	summaryCache[translation[area]] = 0;
+
 	translation[area] = -1;
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Deleted cache entry of area %d", area);
 	return Result::ok;
@@ -142,8 +144,7 @@ Result deleteSummary(Dev* dev, AreaPos area){
 
 Result loadAreaSummaries(Dev* dev){
 	for(AreaPos i = 0; i < 2; i++){
-		if(summaryCache[i] == NULL)
-			summaryCache[i]	= (SummaryEntry*) malloc(dev->param->dataPagesPerArea*sizeof(SummaryEntry));
+		memset(summaryCache[i], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 	}
 	superIndex index = {0};
 	index.areaMap = dev->areaMap;
@@ -151,20 +152,15 @@ Result loadAreaSummaries(Dev* dev){
 	index.areaSummary[1] = summaryCache[1];
 	Result r = readSuperIndex(dev, &index);
 	if(r != Result::ok){
-		for(AreaPos i = 0; i < 2; i++){
-			if(summaryCache[i] != NULL)
-				free(summaryCache[i]);
-		}
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "failed to load Area Summaries!");
+		return r;
 	}
 
-	//TODO: If only one AS has been loaded, discard second Memory space
 	for(int i = 0; i < 2; i++){
 		if(index.asPositions[i] > 0){
-			translation[index.asPositions[i]] = 0;
+			translation[index.asPositions[i]] = i;
 			dev->activeArea[dev->areaMap[index.asPositions[i]].type] = dev->areaMap[index.asPositions[i]].position;
 		}
-		else
-			free(summaryCache[i]);
 	}
 
 	return Result::ok;
@@ -183,14 +179,10 @@ Result commitAreaSummaries(Dev* dev){
 				&& dev->areaMap[i].status == AreaStatus::active){
 			if(pos >= 2){
 				PAFFS_DBG(PAFFS_TRACE_BUG, "More than two active Areas! This is not handled.");
-				return Result::bug;
+				return Result::nimpl;
 			}
 			index.asPositions[pos] = i;
 			index.areaSummary[pos++] = summaryCache[translation[i]];
-			if(summaryCache[translation[i]] == NULL){
-				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of area %d is NULL even though marked as ACTIVE!", i);
-				return Result::bug;
-			}
 		}
 	}
 	return commitSuperIndex(dev, &index);

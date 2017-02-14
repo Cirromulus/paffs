@@ -9,7 +9,7 @@
 #include "paffs.hpp"
 namespace paffs {
 
-extern SummaryEntry* summaryCache[];
+extern SummaryEntry summaryCache[areaSummaryCacheSize][dataPagesPerArea];
 
 Result setPageStatus(Dev* dev, AreaPos area, uint8_t page, SummaryEntry state);
 
