@@ -18,14 +18,14 @@ Result SimuDriver::writePage(uint64_t page_no,
 	if(!cell)
 		return Result::fail;
 
-	if(data_len > param.total_bytes_per_page){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write %u Bytes to a page of %u!", data_len, param.total_bytes_per_page);
+	if(data_len > param.totalBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write %u Bytes to a page of %u!", data_len, param.totalBytesPerPage);
 		return Result::fail;
 	}
 
 
-	if(param.total_bytes_per_page != data_len){
-		memset(buf, 0xFF, param.total_bytes_per_page);
+	if(param.totalBytesPerPage != data_len){
+		memset(buf, 0xFF, param.totalBytesPerPage);
 	}
 	memcpy(buf, data, data_len);
 
@@ -85,13 +85,13 @@ NANDADRESS SimuDriver::translateBlockToAddress(uint32_t block, FlashCell* fc){
 
 void SimuDriver::init(){
 	//Configure parameters of flash
-    param.total_bytes_per_page = cell->pageSize;
-    param.oob_bytes_per_page = cell->pageSize - cell->pageDataSize;
-    param.pages_per_block = cell->blockSize;
+    param.totalBytesPerPage = cell->pageSize;
+    param.oobBytesPerPage = cell->pageSize - cell->pageDataSize;
+    param.pagesPerBlock = cell->blockSize;
     param.blocks = cell->planeSize * cell->cellSize;
 
-	buf = new unsigned char[param.total_bytes_per_page];
-	memset(buf, 0xFF, param.total_bytes_per_page);
+	buf = new unsigned char[param.totalBytesPerPage];
+	memset(buf, 0xFF, param.totalBytesPerPage);
 }
 
 }

@@ -37,7 +37,7 @@ void listDir(const char* path){
 		case InodeType::dir:
 			printf("dir : ");
 			break;
-		case InodeType::lnk:	//FIXME: Warning, -2 ??
+		case InodeType::lnk:
 			printf("link: ");
 			break;
 		default:
@@ -105,6 +105,7 @@ void printWholeFile(const char* path){
 }
 
 int main(int argc, char** argv){
+	printf("Area: %lu", sizeof(Area));
 	fs = new Paffs();
 	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
 	printf("Cache size: %u Bytes\n", getCacheSize() * sizeof(TreeCacheNode));

@@ -14,27 +14,23 @@
 namespace paffs{
 
 //Calculates how many pointers a node can hold in one page
-#define BRANCH_ORDER ((BYTES_PER_PAGE - sizeof(Addr)\
-		- sizeof(unsigned char))\
-		/ (sizeof(Addr) + sizeof(InodeNo)) ) //todo: 'BYTES_PER_PAGE' Dynamisch machen
 
-#define LEAF_ORDER ((BYTES_PER_PAGE - sizeof(Addr)\
-		- sizeof(unsigned char))\
-		/ (sizeof(Inode) + sizeof(InodeNo)) ) //todo: 'BYTES_PER_PAGE' Dynamisch machen
-
-
-static const int btree_branch_order = BRANCH_ORDER;
-static const int btree_leaf_order = LEAF_ORDER;
+static constexpr int branchOrder = (dataBytesPerPage - sizeof(Addr)
+		- sizeof(unsigned char))
+		/ (sizeof(Addr) + sizeof(InodeNo));
+static constexpr int leafOrder = (dataBytesPerPage - sizeof(Addr)
+		- sizeof(unsigned char))
+		/ (sizeof(Inode) + sizeof(InodeNo));
 
 typedef struct TreeNode{
 	union As{
 		struct Branch {
-			InodeNo keys[BRANCH_ORDER-1];
-			Addr pointers[BRANCH_ORDER];
+			InodeNo keys[branchOrder-1];
+			Addr pointers[branchOrder];
 		} branch;
 		struct Leaf {
-			InodeNo keys[LEAF_ORDER];
-			Inode pInodes[LEAF_ORDER];
+			InodeNo keys[leafOrder];
+			Inode pInodes[leafOrder];
 		} leaf;
 	}as;
 	Addr self;	//If '0', it is not committed yet
@@ -46,7 +42,7 @@ typedef struct TreeNode{
 struct TreeCacheNode{
 	TreeNode raw;
 	struct TreeCacheNode* parent;	//Parent either points to parent or to node itself if is root. Special case: NULL if node is invalid.
-	struct TreeCacheNode* pointers[BRANCH_ORDER];
+	struct TreeCacheNode* pointers[branchOrder];
 	bool dirty:1;
 	bool locked:1;
 	bool inheritedLock:1;

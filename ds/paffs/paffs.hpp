@@ -7,10 +7,8 @@
 
 #include <stdint.h>
 #include <functional>
+#include "config/standard.hpp"
 #include "paffs_trace.hpp"
-
-
-#define BYTES_PER_PAGE 512
 
 namespace paffs{
 
@@ -62,16 +60,16 @@ enum class Seekmode{
 
 struct Param{
 	const char *name;
-	unsigned int total_bytes_per_page;
-	unsigned int oob_bytes_per_page;
-	unsigned int pages_per_block;
+	unsigned int totalBytesPerPage;
+	unsigned int oobBytesPerPage;
+	unsigned int pagesPerBlock;
 	unsigned int blocks;
 	/*Automatically filled*/
-	unsigned int data_bytes_per_page;
-	unsigned long areas_no;
-	unsigned int blocks_per_area;
-	unsigned int total_pages_per_area;
-	unsigned int data_pages_per_area;
+	unsigned int dataBytesPerPage;
+	unsigned long areasNo;
+	unsigned int blocksPerArea;
+	unsigned int totalPagesPerArea;
+	unsigned int dataPagesPerArea;
 };
 
 
@@ -92,7 +90,7 @@ enum class InodeType : uint8_t{
 
 struct Inode{
 	InodeNo no;
-	InodeType type:2;
+	InodeType type;//:2;
 	Permission perm:3;
 	Date crea;
 	Date mod;
@@ -158,7 +156,7 @@ enum class SummaryEntry : uint8_t{
 	error
 };
 
-struct Area{
+struct Area{	//TODO: Maybe packed? Slow, but less RAM
 	AreaType type:4;
 	AreaStatus status:2;
 	uint32_t erasecount:17;	//Overflow at 132.000 is acceptable (assuming less than 100k erase cycles)

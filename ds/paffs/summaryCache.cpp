@@ -12,13 +12,13 @@
 
 namespace paffs {
 
-SummaryEntry* summaryCache[AREASUMMARYCACHESIZE] = {NULL};
+SummaryEntry* summaryCache[areaSummaryCacheSize] = {NULL};
 //FIXME Translation needs to be as big as there are Areas. This is bad.
 //TODO: Use Linked List or comparable.
-int8_t translation[AREASUMMARYCACHESIZE] = {-1,-1,-1,-1,-1,-1,-1,-1};
+int8_t translation[areaSummaryCacheSize] = {-1,-1,-1,-1,-1,-1,-1,-1};
 
 int findNextFreeCacheEntry(){
-	for(int i = 0; i < AREASUMMARYCACHESIZE; i++){
+	for(int i = 0; i < areaSummaryCacheSize; i++){
 		if(summaryCache[i] == 0)
 			return i;
 	}
@@ -26,7 +26,7 @@ int findNextFreeCacheEntry(){
 }
 
 Result setPageStatus(Dev* dev, AreaPos area, uint8_t page, SummaryEntry state){
-	if(AREASUMMARYCACHESIZE < area){
+	if(areaSummaryCacheSize < area){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
 		return Result::nimpl;
 	}
@@ -37,19 +37,19 @@ Result setPageStatus(Dev* dev, AreaPos area, uint8_t page, SummaryEntry state){
 					"and flush is not supported yet");
 			return Result::nimpl;
 		}
-		summaryCache[translation[area]] = (SummaryEntry*) malloc(dev->param->data_pages_per_area*sizeof(SummaryEntry));
-		memset(summaryCache[translation[area]], 0, dev->param->data_pages_per_area*sizeof(SummaryEntry));
+		summaryCache[translation[area]] = (SummaryEntry*) malloc(dev->param->dataPagesPerArea*sizeof(SummaryEntry));
+		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
-	if(page > dev->param->data_pages_per_area){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dev->param->data_pages_per_area);
+	if(page > dev->param->dataPagesPerArea){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dev->param->dataPagesPerArea);
 	}
 	summaryCache[translation[area]][page] = state;
 	return Result::ok;
 }
 
 SummaryEntry getPageStatus(Dev* dev, AreaPos area, uint8_t page, Result *result){
-	if(AREASUMMARYCACHESIZE < area){
+	if(areaSummaryCacheSize < area){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
 		*result = Result::nimpl;
 		return SummaryEntry::dirty;
@@ -62,12 +62,12 @@ SummaryEntry getPageStatus(Dev* dev, AreaPos area, uint8_t page, Result *result)
 			*result = Result::nimpl;
 			return SummaryEntry::dirty;
 		}
-		summaryCache[translation[area]] = (SummaryEntry*) malloc(dev->param->data_pages_per_area*sizeof(SummaryEntry));
-		memset(summaryCache[translation[area]], 0, dev->param->data_pages_per_area*sizeof(SummaryEntry));
+		summaryCache[translation[area]] = (SummaryEntry*) malloc(dev->param->dataPagesPerArea*sizeof(SummaryEntry));
+		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
-	if(page > dev->param->data_pages_per_area){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dev->param->data_pages_per_area);
+	if(page > dev->param->dataPagesPerArea){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dev->param->dataPagesPerArea);
 	}
 /*
 	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
@@ -83,7 +83,7 @@ SummaryEntry getPageStatus(Dev* dev, AreaPos area, uint8_t page, Result *result)
 }
 
 SummaryEntry* getSummaryStatus(Dev* dev, AreaPos area, Result *result){
-	if(AREASUMMARYCACHESIZE < area){
+	if(areaSummaryCacheSize < area){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
 		*result = Result::nimpl;
 		return NULL;
@@ -96,8 +96,8 @@ SummaryEntry* getSummaryStatus(Dev* dev, AreaPos area, Result *result){
 			*result = Result::nimpl;
 			return NULL;
 		}
-		summaryCache[translation[area]] = (SummaryEntry*) malloc(dev->param->data_pages_per_area*sizeof(SummaryEntry));
-		memset(summaryCache[translation[area]], 0, dev->param->data_pages_per_area*sizeof(SummaryEntry));
+		summaryCache[translation[area]] = (SummaryEntry*) malloc(dev->param->dataPagesPerArea*sizeof(SummaryEntry));
+		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
 	*result = Result::ok;
@@ -105,7 +105,7 @@ SummaryEntry* getSummaryStatus(Dev* dev, AreaPos area, Result *result){
 }
 
 Result setSummaryStatus(Dev* dev, AreaPos area, SummaryEntry* summary){
-	if(AREASUMMARYCACHESIZE < area){
+	if(areaSummaryCacheSize < area){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
 		return Result::nimpl;
 	}
@@ -116,16 +116,16 @@ Result setSummaryStatus(Dev* dev, AreaPos area, SummaryEntry* summary){
 					"and flush is not supported yet");
 			return Result::nimpl;
 		}
-		summaryCache[translation[area]] = (SummaryEntry*) malloc(dev->param->data_pages_per_area*sizeof(SummaryEntry));
-		memset(summaryCache[translation[area]], 0, dev->param->data_pages_per_area*sizeof(SummaryEntry));
+		summaryCache[translation[area]] = (SummaryEntry*) malloc(dev->param->dataPagesPerArea*sizeof(SummaryEntry));
+		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
-	memcpy(summaryCache[translation[area]], summary, dev->param->data_pages_per_area*sizeof(SummaryEntry));
+	memcpy(summaryCache[translation[area]], summary, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 	return Result::ok;
 }
 
 Result deleteSummary(Dev* dev, AreaPos area){
-	if(AREASUMMARYCACHESIZE < area){
+	if(areaSummaryCacheSize < area){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
 		return Result::nimpl;
 	}
@@ -143,7 +143,7 @@ Result deleteSummary(Dev* dev, AreaPos area){
 Result loadAreaSummaries(Dev* dev){
 	for(AreaPos i = 0; i < 2; i++){
 		if(summaryCache[i] == NULL)
-			summaryCache[i]	= (SummaryEntry*) malloc(dev->param->data_pages_per_area*sizeof(SummaryEntry));
+			summaryCache[i]	= (SummaryEntry*) malloc(dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 	}
 	superIndex index = {0};
 	index.areaMap = dev->areaMap;
@@ -178,7 +178,7 @@ Result commitAreaSummaries(Dev* dev){
 	superIndex index = {0};
 	index.areaMap = dev->areaMap;
 	//write the two open AS'es to Superindex
-	for (unsigned int i = 0; i < dev->param->areas_no; i++){
+	for (unsigned int i = 0; i < dev->param->areasNo; i++){
 		if((dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)
 				&& dev->areaMap[i].status == AreaStatus::active){
 			if(pos >= 2){
@@ -198,9 +198,9 @@ Result commitAreaSummaries(Dev* dev){
 
 uint64_t getPageNumber(Addr addr, Dev *dev){
 	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
-								dev->param->total_pages_per_area;
+								dev->param->totalPagesPerArea;
 	page += extractPage(addr);
-	if(page > dev->param->areas_no * dev->param->total_pages_per_area){
+	if(page > dev->param->areasNo * dev->param->totalPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "calculated Page number out of range!");
 		return 0;
 	}
@@ -208,9 +208,9 @@ uint64_t getPageNumber(Addr addr, Dev *dev){
 }
 
 Result writeAreasummary(Dev *dev, AreaPos area, SummaryEntry* summary){
-	unsigned int needed_bytes = 1 + dev->param->data_pages_per_area / 8;
-	unsigned int needed_pages = 1 + needed_bytes / dev->param->data_bytes_per_page;
-	if(needed_pages != dev->param->total_pages_per_area - dev->param->data_pages_per_area){
+	unsigned int needed_bytes = 1 + dev->param->dataPagesPerArea / 8;
+	unsigned int needed_pages = 1 + needed_bytes / dev->param->dataBytesPerPage;
+	if(needed_pages != dev->param->totalPagesPerArea - dev->param->dataPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
 		return Result::fail;
 	}
@@ -228,16 +228,16 @@ Result writeAreasummary(Dev *dev, AreaPos area, SummaryEntry* summary){
 	 *		Thought 2: GC just cares if dirty or not. Areasummary says exactly that.
 	 *		Win.
 	 */
-	for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
+	for(unsigned int j = 0; j < dev->param->dataPagesPerArea; j++){
 		if(summary[j] != SummaryEntry::dirty)
 			buf[j/8] |= 1 << j%8;
 	}
 
 	uint32_t pointer = 0;
-	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param->data_pages_per_area), dev);
+	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param->dataPagesPerArea), dev);
 	Result r;
 	for(unsigned int page = 0; page < needed_pages; page++){
-		unsigned int btw = pointer + dev->param->data_bytes_per_page < needed_bytes ? dev->param->data_bytes_per_page
+		unsigned int btw = pointer + dev->param->dataBytesPerPage < needed_bytes ? dev->param->dataBytesPerPage
 							: needed_bytes - pointer;
 		r = dev->driver->writePage(page_offs + page, &buf[pointer], btw);
 		if(r != Result::ok)
@@ -250,10 +250,10 @@ Result writeAreasummary(Dev *dev, AreaPos area, SummaryEntry* summary){
 
 //FIXME: readAreasummary is untested, b/c areaSummaries remain in RAM during unmount
 Result readAreasummary(Dev *dev, AreaPos area, SummaryEntry* out_summary, bool complete){
-	unsigned int needed_bytes = 1 + dev->param->data_pages_per_area / 8 /* One bit per entry*/;
+	unsigned int needed_bytes = 1 + dev->param->dataPagesPerArea / 8 /* One bit per entry*/;
 
-	unsigned int needed_pages = 1 + needed_bytes / dev->param->data_bytes_per_page;
-	if(needed_pages != dev->param->total_pages_per_area - dev->param->data_pages_per_area){
+	unsigned int needed_pages = 1 + needed_bytes / dev->param->dataBytesPerPage;
+	if(needed_pages != dev->param->totalPagesPerArea - dev->param->dataPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
 		return Result::fail;
 	}
@@ -261,10 +261,10 @@ Result readAreasummary(Dev *dev, AreaPos area, SummaryEntry* out_summary, bool c
 	char buf[needed_bytes];
 	memset(buf, 0, needed_bytes);
 	uint32_t pointer = 0;
-	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param->data_pages_per_area), dev);
+	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param->dataPagesPerArea), dev);
 	Result r;
 	for(unsigned int page = 0; page < needed_pages; page++){
-		unsigned int btr = pointer + dev->param->data_bytes_per_page < needed_bytes ? dev->param->data_bytes_per_page
+		unsigned int btr = pointer + dev->param->dataBytesPerPage < needed_bytes ? dev->param->dataBytesPerPage
 							: needed_bytes - pointer;
 		r = dev->driver->readPage(page_offs + page, &buf[pointer], btr);
 		if(r != Result::ok)
@@ -276,16 +276,16 @@ Result readAreasummary(Dev *dev, AreaPos area, SummaryEntry* out_summary, bool c
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "SuperIndex Buffer was filled with %u Bytes.", pointer);
 
 
-	for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
+	for(unsigned int j = 0; j < dev->param->dataPagesPerArea; j++){
 		if(buf[j/8] & 1 << j%8){
 			if(complete){
-				unsigned char pagebuf[BYTES_PER_PAGE];
+				unsigned char pagebuf[dataBytesPerPage];
 				Addr tmp = combineAddress(area, j);
-				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dev->param->data_bytes_per_page);
+				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dev->param->dataBytesPerPage);
 				if(r != Result::ok)
 					return r;
 				bool contains_data = false;
-				for(unsigned int byte = 0; byte < dev->param->data_bytes_per_page; byte++){
+				for(unsigned int byte = 0; byte < dev->param->dataBytesPerPage; byte++){
 					if(pagebuf[byte] != 0xFF){
 						contains_data = true;
 						break;

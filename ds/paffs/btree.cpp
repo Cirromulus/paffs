@@ -173,8 +173,8 @@ Result find_leaf( Dev* dev, InodeNo key, TreeCacheNode** outtreeCacheNode) {
 	unsigned int depth = 0;
 	while (!c->raw.is_leaf) {
 		depth++;
-		if(depth >= TREENODECACHESIZE-1){	//-1 because one node is needed for insert functions.
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Cache size (%d) too small for depth %d!", TREENODECACHESIZE, depth);
+		if(depth >= treeNodeCacheSize-1){	//-1 because one node is needed for insert functions.
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Cache size (%d) too small for depth %d!", treeNodeCacheSize, depth);
 			return Result::lowmem;
 		}
 
@@ -279,11 +279,11 @@ Result insert_into_leaf( Dev* dev, TreeCacheNode * leaf, Inode * newInode ) {
 Result insert_into_leaf_after_splitting(Dev* dev, TreeCacheNode * leaf, Inode * newInode) {
 
 	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert into leaf after splitting");
-	InodeNo temp_keys[btree_leaf_order+1];
-	Inode temp_pInodes[btree_leaf_order+1];
+	InodeNo temp_keys[leafOrder+1];
+	Inode temp_pInodes[leafOrder+1];
 	int insertion_index, split, new_key, i, j;
-	memset(temp_keys, 0, btree_leaf_order+1 * sizeof(InodeNo));
-	memset(temp_pInodes, 0, btree_leaf_order+1 * sizeof(Inode));
+	memset(temp_keys, 0, leafOrder+1 * sizeof(InodeNo));
+	memset(temp_pInodes, 0, leafOrder+1 * sizeof(Inode));
 
 	TreeCacheNode *new_leaf = NULL;
 
@@ -299,7 +299,7 @@ Result insert_into_leaf_after_splitting(Dev* dev, TreeCacheNode * leaf, Inode * 
 	new_leaf->raw.is_leaf = true;
 
 	insertion_index = 0;
-	while (insertion_index < btree_leaf_order && leaf->raw.as.leaf.keys[insertion_index] < newInode->no)
+	while (insertion_index < leafOrder && leaf->raw.as.leaf.keys[insertion_index] < newInode->no)
 		insertion_index++;
 
 	for (i = 0, j = 0; i < leaf->raw.num_keys; i++, j++) {
@@ -313,7 +313,7 @@ Result insert_into_leaf_after_splitting(Dev* dev, TreeCacheNode * leaf, Inode * 
 
 	leaf->raw.num_keys = 0;
 
-	split = cut(btree_leaf_order);
+	split = cut(leafOrder);
 
 	for (i = 0; i < split; i++) {
 		leaf->raw.as.leaf.pInodes[i] = temp_pInodes[i];
@@ -321,17 +321,17 @@ Result insert_into_leaf_after_splitting(Dev* dev, TreeCacheNode * leaf, Inode * 
 		leaf->raw.num_keys++;
 	}
 
-	for (i = split, j = 0; i <= btree_leaf_order; i++, j++) {
+	for (i = split, j = 0; i <= leafOrder; i++, j++) {
 		new_leaf->raw.as.leaf.pInodes[j] = temp_pInodes[i];
 		new_leaf->raw.as.leaf.keys[j] = temp_keys[i];
 		new_leaf->raw.num_keys++;
 	}
 
-	for (i = leaf->raw.num_keys; i < btree_leaf_order; i++){
+	for (i = leaf->raw.num_keys; i < leafOrder; i++){
 		memset(&leaf->raw.as.leaf.pInodes[i], 0, sizeof(Inode));
 		leaf->raw.as.leaf.keys[i] = 0;
 	}
-	for (i = new_leaf->raw.num_keys; i < btree_leaf_order; i++){
+	for (i = new_leaf->raw.num_keys; i < leafOrder; i++){
 		memset(&new_leaf->raw.as.leaf.pInodes[i], 0, sizeof(Inode));
 		new_leaf->raw.as.leaf.keys[i] = 0;
 	}
@@ -381,9 +381,9 @@ Result insert_into_node_after_splitting(Dev* dev, TreeCacheNode * old_node, int 
 	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert into node after splitting at key %u, index %d", key, left_index);
 	int i, j, split, k_prime;
 	TreeCacheNode *new_node;
-	InodeNo temp_keys[btree_branch_order+1];
-	TreeCacheNode* temp_RAMaddresses[btree_branch_order+1];
-	Addr temp_addresses[btree_branch_order+1];
+	InodeNo temp_keys[branchOrder+1];
+	TreeCacheNode* temp_RAMaddresses[branchOrder+1];
+	Addr temp_addresses[branchOrder+1];
 
 
 	lockTreeCacheNode(dev, old_node);
@@ -421,7 +421,7 @@ Result insert_into_node_after_splitting(Dev* dev, TreeCacheNode * old_node, int 
 	 * half the keys and pointers to the
 	 * old and half to the new.
 	 */
-	split = cut(btree_branch_order);
+	split = cut(branchOrder);
 
 	old_node->raw.num_keys = 0;
 	for (i = 0; i < split - 1; i++) {
@@ -435,7 +435,7 @@ Result insert_into_node_after_splitting(Dev* dev, TreeCacheNode * old_node, int 
 	old_node->raw.as.branch.pointers[i] = temp_addresses[i];
 	old_node->pointers[i] = temp_RAMaddresses[i];
 	k_prime = temp_keys[split - 1];
-	for (++i, j = 0; i < btree_branch_order; i++, j++) {
+	for (++i, j = 0; i < branchOrder; i++, j++) {
 		new_node->pointers[j] = temp_RAMaddresses[i];
 		new_node->raw.as.branch.pointers[j] = temp_addresses[i];
 		new_node->raw.as.branch.keys[j] = temp_keys[i];
@@ -445,7 +445,7 @@ Result insert_into_node_after_splitting(Dev* dev, TreeCacheNode * old_node, int 
 		//cleanup
 		old_node->pointers[i] = 0;
 		old_node->raw.as.branch.pointers[i] = 0;
-		if(i < btree_branch_order - 1)
+		if(i < branchOrder - 1)
 			old_node->raw.as.branch.keys[i] = 0;
 	}
 
@@ -483,7 +483,7 @@ Result insert_into_parent(Dev* dev, TreeCacheNode * left, InodeNo key, TreeCache
 	left_index = get_left_index(parent, left);
 
 
-	if (parent->raw.num_keys < btree_branch_order - 1)
+	if (parent->raw.num_keys < branchOrder - 1)
 			return insert_into_node(dev, parent, left_index, key, right);
 
 
@@ -587,7 +587,7 @@ Result insert( Dev* dev, Inode* value) {
 	/* Case: leaf has room for key and pointer.
 	 */
 
-	if (node->raw.num_keys < btree_leaf_order) {
+	if (node->raw.num_keys < leafOrder) {
 			return insert_into_leaf(dev, node, value);
 	}
 
@@ -658,12 +658,12 @@ Result remove_entry_from_node(Dev* dev, TreeCacheNode * n, InodeNo key) {
 
 	// Set the other pointers to NULL for tidiness.
 	if (n->raw.is_leaf)
-		for (i = n->raw.num_keys; i < btree_leaf_order; i++){
+		for (i = n->raw.num_keys; i < leafOrder; i++){
 			memset(&n->raw.as.leaf.pInodes[i], 0, sizeof(Inode));
 			n->raw.as.leaf.keys[i] = 0;
 		}
 	else
-		for (i = n->raw.num_keys + 1; i < btree_branch_order; i++){
+		for (i = n->raw.num_keys + 1; i < branchOrder; i++){
 			n->raw.as.branch.pointers[i] = 0;
 			n->pointers[i] = NULL;
 			n->raw.as.branch.keys[i - 1] = 0;
@@ -938,7 +938,7 @@ Result delete_entry( Dev* dev, TreeCacheNode * n, InodeNo key){
 	 */
 
 
-	min_keys = n->raw.is_leaf ? cut(btree_leaf_order) : cut(btree_branch_order) - 1;
+	min_keys = n->raw.is_leaf ? cut(leafOrder) : cut(branchOrder) - 1;
 
 	/* Case:  TreeCacheNode stays at or above minimum.
 	 * (The simple case.)
@@ -968,7 +968,7 @@ Result delete_entry( Dev* dev, TreeCacheNode * n, InodeNo key){
 	if(r != Result::ok && r != Result::flushedcache)
 		return r;
 
-	capacity = neighbor->raw.is_leaf ? btree_leaf_order : btree_branch_order -1;
+	capacity = neighbor->raw.is_leaf ? leafOrder : branchOrder -1;
 
 	/* Coalescence. */
 

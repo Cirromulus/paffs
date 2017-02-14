@@ -1,6 +1,7 @@
 MESSAGE(STATUS "paffs")
 INCLUDE_DIRECTORIES(
-${CMAKE_CURRENT_SOURCE_DIR}
+	${CMAKE_CURRENT_SOURCE_DIR}
+	${CMAKE_CURRENT_SOURCE_DIR}/config/standard.hpp
 )
 
 set(SOURCES
@@ -20,10 +21,7 @@ COMPILE_AS_CXX11()
 add_subdirectory(driver)
 
 add_library(paffs ${SOURCES})
-target_compile_definitions(paffs 
-	PUBLIC TREENODECACHESIZE=5
-	PUBLIC AREASUMMARYCACHESIZE=8
-)
+
 set_target_properties(paffs PROPERTIES
 	COMPILE_FLAGS "-Wall"
 )

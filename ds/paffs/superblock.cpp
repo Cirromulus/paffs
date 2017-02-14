@@ -45,7 +45,7 @@ void printSuperIndex(Dev* dev, superIndex* ind){
 		printf("\tType: %s\n", area_names[ind->areaMap[i].type]);
 		if(asOffs < 2 && i == ind->asPositions[asOffs]){
 			unsigned int free = 0, used = 0, dirty = 0;
-			for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
+			for(unsigned int j = 0; j < dev->param->dataPagesPerArea; j++){
 				if(ind->areaSummary[asOffs][j] == SummaryEntry::free)
 					free++;
 				if(ind->areaSummary[asOffs][j] == SummaryEntry::used)
@@ -86,9 +86,9 @@ Result getAddrOfMostRecentSuperIndex(Dev* dev, Addr *out){
 
 Result commitSuperIndex(Dev* dev, superIndex *newIndex){
 	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
-				dev->param->areas_no * sizeof(Area)
-				+ 2 * dev->param->data_pages_per_area / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
-	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
+				dev->param->areasNo * sizeof(Area)
+				+ 2 * dev->param->dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
+	unsigned int needed_pages = needed_bytes / dataBytesPerPage + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed for SuperIndex: %d (%d bytes)", needed_pages, needed_bytes);
 
 	uint32_t rel_page1 = 0;
@@ -137,7 +137,7 @@ Result commitSuperIndex(Dev* dev, superIndex *newIndex){
 		return Result::bug;
 	}
 
-	Addr target = chosen_block == 0 ? combineAddress(0, rel_page1) : combineAddress(0, rel_page2 + dev->param->pages_per_block);
+	Addr target = chosen_block == 0 ? combineAddress(0, rel_page1) : combineAddress(0, rel_page2 + dev->param->pagesPerBlock);
 
 	Addr lastEntry;
  	Result r = getAddrOfMostRecentSuperIndex(dev, &lastEntry);
@@ -209,8 +209,8 @@ Result readSuperIndex(Dev* dev, superIndex* index){
 
 Result findFirstFreeEntryInBlock(Dev* dev, uint32_t area, uint8_t block, uint32_t* out_pos, unsigned int required_pages){
 	unsigned int in_a_row = 0;
-	uint64_t page_offs = dev->param->pages_per_block * block;
-	for(unsigned int i = 0; i < dev->param->pages_per_block; i++) {
+	uint64_t page_offs = dev->param->pagesPerBlock * block;
+	for(unsigned int i = 0; i < dev->param->pagesPerBlock; i++) {
 		Addr addr = combineAddress(area, i + page_offs);
 		uint32_t no;
 		Result r = dev->driver->readPage(getPageNumber(addr, dev), &no, sizeof(uint32_t));
@@ -236,8 +236,8 @@ Result findMostRecentEntryInBlock(Dev* dev, uint32_t area, uint8_t block, uint32
 	uint32_t* maximum = out_index;
 	*maximum = 0;
 	*out_pos = 0;
-	uint32_t page_offs = dev->param->pages_per_block * block;
-	for(unsigned int i = 0; i < dev->param->pages_per_block; i++) {
+	uint32_t page_offs = dev->param->pagesPerBlock * block;
+	for(unsigned int i = 0; i < dev->param->pagesPerBlock; i++) {
 		Addr addr = combineAddress(area, i + page_offs);
 		uint32_t no;
 		Result r = dev->driver->readPage(getPageNumber(addr, dev), &no, sizeof(uint32_t));
@@ -275,7 +275,7 @@ Result deleteAnchorBlock(Dev* dev, uint32_t area, uint8_t block) {
 		return Result::bug;
 	}
 	dev->areaMap[area].erasecount++;
-	uint32_t block_offs = dev->areaMap[area].position * dev->param->blocks_per_area;
+	uint32_t block_offs = dev->areaMap[area].position * dev->param->blocksPerArea;
 	return dev->driver->eraseBlock(block_offs + block);
 }
 
@@ -304,10 +304,10 @@ Result writeSuperPageIndex(Dev* dev, Addr addr, superIndex* entry){
 	}
 
 	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
-		dev->param->areas_no * sizeof(Area)
-		+ neededASes * dev->param->data_pages_per_area / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
+		dev->param->areasNo * sizeof(Area)
+		+ neededASes * dev->param->dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
 
-	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
+	unsigned int needed_pages = needed_bytes / dataBytesPerPage + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed to write SuperIndex: %d (%d bytes, %d AS'es)", needed_pages, needed_bytes, neededASes);
 
 	unsigned int pointer = 0;
@@ -319,7 +319,7 @@ Result writeSuperPageIndex(Dev* dev, Addr addr, superIndex* entry){
 	pointer += sizeof(Addr);
 	unsigned char pospos = 0;	//Stupid name
 
-	for(unsigned int i = 0; i < dev->param->areas_no; i++){
+	for(unsigned int i = 0; i < dev->param->areasNo; i++){
 		if((entry->areaMap[i].type == AreaType::index || entry->areaMap[i].type == AreaType::data) && entry->areaMap[i].status == AreaStatus::active){
 			entry->asPositions[pospos++] = i;
 		}
@@ -331,11 +331,11 @@ Result writeSuperPageIndex(Dev* dev, Addr addr, superIndex* entry){
 	for(unsigned int i = 0; i < 2; i++){
 		if(entry->asPositions[i] <= 0)
 			continue;
-		for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
+		for(unsigned int j = 0; j < dev->param->dataPagesPerArea; j++){
 			if(entry->areaSummary[i][j] != SummaryEntry::dirty)
 				buf[pointer + j/8] |= 1 << j%8;
 		}
-		pointer += dev->param->data_pages_per_area / 8;
+		pointer += dev->param->dataPagesPerArea / 8;
 	}
 
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "%u bytes have been written to Buffer", pointer);
@@ -344,7 +344,7 @@ Result writeSuperPageIndex(Dev* dev, Addr addr, superIndex* entry){
 	uint64_t page_offs = getPageNumber(addr, dev);
 	Result r;
 	for(unsigned page = 0; page < needed_pages; page++){
-		unsigned int btw = pointer + dev->param->data_bytes_per_page < needed_bytes ? dev->param->data_bytes_per_page
+		unsigned int btw = pointer + dev->param->dataBytesPerPage < needed_bytes ? dev->param->dataBytesPerPage
 							: needed_bytes - pointer;
 		r = dev->driver->writePage(page_offs + page, &buf[pointer], btw);
 		if(r != Result::ok)
@@ -364,10 +364,10 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, bool withAreaM
 		return Result::einval;
 
 	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
-		dev->param->areas_no * sizeof(Area)
-		+ 2 * dev->param->data_pages_per_area / 8; /* One bit per entry, two entries for INDEX and DATA section. Others dont have summaries*/
+		dev->param->areasNo * sizeof(Area)
+		+ 2 * dev->param->dataPagesPerArea / 8; /* One bit per entry, two entries for INDEX and DATA section. Others dont have summaries*/
 
-	unsigned int needed_pages = needed_bytes / BYTES_PER_PAGE + 1;
+	unsigned int needed_pages = needed_bytes / dataBytesPerPage + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Maximum Pages needed to read SuperIndex: %d (%d bytes, 2 AS'es)", needed_pages, needed_bytes);
 
 	char buf[needed_bytes];
@@ -376,7 +376,7 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, bool withAreaM
 	uint64_t page_offs = getPageNumber(addr, dev);
 	Result r;
 	for(unsigned page = 0; page < needed_pages; page++){
-		unsigned int btr = pointer + dev->param->data_bytes_per_page < needed_bytes ? dev->param->data_bytes_per_page
+		unsigned int btr = pointer + dev->param->dataBytesPerPage < needed_bytes ? dev->param->dataBytesPerPage
 							: needed_bytes - pointer;
 		r = dev->driver->readPage(page_offs + page, &buf[pointer], btr);
 		if(r != Result::ok)
@@ -395,7 +395,7 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, bool withAreaM
 	entry->asPositions[0] = 0;
 	entry->asPositions[1] = 0;
 	unsigned char pospos = 0;	//Stupid name
-	for(unsigned int i = 0; i < dev->param->areas_no; i++){
+	for(unsigned int i = 0; i < dev->param->areasNo; i++){
 		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(Area));
 		pointer += sizeof(Area);
 		if((dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)
@@ -403,20 +403,20 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, bool withAreaM
 			entry->asPositions[pospos++] = i;
 	}
 
-	unsigned char pagebuf[BYTES_PER_PAGE];
+	unsigned char pagebuf[dataBytesPerPage];
 	for(unsigned int i = 0; i < 2; i++){
 		if(entry->asPositions[i] <= 0)
 			continue;
 
-		for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
+		for(unsigned int j = 0; j < dev->param->dataPagesPerArea; j++){
 			if(buf[pointer + j/8] & 1 << j%8){
 				//TODO: Normally, we would check in the OOB for a Checksum or so, which is present all the time
 				Addr tmp = combineAddress(entry->asPositions[i], j);
-				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dev->param->data_bytes_per_page);
+				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dev->param->dataBytesPerPage);
 				if(r != Result::ok)
 					return r;
 				bool contains_data = false;
-				for(unsigned int byte = 0; byte < dev->param->data_bytes_per_page; byte++){
+				for(unsigned int byte = 0; byte < dev->param->dataBytesPerPage; byte++){
 					if(pagebuf[byte] != 0xFF){
 						contains_data = true;
 						break;
@@ -430,7 +430,7 @@ Result readSuperPageIndex(Dev* dev, Addr addr, superIndex* entry, bool withAreaM
 				entry->areaSummary[i][j] = SummaryEntry::dirty;
 			}
 		}
-		pointer += dev->param->data_pages_per_area / 8;
+		pointer += dev->param->dataPagesPerArea / 8;
 	}
 
 	return Result::ok;

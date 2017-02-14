@@ -115,22 +115,36 @@ Result Paffs::initializeDevice(const char* devicename){
 	device.param = &device.driver->param;
 
 	Param* param = device.param;
-	param->areas_no = param->blocks / 2;	//For now: 16 b -> 8 Areas
-	param->blocks_per_area = param->blocks / param->areas_no;
-	param->data_bytes_per_page = param->total_bytes_per_page - param->oob_bytes_per_page;
-	param->total_pages_per_area = param->pages_per_block * param->blocks_per_area;
+	param->areasNo = param->blocks / 2;	//For now: 16 b -> 8 Areas
+	param->blocksPerArea = param->blocks / param->areasNo;
+	param->dataBytesPerPage = param->totalBytesPerPage - param->oobBytesPerPage;
+	param->totalPagesPerArea = param->pagesPerBlock * param->blocksPerArea;
 	unsigned int needed_pages_for_AS = 1;	//Todo: actually calculate
-	param->data_pages_per_area = param->total_pages_per_area - needed_pages_for_AS;
-	device.areaMap = new Area[param->areas_no];
-	memset(device.areaMap, 0, sizeof(Area) * param->areas_no);
+	param->dataPagesPerArea = param->totalPagesPerArea - needed_pages_for_AS;
+	device.areaMap = new Area[param->areasNo];
+	memset(device.areaMap, 0, sizeof(Area) * param->areasNo);
 
 	device.activeArea[AreaType::superblock] = 0;
 	device.activeArea[AreaType::index] = 0;
 	device.activeArea[AreaType::journal] = 0;
 	device.activeArea[AreaType::data] = 0;
 
-	if(param->blocks_per_area < 2){
+	if(param->blocksPerArea < 2){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device too small, at least 12 Blocks are needed!");
+		return Result::einval;
+	}
+
+	if(param->dataBytesPerPage != dataBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Total bytes per Page differs between "
+				"calculation and global define! (%d, %d)",
+				param->dataBytesPerPage, dataBytesPerPage);
+		return Result::einval;
+	}
+
+	if(param->dataPagesPerArea != dataPagesPerArea){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "'Data pages per Area' differs between "
+				"calculation and global define! (%d, %d)",
+				param->dataPagesPerArea, dataBytesPerPage);
 		return Result::einval;
 	}
 
@@ -150,7 +164,7 @@ Result Paffs::format(const char* devicename){
 		return r;
 
 	unsigned char had_areaType = 0;		//Efficiency hack, bc there are less than 2⁸ area types
-	for(unsigned int area = 0; area < device.param->areas_no; area++){
+	for(unsigned int area = 0; area < device.param->areasNo; area++){
 		device.areaMap[area].status = AreaStatus::empty;
 		device.areaMap[area].erasecount = 0;
 		device.areaMap[area].position = area;
@@ -228,7 +242,7 @@ Result Paffs::mnt(const char* devicename){
 	}
 
 
-	for(AreaPos i = 0; i < device.param->areas_no; i++){
+	for(AreaPos i = 0; i < device.param->areasNo; i++){
 		if(device.areaMap[i].type == AreaType::garbageBuffer){
 			device.activeArea[AreaType::garbageBuffer] = i;
 		}
@@ -245,10 +259,10 @@ Result Paffs::unmnt(const char* devicename){
 
 	if(trace_mask && PAFFS_TRACE_AREA){
 		printf("Info: \n");
-		for(unsigned int i = 0; i < device.param->areas_no; i++){
+		for(unsigned int i = 0; i < device.param->areasNo; i++){
 			printf("\tArea %d on %u as %10s from page %4d %s\n"
 					, i, device.areaMap[i].position, area_names[device.areaMap[i].type]
-					, device.areaMap[i].position*device.param->blocks_per_area*device.param->pages_per_block
+					, device.areaMap[i].position*device.param->blocksPerArea*device.param->pagesPerBlock
 					, areaStatusNames[device.areaMap[i].status]);
 		}
 	}

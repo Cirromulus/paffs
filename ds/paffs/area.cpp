@@ -43,7 +43,7 @@ unsigned int findWritableArea(AreaType areaType, Dev* dev){
 		}
 	}*/
 
-	for(unsigned int area = 0; area < dev->param->areas_no; area++){
+	for(unsigned int area = 0; area < dev->param->areasNo; area++){
 		if(dev->areaMap[area].type == AreaType::unset){
 			dev->areaMap[area].type = areaType;
 			initArea(dev, area);
@@ -69,7 +69,7 @@ unsigned int findWritableArea(AreaType areaType, Dev* dev){
 
 Result findFirstFreePage(unsigned int* p_out, Dev* dev, unsigned int area){
 	Result r;
-	for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
+	for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
 		if(getPageStatus(dev, area, i,&r) == SummaryEntry::free){
 			*p_out = i;
 			return Result::ok;
@@ -83,14 +83,14 @@ Result findFirstFreePage(unsigned int* p_out, Dev* dev, unsigned int area){
 Result manageActiveAreaFull(Dev *dev, AreaPos *area, AreaType areaType){
 	Result r;
 	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
-		for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
+		for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
 			if(getPageStatus(dev, *area, i,&r) > SummaryEntry::dirty)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries (%s)!", *area, resultMsg[(int)r]);
 		}
 	}
 
 	bool isFull = true;
-	for(unsigned int i = 0; i < dev->param->data_pages_per_area; i++){
+	for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
 		if(getPageStatus(dev, *area, i,&r) == SummaryEntry::free) {
 			isFull = false;
 			break;
