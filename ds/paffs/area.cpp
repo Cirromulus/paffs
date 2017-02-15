@@ -138,13 +138,6 @@ Result closeArea(Dev *dev, AreaPos area){
 
 void retireArea(Dev *dev, AreaPos area){
 	dev->areaMap[area].status = AreaStatus::closed;
-
-	//This is not needed, because Garbage Collection automatically deletes AS
-	/*Result r = deleteSummary(dev, area);
-	if(r != Result::ok){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete AreaSummary of retired Area %d!", area);
-	}*/
-
 	dev->areaMap[area].type = AreaType::retired;
 
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %u at pos. %u.", area, dev->areaMap[area].position);
