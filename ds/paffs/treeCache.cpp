@@ -13,17 +13,7 @@
 
 namespace paffs{
 
-static int16_t cache_root = 0;
-
-static TreeCacheNode cache[treeNodeCacheSize];
-
-static uint8_t cache_usage[(treeNodeCacheSize/8)+1];
-
-//Just for debug/tuning purposes
-static uint16_t cache_hits = 0;
-static uint16_t cache_misses = 0;
-
-void setIndexUsed(uint16_t index){
+void TreeCache::setIndexUsed(uint16_t index){
 	if(index > treeNodeCacheSize){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Index used at %u!", index);
 		lasterr = Result::bug;
@@ -31,7 +21,7 @@ void setIndexUsed(uint16_t index){
 	cache_usage[index / 8] |= 1 << index % 8;
 }
 
-void setIndexFree(uint16_t index){
+void TreeCache::setIndexFree(uint16_t index){
 	if(index > treeNodeCacheSize){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Index free at %u!", index);
 		lasterr = Result::bug;
@@ -39,7 +29,7 @@ void setIndexFree(uint16_t index){
 	cache_usage[index / 8] &= ~(1 << index % 8);
 }
 
-bool isIndexUsed(uint16_t index){
+bool TreeCache::isIndexUsed(uint16_t index){
 	if(index > treeNodeCacheSize){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to query Index Used at %u!", index);
 		lasterr = Result::bug;
@@ -48,7 +38,7 @@ bool isIndexUsed(uint16_t index){
 	return cache_usage[index / 8] & (1 << index % 8);
 }
 
-int16_t findFirstFreeIndex(){
+int16_t TreeCache::findFirstFreeIndex(){
 	for(int i = 0; i <= treeNodeCacheSize/8; i++){
 		if(cache_usage[i] != 0xFF)
 			for(int j = 0; j < 8; j++)
@@ -58,7 +48,7 @@ int16_t findFirstFreeIndex(){
 	return -1;
 }
 
-int16_t getIndexFromPointer(TreeCacheNode* tcn){
+int16_t TreeCache::getIndexFromPointer(TreeCacheNode* tcn){
 	if(tcn - cache > treeNodeCacheSize){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Index from Pointer not inside array (%p)!", tcn);
 		lasterr = Result::bug;
@@ -67,12 +57,12 @@ int16_t getIndexFromPointer(TreeCacheNode* tcn){
 	return tcn - cache;
 }
 
-void initCache(){
+void TreeCache::initCache(){
 	memset(cache, 0, treeNodeCacheSize * sizeof(TreeCacheNode));
 	memset(cache_usage, 0, treeNodeCacheSize / 8 + 1);
 }
 
-Result addNewCacheNode(TreeCacheNode** newTcn){
+Result TreeCache::addNewCacheNode(TreeCacheNode** newTcn){
 	int16_t index = findFirstFreeIndex();
 	if(index < 0){
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache is full!");
@@ -89,8 +79,8 @@ Result addNewCacheNode(TreeCacheNode** newTcn){
  * The new tcn->parent has to be changed _before_ calling another addNewCacheNode!
  * IDEA: Lock nodes when operating to prevent deletion
  */
-Result addNewCacheNodeWithPossibleFlush(Dev* dev, TreeCacheNode** newTcn){
-	Result r = addNewCacheNode(newTcn);
+Result TreeCache:::addNewCacheNodeWithPossibleFlush(TreeCacheNode** newTcn){
+	Result TreeCache::r = addNewCacheNode(newTcn);
 	if(r == Result::ok)
 		return r;
 	if(r != Result::lowmem)
@@ -147,7 +137,7 @@ Result addNewCacheNodeWithPossibleFlush(Dev* dev, TreeCacheNode** newTcn){
 	return r;
 }
 
-bool isParentPathClean(TreeCacheNode* tcn){
+bool TreeCache::isParentPathClean(TreeCacheNode* tcn){
 	if(tcn->dirty)
 		return false;
 	if(tcn->parent == tcn)
@@ -164,7 +154,7 @@ bool isParentPathClean(TreeCacheNode* tcn){
  * returns true if any sibling is dirty
  * stops at first occurrence.
  */
-bool areSiblingsClean(TreeCacheNode* tcn){
+bool TreeCache::areSiblingsClean(TreeCacheNode* tcn){
 	if(tcn->dirty)
 		return false;
 	if(tcn->raw.is_leaf)
@@ -180,7 +170,7 @@ bool areSiblingsClean(TreeCacheNode* tcn){
 	return true;
 }
 
-bool isSubTreeValid(TreeCacheNode* node, uint8_t* cache_node_reachable, InodeNo keyMin, InodeNo keyMax){
+bool TreeCache::isSubTreeValid(TreeCacheNode* node, uint8_t* cache_node_reachable, InodeNo keyMin, InodeNo keyMax){
 
 	cache_node_reachable[getIndexFromPointer(node) / 8] |= 1 << getIndexFromPointer(node) % 8;
 
@@ -274,7 +264,7 @@ bool isSubTreeValid(TreeCacheNode* node, uint8_t* cache_node_reachable, InodeNo 
 }
 
 
-bool isTreeCacheValid(){
+bool TreeCache::isTreeCacheValid(){
 	//Just for debugging purposes
 	//TODO: Switch to deactivate this costly but safer execution
 	uint8_t cache_node_reachable[(treeNodeCacheSize/8)+1];
@@ -311,7 +301,7 @@ bool isTreeCacheValid(){
  * returns true if path contains dirty elements
  * traverses through all paths and marks them
  */
-bool resolveDirtyPaths(TreeCacheNode* tcn){
+bool TreeCache::resolveDirtyPaths(TreeCacheNode* tcn){
 	if(tcn->raw.is_leaf)
 		return tcn->dirty;
 
@@ -329,7 +319,7 @@ bool resolveDirtyPaths(TreeCacheNode* tcn){
 	return anyDirt | tcn->dirty;
 }
 
-void markParentPathDirty(TreeCacheNode* tcn){
+void TreeCache::markParentPathDirty(TreeCacheNode* tcn){
 	tcn->dirty = true;
 	if(tcn->parent == tcn)
 		return;
@@ -341,7 +331,7 @@ void markParentPathDirty(TreeCacheNode* tcn){
 	return markParentPathDirty(tcn->parent);
 }
 
-void deleteFromParent(TreeCacheNode* tcn){
+void TreeCache::deleteFromParent(TreeCacheNode* tcn){
 	if(tcn == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete NULL node from Parent!");
 		lasterr = Result::bug;
@@ -370,7 +360,7 @@ void deleteFromParent(TreeCacheNode* tcn){
 }
 
 
-bool hasNoSiblings(TreeCacheNode* tcn){
+bool TreeCache::hasNoSiblings(TreeCacheNode* tcn){
 	if(tcn->raw.is_leaf)
 		return true;
 	for(int i = 0; i <= tcn->raw.num_keys; i++)
@@ -379,7 +369,7 @@ bool hasNoSiblings(TreeCacheNode* tcn){
 	return true;
 }
 
-void deletePathToRoot(TreeCacheNode* tcn){
+void TreeCache::deletePathToRoot(TreeCacheNode* tcn){
 	if(tcn->dirty)
 		return;
 
@@ -388,22 +378,11 @@ void deletePathToRoot(TreeCacheNode* tcn){
 	if(tcn->parent != tcn && hasNoSiblings(tcn->parent))
 		deletePathToRoot(tcn->parent);
 }
-/**
- * Builds up cache with Elements in the Path to tcn.
- * Maybe this function has to be everywhere a tcn is accessed...
- */
-/*Result buildUpCacheToNode(Dev* dev, TreeCacheNode* localCopyOfNode, TreeCacheNode** cachedOutputNode){
-	if(localCopyOfNode->raw.is_leaf)
-		return find_leaf(dev, localCopyOfNode->raw.as.leaf.keys[0], cachedOutputNode);
-
-	return find_branch(dev, localCopyOfNode, cachedOutputNode);
-}*/
-
 
 /*
  * Just frees clean leaf nodes
  */
-void cleanTreeCacheLeaves(){
+void TreeCache::cleanTreeCacheLeaves(){
 
 	//debug ---->
 	uint16_t usedCache;
@@ -435,7 +414,7 @@ void cleanTreeCacheLeaves(){
 /*
  * Frees clean nodes
  */
-void cleanTreeCache(){
+void TreeCache::cleanTreeCache(){
 	//TODO: This only removes one layer of clean nodes, should check whole path to root
 	//debug ---->
 	uint16_t usedCache;
@@ -469,7 +448,7 @@ void cleanTreeCache(){
 /**
  * Deletes all the nodes
  */
-void deleteTreeCache(){
+void TreeCache::TreeCache::deleteTreeCache(){
 	memset(cache_usage, 0, treeNodeCacheSize/8 + 1);
 	memset(cache, 0, treeNodeCacheSize * sizeof(TreeCacheNode));
 }
@@ -477,7 +456,7 @@ void deleteTreeCache(){
 /**
  * Takes the node->raw.self to update parents flash pointer
  */
-Result updateFlashAddressInParent(Dev* dev, TreeCacheNode* node){
+Result TreeCache::updateFlashAddressInParent(TreeCacheNode* node){
 	if(node->parent == node){
 		//Rootnode
 		return registerRootnode(dev, node->raw.self);
@@ -492,8 +471,8 @@ Result updateFlashAddressInParent(Dev* dev, TreeCacheNode* node){
 	return Result::nf;
 }
 
-Result commitNodesRecursively(Dev* dev, TreeCacheNode* node) {
-	Result r;
+Result TreeCache::TreeCache::commitNodesRecursively(TreeCacheNode* node) {
+	Result TreeCache::r;
 	if(node->raw.is_leaf){
 		r = writeTreeNode(dev, &node->raw);
 		if(r != Result::ok){
@@ -527,7 +506,7 @@ Result commitNodesRecursively(Dev* dev, TreeCacheNode* node) {
  * Commits complete Tree to Flash
  */
 
-Result commitTreeCache(Dev* dev){
+Result TreeCache::TreeCache::commitTreeCache(){
 
 	if(!isTreeCacheValid()){
 		return Result::bug;
@@ -544,7 +523,7 @@ Result commitTreeCache(Dev* dev){
 	resolveDirtyPaths(&cache[cache_root]);
 	if(lasterr != Result::ok)
 		return lasterr;
-	Result r = commitNodesRecursively(dev, &cache[cache_root]);
+	Result TreeCache::r = commitNodesRecursively(dev, &cache[cache_root]);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write Node to flash! (%s)", err_msg(r));
 		return r;
@@ -571,7 +550,7 @@ Result commitTreeCache(Dev* dev){
  * This locks specified treeCache node and its path from Rootnode
  * To prevent Cache GC from deleting it
  */
-Result lockTreeCacheNode(Dev* dev, TreeCacheNode* tcn){
+Result TreeCache::TreeCache::lockTreeCacheNode(TreeCacheNode* tcn){
 	tcn->locked = true;
 	if(tcn->parent == NULL)
 		return Result::ok;	//FIXME: Is it allowed to violate the treerules?
@@ -586,7 +565,7 @@ Result lockTreeCacheNode(Dev* dev, TreeCacheNode* tcn){
 	return Result::ok;
 }
 
-bool hasLockedChilds(Dev* dev, TreeCacheNode* tcn){
+bool TreeCache::hasLockedChilds(TreeCacheNode* tcn){
 	if(tcn == NULL){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Node is invalid!");
 		return false;
@@ -604,7 +583,7 @@ bool hasLockedChilds(Dev* dev, TreeCacheNode* tcn){
 	return false;
 }
 
-Result unlockTreeCacheNode(Dev* dev, TreeCacheNode* tcn){
+Result TreeCache::unlockTreeCacheNode(TreeCacheNode* tcn){
 	if(!tcn->locked){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Tried to double-unlock node n° %d!", getIndexFromPointer(tcn));
 	}
@@ -639,7 +618,7 @@ Result unlockTreeCacheNode(Dev* dev, TreeCacheNode* tcn){
 }
 
 
-Result getRootNodeFromCache(Dev* dev, TreeCacheNode** tcn){
+Result TreeCache::getRootNodeFromCache(TreeCacheNode** tcn){
 	if(isIndexUsed(cache_root)){
 		*tcn = &cache[cache_root];
 		cache_hits++;
@@ -654,7 +633,7 @@ Result getRootNodeFromCache(Dev* dev, TreeCacheNode** tcn){
 		PAFFS_DBG(PAFFS_TRACE_TREE, "get Rootnode, but does not exist!");
 
 	TreeCacheNode* new_root;
-	Result r = addNewCacheNode(&new_root);
+	Result TreeCache::r = addNewCacheNode(&new_root);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Rootnode can't be loaded, cache size (%d) too small!", treeNodeCacheSize);
 		return r;
@@ -672,7 +651,7 @@ Result getRootNodeFromCache(Dev* dev, TreeCacheNode** tcn){
 /**
  * Possible cache flush. Tree could be empty except for path to child! (and parent, of course)
  */
-Result getTreeNodeAtIndexFrom(Dev* dev, unsigned char index,
+Result TreeCache::getTreeNodeAtIndexFrom(unsigned char index,
 									TreeCacheNode* parent, TreeCacheNode** child){
 	if(index > branchOrder){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access index greater than branch size!");
@@ -710,7 +689,7 @@ Result getTreeNodeAtIndexFrom(Dev* dev, unsigned char index,
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache Miss");
 
 	lockTreeCacheNode(dev, parent);
-	Result r = addNewCacheNodeWithPossibleFlush(dev, &target);
+	Result TreeCache::r = addNewCacheNodeWithPossibleFlush(dev, &target);
 	if(r == Result::flushedcache){
 
 	}else if(r != Result::ok){
@@ -723,13 +702,13 @@ Result getTreeNodeAtIndexFrom(Dev* dev, unsigned char index,
 	parent->pointers[index] = target;
 	*child = target;
 
-	Result r2 = readTreeNode(dev, parent->raw.as.branch.pointers[index], &(*child)->raw);
+	Result TreeCache::r2 = readTreeNode(dev, parent->raw.as.branch.pointers[index], &(*child)->raw);
 	if(r2 != Result::ok)
 		return r2;
 	return r;
 }
 
-Result removeCacheNode(Dev* dev, TreeCacheNode* tcn){
+Result TreeCache::removeCacheNode(TreeCacheNode* tcn){
 	setIndexFree(getIndexFromPointer(tcn));
 	if(tcn->raw.self != 0) {
 		return deleteTreeNode(dev, &tcn->raw);
@@ -738,7 +717,7 @@ Result removeCacheNode(Dev* dev, TreeCacheNode* tcn){
 	return Result::ok;
 }
 
-Result setCacheRoot(Dev* dev, TreeCacheNode* rootTcn){
+Result TreeCache::setCacheRoot(TreeCacheNode* rootTcn){
 	if(rootTcn->parent != rootTcn){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: setCacheRoot with root->parent not pointing to itself");
 		return Result::bug;
@@ -749,7 +728,7 @@ Result setCacheRoot(Dev* dev, TreeCacheNode* rootTcn){
 
 
 //debug
-uint16_t getCacheUsage(){
+uint16_t TreeCache::getCacheUsage(){
 	uint16_t usage = 0;
 	for(unsigned int i = 0; i < treeNodeCacheSize; i++){
 		if(isIndexUsed(i))
@@ -758,18 +737,18 @@ uint16_t getCacheUsage(){
 	return usage;
 }
 
-uint16_t getCacheSize(){
+uint16_t TreeCache::getCacheSize(){
 	return treeNodeCacheSize;
 }
 
-uint16_t getCacheHits(){
+uint16_t TreeCache::getCacheHits(){
 	return cache_hits;
 }
-uint16_t getCacheMisses(){
+uint16_t TreeCache::getCacheMisses(){
 	return cache_misses;
 }
 
-void printSubtree(int layer, TreeCacheNode* node){
+void TreeCache::printSubtree(int layer, TreeCacheNode* node){
 	for(int i = 0; i < layer; i++){
 		printf(".");
 	}
@@ -814,7 +793,7 @@ void printSubtree(int layer, TreeCacheNode* node){
 	}
 
 }
-void printTreeCache(){
+void TreeCache::printTreeCache(){
 	printf("----------------\n");
 	if(isIndexUsed(cache_root)){
 		printSubtree(0, &cache[cache_root]);

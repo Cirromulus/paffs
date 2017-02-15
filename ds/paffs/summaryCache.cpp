@@ -5,20 +5,14 @@
  *      Author: Pascal Pieper
  */
 
-
+#include "device.hpp"
 #include "summaryCache.hpp"
 #include "superblock.hpp"
 #include "driver/driver.hpp"
 
 namespace paffs {
 
-SummaryEntry summaryCache[areaSummaryCacheSize][dataPagesPerArea];
-//FIXME Translation needs to be as big as there are Areas. This is bad.
-//TODO: Use Linked List or HashMap.
-//Translates from areaPosition to summaryCachePosition
-int16_t translation[areaSummaryCacheSize] = {-1,-1,-1,-1,-1,-1,-1,-1};
-
-int findNextFreeCacheEntry(){
+int SummaryCache::findNextFreeCacheEntry(){
 	//from summaryCache to AreaPosition
 	bool used[areaSummaryCacheSize] = {0};
 	for(int i = 0; i < areaSummaryCacheSize; i++){
@@ -32,7 +26,7 @@ int findNextFreeCacheEntry(){
 	return -1;
 }
 
-Result setPageStatus(Dev* dev, AreaPos area, uint8_t page, SummaryEntry state){
+Result SummaryCache::setPageStatus(AreaPos area, uint8_t page, SummaryEntry state){
 	if(areaSummaryCacheSize < area){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
 		return Result::nimpl;
@@ -54,7 +48,7 @@ Result setPageStatus(Dev* dev, AreaPos area, uint8_t page, SummaryEntry state){
 	return Result::ok;
 }
 
-SummaryEntry getPageStatus(Dev* dev, AreaPos area, uint8_t page, Result *result){
+SummaryEntry SummaryCache::getPageStatus(AreaPos area, uint8_t page, Result *result){
 	if(areaSummaryCacheSize < area){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
 		*result = Result::nimpl;
@@ -87,7 +81,7 @@ SummaryEntry getPageStatus(Dev* dev, AreaPos area, uint8_t page, Result *result)
 	return summaryCache[translation[area]][page];
 }
 
-SummaryEntry* getSummaryStatus(Dev* dev, AreaPos area, Result *result){
+SummaryEntry* SummaryCache::getSummaryStatus(AreaPos area, Result *result){
 	if(areaSummaryCacheSize < area){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
 		*result = Result::nimpl;
@@ -108,7 +102,7 @@ SummaryEntry* getSummaryStatus(Dev* dev, AreaPos area, Result *result){
 	return summaryCache[translation[area]];
 }
 
-Result setSummaryStatus(Dev* dev, AreaPos area, SummaryEntry* summary){
+Result SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary){
 	if(areaSummaryCacheSize < area){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
 		return Result::nimpl;
@@ -127,7 +121,7 @@ Result setSummaryStatus(Dev* dev, AreaPos area, SummaryEntry* summary){
 	return Result::ok;
 }
 
-Result deleteSummary(Dev* dev, AreaPos area){
+Result SummaryCache::deleteSummary(AreaPos area){
 	if(areaSummaryCacheSize < area){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
 		return Result::nimpl;
@@ -142,7 +136,7 @@ Result deleteSummary(Dev* dev, AreaPos area){
 	return Result::ok;
 }
 
-Result loadAreaSummaries(Dev* dev){
+Result SummaryCache::loadAreaSummaries(){
 	for(AreaPos i = 0; i < 2; i++){
 		memset(summaryCache[i], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 	}
@@ -166,7 +160,7 @@ Result loadAreaSummaries(Dev* dev){
 	return Result::ok;
 }
 
-Result commitAreaSummaries(Dev* dev){
+Result SummaryCache::commitAreaSummaries(){
 	//TODO: commit all Areas except two of the emptiest
 
 
@@ -188,7 +182,7 @@ Result commitAreaSummaries(Dev* dev){
 	return commitSuperIndex(dev, &index);
 }
 
-uint64_t getPageNumber(Addr addr, Dev *dev){
+uint64_t SummaryCache::getPageNumber(Addr addr, Dev *dev){
 	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
 								dev->param->totalPagesPerArea;
 	page += extractPage(addr);
@@ -199,7 +193,7 @@ uint64_t getPageNumber(Addr addr, Dev *dev){
 	return page;
 }
 
-Result writeAreasummary(Dev *dev, AreaPos area, SummaryEntry* summary){
+Result SummaryCache::writeAreasummary(Dev *dev, AreaPos area, SummaryEntry* summary){
 	unsigned int needed_bytes = 1 + dev->param->dataPagesPerArea / 8;
 	unsigned int needed_pages = 1 + needed_bytes / dev->param->dataBytesPerPage;
 	if(needed_pages != dev->param->totalPagesPerArea - dev->param->dataPagesPerArea){

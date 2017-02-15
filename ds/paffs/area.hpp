@@ -12,20 +12,20 @@ extern const char* area_names[];
 extern const char* areaStatusNames[];
 
 //Returns same area if there is still writable Space left
-unsigned int findWritableArea(AreaType areaType, Dev* dev);
+unsigned int findWritableArea(AreaType areaType, Device* dev);
 
-Result findFirstFreePage(unsigned int* p_out, Dev* dev, unsigned int area);
+Result findFirstFreePage(unsigned int* p_out, Device* dev, unsigned int area);
 
-uint64_t getPageNumber(Addr addr, Dev *dev);	//Translates Addr to physical page number in respect to the Area mapping
+uint64_t getPageNumber(Addr addr, Device *dev);	//Translates Addr to physical page number in respect to the Area mapping
 
-Result manageActiveAreaFull(Dev *dev, AreaPos *area, AreaType areaType);
+Result manageActiveAreaFull(Device *dev, AreaPos *area, AreaType areaType);
 
-Result writeAreasummary(Dev *dev, AreaPos area, SummaryEntry* summary);
+Result writeAreasummary(Device *dev, AreaPos area, SummaryEntry* summary);
 
-Result readAreasummary(Dev *dev, AreaPos area, SummaryEntry* out_summary, bool complete);
+Result readAreasummary(Device *dev, AreaPos area, SummaryEntry* out_summary, bool complete);
 
-void initArea(Dev* dev, AreaPos area);
-//Result loadArea(Dev *dev, AreaPos area);
-Result closeArea(Dev *dev, AreaPos area);
-void retireArea(Dev *dev, AreaPos area);
+void initArea(Device* dev, AreaPos area);
+//Result loadArea(Device *dev, AreaPos area);
+Result closeArea(Device *dev, AreaPos area);
+void retireArea(Device *dev, AreaPos area);
 }  // namespace paffs

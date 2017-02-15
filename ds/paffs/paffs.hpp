@@ -13,6 +13,7 @@
 namespace paffs{
 
 class Driver;
+class Device;
 
 enum class Result : uint8_t{
 	ok = 0,
@@ -163,19 +164,12 @@ struct Area{	//TODO: Maybe packed? Slow, but less RAM
 	AreaPos position;	//physical position, not logical
 };	//4 + 2 + 17 + 32 = 55 Bit = 7 Byte
 
-struct Dev{
-	Param* param;
-	AreaPos activeArea[AreaType::no];
-	Area* areaMap;
-	Driver *driver;
-};
-
 Addr combineAddress(uint32_t logical_area, uint32_t page);
 unsigned int extractLogicalArea(Addr addr);
 unsigned int extractPage(Addr addr);
 
 class Paffs{
-	Dev device = {0};
+	Device *device;
 
 public:
 	Paffs();
@@ -212,23 +206,7 @@ public:
 	Result remove(const char* path);
 
 	//ONLY FOR DEBUG
-	Dev* getDevice();
-
-private:
-	Result initializeDevice(const char* devicename);
-	Result destroyDevice(const char* devicename);
-
-	Result createInode(Inode* outInode, Permission mask);
-	Result createDirInode(Inode* outInode, Permission mask);
-	Result createFilInode(Inode* outInode, Permission mask);
-	void destroyInode(Inode* node);
-	Result getParentDir(const char* fullPath, Inode* parDir, unsigned int *lastSlash);
-	Result getInodeInDir( Inode* outInode, Inode* folder, const char* name);
-	Result getInodeOfElem( Inode* outInode, const char* fullPath);
-	//newElem should be already inserted in Tree
-	Result insertInodeInDir(const char* name, Inode* contDir, Inode* newElem);
-	Result removeInodeFromDir(Inode* contDir, Inode* elem);
-	Result createFile(Inode* outFile, const char* fullPath, Permission mask);
+	Device* getDevice();
 
 };
 }

@@ -9,23 +9,43 @@
 #include "paffs.hpp"
 namespace paffs {
 
-extern SummaryEntry summaryCache[areaSummaryCacheSize][dataPagesPerArea];
+class SummaryCache{
+	SummaryEntry summaryCache[areaSummaryCacheSize][dataPagesPerArea];
+	//FIXME Translation needs to be as big as there are Areas. This is bad.
+	//TODO: Use Linked List or HashMap.
+	//Translates from areaPosition to summaryCachePosition
+	int16_t translation[areaSummaryCacheSize] = {-1,-1,-1,-1,-1,-1,-1,-1};
+	Device* dev;
 
-Result setPageStatus(Dev* dev, AreaPos area, uint8_t page, SummaryEntry state);
+public:
 
-SummaryEntry getPageStatus(Dev* dev, AreaPos area, uint8_t page, Result *result);
+	SummaryCache(Device* dev) : dev(dev){};
 
-Result setSummaryStatus(Dev* dev, AreaPos area, SummaryEntry* summary);
+	Result setPageStatus(AreaPos area, uint8_t page, SummaryEntry state);
 
-SummaryEntry* getSummaryStatus(Dev* dev, AreaPos area, Result *result);
+	SummaryEntry getPageStatus(AreaPos area, uint8_t page, Result *result);
 
-//for retired or unused Areas
-Result deleteSummary(Dev* dev, AreaPos area);
+	Result setSummaryStatus(AreaPos area, SummaryEntry* summary);
 
-//Loads all unclosed AreaSummaries in RAM upon Mount
-Result loadAreaSummaries(Dev* dev);
+	SummaryEntry* getSummaryStatus(AreaPos area, Result *result);
 
-Result commitAreaSummaries(Dev* dev);
+	//for retired or unused Areas
+	Result deleteSummary(AreaPos area);
+
+	//Loads all unclosed AreaSummaries in RAM upon Mount
+	Result loadAreaSummaries();
+
+	Result commitAreaSummaries();
+
+private:
+
+	int findNextFreeCacheEntry();
+
+	uint64_t getPageNumber(Addr addr);
+
+	Result readAreasummary(AreaPos area, SummaryEntry* out_summary, bool complete);
+
+};
 
 
 }  // namespace paffs

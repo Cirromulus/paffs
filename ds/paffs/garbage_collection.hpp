@@ -11,6 +11,6 @@
 
 namespace paffs {
 
-Result collectGarbage(Dev* dev, AreaType target);
+Result collectGarbage(Device* dev, AreaType target);
 
 }

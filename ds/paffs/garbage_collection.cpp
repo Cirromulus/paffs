@@ -17,7 +17,7 @@ namespace paffs{
  * It could be possible that closed area contains free pages which count as
  * dirty in this case.
  */
-uint32_t countDirtyPages(Dev* dev, AreaPos area){
+uint32_t countDirtyPages(Device* dev, AreaPos area){
 	uint32_t dirty = 0;
 	Result r;
 	for(uint32_t i = 0; i < dev->param->dataPagesPerArea; i++){
@@ -30,7 +30,7 @@ uint32_t countDirtyPages(Dev* dev, AreaPos area){
 	return dirty;
 }
 
-AreaPos findNextBestArea(Dev* dev, AreaType target, SummaryEntry* out_summary, bool* srcAreaContainsData){
+AreaPos findNextBestArea(Device* dev, AreaType target, SummaryEntry* out_summary, bool* srcAreaContainsData){
 	AreaPos favourite_area = 0;
 	uint32_t fav_dirty_pages = 0;
 	*srcAreaContainsData = true;
@@ -74,7 +74,7 @@ AreaPos findNextBestArea(Dev* dev, AreaType target, SummaryEntry* out_summary, b
 /**
  * @param summary is input and output (with changed SummaryEntry::dirty to SummaryEntry::free)
  */
-Result moveValidDataToNewArea(Dev* dev, AreaPos srcArea, AreaPos dstArea, SummaryEntry* summary){
+Result moveValidDataToNewArea(Device* dev, AreaPos srcArea, AreaPos dstArea, SummaryEntry* summary){
 	PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "Moving valid data from Area %u (on %u) to Area %u (on %u)"
 	, srcArea, dev->areaMap[srcArea].position, dstArea, dev->areaMap[dstArea].position);
 	for(unsigned long page = 0; page < dev->param->dataPagesPerArea; page++){
@@ -100,7 +100,7 @@ Result moveValidDataToNewArea(Dev* dev, AreaPos srcArea, AreaPos dstArea, Summar
 	return Result::ok;
 }
 
-Result deleteArea(Dev* dev, AreaPos area){
+Result deleteArea(Device* dev, AreaPos area){
 	for(unsigned int i = 0; i < dev->param->blocksPerArea; i++){
 		Result r = dev->driver->eraseBlock(dev->areaMap[area].position*dev->param->blocksPerArea + i);
 		if(r != Result::ok){
@@ -122,7 +122,7 @@ Result deleteArea(Dev* dev, AreaPos area){
  *
  * Changes active Area to one of the new freed areas.
  */
-Result collectGarbage(Dev* dev, AreaType targetType){
+Result collectGarbage(Device* dev, AreaType targetType){
 	SummaryEntry summary[dev->param->dataPagesPerArea];
 	memset(summary, 0xFF, dev->param->dataPagesPerArea);
 	bool srcAreaContainsData = false;

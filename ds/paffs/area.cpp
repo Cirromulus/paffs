@@ -5,6 +5,7 @@
  *      Author: Pascal Pieper
  */
 #include "area.hpp"
+#include "device.hpp"
 #include "garbage_collection.hpp"
 #include "summaryCache.hpp"
 #include <stdlib.h>
@@ -28,7 +29,7 @@ const char* areaStatusNames[] = {
 };
 
 
-unsigned int findWritableArea(AreaType areaType, Dev* dev){
+unsigned int findWritableArea(AreaType areaType, Device* dev){
 	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != AreaStatus::closed){
 		//current Area has still space left
 		return dev->activeArea[areaType];
@@ -36,14 +37,14 @@ unsigned int findWritableArea(AreaType areaType, Dev* dev){
 
 	/* This is now done by SummaryCache
 	//Look for active Areas loaded from Superblock
-	for(unsigned int area = 0; area < dev->param->areas_no; area++){
+	for(unsigned int area = 0; area < dev->param.areas_no; area++){
 		if(dev->areaMap[area].type == areaType && dev->areaMap[area].status == AreaStatus::active){
 			PAFFS_DBG_S(PAFFS_TRACE_AREA, "Active Area %d is chosen for new Target.", area);
 			return area;
 		}
 	}*/
 
-	for(unsigned int area = 0; area < dev->param->areasNo; area++){
+	for(unsigned int area = 0; area < dev->param.areasNo; area++){
 		if(dev->areaMap[area].type == AreaType::unset){
 			dev->areaMap[area].type = areaType;
 			initArea(dev, area);
@@ -73,10 +74,10 @@ unsigned int findWritableArea(AreaType areaType, Dev* dev){
 	return 0;
 }
 
-Result findFirstFreePage(unsigned int* p_out, Dev* dev, unsigned int area){
+Result findFirstFreePage(unsigned int* p_out, Device* dev, unsigned int area){
 	Result r;
-	for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
-		if(getPageStatus(dev, area, i,&r) == SummaryEntry::free){
+	for(unsigned int i = 0; i < dev->param.dataPagesPerArea; i++){
+		if(dev->sumCache.getPageStatus(area, i,&r) == SummaryEntry::free){
 			*p_out = i;
 			return Result::ok;
 		}
@@ -86,18 +87,18 @@ Result findFirstFreePage(unsigned int* p_out, Dev* dev, unsigned int area){
 	return Result::nosp;
 }
 
-Result manageActiveAreaFull(Dev *dev, AreaPos *area, AreaType areaType){
+Result manageActiveAreaFull(Device *dev, AreaPos *area, AreaType areaType){
 	Result r;
 	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
-		for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
-			if(getPageStatus(dev, *area, i,&r) > SummaryEntry::dirty)
+		for(unsigned int i = 0; i < dev->param.dataPagesPerArea; i++){
+			if(dev->sumCache.getPageStatus(*area, i,&r) > SummaryEntry::dirty)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries (%s)!", *area, resultMsg[(int)r]);
 		}
 	}
 
 	bool isFull = true;
-	for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
-		if(getPageStatus(dev, *area, i,&r) == SummaryEntry::free) {
+	for(unsigned int i = 0; i < dev->param.dataPagesPerArea; i++){
+		if(dev->sumCache.getPageStatus(*area, i,&r) == SummaryEntry::free) {
 			isFull = false;
 			break;
 		}
@@ -116,27 +117,27 @@ Result manageActiveAreaFull(Dev *dev, AreaPos *area, AreaType areaType){
 
 
 //TODO: Add initAreaAs(...) to handle typical areaMap[abc].type = def; initArea(...);
-void initArea(Dev* dev, AreaPos area){
+void initArea(Device* dev, AreaPos area){
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %u (pos %u) as %s.", (unsigned int)area, (unsigned int)dev->areaMap[area].position, area_names[dev->areaMap[area].type]);
 	dev->areaMap[area].status = AreaStatus::active;
 }
 
-/*Result loadArea(Dev *dev, AreaPos area){
+/*Result loadArea(Device *dev, AreaPos area){
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Loading Areasummary of Area %u (pos %u) as %s.", area, dev->areaMap[area].position, area_names[dev->areaMap[area].type]);
 	if(dev->areaMap[area].type != AreaType::dataarea && dev->areaMap[area].type != AreaType::indexarea){
 		return Result::ok;
 	}
-	return readAreasummary(dev, area, dev->areaMap[area].areaSummary, true);
+	return readAreasummary(area, dev->areaMap[area].areaSummary, true);
 }*/
 
-Result closeArea(Dev *dev, AreaPos area){
+Result closeArea(Device *dev, AreaPos area){
 	dev->areaMap[area].status = AreaStatus::closed;
 
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Closed %s Area %u at pos. %u.", area_names[dev->areaMap[area].type], area, dev->areaMap[area].position);
 	return Result::ok;
 }
 
-void retireArea(Dev *dev, AreaPos area){
+void retireArea(Device *dev, AreaPos area){
 	dev->areaMap[area].status = AreaStatus::closed;
 	dev->areaMap[area].type = AreaType::retired;
 
