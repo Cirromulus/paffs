@@ -51,9 +51,15 @@ unsigned int findWritableArea(AreaType areaType, Dev* dev){
 		}
 	}
 
-	Result r = collectGarbage(dev, areaType);
+ 	Result r = collectGarbage(dev, areaType);
 	if(r != Result::ok){
 		lasterr = r;
+		return 0;
+	}
+
+	if(dev->areaMap[dev->activeArea[areaType]].status > AreaStatus::empty){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "garbage Collection returned invalid Status! (was %d, should <%d)",dev->areaMap[dev->activeArea[areaType]].status, AreaStatus::empty);
+		lasterr = Result::bug;
 		return 0;
 	}
 
@@ -133,10 +139,11 @@ Result closeArea(Dev *dev, AreaPos area){
 void retireArea(Dev *dev, AreaPos area){
 	dev->areaMap[area].status = AreaStatus::closed;
 
-	Result r = deleteSummary(dev, area);
+	//This is not needed, because Garbage Collection automatically deletes AS
+	/*Result r = deleteSummary(dev, area);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete AreaSummary of retired Area %d!", area);
-	}
+	}*/
 
 	dev->areaMap[area].type = AreaType::retired;
 

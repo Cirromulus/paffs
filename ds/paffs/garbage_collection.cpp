@@ -75,6 +75,8 @@ AreaPos findNextBestArea(Dev* dev, AreaType target, SummaryEntry* out_summary, b
  * @param summary is input and output (with changed SummaryEntry::dirty to SummaryEntry::free)
  */
 Result moveValidDataToNewArea(Dev* dev, AreaPos srcArea, AreaPos dstArea, SummaryEntry* summary){
+	PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "Moving valid data from Area %u (on %u) to Area %u (on %u)"
+	, srcArea, dev->areaMap[srcArea].position, dstArea, dev->areaMap[dstArea].position);
 	for(unsigned long page = 0; page < dev->param->dataPagesPerArea; page++){
 		if(summary[page] == SummaryEntry::used){
 			uint64_t src = dev->areaMap[srcArea].position * dev->param->totalPagesPerArea + page;
@@ -108,13 +110,6 @@ Result deleteArea(Dev* dev, AreaPos area){
 		}
 	}
 	dev->areaMap[area].erasecount++;
-	Result r;
-	SummaryEntry* as = getSummaryStatus(dev, area, &r);
-	if(r != Result::ok || as == NULL){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not free Areasummary after deletion of Area %d!", area);
-		return r;
-	}
-	memset(as, (char) SummaryEntry::free, dev->param->dataPagesPerArea);
 	return Result::ok;
 }
 
@@ -129,15 +124,11 @@ Result deleteArea(Dev* dev, AreaPos area){
  */
 Result collectGarbage(Dev* dev, AreaType targetType){
 	SummaryEntry summary[dev->param->dataPagesPerArea];
-	memset(summary, 0, dev->param->dataPagesPerArea);
+	memset(summary, 0xFF, dev->param->dataPagesPerArea);
 	bool srcAreaContainsData = false;
 	bool desperateMode = dev->activeArea[AreaType::garbageBuffer] == 0;	//If we have no AreaType::garbage_buffer left
 	AreaPos deletion_target = 0;
 	Result r;
-
-	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
-		memset(summary, 0xFF, dev->param->dataPagesPerArea);
-	}
 
 	if(desperateMode){
 		/*TODO: The last Straw.
@@ -242,8 +233,17 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 			//Notify for used Pages
 			dev->areaMap[deletion_target].status = AreaStatus::active;	//Safe, because we can assume deletion targetType is same Type as we want (from getNextBestArea)
 		}else{
-			//This is not necessary because write function handles empty areas by itself
-			//				memset(dev->areaMap[deletion_target].areaSummary, 0, dev->param->data_pages_per_area);
+			/*memset(summary, (char) SummaryEntry::free, dev->param->dataPagesPerArea);
+			r = setSummaryStatus(dev, deletion_target, summary);
+			if(r != Result::ok){
+				PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not free AS of area %d", deletion_target);
+				return r;
+			}*/
+			r = deleteSummary(dev, deletion_target);
+			if(r != Result::ok){
+				PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not free AS of area %d", deletion_target);
+				return r;
+			}
 			dev->areaMap[deletion_target].status = AreaStatus::empty;
 		}
 
@@ -254,7 +254,7 @@ Result collectGarbage(Dev* dev, AreaType targetType){
 			if(trace_mask && (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
 				printf("Info: \n");
 				for(unsigned int i = 0; i < dev->param->areasNo; i++){
-					printf("\tArea %d on %u as %10s with %u erases\n", i, dev->areaMap[i].position, area_names[dev->areaMap[i].type], dev->areaMap[i].erasecount);
+					printf("\tArea %d on %u as %10s with %3u erases\n", i, dev->areaMap[i].position, area_names[dev->areaMap[i].type], dev->areaMap[i].erasecount);
 				}
 			}
 		}else if(r != Result::ok){

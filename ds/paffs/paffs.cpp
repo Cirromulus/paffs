@@ -34,11 +34,11 @@ unsigned int trace_mask =
 	PAFFS_TRACE_CACHE |
 	//PAFFS_TRACE_SCAN |
 	//PAFFS_TRACE_WRITE |
-	PAFFS_TRACE_SUPERBLOCK |
+	//PAFFS_TRACE_SUPERBLOCK |
 	//PAFFS_TRACE_ALLOCATE |
 	PAFFS_TRACE_VERIFY_AS |
 	PAFFS_TRACE_GC |
-	//PAFFS_TRACE_GC_DETAIL |
+	PAFFS_TRACE_GC_DETAIL |
 	0;
 
 const char* resultMsg[] = {
@@ -377,18 +377,26 @@ Result Paffs::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 	unsigned int p = sizeof(DirEntryCount);		//skip directory entry count
 	while(p < folder->size){
 			DirEntryLength direntryl = buf[p];
-			if(direntryl < sizeof(DirEntryLength)){
+			if(direntryl < sizeof(DirEntryLength) + sizeof(InodeNo)){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Directory size of Folder %u is unplausible! (was: %d, should: >%d)", folder->no, direntryl, sizeof(DirEntryLength) + sizeof(InodeNo));
+				free(buf);
+				return Result::bug;
+			}
+			if(direntryl > folder->size){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: direntry length of Folder %u not plausible (was: %d, should: >%d)!", folder->no, direntryl, folder->size);
+				free(buf);
 				return Result::bug;
 			}
 			unsigned int dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
+			if(dirnamel > folder->size){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: dirname length of Inode %u not plausible (was: %d, should: >%d)!", folder->no, folder->size, p + dirnamel);
+				free(buf);
+				return Result::bug;
+			}
 			p += sizeof(DirEntryLength);
 			InodeNo tmp_no;
 			memcpy(&tmp_no, &buf[p], sizeof(InodeNo));
 			p += sizeof(InodeNo);
-			if(p + dirnamel > folder->size){
-				PAFFS_DBG(PAFFS_TRACE_ERROR, "ERROR: foldersize of Inode %u not plausible!", folder->no);
-				return Result::fail;
-			}
 			char* tmpname = (char*) malloc((dirnamel+1) * sizeof(char));
 			memcpy(tmpname, &buf[p], dirnamel);
 			tmpname[dirnamel] = 0;
@@ -396,8 +404,9 @@ Result Paffs::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 			if(strcmp(name, tmpname) == 0){
 				//Eintrag gefunden
 				if(getInode(&device, tmp_no, outInode) != Result::ok){
-					PAFFS_DBG(PAFFS_TRACE_BUG, "Result::bug: Found Element '%s' in dir, but did not find its Inode (No. %d) in Index!", tmpname, tmp_no);
+					PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Found Element '%s' in dir, but did not find its Inode (No. %d) in Index!", tmpname, tmp_no);
 					free(tmpname);
+					free(buf);
 					return Result::bug;
 				}
 				free(tmpname);
