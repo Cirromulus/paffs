@@ -50,8 +50,11 @@ struct TreeCacheNode{
 
 class Btree{
 	Device* dev;
+	TreeCache cache;
 public:
-	Btree(Device* dev) : dev(dev){};
+	Btree(Device* dev) : dev(dev){
+		cache = TreeCache(dev);
+	};
 
 	Result insertInode(Inode* inode);
 	Result getInode(InodeNo number, Inode* outInode);

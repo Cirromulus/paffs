@@ -15,7 +15,8 @@
 namespace paffs{
 
 Device::Device(Driver* driver) : driver(driver){
-
+	tree = Btree(this);
+	sumCache = SummaryCache(this);
 }
 
 Device::~Device(){

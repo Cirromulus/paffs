@@ -5,12 +5,12 @@
  *      Author: Pascal Pieper
  */
 
+#include "dataIO.hpp"
 #include "driver/driver.hpp"
 #include "area.hpp"
-#include "summaryCache.hpp"
+#include "device.hpp"
 #include <stdlib.h>
 #include <string.h>
-#include "dataIO.hpp"
 
 namespace paffs{
 
@@ -19,15 +19,15 @@ namespace paffs{
 //modifies inode->size and inode->reserved size as well
 Result writeInodeData(Inode* inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_written,
-					const char* data, Dev* dev){
+					const char* data, Device* dev){
 
 	if(offs+bytes == 0){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Write size 0! Bug?");
 		return lasterr = Result::einval;
 	}
 
-	unsigned int pageFrom = offs/dev->param->dataBytesPerPage;
-	unsigned int pageTo = (offs + bytes - 1) / dev->param->dataBytesPerPage;
+	unsigned int pageFrom = offs/dev->param.dataBytesPerPage;
+	unsigned int pageTo = (offs + bytes - 1) / dev->param.dataBytesPerPage;
 
 	if(pageTo - pageFrom > 11){
 		//Would use first indirection Layer
@@ -35,7 +35,7 @@ Result writeInodeData(Inode* inode,
 		return lasterr = Result::nimpl;
 	}
 
-	unsigned int pageOffs = offs % dev->param->dataBytesPerPage;
+	unsigned int pageOffs = offs % dev->param.dataBytesPerPage;
 	*bytes_written = 0;
 
 	Result res;
@@ -60,18 +60,18 @@ Result writeInodeData(Inode* inode,
 		}
 		Addr pageAddress = combineAddress(dev->activeArea[AreaType::data], firstFreePage);
 
-		res = setPageStatus(dev, dev->activeArea[AreaType::data], firstFreePage, SummaryEntry::used);
+		res = dev->sumCache.setPageStatus(dev->activeArea[AreaType::data], firstFreePage, SummaryEntry::used);
 		if(res != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[(int)res]);
 		}
 
 		//Prepare buffer and calculate bytes to write
-		char* buf = &((char*)data)[page*dev->param->dataBytesPerPage];
+		char* buf = &((char*)data)[page*dev->param.dataBytesPerPage];
 		unsigned int btw = bytes - *bytes_written;
-		if((bytes+pageOffs) > dev->param->dataBytesPerPage){
-			btw = (bytes+pageOffs) > (page+1)*dev->param->dataBytesPerPage ?
-						dev->param->dataBytesPerPage - pageOffs :
-						bytes - page*dev->param->dataBytesPerPage;
+		if((bytes+pageOffs) > dev->param.dataBytesPerPage){
+			btw = (bytes+pageOffs) > (page+1)*dev->param.dataBytesPerPage ?
+						dev->param.dataBytesPerPage - pageOffs :
+						bytes - page*dev->param.dataBytesPerPage;
 		}
 
 
@@ -83,23 +83,23 @@ Result writeInodeData(Inode* inode,
 			unsigned long oldPage = extractPage(inode->direct[page+pageFrom]);
 
 
-			if((btw + pageOffs < dev->param->dataBytesPerPage &&
-				page*dev->param->dataBytesPerPage + btw < inode->size) ||  //End Misaligned
+			if((btw + pageOffs < dev->param.dataBytesPerPage &&
+				page*dev->param.dataBytesPerPage + btw < inode->size) ||  //End Misaligned
 				(pageOffs > 0 && page == 0)){				//Start Misaligned
 
 				//fill write buffer with valid Data
 				misaligned = true;
-				buf = (char*)malloc(dev->param->dataBytesPerPage);
-				memset(buf, 0xFF, dev->param->dataBytesPerPage);
+				buf = (char*)malloc(dev->param.dataBytesPerPage);
+				memset(buf, 0xFF, dev->param.dataBytesPerPage);
 
-				unsigned int btr = dev->param->dataBytesPerPage;
+				unsigned int btr = dev->param.dataBytesPerPage;
 
-				if((pageFrom+1+page)*dev->param->dataBytesPerPage > inode->size){
-					btr = inode->size - (pageFrom+page) * dev->param->dataBytesPerPage;
+				if((pageFrom+1+page)*dev->param.dataBytesPerPage > inode->size){
+					btr = inode->size - (pageFrom+page) * dev->param.dataBytesPerPage;
 				}
 
 				unsigned int bytes_read = 0;
-				Result r = readInodeData(inode, (pageFrom+page)*dev->param->dataBytesPerPage, btr, &bytes_read, buf, dev);
+				Result r = readInodeData(inode, (pageFrom+page)*dev->param.dataBytesPerPage, btr, &bytes_read, buf, dev);
 				if(r != Result::ok || bytes_read != btr){
 					free(buf);
 					return Result::bug;
@@ -122,7 +122,7 @@ Result writeInodeData(Inode* inode,
 			}
 
 			//Mark old pages dirty
-			res = setPageStatus(dev, oldArea, oldPage, SummaryEntry::dirty);
+			res = dev->sumCache.setPageStatus(oldArea, oldPage, SummaryEntry::dirty);
 			if(res != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[(int)res]);
 			}
@@ -130,7 +130,7 @@ Result writeInodeData(Inode* inode,
 		}else{
 			//we are writing to a new page
 			*bytes_written += btw;
-			inode->reservedSize += dev->param->dataBytesPerPage;
+			inode->reservedSize += dev->param.dataBytesPerPage;
 		}
 		inode->direct[page+pageFrom] = pageAddress;
 
@@ -154,11 +154,11 @@ Result writeInodeData(Inode* inode,
 	if(inode->size < *bytes_written + offs)
 		inode->size = *bytes_written + offs;
 
-	return updateExistingInode(dev, inode);
+	return dev->tree.updateExistingInode(inode);
 }
 Result readInodeData(Inode* inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_read,
-					char* data, Dev* dev){
+					char* data, Device* dev){
 
 	if(offs+bytes == 0){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read size 0! Bug?");
@@ -166,9 +166,9 @@ Result readInodeData(Inode* inode,
 	}
 
 	*bytes_read = 0;
-	unsigned int pageFrom = offs/dev->param->dataBytesPerPage;
-	unsigned int pageTo = (offs + bytes - 1) / dev->param->dataBytesPerPage;
-	unsigned int pageOffs = offs % dev->param->dataBytesPerPage;
+	unsigned int pageFrom = offs/dev->param.dataBytesPerPage;
+	unsigned int pageTo = (offs + bytes - 1) / dev->param.dataBytesPerPage;
+	unsigned int pageOffs = offs % dev->param.dataBytesPerPage;
 
 
 	if(offs + bytes > inode->size){
@@ -190,13 +190,13 @@ Result readInodeData(Inode* inode,
 	}
 
 	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
-		char* buf = &wrap[page*dev->param->dataBytesPerPage];
+		char* buf = &wrap[page*dev->param.dataBytesPerPage];
 
 		unsigned int btr = bytes + pageOffs - *bytes_read;
-		if(btr > dev->param->dataBytesPerPage){
-			btr = (bytes + pageOffs) > (page+1)*dev->param->dataBytesPerPage ?
-						dev->param->dataBytesPerPage :
-						(bytes + pageOffs) - page*dev->param->dataBytesPerPage;
+		if(btr > dev->param.dataBytesPerPage){
+			btr = (bytes + pageOffs) > (page+1)*dev->param.dataBytesPerPage ?
+						dev->param.dataBytesPerPage :
+						(bytes + pageOffs) - page*dev->param.dataBytesPerPage;
 		}
 
 		AreaPos area = extractLogicalArea(inode->direct[page + pageFrom]);
@@ -206,7 +206,7 @@ Result readInodeData(Inode* inode,
 		}
 		Result r;
 		if(trace_mask && PAFFS_TRACE_VERIFY_AS){
-			SummaryEntry e = getPageStatus(dev, extractLogicalArea(inode->direct[page + pageFrom])
+			SummaryEntry e = dev->sumCache.getPageStatus(extractLogicalArea(inode->direct[page + pageFrom])
 					,extractPage(inode->direct[page + pageFrom]), &r);
 			if(r != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load AreaSummary of area %d for verification!", extractLogicalArea(inode->direct[page + pageFrom]));
@@ -249,10 +249,10 @@ Result readInodeData(Inode* inode,
 
 
 //inode->size and inode->reservedSize is altered.
-Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs){
+Result deleteInodeData(Inode* inode, Device* dev, unsigned int offs){
 	//TODO: This calculation contains errors in border cases
-	unsigned int pageFrom = offs/dev->param->dataBytesPerPage;
-	unsigned int pageTo = (inode->size - 1) / dev->param->dataBytesPerPage;
+	unsigned int pageFrom = offs/dev->param.dataBytesPerPage;
+	unsigned int pageTo = (inode->size - 1) / dev->param.dataBytesPerPage;
 
 	if(inode->size < offs){
 		//Offset bigger than actual filesize
@@ -270,7 +270,7 @@ Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs){
 	if(inode->reservedSize == 0)
 		return Result::ok;
 
-	if(inode->size >= inode->reservedSize - dev->param->dataBytesPerPage)
+	if(inode->size >= inode->reservedSize - dev->param.dataBytesPerPage)
 		//doesn't leave a whole page blank
 		return Result::ok;
 
@@ -288,7 +288,7 @@ Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs){
 		}
 
 		Result r;
-		if(getPageStatus(dev, area, relPage, &r) == SummaryEntry::dirty){
+		if(dev->sumCache.getPageStatus(area, relPage, &r) == SummaryEntry::dirty){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of outdated (dirty)"
 					" data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),
 					extractPage(inode->direct[page + pageFrom]));
@@ -301,14 +301,14 @@ Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs){
 		}
 
 		//Mark old pages dirty
-		r = setPageStatus(dev, area, relPage, SummaryEntry::dirty);
+		r = dev->sumCache.setPageStatus(area, relPage, SummaryEntry::dirty);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write AreaSummary for area %d,"
 					" so no invalidation of data!", area);
 			return r;
 		}
 
-		inode->reservedSize -= dev->param->dataBytesPerPage;
+		inode->reservedSize -= dev->param.dataBytesPerPage;
 		inode->direct[page+pageFrom] = 0;
 
 	}
@@ -317,20 +317,20 @@ Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs){
 }
 
 //Does not change addresses in parent Nodes
-Result writeTreeNode(Dev* dev, TreeNode* node){
+Result writeTreeNode(Device* dev, TreeNode* node){
 	if(node == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode NULL");
 				return Result::bug;
 	}
-	if(sizeof(TreeNode) > dev->param->dataBytesPerPage){
+	if(sizeof(TreeNode) > dev->param.dataBytesPerPage){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page"
-				" (Was %u, should %u)", sizeof(TreeNode), dev->param->dataBytesPerPage);
+				" (Was %u, should %u)", sizeof(TreeNode), dev->param.dataBytesPerPage);
 		return Result::bug;
 	}
 
 	if(node->self != 0){
 		//We have to invalidate former position first
-		Result r = setPageStatus(dev, extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);
+		Result r = dev->sumCache.setPageStatus(extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate old Page!");
 			return r;
@@ -357,7 +357,7 @@ Result writeTreeNode(Dev* dev, TreeNode* node){
 	node->self = addr;
 
 	//Mark Page as used
-	Result r = setPageStatus(dev, dev->activeArea[AreaType::index], firstFreePage, SummaryEntry::used);
+	Result r = dev->sumCache.setPageStatus(dev->activeArea[AreaType::index], firstFreePage, SummaryEntry::used);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
 		return r;
@@ -375,13 +375,13 @@ Result writeTreeNode(Dev* dev, TreeNode* node){
 	return Result::ok;
 }
 
-Result readTreeNode(Dev* dev, Addr addr, TreeNode* node){
+Result readTreeNode(Device* dev, Addr addr, TreeNode* node){
 	if(node == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode NULL");
 		return Result::bug;
 	}
-	if(sizeof(TreeNode) > dev->param->dataBytesPerPage){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page (Was %u, should %u)", sizeof(TreeNode), dev->param->dataBytesPerPage);
+	if(sizeof(TreeNode) > dev->param.dataBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page (Was %u, should %u)", sizeof(TreeNode), dev->param.dataBytesPerPage);
 		return Result::bug;
 	}
 
@@ -398,7 +398,7 @@ Result readTreeNode(Dev* dev, Addr addr, TreeNode* node){
 
 	Result r;
 	if(trace_mask && PAFFS_TRACE_VERIFY_AS){
-		if(getPageStatus(dev, extractLogicalArea(addr), extractPage(addr),&r) == SummaryEntry::dirty){
+		if(dev->sumCache.getPageStatus(extractLogicalArea(addr), extractPage(addr),&r) == SummaryEntry::dirty){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "READ operation of obsoleted data at %X:%X", extractLogicalArea(addr), extractPage(addr));
 			return Result::bug;
 		}
@@ -419,8 +419,8 @@ Result readTreeNode(Dev* dev, Addr addr, TreeNode* node){
 	return Result::ok;
 }
 
-Result deleteTreeNode(Dev* dev, TreeNode* node){
-	return setPageStatus(dev, extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);
+Result deleteTreeNode(Device* dev, TreeNode* node){
+	return dev->sumCache.setPageStatus(extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);
 }
 
 

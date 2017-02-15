@@ -18,17 +18,17 @@ namespace paffs{
 //Updates changes to treeCache as well
 Result writeInodeData(Inode* inode,
 					unsigned int offs, unsigned int bytes,unsigned int *bytes_written,
-					const char* data, Dev* dev);
+					const char* data, Device* dev);
 Result readInodeData(Inode* inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_read,
-					char* data, Dev* dev);
-Result deleteInodeData(Inode* inode, Dev* dev, unsigned int offs);
+					char* data, Device* dev);
+Result deleteInodeData(Inode* inode, Device* dev, unsigned int offs);
 
 
 // TreeNode related
-Result writeTreeNode(Dev* dev, TreeNode* node);
-Result readTreeNode(Dev* dev, Addr addr, TreeNode* node);
-Result deleteTreeNode(Dev* dev, TreeNode* node);
+Result writeTreeNode(Device* dev, TreeNode* node);
+Result readTreeNode(Device* dev, Addr addr, TreeNode* node);
+Result deleteTreeNode(Device* dev, TreeNode* node);
 }
 
 #endif /* PAFFS_FLASH_H_ */
