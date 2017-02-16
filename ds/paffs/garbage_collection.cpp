@@ -6,10 +6,11 @@
  */
 
 #include "garbage_collection.hpp"
-#include "area.hpp"
-#include "summaryCache.hpp"
-#include "dataIO.hpp"
 #include "driver/driver.hpp"
+#include "summaryCache.hpp"
+#include "device.hpp"
+#include "dataIO.hpp"
+#include "area.hpp"
 
 namespace paffs{
 
@@ -21,7 +22,7 @@ uint32_t countDirtyPages(Device* dev, AreaPos area){
 	uint32_t dirty = 0;
 	Result r;
 	for(uint32_t i = 0; i < dev->param->dataPagesPerArea; i++){
-		if(getPageStatus(dev, area, i, &r) != SummaryEntry::used)
+		if(dev->sumCache.getPageStatus(area, i, &r) != SummaryEntry::used)
 			dirty++;
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not determine Pagestatus for Garbagecollection!");
@@ -43,7 +44,7 @@ AreaPos findNextBestArea(Device* dev, AreaType target, SummaryEntry* out_summary
 
 			uint32_t dirty_pages = countDirtyPages(dev, i);
 			Result r;
-			curr = getSummaryStatus(dev, i, &r);
+			curr = dev->sumCache.getSummaryStatus(i, &r);
 			if(r != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Could not load Summary of Area %d for Garbage collection!", i);
 				return 0;
@@ -176,7 +177,7 @@ Result collectGarbage(Device* dev, AreaType targetType){
 			//Resurrect area, fill it with the former summary. In end routine, positions will be swapped.
 			dev->areaMap[lastDeletionTarget].type = targetType;
 			initArea(dev, lastDeletionTarget);
-			r = setSummaryStatus(dev, lastDeletionTarget, summary);
+			r = dev->sumCache.setSummaryStatus(lastDeletionTarget, summary);
 			if(r != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not move former Summary to area %d!", lastDeletionTarget);
 				return r;
@@ -187,7 +188,7 @@ Result collectGarbage(Device* dev, AreaType targetType){
 
 		if(trace_mask & PAFFS_TRACE_VERIFY_AS){
 			//Just for debug, in production AS might be invalid and summary may be incomplete
-			SummaryEntry *tmp = getSummaryStatus(dev, deletion_target, &r);
+			SummaryEntry *tmp = dev->sumCache.getSummaryStatus(deletion_target, &r);
 			if(tmp == NULL || r != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_VERIFY_AS, "Could not verify AreaSummary of area %d!", deletion_target);
 			}
@@ -225,7 +226,7 @@ Result collectGarbage(Device* dev, AreaType targetType){
 				return r;
 			}
 			//Copy the updated (no SummaryEntry::dirty pages) summary to the deletion_target (it will be the fresh area!)
-			r = setSummaryStatus(dev, deletion_target, summary);
+			r = dev->sumCache.setSummaryStatus(deletion_target, summary);
 			if(r != Result::ok){
 				PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not remove dirty entries in AS of area %d", deletion_target);
 				return r;
@@ -234,12 +235,12 @@ Result collectGarbage(Device* dev, AreaType targetType){
 			dev->areaMap[deletion_target].status = AreaStatus::active;	//Safe, because we can assume deletion targetType is same Type as we want (from getNextBestArea)
 		}else{
 			/*memset(summary, (char) SummaryEntry::free, dev->param->dataPagesPerArea);
-			r = setSummaryStatus(dev, deletion_target, summary);
+			r = dev->sumCache.setSummaryStatus(deletion_target, summary);
 			if(r != Result::ok){
 				PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not free AS of area %d", deletion_target);
 				return r;
 			}*/
-			r = deleteSummary(dev, deletion_target);
+			r = dev->sumCache.deleteSummary(deletion_target);
 			if(r != Result::ok){
 				PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not free AS of area %d", deletion_target);
 				return r;

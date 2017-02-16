@@ -10,51 +10,17 @@
 #include <stddef.h>
 
 #include "paffs.hpp"
+#include "treeCache.hpp"
+#include "treeTypes.hpp"
+#include "treequeue.hpp" //Just for printing debug info in tree
 
 namespace paffs{
 
-//Calculates how many pointers a node can hold in one page
-
-static constexpr int branchOrder = (dataBytesPerPage - sizeof(Addr)
-		- sizeof(unsigned char))
-		/ (sizeof(Addr) + sizeof(InodeNo));
-static constexpr int leafOrder = (dataBytesPerPage - sizeof(Addr)
-		- sizeof(unsigned char))
-		/ (sizeof(Inode) + sizeof(InodeNo));
-
-typedef struct TreeNode{
-	union As{
-		struct Branch {
-			InodeNo keys[branchOrder-1];
-			Addr pointers[branchOrder];
-		} branch;
-		struct Leaf {
-			InodeNo keys[leafOrder];
-			Inode pInodes[leafOrder];
-		} leaf;
-	}as;
-	Addr self;	//If '0', it is not committed yet
-	bool is_leaf:1;
-	unsigned char num_keys:7; //If leaf: Number of pInodes
-							//If Branch: Number of addresses - 1
-} treeNode;
-
-struct TreeCacheNode{
-	TreeNode raw;
-	struct TreeCacheNode* parent;	//Parent either points to parent or to node itself if is root. Special case: NULL if node is invalid.
-	struct TreeCacheNode* pointers[branchOrder];
-	bool dirty:1;
-	bool locked:1;
-	bool inheritedLock:1;
-};
-
 class Btree{
 	Device* dev;
-	TreeCache cache;
 public:
-	Btree(Device* dev) : dev(dev){
-		cache = TreeCache(dev);
-	};
+	TreeCache cache;
+	Btree(Device* dev): dev(dev), cache(TreeCache(dev)){};
 
 	Result insertInode(Inode* inode);
 	Result getInode(InodeNo number, Inode* outInode);
@@ -62,13 +28,14 @@ public:
 	Result deleteInode(InodeNo number);
 	Result findFirstFreeNo(InodeNo* outNumber);
 
-
 	void print_tree();
-	void print_leaves(TreeCacheNode* c);
-	void print_keys(TreeCacheNode* c);
-
-
+	Result start_new_tree();
+	Result commitCache();
+	void wipeCache();
 private:
+	void print_leaves(TreeCacheNode* c);
+	void print_queued_keys_r(queue_s* q);
+	void print_keys(TreeCacheNode* c);
 
 	Addr* getPointerAsAddr(char* pointers, unsigned int pos);
 	Inode* getPointerAsInode(char* pointers, unsigned int pos);
@@ -104,8 +71,6 @@ private:
 	Result insert_into_parent(TreeCacheNode * left, InodeNo key, TreeCacheNode * right);
 	Result insert_into_new_root(TreeCacheNode * left, InodeNo key, TreeCacheNode * right);
 	Result insert(Inode* value);
-
-	Result start_new_tree();
 
 	// Deletion.
 

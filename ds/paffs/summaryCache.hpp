@@ -41,9 +41,9 @@ private:
 
 	int findNextFreeCacheEntry();
 
-	uint64_t getPageNumber(Addr addr);
-
 	Result readAreasummary(AreaPos area, SummaryEntry* out_summary, bool complete);
+
+	Result writeAreasummary(AreaPos area, SummaryEntry* summary);
 
 };
 

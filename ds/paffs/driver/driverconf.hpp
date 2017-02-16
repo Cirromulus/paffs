@@ -12,7 +12,6 @@
 
 namespace paffs {
 
-
 	Driver* getDriver(const char* devicename){
 		Driver* out = new SimuDriver();
 		out->param.name = devicename;

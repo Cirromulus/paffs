@@ -14,6 +14,9 @@
 #include <time.h>
 
 #include "../paffs.hpp"
+
+//for debug:
+#include "../device.hpp"
 #include "../btree.hpp"
 #include "../treeCache.hpp"
 
@@ -105,44 +108,45 @@ void printWholeFile(const char* path){
 }
 
 int main(int argc, char** argv){
-	printf("Area: %lu", sizeof(Area));
+	printf("Area: %u", sizeof(Area));
 	fs = new Paffs();
-	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
-	printf("Cache size: %u Bytes\n", getCacheSize() * sizeof(TreeCacheNode));
+	TreeCache *cache = &fs->getDevice()->tree.cache;
+	printf("Cache usage: %d/%d\n", cache->getCacheUsage(), cache->getCacheSize());
+	printf("Cache size: %u Bytes\n", cache->getCacheSize() * sizeof(TreeCacheNode));
 	Result r = fs->format("1");
 	if(r != Result::ok)
 		return -1;
 	r = fs->mnt("1");
 	if(r != Result::ok)
 		return -1;
-	print_tree(fs->getDevice());
+	fs->getDevice()->tree.print_tree();
 	Permission p = R | W;
 	printf("Creating directory /a... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
 	printf("%s\n", err_msg(fs->mkDir("/a", p)));
-	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
-	print_tree(fs->getDevice());
+	printf("Cache usage: %d/%d\n", cache->getCacheUsage(), cache->getCacheSize());
+	fs->getDevice()->tree.print_tree();
 //	while(getchar() == EOF);
 	printf("Creating directory /b... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
 	printf("%s\n", err_msg(fs->mkDir("/b", p)));
-	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
-	print_tree(fs->getDevice());
+	printf("Cache usage: %d/%d\n", cache->getCacheUsage(), cache->getCacheSize());
+	fs->getDevice()->tree.print_tree();
 //	while(getchar() == EOF);
 	printf("Creating directory /b/foo... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
 	printf("%s\n", err_msg(fs->mkDir("/b/foo", p)));
-	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
-	print_tree(fs->getDevice());
+	printf("Cache usage: %d/%d\n", cache->getCacheUsage(), cache->getCacheSize());
+	fs->getDevice()->tree.print_tree();
 	printf("Touching file /b/file ... ");
 	fflush(stdout);
 //	while(getchar() == EOF);
 	printf("%s\n", err_msg(fs->touch ("/b/file")));
-	printf("Cache usage: %d/%d\n", getCacheUsage(), getCacheSize());
-	print_tree(fs->getDevice());
+	printf("Cache usage: %d/%d\n", cache->getCacheUsage(), cache->getCacheSize());
+	fs->getDevice()->tree.print_tree();
 
 	listDir("/");
 
@@ -299,10 +303,10 @@ int main(int argc, char** argv){
 
 	printInfo(&fileInfo);
 
-	print_tree(fs->getDevice());
+	fs->getDevice()->tree.print_tree();
 	printf("Flushing Cache ... ");
 	fflush(stdout);
-	r = commitTreeCache(fs->getDevice());
+	r = cache->commitCache();
 	printf("%s\n", err_msg(r));
 	if(r != Result::ok)
 		return -1;
@@ -385,8 +389,8 @@ int main(int argc, char** argv){
 	printf("Success.\n");
 
 	printf("\nCache-Hits: %d, Cache-Misses: %d\n\tHit ratio: %.5f%%\n",
-			getCacheHits(), getCacheMisses(),
-			100*((float)getCacheHits())/(getCacheHits()+getCacheMisses()));
+			cache->getCacheHits(), cache->getCacheMisses(),
+			100*((float)cache->getCacheHits())/(cache->getCacheHits()+cache->getCacheMisses()));
 //	while(getchar() == EOF);
 	r = fs->unmnt("1");
 	if(r != Result::ok)

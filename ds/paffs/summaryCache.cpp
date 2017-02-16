@@ -5,9 +5,10 @@
  *      Author: Pascal Pieper
  */
 
+#include "area.hpp"
 #include "device.hpp"
-#include "summaryCache.hpp"
 #include "superblock.hpp"
+#include "summaryCache.hpp"
 #include "driver/driver.hpp"
 
 namespace paffs {
@@ -182,18 +183,7 @@ Result SummaryCache::commitAreaSummaries(){
 	return commitSuperIndex(dev, &index);
 }
 
-uint64_t SummaryCache::getPageNumber(Addr addr, Dev *dev){
-	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
-								dev->param->totalPagesPerArea;
-	page += extractPage(addr);
-	if(page > dev->param->areasNo * dev->param->totalPagesPerArea){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "calculated Page number out of range!");
-		return 0;
-	}
-	return page;
-}
-
-Result SummaryCache::writeAreasummary(Dev *dev, AreaPos area, SummaryEntry* summary){
+Result SummaryCache::writeAreasummary(AreaPos area, SummaryEntry* summary){
 	unsigned int needed_bytes = 1 + dev->param->dataPagesPerArea / 8;
 	unsigned int needed_pages = 1 + needed_bytes / dev->param->dataBytesPerPage;
 	if(needed_pages != dev->param->totalPagesPerArea - dev->param->dataPagesPerArea){
@@ -235,7 +225,7 @@ Result SummaryCache::writeAreasummary(Dev *dev, AreaPos area, SummaryEntry* summ
 }
 
 //FIXME: readAreasummary is untested, b/c areaSummaries remain in RAM during unmount
-Result readAreasummary(Dev *dev, AreaPos area, SummaryEntry* out_summary, bool complete){
+Result SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bool complete){
 	unsigned int needed_bytes = 1 + dev->param->dataPagesPerArea / 8 /* One bit per entry*/;
 
 	unsigned int needed_pages = 1 + needed_bytes / dev->param->dataBytesPerPage;

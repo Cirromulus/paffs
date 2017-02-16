@@ -37,14 +37,14 @@ unsigned int findWritableArea(AreaType areaType, Device* dev){
 
 	/* This is now done by SummaryCache
 	//Look for active Areas loaded from Superblock
-	for(unsigned int area = 0; area < dev->param.areas_no; area++){
+	for(unsigned int area = 0; area < dev->param->areas_no; area++){
 		if(dev->areaMap[area].type == areaType && dev->areaMap[area].status == AreaStatus::active){
 			PAFFS_DBG_S(PAFFS_TRACE_AREA, "Active Area %d is chosen for new Target.", area);
 			return area;
 		}
 	}*/
 
-	for(unsigned int area = 0; area < dev->param.areasNo; area++){
+	for(unsigned int area = 0; area < dev->param->areasNo; area++){
 		if(dev->areaMap[area].type == AreaType::unset){
 			dev->areaMap[area].type = areaType;
 			initArea(dev, area);
@@ -76,7 +76,7 @@ unsigned int findWritableArea(AreaType areaType, Device* dev){
 
 Result findFirstFreePage(unsigned int* p_out, Device* dev, unsigned int area){
 	Result r;
-	for(unsigned int i = 0; i < dev->param.dataPagesPerArea; i++){
+	for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
 		if(dev->sumCache.getPageStatus(area, i,&r) == SummaryEntry::free){
 			*p_out = i;
 			return Result::ok;
@@ -87,17 +87,28 @@ Result findFirstFreePage(unsigned int* p_out, Device* dev, unsigned int area){
 	return Result::nosp;
 }
 
+uint64_t getPageNumber(Addr addr, Device* dev){
+	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
+								dev->param->totalPagesPerArea;
+	page += extractPage(addr);
+	if(page > dev->param->areasNo * dev->param->totalPagesPerArea){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "calculated Page number out of range!");
+		return 0;
+	}
+	return page;
+}
+
 Result manageActiveAreaFull(Device *dev, AreaPos *area, AreaType areaType){
 	Result r;
 	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
-		for(unsigned int i = 0; i < dev->param.dataPagesPerArea; i++){
+		for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
 			if(dev->sumCache.getPageStatus(*area, i,&r) > SummaryEntry::dirty)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries (%s)!", *area, resultMsg[(int)r]);
 		}
 	}
 
 	bool isFull = true;
-	for(unsigned int i = 0; i < dev->param.dataPagesPerArea; i++){
+	for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
 		if(dev->sumCache.getPageStatus(*area, i,&r) == SummaryEntry::free) {
 			isFull = false;
 			break;

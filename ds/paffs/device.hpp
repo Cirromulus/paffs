@@ -9,17 +9,13 @@
 #include "summaryCache.hpp"
 #pragma once
 
-//I dont think this is quite elegant
-class TreeCache;
-class SummaryCache;
-
 namespace paffs {
 
 class Device{
 public:
-	Param param;
+	Param *param;
 	AreaPos activeArea[AreaType::no];
-	Area areaMap[];
+	Area *areaMap;
 	Driver *driver;
 
 	Btree tree;

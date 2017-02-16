@@ -6,18 +6,17 @@
  */
 
 #include "device.hpp"
-
 #include "area.hpp"
 #include "dataIO.hpp"
 #include "paffs_trace.hpp"
-#include "driver/driverconf.hpp"
+#include "driver/driver.hpp"
+
+#include <iostream>
 
 namespace paffs{
 
-Device::Device(Driver* driver) : driver(driver){
-	tree = Btree(this);
-	sumCache = SummaryCache(this);
-}
+Device::Device(Driver* driver) : driver(driver)
+	, tree(Btree(this)), sumCache(SummaryCache(this)){};
 
 Device::~Device(){
 	if(areaMap != NULL){
@@ -33,37 +32,37 @@ Device::~Device(){
 }
 
 Result Device::initializeDevice(){
-
-	param.areasNo = param.blocks / 2;	//For now: 16 b -> 8 Areas
-	param.blocksPerArea = param.blocks / param.areasNo;
-	param.dataBytesPerPage = param.totalBytesPerPage - param.oobBytesPerPage;
-	param.totalPagesPerArea = param.pagesPerBlock * param.blocksPerArea;
+	param = &driver->param;
+	param->areasNo = param->blocks / 2;	//For now: 16 b -> 8 Areas
+	param->blocksPerArea = param->blocks / param->areasNo;
+	param->dataBytesPerPage = param->totalBytesPerPage - param->oobBytesPerPage;
+	param->totalPagesPerArea = param->pagesPerBlock * param->blocksPerArea;
 	unsigned int needed_pages_for_AS = 1;	//Todo: actually calculate
-	param.dataPagesPerArea = param.totalPagesPerArea - needed_pages_for_AS;
-	areaMap = new Area[param.areasNo];
-	memset(areaMap, 0, sizeof(Area) * param.areasNo);
+	param->dataPagesPerArea = param->totalPagesPerArea - needed_pages_for_AS;
+	areaMap = new Area[param->areasNo];
+	memset(areaMap, 0, sizeof(Area) * param->areasNo);
 
 	activeArea[AreaType::superblock] = 0;
 	activeArea[AreaType::index] = 0;
 	activeArea[AreaType::journal] = 0;
 	activeArea[AreaType::data] = 0;
 
-	if(param.blocksPerArea < 2){
+	if(param->blocksPerArea < 2){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device too small, at least 12 Blocks are needed!");
 		return Result::einval;
 	}
 
-	if(param.dataBytesPerPage != dataBytesPerPage){
+	if(param->dataBytesPerPage != dataBytesPerPage){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Total bytes per Page differs between "
 				"calculation and global define! (%d, %d)",
-				param.dataBytesPerPage, dataBytesPerPage);
+				param->dataBytesPerPage, dataBytesPerPage);
 		return Result::einval;
 	}
 
-	if(param.dataPagesPerArea != dataPagesPerArea){
+	if(param->dataPagesPerArea != dataPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "'Data pages per Area' differs between "
 				"calculation and global define! (%d, %d)",
-				param.dataPagesPerArea, dataBytesPerPage);
+				param->dataPagesPerArea, dataBytesPerPage);
 		return Result::einval;
 	}
 
@@ -83,7 +82,7 @@ Result Device::format(){
 		return r;
 
 	unsigned char had_areaType = 0;		//Efficiency hack, bc there are less than 2⁸ area types
-	for(unsigned int area = 0; area < param.areasNo; area++){
+	for(unsigned int area = 0; area < param->areasNo; area++){
 		areaMap[area].status = AreaStatus::empty;
 		areaMap[area].erasecount = 0;
 		areaMap[area].position = area;
@@ -91,14 +90,14 @@ Result Device::format(){
 		if(!(had_areaType & 1 << AreaType::superblock)){
 			activeArea[AreaType::superblock] = area;
 			areaMap[area].type = AreaType::superblock;
-			initArea(&device, area);
+			initArea(this, area);
 			had_areaType |= 1 << AreaType::superblock;
 			continue;
 		}
 		if(!(had_areaType & 1 << AreaType::journal)){
 			activeArea[AreaType::journal] = area;
 			areaMap[area].type = AreaType::journal;
-			initArea(&device, area);
+			initArea(this, area);
 			had_areaType |= 1 << AreaType::journal;
 			continue;
 		}
@@ -106,7 +105,7 @@ Result Device::format(){
 		if(!(had_areaType & 1 << AreaType::garbageBuffer)){
 			activeArea[AreaType::garbageBuffer] = area;
 			areaMap[area].type = AreaType::garbageBuffer;
-			initArea(&device, area);
+			initArea(this, area);
 			had_areaType |= 1 << AreaType::garbageBuffer;
 			continue;
 		}
@@ -115,7 +114,7 @@ Result Device::format(){
 
 	}
 
-	r = start_new_tree(&device);
+	r = tree.start_new_tree();
 	if(r != Result::ok)
 		return r;
 
@@ -125,17 +124,17 @@ Result Device::format(){
 		destroyDevice();
 		return r;
 	}
-	r = insertInode(&device, &rootDir);
+	r = tree.insertInode(&rootDir);
 	if(r != Result::ok){
 		destroyDevice();
 		return r;
 	}
-	r = commitTreeCache(&device);
+	r = tree.commitCache();
 	if(r != Result::ok){
 		destroyDevice();
 		return r;
 	}
-	r = commitAreaSummaries(&device);
+	r = sumCache.commitAreaSummaries();
 	if(r != Result::ok){
 		destroyDevice();
 		return r;
@@ -150,7 +149,7 @@ Result Device::mnt(){
 	if(r != Result::ok)
 		return r;
 
-	r = loadAreaSummaries(&device);
+	r = sumCache.loadAreaSummaries();
 	if(r == Result::nf){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Tried mounting a device with an empty superblock!");
 		destroyDevice();
@@ -158,7 +157,7 @@ Result Device::mnt(){
 	}
 
 
-	for(AreaPos i = 0; i < param.areasNo; i++){
+	for(AreaPos i = 0; i < param->areasNo; i++){
 		if(areaMap[i].type == AreaType::garbageBuffer){
 			activeArea[AreaType::garbageBuffer] = i;
 		}
@@ -172,26 +171,26 @@ Result Device::unmnt(){
 
 	if(trace_mask && PAFFS_TRACE_AREA){
 		printf("Info: \n");
-		for(unsigned int i = 0; i < param.areasNo; i++){
+		for(unsigned int i = 0; i < param->areasNo; i++){
 			printf("\tArea %d on %u as %10s from page %4d %s\n"
 					, i, areaMap[i].position, area_names[areaMap[i].type]
-					, areaMap[i].position*param.blocksPerArea*param.pagesPerBlock
+					, areaMap[i].position*param->blocksPerArea*param->pagesPerBlock
 					, areaStatusNames[areaMap[i].status]);
 		}
 	}
 
-	Result r = commitTreeCache(&device);
+	Result r = tree.commitCache();
 	if(r != Result::ok)
 		return r;
 
-	r = commitAreaSummaries(&device);
+	r = sumCache.commitAreaSummaries();
 	if(r != Result::ok)
 		return r;
 
 	destroyDevice();
 
 	//just for cleanup & tests
-	deleteTreeCache();
+	tree.wipeCache();
 
 	return Result::ok;
 }
@@ -200,7 +199,7 @@ Result Device::createInode(Inode* outInode, Permission mask){
 	memset(outInode, 0, sizeof(Inode));
 
 	//FIXME: is this the best way to find a new number?
-	Result r = findFirstFreeNo(&device, &outInode->no);
+	Result r = tree.findFirstFreeNo(&outInode->no);
 	if(r != Result::ok)
 		return r;
 
@@ -238,7 +237,7 @@ Result Device::createFilInode(Inode* outInode, Permission mask){
 }
 
 void Device::destroyInode(Inode* node){
-	deleteInodeData(node, &device, 0);
+	deleteInodeData(node, this, 0);
 	free(node);
 }
 
@@ -281,7 +280,7 @@ Result Device::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 
 	char* buf = (char*) malloc(folder->size);
 	unsigned int bytes_read = 0;
-	Result r = readInodeData(folder, 0, folder->size, &bytes_read, buf, &device);
+	Result r = readInodeData(folder, 0, folder->size, &bytes_read, buf, this);
 	if(r != Result::ok || bytes_read != folder->size){
 		free(buf);
 		return r == Result::ok ? Result::bug : r;
@@ -316,7 +315,7 @@ Result Device::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 			p += dirnamel;
 			if(strcmp(name, tmpname) == 0){
 				//Eintrag gefunden
-				if(getInode(&device, tmp_no, outInode) != Result::ok){
+				if(tree.getInode(tmp_no, outInode) != Result::ok){
 					PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Found Element '%s' in dir, but did not find its Inode (No. %d) in Index!", tmpname, tmp_no);
 					free(tmpname);
 					free(buf);
@@ -335,7 +334,7 @@ Result Device::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 
 Result Device::getInodeOfElem(Inode* outInode, const char* fullPath){
 	Inode root;
-	if(getInode(&device, 0, &root) != Result::ok){
+	if(tree.getInode(0, &root) != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find rootInode! (%s)", resultMsg[static_cast<int>(lasterr)]);
 		return Result::fail;
 	}
@@ -401,7 +400,7 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 	unsigned int bytes = 0;
 	Result r;
 	if(contDir->reservedSize > 0){		//if Directory is not empty
-		r = readInodeData(contDir, 0, contDir->size, &bytes, dirData, &device);
+		r = readInodeData(contDir, 0, contDir->size, &bytes, dirData, this);
 		if(r != Result::ok || bytes != contDir->size){
 			lasterr = r;
 			free(dirData);
@@ -420,7 +419,7 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 	directoryEntryCount ++;
 	memcpy (dirData, &directoryEntryCount, sizeof(DirEntryCount));
 
-	r = writeInodeData(contDir, 0, contDir->size + direntryl, &bytes, dirData, &device);
+	r = writeInodeData(contDir, 0, contDir->size + direntryl, &bytes, dirData, this);
 	free(dirData);
 	free(buf);
 	if(bytes != contDir->size)
@@ -441,7 +440,7 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 	unsigned int bytes = 0;
 	Result r;
 	if(contDir->reservedSize > 0){		//if Directory is not empty
-		r = readInodeData(contDir, 0, contDir->size, &bytes, dirData, &device);
+		r = readInodeData(contDir, 0, contDir->size, &bytes, dirData, this);
 		if(r != Result::ok || bytes != contDir->size){
 			lasterr = r;
 			free(dirData);
@@ -462,7 +461,7 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 			unsigned int newSize = contDir->size - entryl;
 			unsigned int restByte = newSize - pointer;
 
-			if((r = deleteInodeData(contDir, &device, newSize)) != Result::ok)
+			if((r = deleteInodeData(contDir, this, newSize)) != Result::ok)
 				return r;
 
 			if(restByte > 0 && restByte < 4)	//should either be 0 (no entries left) or bigger than 4 (minimum size for one entry)
@@ -475,7 +474,7 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 			memcpy(&dirData[pointer], &dirData[pointer + entryl], restByte);
 
 			unsigned int bw = 0;
-			r = writeInodeData(contDir, 0, newSize, &bw, dirData, &device);
+			r = writeInodeData(contDir, 0, newSize, &bw, dirData, this);
 			free(dirData);
 			return r;
 		}
@@ -497,7 +496,7 @@ Result Device::mkDir(const char* fullPath, Permission mask){
 	Result r = createDirInode(&newDir, mask);
 	if(r != Result::ok)
 		return r;
-	r = insertInode(&device, &newDir);
+	r = tree.insertInode(&newDir);
 	if(r != Result::ok)
 		return r;
 
@@ -523,7 +522,7 @@ Dir* Device::openDir(const char* path){
 	char* dirData = (char*) malloc(dirPinode.size);
 	unsigned int br = 0;
 	if(dirPinode.reservedSize > 0){
-		r = readInodeData(&dirPinode, 0, dirPinode.size, &br, dirData, &device);
+		r = readInodeData(&dirPinode, 0, dirPinode.size, &br, dirData, this);
 		if(r != Result::ok || br != dirPinode.size){
 			lasterr = r;
 			return NULL;
@@ -633,7 +632,7 @@ Dirent* Device::readDir(Dir* dir){
 		return dir->childs[dir->pos++];
 	}
 	Inode item;
-	Result r = getInode(&device, dir->childs[dir->pos]->no, &item);
+	Result r = tree.getInode(dir->childs[dir->pos]->no, &item);
 	if(r != Result::ok){
 	   lasterr = Result::bug;
 	   return NULL;
@@ -669,7 +668,7 @@ Result Device::createFile(Inode* outFile, const char* fullPath, Permission mask)
 	if(createFilInode(outFile, mask) != Result::ok){
 		return Result::bug;
 	}
-	res = insertInode(&device, outFile);
+	res = tree.insertInode(outFile);
 	if(res != Result::ok)
 		return res;
 
@@ -759,7 +758,7 @@ Result Device::touch(const char* path){
 		if(r != Result::ok)
 			return r;
 		file.mod = time(0);
-		return updateExistingInode(&device, &file);
+		return tree.updateExistingInode(&file);
 	}
 
 }
@@ -797,7 +796,7 @@ Result Device::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned in
 		return Result::ok;
 	}
 
-	Result r = readInodeData(obj->dirent->node, obj->fp, bytes_to_read, bytes_read, buf, &device);
+	Result r = readInodeData(obj->dirent->node, obj->fp, bytes_to_read, bytes_read, buf, this);
 	if(r != Result::ok){
 		return r;
 	}
@@ -820,7 +819,7 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 	if((obj->dirent->node->perm & W) == 0)
 		return Result::noperm;
 
-	Result r = writeInodeData(obj->dirent->node, obj->fp, bytes_to_write, bytes_written, buf, &device);
+	Result r = writeInodeData(obj->dirent->node, obj->fp, bytes_to_write, bytes_written, buf, this);
 	if(r != Result::ok){
 		return r;
 	}
@@ -835,7 +834,7 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 			return Result::bug;
 		}
 	}
-	return updateExistingInode(&device, obj->dirent->node);
+	return tree.updateExistingInode(obj->dirent->node);
 }
 
 Result Device::seek(Obj* obj, int m, Seekmode mode){
@@ -868,7 +867,7 @@ Result Device::chmod(const char* path, Permission perm){
 		return r;
 	}
 	object.perm = perm;
-	return updateExistingInode(&device, &object);
+	return tree.updateExistingInode(&object);
 }
 Result Device::remove(const char* path){
 	Inode object;
@@ -883,7 +882,7 @@ Result Device::remove(const char* path){
 		if(object.size > sizeof(DirEntryCount))
 			return Result::dirnotempty;
 
-	if((r = deleteInodeData(&object, &device, 0)) != Result::ok)
+	if((r = deleteInodeData(&object, this, 0)) != Result::ok)
 		return r;
 
 	Inode parentDir;
@@ -893,13 +892,7 @@ Result Device::remove(const char* path){
 
 	if((r = removeInodeFromDir(&parentDir, &object)) != Result::ok)
 		return r;
-	return deleteInode(&device, object.no);
-}
-
-
-//ONLY FOR DEBUG
-Dev* Device::getDevice(){
-	return &device;
+	return tree.deleteInode(object.no);
 }
 
 };
