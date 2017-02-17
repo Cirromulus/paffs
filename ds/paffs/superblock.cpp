@@ -14,14 +14,7 @@
 
 namespace paffs{
 
-
-
-//TODO: Move this to SummaryCache
-static Addr rootnode_addr = 0;
-static bool rootnode_dirty = 0;
-
-
-Result registerRootnode(Device*dev, Addr addr){
+Result Superblock::registerRootnode(Addr addr){
 	if(addr == 0)
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Tried to set Rootnode to 0");
 	rootnode_addr = addr;
@@ -29,7 +22,7 @@ Result registerRootnode(Device*dev, Addr addr){
 	return Result::ok;
 }
 
-Addr getRootnodeAddr(Device*dev){
+Addr Superblock::getRootnodeAddr(){
 	if(rootnode_addr == 0){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "rootnode_address is 0! Maybe device not mounted?");
 	}
@@ -38,9 +31,11 @@ Addr getRootnodeAddr(Device*dev){
 }
 
 
-void printSuperIndex(Device*dev, superIndex* ind){
+void Superblock::printSuperIndex(superIndex* ind){
 	printf("No:\t\t%d\n", ind->no);
-	printf("Rootnode addr.: \t%u:%u\n", extractLogicalArea(ind->rootNode), extractPage(ind->rootNode));
+	printf("Rootnode addr.: \t%u:%u\n",
+			extractLogicalArea(ind->rootNode),
+			extractPage(ind->rootNode));
 	printf("areaMap:\n");
 	AreaPos asOffs = 0;
 	for(AreaPos i = 0; i < 8; i ++){
@@ -66,15 +61,15 @@ void printSuperIndex(Device*dev, superIndex* ind){
 }
 
 
-Result getAddrOfMostRecentSuperIndex(Device*dev, Addr *out){
+Result Superblock::getAddrOfMostRecentSuperIndex(Addr *out){
 
 	uint32_t pos1, index1;
-	Result r1 = findMostRecentEntryInBlock(dev, 0, 0, &pos1, &index1);
+	Result r1 = findMostRecentEntryInBlock(0, 0, &pos1, &index1);
 	if(r1 != Result::ok && r1 != Result::nf)
 		return r1;
 
 	uint32_t pos2, index2;
-	Result r2 = findMostRecentEntryInBlock(dev, 0, 1, &pos2, &index2);
+	Result r2 = findMostRecentEntryInBlock(0, 1, &pos2, &index2);
 	if(r2 != Result::ok && r2 != Result::nf)
 		return r2;
 
@@ -87,7 +82,7 @@ Result getAddrOfMostRecentSuperIndex(Device*dev, Addr *out){
 	return Result::ok;
 }
 
-Result commitSuperIndex(Device*dev, superIndex *newIndex){
+Result Superblock::commitSuperIndex(superIndex *newIndex){
 	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
 				dev->param->areasNo * sizeof(Area)
 				+ 2 * dev->param->dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
@@ -95,14 +90,14 @@ Result commitSuperIndex(Device*dev, superIndex *newIndex){
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed to read former SuperIndex: %d (%d bytes, 2 AS'es)", needed_pages, needed_bytes);
 
 	uint32_t rel_page1 = 0;
-	Result r1 = findFirstFreeEntryInBlock(dev, 0, 0, &rel_page1, needed_pages);
+	Result r1 = findFirstFreeEntryInBlock(0, 0, &rel_page1, needed_pages);
 	if(r1 != Result::ok && r1 != Result::nf){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Error while getting space on first block for new superIndex!");
 		return r1;
 	}
 
 	uint32_t rel_page2 = 0;
-	Result r2 = findFirstFreeEntryInBlock(dev, 0, 1, &rel_page2, needed_pages);
+	Result r2 = findFirstFreeEntryInBlock(0, 1, &rel_page2, needed_pages);
 	if(r2 != Result::ok && r2 != Result::nf){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Error while getting space on second block for new superIndex!");
 		return r2;
@@ -143,7 +138,7 @@ Result commitSuperIndex(Device*dev, superIndex *newIndex){
 	Addr target = chosen_block == 0 ? combineAddress(0, rel_page1) : combineAddress(0, rel_page2 + dev->param->pagesPerBlock);
 
 	Addr lastEntry;
- 	Result r = getAddrOfMostRecentSuperIndex(dev, &lastEntry);
+ 	Result r = getAddrOfMostRecentSuperIndex(&lastEntry);
 	if(r != Result::ok && r != Result::nf){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not determine Address of last SuperIndex!");
 		return r;
@@ -152,7 +147,7 @@ Result commitSuperIndex(Device*dev, superIndex *newIndex){
 	superIndex lastIndex = {0};
 
 	if(r != Result::nf){
-		r = readSuperPageIndex(dev, lastEntry, &lastIndex, false);
+		r = readSuperPageIndex(lastEntry, &lastIndex, false);
 		if(r != Result::ok)
 			return r;
 	}
@@ -163,20 +158,20 @@ Result commitSuperIndex(Device*dev, superIndex *newIndex){
 
 	if(trace_mask & PAFFS_TRACE_SUPERBLOCK){
 		printf("write Super Index:\n");
-		printSuperIndex(dev, newIndex);
+		printSuperIndex(newIndex);
 	}
 
-	r = writeSuperPageIndex(dev, target, newIndex);
+	r = writeSuperPageIndex(target, newIndex);
 	if(r != Result::ok)
 		return r;
 
 	//Handle deletion.
 	if(r1 == Result::nf){
-		return deleteAnchorBlock(dev, 0, 0);
+		return deleteAnchorBlock(0, 0);
 	}
 
 	if(r1 == Result::nf){
-		return deleteAnchorBlock(dev, 0, 1);
+		return deleteAnchorBlock(0, 1);
 	}
 
 	rootnode_dirty = false;
@@ -184,15 +179,15 @@ Result commitSuperIndex(Device*dev, superIndex *newIndex){
 	return Result::ok;
 }
 
-Result readSuperIndex(Device*dev, superIndex* index){
+Result Superblock::readSuperIndex(superIndex* index){
 	Addr addr;
-	Result r = getAddrOfMostRecentSuperIndex(dev, &addr);
+	Result r = getAddrOfMostRecentSuperIndex(&addr);
 	if(r != Result::ok)
 		return r;
 
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found Super Index at %u:%u\n", extractLogicalArea(addr), extractPage(addr));
 
-	r = readSuperPageIndex(dev, addr, index, true);
+	r = readSuperPageIndex(addr, index, true);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read Super Index!");
 		return r;
@@ -200,7 +195,7 @@ Result readSuperIndex(Device*dev, superIndex* index){
 
 	if(trace_mask & PAFFS_TRACE_SUPERBLOCK){
 		printf("Read Super Index:\n");
-		printSuperIndex(dev, index);
+		printSuperIndex(index);
 	}
 
 	rootnode_addr = index->rootNode;
@@ -210,7 +205,7 @@ Result readSuperIndex(Device*dev, superIndex* index){
 
 // Superblock related
 
-Result findFirstFreeEntryInBlock(Device*dev, uint32_t area, uint8_t block, uint32_t* out_pos, unsigned int required_pages){
+Result Superblock::findFirstFreeEntryInBlock(uint32_t area, uint8_t block, uint32_t* out_pos, unsigned int required_pages){
 	unsigned int in_a_row = 0;
 	uint64_t page_offs = dev->param->pagesPerBlock * block;
 	for(unsigned int i = 0; i < dev->param->pagesPerBlock; i++) {
@@ -235,7 +230,7 @@ Result findFirstFreeEntryInBlock(Device*dev, uint32_t area, uint8_t block, uint3
 	return Result::nf;
 }
 
-Result findMostRecentEntryInBlock(Device*dev, uint32_t area, uint8_t block, uint32_t* out_pos, uint32_t* out_index){
+Result Superblock::findMostRecentEntryInBlock(uint32_t area, uint8_t block, uint32_t* out_pos, uint32_t* out_index){
 	uint32_t* maximum = out_index;
 	*maximum = 0;
 	*out_pos = 0;
@@ -263,16 +258,16 @@ Result findMostRecentEntryInBlock(Device*dev, uint32_t area, uint8_t block, uint
 }
 
 
-Result writeAnchorEntry(Device*dev, Addr addr, AnchorEntry* entry){
+Result Superblock::writeAnchorEntry(Addr addr, AnchorEntry* entry){
 	//Currently not implemented to simplify Find-Strategy
 	return Result::nimpl;
 }
-Result readAnchorEntry(Device*dev, Addr addr, AnchorEntry* entry){
+Result Superblock::readAnchorEntry(Addr addr, AnchorEntry* entry){
 	//Currently not implemented to simplify Find-Strategy
 	return Result::nimpl;
 }
 
-Result deleteAnchorBlock(Device*dev, uint32_t area, uint8_t block) {
+Result Superblock::deleteAnchorBlock(uint32_t area, uint8_t block) {
 	if(dev->areaMap[area].type != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete Block outside of SUPARBLCOKAREA");
 		return Result::bug;
@@ -282,19 +277,19 @@ Result deleteAnchorBlock(Device*dev, uint32_t area, uint8_t block) {
 	return dev->driver->eraseBlock(block_offs + block);
 }
 
-Result writeJumpPadEntry(Device*dev, Addr addr, JumpPadEntry* entry){
+Result Superblock::writeJumpPadEntry(Addr addr, JumpPadEntry* entry){
 	//Currently not implemented to simplify Find-Strategy
 	return Result::nimpl;
 }
 
-Result readJumpPadEntry(Device*dev, Addr addr, JumpPadEntry* entry){
+Result Superblock::readJumpPadEntry(Addr addr, JumpPadEntry* entry){
 	//Currently not implemented to simplify Find-Strategy
 	return Result::nimpl;
 }
 
 
 //todo: Make sure that free space is sufficient!
-Result writeSuperPageIndex(Device*dev, Addr addr, superIndex* entry){
+Result Superblock::writeSuperPageIndex(Addr addr, superIndex* entry){
 	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
 		return Result::bug;
@@ -359,7 +354,7 @@ Result writeSuperPageIndex(Device*dev, Addr addr, superIndex* entry){
 	return Result::ok;
 }
 
-Result readSuperPageIndex(Device* dev, Addr addr, superIndex* entry, bool withAreaMap){
+Result Superblock::readSuperPageIndex(Addr addr, superIndex* entry, bool withAreaMap){
 	if(!withAreaMap)
 		 return dev->driver->readPage(getPageNumber(addr, dev), entry, sizeof(uint32_t) + sizeof(Addr));
 

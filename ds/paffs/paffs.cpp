@@ -60,8 +60,8 @@ const char* err_msg(Result pr){
 }
 
 
-Paffs::Paffs() : Device(getDriver("1")){}
-Paffs::Paffs(void* fc) : Device(getDriverSpecial("1", fc)){}
+Paffs::Paffs() : device(getDriver("1")){}
+Paffs::Paffs(void* fc) : device(getDriverSpecial("1", fc)){}
 Paffs::~Paffs(){};
 
 

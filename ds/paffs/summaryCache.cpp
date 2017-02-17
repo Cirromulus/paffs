@@ -145,7 +145,7 @@ Result SummaryCache::loadAreaSummaries(){
 	index.areaMap = dev->areaMap;
 	index.areaSummary[0] = summaryCache[0];
 	index.areaSummary[1] = summaryCache[1];
-	Result r = readSuperIndex(dev, &index);
+	Result r = dev->superblock.readSuperIndex(&index);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "failed to load Area Summaries!");
 		return r;
@@ -180,7 +180,7 @@ Result SummaryCache::commitAreaSummaries(){
 			index.areaSummary[pos++] = summaryCache[translation[i]];
 		}
 	}
-	return commitSuperIndex(dev, &index);
+	return dev->superblock.commitSuperIndex(&index);
 }
 
 Result SummaryCache::writeAreasummary(AreaPos area, SummaryEntry* summary){

@@ -1,8 +1,8 @@
 /*
- * cpp
+ * device.hpp
  *
  *  Created on: 15 Feb 2017
- *      Author: rooot
+ *      Author: Pascal Pieper
  */
 
 #include "device.hpp"
@@ -13,8 +13,9 @@
 
 namespace paffs{
 
-Device::Device(Driver* driver) : driver(driver)
-	, tree(Btree(this)), sumCache(SummaryCache(this)), areaMgmt(this), dataIO(this){
+Device::Device(Driver* driver) : driver(driver),
+		tree(Btree(this)), sumCache(SummaryCache(this)),
+		areaMgmt(this), dataIO(this), superblock(this){
 	areaMap = 0;
 	param = 0;
 	lasterr = Result::ok;

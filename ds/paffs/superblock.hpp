@@ -38,32 +38,39 @@ typedef struct superIndex{
 	SummaryEntry* areaSummary[2];
 } superIndex;
 
-Result registerRootnode(Device* dev, Addr addr);
-Addr getRootnodeAddr(Device* dev);
+class Superblock{
+	Device* dev;
+	Addr rootnode_addr = 0;
+	bool rootnode_dirty = 0;
 
-//returns PAFFS_NF if no superindex is in flash
-Result readSuperIndex(Device* dev, superIndex* index);
-Result commitSuperIndex(Device* dev, superIndex* index);
+public:
+	Superblock(Device *dev) : dev(dev){};
+	Result registerRootnode(Addr addr);
+	Addr getRootnodeAddr();
 
+	//returns PAFFS_NF if no superindex is in flash
+	Result readSuperIndex(superIndex* index);
+	Result commitSuperIndex(superIndex* index);
+	void printSuperIndex(superIndex* ind);
 
-//returns PAFFS_NF if no superindex is in flash
-Result getAddrOfMostRecentSuperIndex(Device* dev, Addr *out);
+private:
 
-void printSuperIndex(Device* dev, superIndex* ind);
+	//returns PAFFS_NF if no superindex is in flash
+	Result getAddrOfMostRecentSuperIndex(Addr *out);
 
+	Result findFirstFreeEntryInBlock(uint32_t area, uint8_t block, uint32_t* out_pos, unsigned int required_pages);
+	Result findMostRecentEntryInBlock(uint32_t area, uint8_t block, uint32_t* out_pos, uint32_t* out_index);
 
-Result findFirstFreeEntryInBlock(Device* dev, uint32_t area, uint8_t block, uint32_t* out_pos, unsigned int required_pages);
-Result findMostRecentEntryInBlock(Device* dev, uint32_t area, uint8_t block, uint32_t* out_pos, uint32_t* out_index);
+	Result writeAnchorEntry(Addr _addr, AnchorEntry* entry);
+	Result readAnchorEntry(Addr addr, AnchorEntry* entry);
+	Result deleteAnchorBlock(uint32_t area, uint8_t block);
 
-Result writeAnchorEntry(Device* dev, Addr _addr, AnchorEntry* entry);
-Result readAnchorEntry(Device* dev, Addr addr, AnchorEntry* entry);
-Result deleteAnchorBlock(Device* dev, uint32_t area, uint8_t block);
+	Result writeJumpPadEntry(Addr addr, JumpPadEntry* entry);
+	Result readJumpPadEntry(Addr addr, JumpPadEntry* entry);
 
-Result writeJumpPadEntry(Device* dev, Addr addr, JumpPadEntry* entry);
-Result readJumpPadEntry(Device* dev, Addr addr, JumpPadEntry* entry);
+	Result writeSuperPageIndex(Addr addr, superIndex* entry);
+	Result readSuperPageIndex(Addr addr, superIndex* entry, bool withAreaMap);
 
-Result writeSuperPageIndex(Device* dev, Addr addr, superIndex* entry);
-Result readSuperPageIndex(Device* dev, Addr addr, superIndex* entry, bool withAreaMap);
-
+};
 
 }

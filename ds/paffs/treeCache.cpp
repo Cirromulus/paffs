@@ -453,7 +453,7 @@ void TreeCache::cleanFreeNodes(){
 Result TreeCache::updateFlashAddressInParent(TreeCacheNode* node){
 	if(node->parent == node){
 		//Rootnode
-		return registerRootnode(dev, node->raw.self);
+		return dev->superblock.registerRootnode(node->raw.self);
 	}
 	for(int i = 0; i <= node->parent->raw.num_keys; i++){
 		if(node->parent->pointers[i] == node){
@@ -622,7 +622,7 @@ Result TreeCache::getRootNodeFromCache(TreeCacheNode** tcn){
 
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Load rootnode from Flash");
 
-	Addr addr = getRootnodeAddr(dev);
+	Addr addr = dev->superblock.getRootnodeAddr();
 	if(addr == 0)
 		PAFFS_DBG(PAFFS_TRACE_TREE, "get Rootnode, but does not exist!");
 

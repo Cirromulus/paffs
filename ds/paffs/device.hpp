@@ -6,10 +6,12 @@
  */
 #include "commonTypes.hpp"
 #include "driver/driver.hpp"
-#include "btree.hpp"
 #include "area.hpp"
+#include "btree.hpp"
 #include "dataIO.hpp"
+#include "superblock.hpp"
 #include "summaryCache.hpp"
+
 #pragma once
 
 namespace paffs {
@@ -26,6 +28,7 @@ public:
 	SummaryCache sumCache;
 	AreaManagement areaMgmt;
 	DataIO dataIO;
+	Superblock superblock;
 
 	Device(Driver* driver);
 	~Device();
@@ -46,8 +49,10 @@ public:
 	Result close(Obj* obj);
 	Result touch(const char* path);
 	Result getObjInfo(const char *fullPath, ObjInfo* nfo);
-	Result read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read);
-	Result write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written);
+	Result read(Obj* obj, char* buf, unsigned int bytes_to_read,
+			unsigned int *bytes_read);
+	Result write(Obj* obj, const char* buf, unsigned int bytes_to_write,
+			unsigned int *bytes_written);
 	Result seek(Obj* obj, int m, Seekmode mode);
 	Result flush(Obj* obj);
 	Result truncate(Dirent* obj);
@@ -64,7 +69,8 @@ private:
 	Result createDirInode(Inode* outInode, Permission mask);
 	Result createFilInode(Inode* outInode, Permission mask);
 	void destroyInode(Inode* node);
-	Result getParentDir(const char* fullPath, Inode* parDir, unsigned int *lastSlash);
+	Result getParentDir(const char* fullPath, Inode* parDir,
+			unsigned int *lastSlash);
 	Result getInodeInDir( Inode* outInode, Inode* folder, const char* name);
 	Result getInodeOfElem( Inode* outInode, const char* fullPath);
 	//newElem should be already inserted in Tree
