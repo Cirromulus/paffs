@@ -252,7 +252,7 @@ Result collectGarbage(Device* dev, AreaType targetType){
 		r = deleteArea(dev, deletion_target);
 		if(r == Result::badflash){
 			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block in area %u on position %u! Retired Area.", deletion_target, dev->areaMap[deletion_target].position);
-			if(trace_mask && (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
+			if(trace_mask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
 				printf("Info: \n");
 				for(unsigned int i = 0; i < dev->param->areasNo; i++){
 					printf("\tArea %d on %u as %10s with %3u erases\n", i, dev->areaMap[i].position, area_names[dev->areaMap[i].type], dev->areaMap[i].erasecount);
@@ -282,7 +282,7 @@ Result collectGarbage(Device* dev, AreaType targetType){
 		//now former retired section became garbage buffer, retire it officially.
 		retireArea(dev, dev->activeArea[AreaType::garbageBuffer]);
 		dev->activeArea[AreaType::garbageBuffer] = 0;
-		if(trace_mask && (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
+		if(trace_mask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
 			printf("Info: \n");
 			for(unsigned int i = 0; i < dev->param->areasNo; i++){
 				printf("\tArea %d on %u as %10s with %u erases\n", i, dev->areaMap[i].position, area_names[dev->areaMap[i].type], dev->areaMap[i].erasecount);
