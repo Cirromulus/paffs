@@ -5,12 +5,10 @@
  *      Author: urinator
  */
 
-#ifndef DS_PAFFS_SUPERBLOCK_H_
-#define DS_PAFFS_SUPERBLOCK_H_
+#pragma once
 
 #include <stdint.h>
-
-#include "paffs.hpp"
+#include "commonTypes.hpp"
 
 namespace paffs{
 
@@ -69,5 +67,3 @@ Result readSuperPageIndex(Device* dev, Addr addr, superIndex* entry, bool withAr
 
 
 }
-
-#endif /* DS_PAFFS_SUPERBLOCK_H_ */

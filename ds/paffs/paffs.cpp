@@ -55,126 +55,99 @@ const char* resultMsg[] = {
 		"You should not be seeing this..."
 };
 
-Result lasterr = Result::ok;
-
 const char* err_msg(Result pr){
 	return resultMsg[static_cast<int>(pr)];
 }
 
-Addr combineAddress(uint32_t logical_area, uint32_t page){
-	Addr addr = 0;
-	memcpy(&addr, &logical_area, sizeof(uint32_t));
-	memcpy(&((char*)&addr)[sizeof(uint32_t)], &page, sizeof(uint32_t));
 
-	return addr;
-}
-
-unsigned int extractLogicalArea(Addr addr){
-	unsigned int area = 0;
-	memcpy(&area, &addr, sizeof(uint32_t));
-	return area;
-}
-unsigned int extractPage(Addr addr){
-	unsigned int page = 0;
-	memcpy(&page, &((char*)&addr)[sizeof(uint32_t)], sizeof(uint32_t));
-	return page;
-}
-
-Paffs::Paffs(){
-	//normal startup, load drivers
-	device = new Device(getDriver("1"));
-};
-Paffs::Paffs(void* fc){
-	device = new Device(getDriverSpecial("1", fc));
-}
-Paffs::~Paffs(){
-	delete device;
-}
+Paffs::Paffs() : Device(getDriver("1")){}
+Paffs::Paffs(void* fc) : Device(getDriverSpecial("1", fc)){}
+Paffs::~Paffs(){};
 
 
 Result Paffs::getLastErr(){
-	return lasterr;
+	return device.lasterr;
 }
 
 void Paffs::resetLastErr(){
-	lasterr = Result::ok;
+	device.lasterr = Result::ok;
 }
 
 Result Paffs::format(const char* devicename){
-	return device->format();
+	return device.format();
 }
 
 Result Paffs::mnt(const char* devicename){
-	return device->mnt();
+	return device.mnt();
 }
 Result Paffs::unmnt(const char* devicename){
-	return device->unmnt();
+	return device.unmnt();
 }
 
 Result Paffs::mkDir(const char* fullPath, Permission mask){
-	return device->mkDir(fullPath, mask);
+	return device.mkDir(fullPath, mask);
 }
 
 Dir* Paffs::openDir(const char* path){
-	return device->openDir(path);
+	return device.openDir(path);
 }
 
 Result Paffs::closeDir(Dir* dir){
-	return device->closeDir(dir);
+	return device.closeDir(dir);
 }
 
 
 Dirent* Paffs::readDir(Dir* dir){
-	return device->readDir(dir);
+	return device.readDir(dir);
 }
 
 void Paffs::rewindDir(Dir* dir){
-	return device->rewindDir(dir);
+	device.rewindDir(dir);
 }
 
 
 Obj* Paffs::open(const char* path, Fileopenmask mask){
-	return device->open(path, mask);
+	return device.open(path, mask);
 }
 
 Result Paffs::close(Obj* obj){
-	return device->close(obj);
+	return device.close(obj);
 }
 
 Result Paffs::touch(const char* path){
-	return device->touch(path);
+	return device.touch(path);
 }
 
 Result Paffs::getObjInfo(const char *fullPath, ObjInfo* nfo){
-	return device->getObjInfo(fullPath, nfo);
+	return device.getObjInfo(fullPath, nfo);
 }
 
 Result Paffs::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read){
-	return device->read(obj, buf, bytes_to_read, bytes_read);
+	return device.read(obj, buf, bytes_to_read, bytes_read);
 }
 
 Result Paffs::write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written){
-	return device->write(obj, buf, bytes_to_write, bytes_written);
+	return device.write(obj, buf, bytes_to_write, bytes_written);
 }
 
 Result Paffs::seek(Obj* obj, int m, Seekmode mode){
-	return device->seek(obj, m, mode);
+	return device.seek(obj, m, mode);
 }
 
 Result Paffs::flush(Obj* obj){
-	return device->flush(obj);
+	return device.flush(obj);
 }
 
 Result Paffs::chmod(const char* path, Permission perm){
-	return device->chmod(path, perm);
+	return device.chmod(path, perm);
 }
 Result Paffs::remove(const char* path){
-	return device->remove(path);
+	return device.remove(path);
 }
 
 //ONLY FOR DEBUG
 Device* Paffs::getDevice(){
-	return device;
+	return &device;
 }
 
 }

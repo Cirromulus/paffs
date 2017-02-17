@@ -9,21 +9,20 @@
 #include "driver/driver.hpp"
 #include "area.hpp"
 #include "device.hpp"
+#include "paffs_trace.hpp"
 #include <stdlib.h>
 #include <string.h>
 
 namespace paffs{
 
-
-
 //modifies inode->size and inode->reserved size as well
-Result writeInodeData(Inode* inode,
+Result DataIO::writeInodeData(Inode* inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_written,
-					const char* data, Device* dev){
+					const char* data){
 
 	if(offs+bytes == 0){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Write size 0! Bug?");
-		return lasterr = Result::einval;
+		return dev->lasterr = Result::einval;
 	}
 
 	unsigned int pageFrom = offs/dev->param->dataBytesPerPage;
@@ -32,7 +31,7 @@ Result writeInodeData(Inode* inode,
 	if(pageTo - pageFrom > 11){
 		//Would use first indirection Layer
 		PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Write would use first indirection layer, too big!");
-		return lasterr = Result::nimpl;
+		return dev->lasterr = Result::nimpl;
 	}
 
 	unsigned int pageOffs = offs % dev->param->dataBytesPerPage;
@@ -42,19 +41,19 @@ Result writeInodeData(Inode* inode,
 
 	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
 		bool misaligned = false;
-		dev->activeArea[AreaType::data] = findWritableArea(AreaType::data, dev);
-		if(lasterr != Result::ok){
-			return lasterr;
+		dev->activeArea[AreaType::data] = dev->areaMgmt.findWritableArea(AreaType::data);
+		if(dev->lasterr != Result::ok){
+			return dev->lasterr;
 		}
 
 		//Handle Areas
 		if(dev->areaMap[dev->activeArea[AreaType::data]].status == AreaStatus::empty){
 			//We'll have to use a fresh area,
 			//so generate the areaSummary in Memory
-			initArea(dev, dev->activeArea[AreaType::data]);
+			dev->areaMgmt.initArea(dev->activeArea[AreaType::data]);
 		}
 		unsigned int firstFreePage = 0;
-		if(findFirstFreePage(&firstFreePage, dev, dev->activeArea[AreaType::data]) == Result::nosp){
+		if(dev->areaMgmt.findFirstFreePage(&firstFreePage, dev->activeArea[AreaType::data]) == Result::nosp){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::data]);
 			return Result::bug;
 		}
@@ -99,7 +98,7 @@ Result writeInodeData(Inode* inode,
 				}
 
 				unsigned int bytes_read = 0;
-				Result r = readInodeData(inode, (pageFrom+page)*dev->param->dataBytesPerPage, btr, &bytes_read, buf, dev);
+				Result r = readInodeData(inode, (pageFrom+page)*dev->param->dataBytesPerPage, btr, &bytes_read, buf);
 				if(r != Result::ok || bytes_read != btr){
 					free(buf);
 					return Result::bug;
@@ -145,7 +144,7 @@ Result writeInodeData(Inode* inode,
 			return Result::fail;
 		}
 
-		res = manageActiveAreaFull(dev, &dev->activeArea[AreaType::data], AreaType::data);
+		res = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::data], AreaType::data);
 		if(res != Result::ok)
 			return res;
 
@@ -156,13 +155,13 @@ Result writeInodeData(Inode* inode,
 
 	return dev->tree.updateExistingInode(inode);
 }
-Result readInodeData(Inode* inode,
+Result DataIO::readInodeData(Inode* inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_read,
-					char* data, Device* dev){
+					char* data){
 
 	if(offs+bytes == 0){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read size 0! Bug?");
-		return lasterr = Result::einval;
+		return dev->lasterr = Result::einval;
 	}
 
 	*bytes_read = 0;
@@ -232,7 +231,7 @@ Result readInodeData(Inode* inode,
 		if(r != Result::ok){
 			if(misaligned)
 				free (wrap);
-			return lasterr = r;
+			return dev->lasterr = r;
 		}
 		*bytes_read += btr;
 
@@ -249,7 +248,7 @@ Result readInodeData(Inode* inode,
 
 
 //inode->size and inode->reservedSize is altered.
-Result deleteInodeData(Inode* inode, Device* dev, unsigned int offs){
+Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 	//TODO: This calculation contains errors in border cases
 	unsigned int pageFrom = offs/dev->param->dataBytesPerPage;
 	unsigned int pageTo = (inode->size - 1) / dev->param->dataBytesPerPage;
@@ -317,7 +316,7 @@ Result deleteInodeData(Inode* inode, Device* dev, unsigned int offs){
 }
 
 //Does not change addresses in parent Nodes
-Result writeTreeNode(Device* dev, TreeNode* node){
+Result DataIO::writeTreeNode(TreeNode* node){
 	if(node == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode NULL");
 				return Result::bug;
@@ -337,10 +336,10 @@ Result writeTreeNode(Device* dev, TreeNode* node){
 		}
 	}
 
-	lasterr = Result::ok;
-	dev->activeArea[AreaType::index] = findWritableArea(AreaType::index, dev);
-	if(lasterr != Result::ok){
-		return lasterr;
+	dev->lasterr = Result::ok;
+	dev->activeArea[AreaType::index] = dev->areaMgmt.findWritableArea(AreaType::index);
+	if(dev->lasterr != Result::ok){
+		return dev->lasterr;
 	}
 
 	if(dev->activeArea[AreaType::index] == 0){
@@ -349,9 +348,9 @@ Result writeTreeNode(Device* dev, TreeNode* node){
 	}
 
 	unsigned int firstFreePage = 0;
-	if(findFirstFreePage(&firstFreePage, dev, dev->activeArea[AreaType::index]) == Result::nosp){
+	if(dev->areaMgmt.findFirstFreePage(&firstFreePage, dev->activeArea[AreaType::index]) == Result::nosp){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::index]);
-		return lasterr = Result::bug;
+		return dev->lasterr = Result::bug;
 	}
 	Addr addr = combineAddress(dev->activeArea[AreaType::index], firstFreePage);
 	node->self = addr;
@@ -368,14 +367,14 @@ Result writeTreeNode(Device* dev, TreeNode* node){
 	if(r != Result::ok)
 		return r;
 
-	r = manageActiveAreaFull(dev, &dev->activeArea[AreaType::index], AreaType::index);
+	r = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::index], AreaType::index);
 	if(r != Result::ok)
 		return r;
 
 	return Result::ok;
 }
 
-Result readTreeNode(Device* dev, Addr addr, TreeNode* node){
+Result DataIO::readTreeNode(Addr addr, TreeNode* node){
 	if(node == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode NULL");
 		return Result::bug;
@@ -419,7 +418,7 @@ Result readTreeNode(Device* dev, Addr addr, TreeNode* node){
 	return Result::ok;
 }
 
-Result deleteTreeNode(Device* dev, TreeNode* node){
+Result DataIO::deleteTreeNode(TreeNode* node){
 	return dev->sumCache.setPageStatus(extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);
 }
 

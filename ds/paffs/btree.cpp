@@ -6,10 +6,11 @@
 #include "btree.hpp"
 #include "treeCache.hpp"
 #include <stdio.h>
-#include <stdlib.h> 
+#include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
 #include "dataIO.hpp"
+#include "device.hpp"
 
 namespace paffs{
 
@@ -108,7 +109,7 @@ int Btree::height(TreeCacheNode * root ) {
 	while (!curr->raw.is_leaf) {
 		Result r = cache.getTreeNodeAtIndexFrom(0, curr, &curr);
 		if(r != Result::ok && r != Result::flushedcache){
-			lasterr = r;
+			dev->lasterr = r;
 			return -1;
 		}
 		h++;

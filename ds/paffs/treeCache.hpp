@@ -6,7 +6,7 @@
  */
 
 #pragma once
-#include "paffs.hpp"
+#include "commonTypes.hpp"
 #include "treeTypes.hpp"
 
 namespace paffs{

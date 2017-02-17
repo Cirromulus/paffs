@@ -6,8 +6,6 @@
  */
 
 #include "device.hpp"
-#include "area.hpp"
-#include "dataIO.hpp"
 #include "paffs_trace.hpp"
 #include "driver/driver.hpp"
 
@@ -16,7 +14,11 @@
 namespace paffs{
 
 Device::Device(Driver* driver) : driver(driver)
-	, tree(Btree(this)), sumCache(SummaryCache(this)){};
+	, tree(Btree(this)), sumCache(SummaryCache(this)), areaMgmt(this), dataIO(this){
+	areaMap = 0;
+	param = 0;
+	lasterr = Result::ok;
+};
 
 Device::~Device(){
 	if(areaMap != NULL){
@@ -90,14 +92,14 @@ Result Device::format(){
 		if(!(had_areaType & 1 << AreaType::superblock)){
 			activeArea[AreaType::superblock] = area;
 			areaMap[area].type = AreaType::superblock;
-			initArea(this, area);
+			areaMgmt.initArea(area);
 			had_areaType |= 1 << AreaType::superblock;
 			continue;
 		}
 		if(!(had_areaType & 1 << AreaType::journal)){
 			activeArea[AreaType::journal] = area;
 			areaMap[area].type = AreaType::journal;
-			initArea(this, area);
+			areaMgmt.initArea(area);
 			had_areaType |= 1 << AreaType::journal;
 			continue;
 		}
@@ -105,7 +107,7 @@ Result Device::format(){
 		if(!(had_areaType & 1 << AreaType::garbageBuffer)){
 			activeArea[AreaType::garbageBuffer] = area;
 			areaMap[area].type = AreaType::garbageBuffer;
-			initArea(this, area);
+			areaMgmt.initArea(area);
 			had_areaType |= 1 << AreaType::garbageBuffer;
 			continue;
 		}
@@ -237,7 +239,7 @@ Result Device::createFilInode(Inode* outInode, Permission mask){
 }
 
 void Device::destroyInode(Inode* node){
-	deleteInodeData(node, this, 0);
+	dataIO.deleteInodeData(node, 0);
 	free(node);
 }
 
@@ -280,7 +282,7 @@ Result Device::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 
 	char* buf = (char*) malloc(folder->size);
 	unsigned int bytes_read = 0;
-	Result r = readInodeData(folder, 0, folder->size, &bytes_read, buf, this);
+	Result r = dataIO.readInodeData(folder, 0, folder->size, &bytes_read, buf);
 	if(r != Result::ok || bytes_read != folder->size){
 		free(buf);
 		return r == Result::ok ? Result::bug : r;
@@ -400,7 +402,7 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 	unsigned int bytes = 0;
 	Result r;
 	if(contDir->reservedSize > 0){		//if Directory is not empty
-		r = readInodeData(contDir, 0, contDir->size, &bytes, dirData, this);
+		r = dataIO.readInodeData(contDir, 0, contDir->size, &bytes, dirData);
 		if(r != Result::ok || bytes != contDir->size){
 			lasterr = r;
 			free(dirData);
@@ -419,7 +421,7 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 	directoryEntryCount ++;
 	memcpy (dirData, &directoryEntryCount, sizeof(DirEntryCount));
 
-	r = writeInodeData(contDir, 0, contDir->size + direntryl, &bytes, dirData, this);
+	r = dataIO.writeInodeData(contDir, 0, contDir->size + direntryl, &bytes, dirData);
 	free(dirData);
 	free(buf);
 	if(bytes != contDir->size)
@@ -440,7 +442,7 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 	unsigned int bytes = 0;
 	Result r;
 	if(contDir->reservedSize > 0){		//if Directory is not empty
-		r = readInodeData(contDir, 0, contDir->size, &bytes, dirData, this);
+		r = dataIO.readInodeData(contDir, 0, contDir->size, &bytes, dirData);
 		if(r != Result::ok || bytes != contDir->size){
 			lasterr = r;
 			free(dirData);
@@ -461,7 +463,7 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 			unsigned int newSize = contDir->size - entryl;
 			unsigned int restByte = newSize - pointer;
 
-			if((r = deleteInodeData(contDir, this, newSize)) != Result::ok)
+			if((r = dataIO.deleteInodeData(contDir, newSize)) != Result::ok)
 				return r;
 
 			if(restByte > 0 && restByte < 4)	//should either be 0 (no entries left) or bigger than 4 (minimum size for one entry)
@@ -474,7 +476,7 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 			memcpy(&dirData[pointer], &dirData[pointer + entryl], restByte);
 
 			unsigned int bw = 0;
-			r = writeInodeData(contDir, 0, newSize, &bw, dirData, this);
+			r = dataIO.writeInodeData(contDir, 0, newSize, &bw, dirData);
 			free(dirData);
 			return r;
 		}
@@ -522,7 +524,7 @@ Dir* Device::openDir(const char* path){
 	char* dirData = (char*) malloc(dirPinode.size);
 	unsigned int br = 0;
 	if(dirPinode.reservedSize > 0){
-		r = readInodeData(&dirPinode, 0, dirPinode.size, &br, dirData, this);
+		r = dataIO.readInodeData(&dirPinode, 0, dirPinode.size, &br, dirData);
 		if(r != Result::ok || br != dirPinode.size){
 			lasterr = r;
 			return NULL;
@@ -796,7 +798,7 @@ Result Device::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned in
 		return Result::ok;
 	}
 
-	Result r = readInodeData(obj->dirent->node, obj->fp, bytes_to_read, bytes_read, buf, this);
+	Result r = dataIO.readInodeData(obj->dirent->node, obj->fp, bytes_to_read, bytes_read, buf);
 	if(r != Result::ok){
 		return r;
 	}
@@ -819,7 +821,7 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 	if((obj->dirent->node->perm & W) == 0)
 		return Result::noperm;
 
-	Result r = writeInodeData(obj->dirent->node, obj->fp, bytes_to_write, bytes_written, buf, this);
+	Result r = dataIO.writeInodeData(obj->dirent->node, obj->fp, bytes_to_write, bytes_written, buf);
 	if(r != Result::ok){
 		return r;
 	}
@@ -882,7 +884,7 @@ Result Device::remove(const char* path){
 		if(object.size > sizeof(DirEntryCount))
 			return Result::dirnotempty;
 
-	if((r = deleteInodeData(&object, this, 0)) != Result::ok)
+	if((r = dataIO.deleteInodeData(&object, 0)) != Result::ok)
 		return r;
 
 	Inode parentDir;

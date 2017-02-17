@@ -7,8 +7,9 @@
 #include "area.hpp"
 #include "device.hpp"
 #include "garbage_collection.hpp"
+#include "paffs_trace.hpp"
 #include "summaryCache.hpp"
-#include <stdlib.h>
+#include <string.h>
 namespace paffs {
 
 const char* area_names[] = {
@@ -28,8 +29,39 @@ const char* areaStatusNames[] = {
 		"EMPTY "
 };
 
+uint64_t getPageNumber(Addr addr, Device* dev){
+	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
+								dev->param->totalPagesPerArea;
+	page += extractPage(addr);
+	if(page > dev->param->areasNo * dev->param->totalPagesPerArea){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "calculated Page number out of range!");
+		return 0;
+	}
+	return page;
+}
 
-unsigned int findWritableArea(AreaType areaType, Device* dev){
+
+Addr combineAddress(uint32_t logical_area, uint32_t page){
+	Addr addr = 0;
+	memcpy(&addr, &logical_area, sizeof(uint32_t));
+	memcpy(&((char*)&addr)[sizeof(uint32_t)], &page, sizeof(uint32_t));
+
+	return addr;
+}
+
+unsigned int extractLogicalArea(Addr addr){
+	unsigned int area = 0;
+	memcpy(&area, &addr, sizeof(uint32_t));
+	return area;
+}
+unsigned int extractPage(Addr addr){
+	unsigned int page = 0;
+	memcpy(&page, &((char*)&addr)[sizeof(uint32_t)], sizeof(uint32_t));
+	return page;
+}
+
+
+unsigned int AreaManagement::findWritableArea(AreaType areaType){
 	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != AreaStatus::closed){
 		//current Area has still space left
 		return dev->activeArea[areaType];
@@ -47,20 +79,20 @@ unsigned int findWritableArea(AreaType areaType, Device* dev){
 	for(unsigned int area = 0; area < dev->param->areasNo; area++){
 		if(dev->areaMap[area].type == AreaType::unset){
 			dev->areaMap[area].type = areaType;
-			initArea(dev, area);
+			initArea(area);
 			return area;
 		}
 	}
 
- 	Result r = collectGarbage(dev, areaType);
+ 	Result r = gc.collectGarbage(areaType);
 	if(r != Result::ok){
-		lasterr = r;
+		dev->lasterr = r;
 		return 0;
 	}
 
 	if(dev->areaMap[dev->activeArea[areaType]].status > AreaStatus::empty){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "garbage Collection returned invalid Status! (was %d, should <%d)",dev->areaMap[dev->activeArea[areaType]].status, AreaStatus::empty);
-		lasterr = Result::bug;
+		dev->lasterr = Result::bug;
 		return 0;
 	}
 
@@ -70,11 +102,11 @@ unsigned int findWritableArea(AreaType areaType, Device* dev){
 
 	//If we arrive here, something buggy must have happened
 	PAFFS_DBG(PAFFS_TRACE_BUG, "Garbagecollection pointed to invalid area!");
-	lasterr = Result::bug;
+	dev->lasterr = Result::bug;
 	return 0;
 }
 
-Result findFirstFreePage(unsigned int* p_out, Device* dev, unsigned int area){
+Result AreaManagement::findFirstFreePage(unsigned int* p_out, unsigned int area){
 	Result r;
 	for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
 		if(dev->sumCache.getPageStatus(area, i,&r) == SummaryEntry::free){
@@ -87,18 +119,7 @@ Result findFirstFreePage(unsigned int* p_out, Device* dev, unsigned int area){
 	return Result::nosp;
 }
 
-uint64_t getPageNumber(Addr addr, Device* dev){
-	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
-								dev->param->totalPagesPerArea;
-	page += extractPage(addr);
-	if(page > dev->param->areasNo * dev->param->totalPagesPerArea){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "calculated Page number out of range!");
-		return 0;
-	}
-	return page;
-}
-
-Result manageActiveAreaFull(Device *dev, AreaPos *area, AreaType areaType){
+Result AreaManagement::manageActiveAreaFull(AreaPos *area, AreaType areaType){
 	Result r;
 	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
 		for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
@@ -120,7 +141,7 @@ Result manageActiveAreaFull(Device *dev, AreaPos *area, AreaType areaType){
 	if(isFull){
 		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Area %u (Type %s) full.", *area, area_names[areaType]);
 		//Current Area is full!
-		closeArea(dev, *area);
+		closeArea(*area);
 	}
 
 	return Result::ok;
@@ -128,12 +149,12 @@ Result manageActiveAreaFull(Device *dev, AreaPos *area, AreaType areaType){
 
 
 //TODO: Add initAreaAs(...) to handle typical areaMap[abc].type = def; initArea(...);
-void initArea(Device* dev, AreaPos area){
+void AreaManagement::initArea(AreaPos area){
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %u (pos %u) as %s.", (unsigned int)area, (unsigned int)dev->areaMap[area].position, area_names[dev->areaMap[area].type]);
 	dev->areaMap[area].status = AreaStatus::active;
 }
 
-/*Result loadArea(Device *dev, AreaPos area){
+/*Result loadArea(AreaPos area){
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Loading Areasummary of Area %u (pos %u) as %s.", area, dev->areaMap[area].position, area_names[dev->areaMap[area].type]);
 	if(dev->areaMap[area].type != AreaType::dataarea && dev->areaMap[area].type != AreaType::indexarea){
 		return Result::ok;
@@ -141,14 +162,14 @@ void initArea(Device* dev, AreaPos area){
 	return readAreasummary(area, dev->areaMap[area].areaSummary, true);
 }*/
 
-Result closeArea(Device *dev, AreaPos area){
+Result AreaManagement::closeArea(AreaPos area){
 	dev->areaMap[area].status = AreaStatus::closed;
 
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Closed %s Area %u at pos. %u.", area_names[dev->areaMap[area].type], area, dev->areaMap[area].position);
 	return Result::ok;
 }
 
-void retireArea(Device *dev, AreaPos area){
+void AreaManagement::retireArea(AreaPos area){
 	dev->areaMap[area].status = AreaStatus::closed;
 	dev->areaMap[area].type = AreaType::retired;
 

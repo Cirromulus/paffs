@@ -2,10 +2,13 @@
  * device.hpp
  *
  *  Created on: 15 Feb 2017
- *      Author: rooot
+ *      Author: Pascal Pieper
  */
-#include "paffs.hpp"
+#include "commonTypes.hpp"
+#include "driver/driver.hpp"
 #include "btree.hpp"
+#include "area.hpp"
+#include "dataIO.hpp"
 #include "summaryCache.hpp"
 #pragma once
 
@@ -17,9 +20,12 @@ public:
 	AreaPos activeArea[AreaType::no];
 	Area *areaMap;
 	Driver *driver;
+	Result lasterr;
 
 	Btree tree;
 	SummaryCache sumCache;
+	AreaManagement areaMgmt;
+	DataIO dataIO;
 
 	Device(Driver* driver);
 	~Device();

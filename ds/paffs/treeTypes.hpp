@@ -5,6 +5,7 @@
  *      Author: rooot
  */
 
+#include "commonTypes.hpp"
 #pragma once
 
 namespace paffs {

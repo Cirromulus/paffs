@@ -5,27 +5,37 @@
  *      Author: Pascal Pieper
  */
 #pragma once
-#include "paffs.hpp"
+#include "commonTypes.hpp"
+#include "garbage_collection.hpp"
+
 namespace paffs {
 
 extern const char* area_names[];
 extern const char* areaStatusNames[];
 
-//Returns same area if there is still writable Space left
-unsigned int findWritableArea(AreaType areaType, Device* dev);
-
-Result findFirstFreePage(unsigned int* p_out, Device* dev, unsigned int area);
-
+//Helper functions
 uint64_t getPageNumber(Addr addr, Device *dev);	//Translates Addr to physical page number in respect to the Area mapping
+Addr combineAddress(uint32_t logical_area, uint32_t page);
+unsigned int extractLogicalArea(Addr addr);
+unsigned int extractPage(Addr addr);
 
-Result manageActiveAreaFull(Device *dev, AreaPos *area, AreaType areaType);
+class AreaManagement{
 
-Result writeAreasummary(Device *dev, AreaPos area, SummaryEntry* summary);
+	Device *dev;
+public:
+	GarbageCollection gc;
+	AreaManagement(Device *dev): dev(dev), gc(dev){};
 
-Result readAreasummary(Device *dev, AreaPos area, SummaryEntry* out_summary, bool complete);
+	//Returns same area if there is still writable Space left
+	unsigned int findWritableArea(AreaType areaType);
 
-void initArea(Device* dev, AreaPos area);
-//Result loadArea(Device *dev, AreaPos area);
-Result closeArea(Device *dev, AreaPos area);
-void retireArea(Device *dev, AreaPos area);
+	Result findFirstFreePage(unsigned int* p_out, unsigned int area);
+
+	Result manageActiveAreaFull(AreaPos *area, AreaType areaType);
+
+	void initArea(AreaPos area);
+	Result closeArea(AreaPos area);
+	void retireArea(AreaPos area);
+};
+
 }  // namespace paffs

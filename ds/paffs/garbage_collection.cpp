@@ -18,7 +18,7 @@ namespace paffs{
  * It could be possible that closed area contains free pages which count as
  * dirty in this case.
  */
-uint32_t countDirtyPages(Device* dev, AreaPos area){
+uint32_t GarbageCollection::countDirtyPages(AreaPos area){
 	uint32_t dirty = 0;
 	Result r;
 	for(uint32_t i = 0; i < dev->param->dataPagesPerArea; i++){
@@ -31,7 +31,7 @@ uint32_t countDirtyPages(Device* dev, AreaPos area){
 	return dirty;
 }
 
-AreaPos findNextBestArea(Device* dev, AreaType target, SummaryEntry* out_summary, bool* srcAreaContainsData){
+AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_summary, bool* srcAreaContainsData){
 	AreaPos favourite_area = 0;
 	uint32_t fav_dirty_pages = 0;
 	*srcAreaContainsData = true;
@@ -42,7 +42,7 @@ AreaPos findNextBestArea(Device* dev, AreaType target, SummaryEntry* out_summary
 		if(dev->areaMap[i].status == AreaStatus::closed &&
 				(dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)){
 
-			uint32_t dirty_pages = countDirtyPages(dev, i);
+			uint32_t dirty_pages = countDirtyPages(i);
 			Result r;
 			curr = dev->sumCache.getSummaryStatus(i, &r);
 			if(r != Result::ok){
@@ -75,7 +75,7 @@ AreaPos findNextBestArea(Device* dev, AreaType target, SummaryEntry* out_summary
 /**
  * @param summary is input and output (with changed SummaryEntry::dirty to SummaryEntry::free)
  */
-Result moveValidDataToNewArea(Device* dev, AreaPos srcArea, AreaPos dstArea, SummaryEntry* summary){
+Result GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea, SummaryEntry* summary){
 	PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "Moving valid data from Area %u (on %u) to Area %u (on %u)"
 	, srcArea, dev->areaMap[srcArea].position, dstArea, dev->areaMap[dstArea].position);
 	for(unsigned long page = 0; page < dev->param->dataPagesPerArea; page++){
@@ -101,12 +101,12 @@ Result moveValidDataToNewArea(Device* dev, AreaPos srcArea, AreaPos dstArea, Sum
 	return Result::ok;
 }
 
-Result deleteArea(Device* dev, AreaPos area){
+Result GarbageCollection::deleteArea(AreaPos area){
 	for(unsigned int i = 0; i < dev->param->blocksPerArea; i++){
 		Result r = dev->driver->eraseBlock(dev->areaMap[area].position*dev->param->blocksPerArea + i);
 		if(r != Result::ok){
 			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block n° %u (Area %u)!", dev->areaMap[area].position*dev->param->blocksPerArea + i, area);
-			retireArea(dev, area);
+			dev->areaMgmt.retireArea(area);
 			return Result::badflash;
 		}
 	}
@@ -123,7 +123,7 @@ Result deleteArea(Device* dev, AreaPos area){
  *
  * Changes active Area to one of the new freed areas.
  */
-Result collectGarbage(Device* dev, AreaType targetType){
+Result GarbageCollection::collectGarbage(AreaType targetType){
 	SummaryEntry summary[dev->param->dataPagesPerArea];
 	memset(summary, 0xFF, dev->param->dataPagesPerArea);
 	bool srcAreaContainsData = false;
@@ -145,7 +145,7 @@ Result collectGarbage(Device* dev, AreaType targetType){
 
 	AreaPos lastDeletionTarget = 0;
 	while(1){
-		deletion_target = findNextBestArea(dev, targetType, summary, &srcAreaContainsData);
+		deletion_target = findNextBestArea(targetType, summary, &srcAreaContainsData);
 		if(deletion_target == 0){
 			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not find any GC'able pages for type %s!", area_names[targetType]);
 
@@ -167,7 +167,7 @@ Result collectGarbage(Device* dev, AreaType targetType){
 				//this is first round, no possible chunks found.
 				//Just init and return garbageBuffer.
 				dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].type = targetType;
-				initArea(dev, dev->activeArea[AreaType::garbageBuffer]);
+				dev->areaMgmt.initArea(dev->activeArea[AreaType::garbageBuffer]);
 				dev->activeArea[targetType] = dev->activeArea[AreaType::garbageBuffer];
 
 				dev->activeArea[AreaType::garbageBuffer] = 0;	//No GC_BUFFER left
@@ -176,7 +176,7 @@ Result collectGarbage(Device* dev, AreaType targetType){
 
 			//Resurrect area, fill it with the former summary. In end routine, positions will be swapped.
 			dev->areaMap[lastDeletionTarget].type = targetType;
-			initArea(dev, lastDeletionTarget);
+			dev->areaMgmt.initArea(lastDeletionTarget);
 			r = dev->sumCache.setSummaryStatus(lastDeletionTarget, summary);
 			if(r != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not move former Summary to area %d!", lastDeletionTarget);
@@ -217,7 +217,7 @@ Result collectGarbage(Device* dev, AreaType targetType){
 			//still some valid data, copy to new area
 			PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "GC found just partially clean area %u on pos %u", deletion_target, dev->areaMap[deletion_target].position);
 
-			r = moveValidDataToNewArea(dev, deletion_target, dev->activeArea[AreaType::garbageBuffer], summary);
+			r = moveValidDataToNewArea(deletion_target, dev->activeArea[AreaType::garbageBuffer], summary);
 			//while(getchar() == EOF);
 			if(r != Result::ok){
 				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not copy valid pages from area %u to %u!", deletion_target, dev->activeArea[AreaType::garbageBuffer]);
@@ -249,7 +249,7 @@ Result collectGarbage(Device* dev, AreaType targetType){
 		}
 
 		//Delete old area
-		r = deleteArea(dev, deletion_target);
+		r = deleteArea(deletion_target);
 		if(r == Result::badflash){
 			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block in area %u on position %u! Retired Area.", deletion_target, dev->areaMap[deletion_target].position);
 			if(trace_mask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
@@ -280,7 +280,7 @@ Result collectGarbage(Device* dev, AreaType targetType){
 
 	if(desperateMode){
 		//now former retired section became garbage buffer, retire it officially.
-		retireArea(dev, dev->activeArea[AreaType::garbageBuffer]);
+		dev->areaMgmt.retireArea(dev->activeArea[AreaType::garbageBuffer]);
 		dev->activeArea[AreaType::garbageBuffer] = 0;
 		if(trace_mask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
 			printf("Info: \n");

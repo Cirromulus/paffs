@@ -9,7 +9,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "paffs.hpp"
+#include "paffs_trace.hpp"
+#include "commonTypes.hpp"
 #include "treeCache.hpp"
 #include "treeTypes.hpp"
 #include "treequeue.hpp" //Just for printing debug info in tree

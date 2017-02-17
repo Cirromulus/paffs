@@ -6,7 +6,8 @@
  */
 
 #pragma once
-#include "paffs.hpp"
+#include "commonTypes.hpp"
+
 namespace paffs {
 
 class SummaryCache{
