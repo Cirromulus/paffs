@@ -17,6 +17,12 @@
 namespace paffs {
 
 class Device{
+	//Dirents zur schnelleren verfügung
+	/*Dirent* Dirent_buf[Dirent_BUFSIZE];
+	unsigned char Dirents_buf_used = 0;
+	*/
+
+
 public:
 	Param *param;
 	AreaPos activeArea[AreaType::no];

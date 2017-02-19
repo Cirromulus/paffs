@@ -13,7 +13,59 @@
 
 namespace paffs {
 
-SummaryCache::SummaryCache(Device* dev) : dev(dev){}
+SummaryCache::SummaryCache(Device* dev) : dev(dev){
+/*	printf("Ayerg: %d\n", dataPagesPerArea / 4 + 1);
+	memset(summaryCache[0], 0, dataPagesPerArea / 4 + 1);
+	printf("Status: %d\n", (int)getPackedStatus(0, 0));
+	setPackedStatus(0, 0, SummaryEntry::used);
+	printf("Status: %d\n", (int)getPackedStatus(0, 0));
+	setPackedStatus(0, 0, SummaryEntry::dirty);
+	printf("Status: %d\n", (int)getPackedStatus(0, 0));
+	setPackedStatus(0, 0, SummaryEntry::error);
+	printf("Status: %d\n", (int)getPackedStatus(0, 0));
+	setPackedStatus(0, 0, SummaryEntry::free);
+	printf("Status: %d\n", (int)getPackedStatus(0, 0));
+
+	for(unsigned int i = 0; i < dataPagesPerArea; i++){
+		setPackedStatus(0, i, SummaryEntry::error);
+	}
+
+	setDirty(0);
+	printf("dirty: %d\n", isDirty(0));*/
+	}
+
+SummaryEntry SummaryCache::getPackedStatus(uint16_t position, uint16_t page){
+	return (SummaryEntry)((summaryCache[position][page/4] & (0b11 << (page % 4)*2)) >> (page % 4)*2);
+}
+
+void SummaryCache::setPackedStatus(uint16_t position, uint16_t page, SummaryEntry value){
+	summaryCache[position][page/4] =
+			(summaryCache[position][page/4] & ~(0b11 << (page % 4)*2)) |
+			((int)value << (page % 4) * 2);
+}
+
+bool SummaryCache::isDirty(uint16_t position){
+	return summaryCache[position][dataPagesPerArea / 4 + 1] & 0b1;
+}
+
+void SummaryCache::setDirty(uint16_t position, bool value){
+	if(value)
+		summaryCache[position][dataPagesPerArea / 4 + 1] |= 1;
+	else
+		summaryCache[position][dataPagesPerArea / 4 + 1] &= 0;
+}
+
+void SummaryCache::unpackStatusArray(uint16_t position, SummaryEntry* arr){
+	for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
+		arr[i] = getPackedStatus(position, i);
+	}
+}
+
+void SummaryCache::packStatusArray(uint16_t position, SummaryEntry* arr){
+	for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
+		setPackedStatus(position, i, arr[i]);
+	}
+}
 
 int SummaryCache::findNextFreeCacheEntry(){
 	//from summaryCache to AreaPosition
@@ -38,13 +90,13 @@ Result SummaryCache::setPageStatus(AreaPos area, uint8_t page, SummaryEntry stat
 			return Result::nimpl;
 		}
 		translation[area] = nextEntry;
-		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
+		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea / 4 + 1);
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
 	if(page > dev->param->dataPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dev->param->dataPagesPerArea);
 	}
-	summaryCache[translation[area]][page] = state;
+	setPackedStatus(translation[area], page, state);
 	return Result::ok;
 }
 
@@ -55,14 +107,16 @@ SummaryEntry SummaryCache::getPageStatus(AreaPos area, uint8_t page, Result *res
 			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not find free Cache Entry for summaryCache, "
 					"and flush is not supported yet");
 			*result = Result::nimpl;
-			return SummaryEntry::dirty;
+			return SummaryEntry::error;
 		}
 		translation[area] = nextEntry;
-		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
+		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea / 4 + 1);
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
 	if(page > dev->param->dataPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dev->param->dataPagesPerArea);
+		*result = Result::einval;
+		return SummaryEntry::error;
 	}
 /*
 	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
@@ -74,24 +128,24 @@ SummaryEntry SummaryCache::getPageStatus(AreaPos area, uint8_t page, Result *res
 */
 
 	*result = Result::ok;
-	return summaryCache[translation[area]][page];
+	SummaryEntry ergebnis = getPackedStatus(translation[area], page);
+	return ergebnis;
 }
 
-SummaryEntry* SummaryCache::getSummaryStatus(AreaPos area, Result *result){
+Result SummaryCache::getSummaryStatus(AreaPos area, SummaryEntry* summary){
 	if(translation.find(area) == translation.end()){
 		int nextEntry = findNextFreeCacheEntry();
 		if(nextEntry < 0){
 			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not find free Cache Entry for summaryCache, "
 					"and flush is not supported yet");
-			*result = Result::nimpl;
-			return nullptr;
+			return Result::nimpl;
 		}
 		translation[area] = nextEntry;
-		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
+		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea / 4 + 1);
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
-	*result = Result::ok;
-	return summaryCache[translation[area]];
+	unpackStatusArray(0, summary);
+	return Result::ok;
 }
 
 Result SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary){
@@ -103,10 +157,10 @@ Result SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary){
 			return Result::nimpl;
 		}
 		translation[area] = nextEntry;
-		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
+		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea / 4 + 1);
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
-	memcpy(summaryCache[translation[area]], summary, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
+	packStatusArray(translation[area], summary);
 	return Result::ok;
 }
 
@@ -125,10 +179,11 @@ Result SummaryCache::loadAreaSummaries(){
 	for(AreaPos i = 0; i < 2; i++){
 		memset(summaryCache[i], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 	}
+	SummaryEntry tmp[2][dataPagesPerArea];
 	superIndex index = {0};
 	index.areaMap = dev->areaMap;
-	index.areaSummary[0] = summaryCache[0];
-	index.areaSummary[1] = summaryCache[1];
+	index.areaSummary[0] = tmp[0];
+	index.areaSummary[1] = tmp[1];
 	Result r = dev->superblock.readSuperIndex(&index);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "failed to load Area Summaries!");
@@ -138,6 +193,7 @@ Result SummaryCache::loadAreaSummaries(){
 	for(int i = 0; i < 2; i++){
 		if(index.asPositions[i] > 0){
 			translation[index.asPositions[i]] = i;
+			packStatusArray(i, index.areaSummary[i]);
 			dev->activeArea[dev->areaMap[index.asPositions[i]].type] = dev->areaMap[index.asPositions[i]].position;
 		}
 	}
@@ -150,8 +206,12 @@ Result SummaryCache::commitAreaSummaries(){
 
 
 	unsigned char pos = 0;
+	SummaryEntry tmp[2][dataPagesPerArea];
 	superIndex index = {0};
 	index.areaMap = dev->areaMap;
+	index.areaSummary[0] = tmp[0];
+	index.areaSummary[1] = tmp[1];
+
 	//write the two open AS'es to Superindex
 	for (unsigned int i = 0; i < dev->param->areasNo; i++){
 		if((dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)
@@ -161,7 +221,7 @@ Result SummaryCache::commitAreaSummaries(){
 				return Result::nimpl;
 			}
 			index.asPositions[pos] = i;
-			index.areaSummary[pos++] = summaryCache[translation[i]];
+			unpackStatusArray(translation[i], index.areaSummary[pos++]);
 		}
 	}
 	return dev->superblock.commitSuperIndex(&index);

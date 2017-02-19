@@ -35,7 +35,7 @@ AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_s
 	AreaPos favourite_area = 0;
 	uint32_t fav_dirty_pages = 0;
 	*srcAreaContainsData = true;
-	SummaryEntry* curr = NULL;
+	SummaryEntry curr[dataPagesPerArea];
 
 	//Look for the most dirty block
 	for(AreaPos i = 0; i < dev->param->areasNo; i++){
@@ -43,8 +43,7 @@ AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_s
 				(dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)){
 
 			uint32_t dirty_pages = countDirtyPages(i);
-			Result r;
-			curr = dev->sumCache.getSummaryStatus(i, &r);
+			Result r = dev->sumCache.getSummaryStatus(i, curr);
 			if(r != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Could not load Summary of Area %d for Garbage collection!", i);
 				return 0;
@@ -188,7 +187,8 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 
 		if(trace_mask & PAFFS_TRACE_VERIFY_AS){
 			//Just for debug, in production AS might be invalid and summary may be incomplete
-			SummaryEntry *tmp = dev->sumCache.getSummaryStatus(deletion_target, &r);
+			SummaryEntry tmp[dataPagesPerArea];
+			r = dev->sumCache.getSummaryStatus(deletion_target, tmp);
 			if(tmp == NULL || r != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_VERIFY_AS, "Could not verify AreaSummary of area %d!", deletion_target);
 			}

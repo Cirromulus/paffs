@@ -16,25 +16,19 @@
 
 namespace paffs{
 
-//Dirents zur schnelleren verfügung
-/*#define Dirent_BUFSIZE 10
-static Dirent* Dirent_buf[Dirent_BUFSIZE];
-static unsigned char Dirents_buf_used = 0;
-*/
-
 unsigned int trace_mask =
-	//PAFFS_TRACE_AREA |
+	PAFFS_TRACE_AREA |
 	PAFFS_TRACE_ERROR |
 	PAFFS_TRACE_BUG |
 	//PAFFS_TRACE_TREE |
-	//PAFFS_TRACE_CACHE |
+	PAFFS_TRACE_CACHE |
 	//PAFFS_TRACE_SCAN |
 	//PAFFS_TRACE_WRITE |
-	//PAFFS_TRACE_SUPERBLOCK |
+	PAFFS_TRACE_SUPERBLOCK |
 	//PAFFS_TRACE_ALLOCATE |
 	//PAFFS_TRACE_VERIFY_AS |
-	//PAFFS_TRACE_GC |
-	//PAFFS_TRACE_GC_DETAIL |
+	PAFFS_TRACE_GC |
+	PAFFS_TRACE_GC_DETAIL |
 	0;
 
 const char* resultMsg[] = {
