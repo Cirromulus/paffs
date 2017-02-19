@@ -539,7 +539,7 @@ Dir* Device::openDir(const char* path){
 	dir->self->name = (char*) "not_impl.";
 	dir->self->node = (Inode*) malloc(sizeof(Inode));
 	*dir->self->node = dirPinode;
-	dir->self->parent = NULL;
+	dir->self->parent = NULL;	//no caching, so we pobably dont have the parent
 	dir->no_entrys = dirData[0];
 	dir->childs = (Dirent**) malloc(dir->no_entrys * sizeof(Dirent*));
 	dir->pos = 0;

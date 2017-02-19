@@ -108,7 +108,7 @@ void printWholeFile(const char* path){
 }
 
 int main(int argc, char** argv){
-	printf("Area: %u", sizeof(Area));
+	printf("Size of Area: %u Bytes", sizeof(Area));
 	fs = new Paffs();
 	TreeCache *cache = &fs->getDevice()->tree.cache;
 	printf("Cache usage: %d/%d\n", cache->getCacheUsage(), cache->getCacheSize());

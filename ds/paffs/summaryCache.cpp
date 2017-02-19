@@ -13,12 +13,14 @@
 
 namespace paffs {
 
+SummaryCache::SummaryCache(Device* dev) : dev(dev){}
+
 int SummaryCache::findNextFreeCacheEntry(){
 	//from summaryCache to AreaPosition
 	bool used[areaSummaryCacheSize] = {0};
-	for(int i = 0; i < areaSummaryCacheSize; i++){
-		if(translation[i] >= 0)
-			used[translation[i]] = true;
+	for(auto it = translation.cbegin(), end = translation.cend();
+			it != end; ++it){
+		used[it->second] = true;
 	}
 	for(int i = 0; i < areaSummaryCacheSize; i++){
 		if(!used[i])
@@ -28,17 +30,14 @@ int SummaryCache::findNextFreeCacheEntry(){
 }
 
 Result SummaryCache::setPageStatus(AreaPos area, uint8_t page, SummaryEntry state){
-	if(areaSummaryCacheSize < area){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
-		return Result::nimpl;
-	}
-	if(translation[area] <= -1){
-		translation[area] = findNextFreeCacheEntry();
-		if(translation[area] < 0){
+	if(translation.find(area) == translation.end()){
+		int nextEntry = findNextFreeCacheEntry();
+		if(nextEntry < 0){
 			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not find free Cache Entry for summaryCache, "
 					"and flush is not supported yet");
 			return Result::nimpl;
 		}
+		translation[area] = nextEntry;
 		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
@@ -50,19 +49,15 @@ Result SummaryCache::setPageStatus(AreaPos area, uint8_t page, SummaryEntry stat
 }
 
 SummaryEntry SummaryCache::getPageStatus(AreaPos area, uint8_t page, Result *result){
-	if(areaSummaryCacheSize < area){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
-		*result = Result::nimpl;
-		return SummaryEntry::dirty;
-	}
-	if(translation[area] <= -1){
-		translation[area] = findNextFreeCacheEntry();
-		if(translation[area] < 0){
+	if(translation.find(area) == translation.end()){
+		int nextEntry = findNextFreeCacheEntry();
+		if(nextEntry < 0){
 			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not find free Cache Entry for summaryCache, "
 					"and flush is not supported yet");
 			*result = Result::nimpl;
 			return SummaryEntry::dirty;
 		}
+		translation[area] = nextEntry;
 		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
@@ -83,19 +78,15 @@ SummaryEntry SummaryCache::getPageStatus(AreaPos area, uint8_t page, Result *res
 }
 
 SummaryEntry* SummaryCache::getSummaryStatus(AreaPos area, Result *result){
-	if(areaSummaryCacheSize < area){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
-		*result = Result::nimpl;
-		return NULL;
-	}
-	if(translation[area] <= -1){
-		translation[area] = findNextFreeCacheEntry();
-		if(translation[area] < 0){
+	if(translation.find(area) == translation.end()){
+		int nextEntry = findNextFreeCacheEntry();
+		if(nextEntry < 0){
 			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not find free Cache Entry for summaryCache, "
 					"and flush is not supported yet");
 			*result = Result::nimpl;
-			return NULL;
+			return nullptr;
 		}
+		translation[area] = nextEntry;
 		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
@@ -104,17 +95,14 @@ SummaryEntry* SummaryCache::getSummaryStatus(AreaPos area, Result *result){
 }
 
 Result SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary){
-	if(areaSummaryCacheSize < area){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
-		return Result::nimpl;
-	}
-	if(translation[area] <= -1){
-		translation[area] = findNextFreeCacheEntry();
-		if(translation[area] < 0){
+	if(translation.find(area) == translation.end()){
+		int nextEntry = findNextFreeCacheEntry();
+		if(nextEntry < 0){
 			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not find free Cache Entry for summaryCache, "
 					"and flush is not supported yet");
 			return Result::nimpl;
 		}
+		translation[area] = nextEntry;
 		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
@@ -123,16 +111,12 @@ Result SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary){
 }
 
 Result SummaryCache::deleteSummary(AreaPos area){
-	if(areaSummaryCacheSize < area){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Areasummarycache is too small for current implementation");
-		return Result::nimpl;
-	}
-	if(translation[area] <= -1){
+	if(translation.find(area) == translation.end()){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete nonexisting Area %d", area);
 		return Result::einval;
 	}
 
-	translation[area] = -1;
+	translation.erase(area);
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Deleted cache entry of area %d", area);
 	return Result::ok;
 }

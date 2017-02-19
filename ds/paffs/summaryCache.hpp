@@ -7,20 +7,19 @@
 
 #pragma once
 #include "commonTypes.hpp"
+#include <unordered_map>
 
 namespace paffs {
 
 class SummaryCache{
 	SummaryEntry summaryCache[areaSummaryCacheSize][dataPagesPerArea];
-	//FIXME Translation needs to be as big as there are Areas. This is bad.
-	//TODO: Use Linked List or HashMap.
-	//Translates from areaPosition to summaryCachePosition
-	int16_t translation[areaSummaryCacheSize] = {-1,-1,-1,-1,-1,-1,-1,-1};
+
+	std::unordered_map<AreaPos, uint16_t> translation;	//from area number to array offset
 	Device* dev;
 
 public:
 
-	SummaryCache(Device* dev) : dev(dev){};
+	SummaryCache(Device* dev);
 
 	Result setPageStatus(AreaPos area, uint8_t page, SummaryEntry state);
 

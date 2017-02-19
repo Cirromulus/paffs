@@ -155,7 +155,7 @@ struct Area{	//TODO: Maybe packed? Slow, but less RAM
 	AreaStatus status:2;
 	uint32_t erasecount:17;	//Overflow at 132.000 is acceptable (assuming less than 100k erase cycles)
 	AreaPos position;	//physical position, not logical
-};	//4 + 2 + 17 + 32 = 55 Bit = 7 Byte
+};	//4 + 2 + 17 + 32 = 55 Bit = 7 Byte (8 on RAM)
 
 const char* err_msg(Result pr);	//implemented in paffs.cpp
 
