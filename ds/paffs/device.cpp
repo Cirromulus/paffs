@@ -684,7 +684,8 @@ Obj* Device::open(const char* path, Fileopenmask mask){
 	if(r == Result::nf){
 		//create new file
 		if(mask & FC){
-			r = createFile(&file, path, mask);
+			//use standard mask
+			r = createFile(&file, path, R | W);
 			if(r != Result::ok){
 				lasterr = r;
 				return NULL;

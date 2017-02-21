@@ -6,7 +6,9 @@
  */
 #include "simuDriver.hpp"
 
-#include "../paffs.hpp"
+#include "../commonTypes.hpp"
+#include "../paffs_trace.hpp"
+#include <string.h>
 
 
 
@@ -56,11 +58,17 @@ Result SimuDriver::eraseBlock(uint32_t block_no){
 		return Result::fail;
 
 	NANDADRESS d = translateBlockToAddress(block_no, cell);
-
 	return cell->eraseBlock(d.plane, d.block) == 0 ? Result::ok : Result::fail;
 }
 Result SimuDriver::markBad(uint32_t block_no){
-	return Result::nimpl;
+	memset(buf, 0, param.totalBytesPerPage);
+	for(unsigned page = 0; page < param.pagesPerBlock; page++){
+		NANDADRESS d = translatePageToAddress(block_no * param.pagesPerBlock + page, cell);
+		if(cell->writePage(d.plane, d.block, d.page, buf) < 0){
+			//ignore return Result::fail;
+		}
+	}
+	return Result::ok;
 }
 
 Result SimuDriver::checkBad(uint32_t block_no){

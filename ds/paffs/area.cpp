@@ -43,12 +43,13 @@ uint64_t getPageNumber(Addr addr, Device* dev){
 
 Addr combineAddress(uint32_t logical_area, uint32_t page){
 	Addr addr = 0;
-	memcpy(&addr, &logical_area, sizeof(uint32_t));
-	memcpy(&((char*)&addr)[sizeof(uint32_t)], &page, sizeof(uint32_t));
+	memcpy(&addr, &page, sizeof(uint32_t));
+	memcpy(&((char*)&addr)[sizeof(uint32_t)], &logical_area, sizeof(uint32_t));
 
 	return addr;
 }
 
+/*
 unsigned int extractLogicalArea(Addr addr){
 	unsigned int area = 0;
 	memcpy(&area, &addr, sizeof(uint32_t));
@@ -58,8 +59,18 @@ unsigned int extractPage(Addr addr){
 	unsigned int page = 0;
 	memcpy(&page, &((char*)&addr)[sizeof(uint32_t)], sizeof(uint32_t));
 	return page;
-}
+}*/
 
+unsigned int extractLogicalArea(Addr addr){
+	unsigned int area = 0;
+	memcpy(&area, &((char*)&addr)[sizeof(uint32_t)], sizeof(uint32_t));
+	return area;
+}
+unsigned int extractPage(Addr addr){
+	unsigned int page = 0;
+	memcpy(&page, &addr, sizeof(uint32_t));
+	return page;
+}
 
 unsigned int AreaManagement::findWritableArea(AreaType areaType){
 	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != AreaStatus::closed){
@@ -172,7 +183,8 @@ Result AreaManagement::closeArea(AreaPos area){
 void AreaManagement::retireArea(AreaPos area){
 	dev->areaMap[area].status = AreaStatus::closed;
 	dev->areaMap[area].type = AreaType::retired;
-
+	for(unsigned block = 0; block < dev->param->blocksPerArea; block++)
+			dev->driver->markBad(dev->areaMap[area].position * dev->param->blocksPerArea + block);
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %u at pos. %u.", area, dev->areaMap[area].position);
 }
 

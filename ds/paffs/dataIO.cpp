@@ -216,7 +216,7 @@ Result DataIO::readInodeData(Inode* inode,
 				}
 
 				if(e == SummaryEntry::free){
-					PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid (SummaryEntry::free) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
+					PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid (free) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
 					return Result::bug;
 				}
 
