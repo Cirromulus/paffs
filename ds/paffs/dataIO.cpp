@@ -57,8 +57,8 @@ Result DataIO::writeInodeData(Inode* inode,
 			PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::data]);
 			return Result::bug;
 		}
-		Addr pageAddress = combineAddress(dev->activeArea[AreaType::data], firstFreePage);
 
+		Addr pageAddress = combineAddress(dev->activeArea[AreaType::data], firstFreePage);
 		res = dev->sumCache.setPageStatus(dev->activeArea[AreaType::data], firstFreePage, SummaryEntry::used);
 		if(res != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[(int)res]);

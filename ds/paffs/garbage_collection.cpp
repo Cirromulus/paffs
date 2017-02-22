@@ -214,9 +214,6 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 		lastDeletionTarget = deletion_target;
 
 		if(srcAreaContainsData){
-			static int turns = 0;
-			if(++turns == 2)
-				printf("Hereby lieth the beug\n");
 			//still some valid data, copy to new area
 			PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "GC found just partially clean area %u on pos %u", deletion_target, dev->areaMap[deletion_target].position);
 

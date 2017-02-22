@@ -144,7 +144,7 @@ Result SummaryCache::getSummaryStatus(AreaPos area, SummaryEntry* summary){
 		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea / 4 + 1);
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
 	}
-	unpackStatusArray(0, summary);
+	unpackStatusArray(translation[area], summary);
 	return Result::ok;
 }
 
