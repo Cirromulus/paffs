@@ -108,15 +108,15 @@ void printWholeFile(const char* path){
 }
 
 int main(int argc, char** argv){
-	printf("Size of Area: %u Bytes\n", sizeof(Area));
+	printf("Size of Area: %lu Bytes\n", sizeof(Area));
 	fs = new Paffs();
 	TreeCache *cache = &fs->getDevice()->tree.cache;
 	printf("Cache usage: %d/%d\n", cache->getCacheUsage(), cache->getCacheSize());
-	printf("Cache size: %u Bytes\n", cache->getCacheSize() * sizeof(TreeCacheNode));
+	printf("Cache size: %lu Bytes\n", cache->getCacheSize() * sizeof(TreeCacheNode));
 	Result r = fs->format("1");
 	if(r != Result::ok)
 		return -1;
-	r = fs->mnt("1");
+	r = fs->mount("1");
 	if(r != Result::ok)
 		return -1;
 	fs->getDevice()->tree.print_tree();
@@ -392,7 +392,7 @@ int main(int argc, char** argv){
 			cache->getCacheHits(), cache->getCacheMisses(),
 			100*((float)cache->getCacheHits())/(cache->getCacheHits()+cache->getCacheMisses()));
 //	while(getchar() == EOF);
-	r = fs->unmnt("1");
+	r = fs->unmount("1");
 	if(r != Result::ok)
 		return -1;
 	delete fs;

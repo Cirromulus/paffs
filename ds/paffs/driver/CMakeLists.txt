@@ -4,5 +4,12 @@ INCLUDE_DIRECTORIES(
 
 set(SOURCES ${SOURCES}
     ${CMAKE_CURRENT_SOURCE_DIR}/simuDriver.cpp
-    PARENT_SCOPE
 )
+
+add_library(simuDriver ${SOURCES})
+
+set_target_properties(simuDriver PROPERTIES
+	COMPILE_FLAGS "-Wall"
+)
+
+target_link_libraries(simuDriver simu)

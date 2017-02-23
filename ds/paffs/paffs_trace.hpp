@@ -9,7 +9,7 @@
 #define DS_PAFFS_PAFFS_TRACE_H_
 
 namespace paffs{
-	extern unsigned int trace_mask;
+	extern unsigned int traceMask;
 }
 
 #include <string.h>
@@ -19,7 +19,7 @@ namespace paffs{
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
 #define PAFFS_DBG(mask, msg, ...) do {\
-		if(mask & trace_mask || mask & PAFFS_TRACE_ALWAYS){\
+		if(mask & traceMask || mask & PAFFS_TRACE_ALWAYS){\
 			fprintf(stderr, "paffs: " msg "\n\t-line %d, file %s\n", ##__VA_ARGS__,  __LINE__, __FILENAME__);\
 			if(mask & PAFFS_TRACE_BUG)\
 				raise(SIGINT);\
@@ -27,7 +27,7 @@ namespace paffs{
 	} while(0)
 
 #define PAFFS_DBG_S(mask, msg, ...) do {\
-		if(mask & trace_mask || mask & PAFFS_TRACE_ALWAYS){\
+		if(mask & traceMask || mask & PAFFS_TRACE_ALWAYS){\
 			fprintf(stderr, "paffs: " msg "\n", ##__VA_ARGS__);\
 		}\
 	} while(0)

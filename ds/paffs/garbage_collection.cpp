@@ -185,7 +185,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 			break;
 		}
 
-		if(trace_mask & PAFFS_TRACE_VERIFY_AS){
+		if(traceMask & PAFFS_TRACE_VERIFY_AS){
 			//Just for debug, in production AS might be invalid and summary may be incomplete
 			SummaryEntry tmp[dataPagesPerArea];
 			r = dev->sumCache.getSummaryStatus(deletion_target, tmp);
@@ -197,7 +197,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 			}
 		}
 
-		if(trace_mask & PAFFS_TRACE_VERIFY_AS){
+		if(traceMask & PAFFS_TRACE_VERIFY_AS){
 			for(unsigned int j = 0; j < dev->param->dataPagesPerArea; j++){
 				if(summary[j] > SummaryEntry::dirty)
 					PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", j);
@@ -252,7 +252,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 		r = deleteArea(deletion_target);
 		if(r == Result::badflash){
 			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block in area %u on position %u! Retired Area.", deletion_target, dev->areaMap[deletion_target].position);
-			if(trace_mask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
+			if(traceMask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
 				printf("Info: \n");
 				for(unsigned int i = 0; i < dev->param->areasNo; i++){
 					printf("\tArea %d on %u as %10s with %3u erases\n", i, dev->areaMap[i].position, area_names[dev->areaMap[i].type], dev->areaMap[i].erasecount);
@@ -282,7 +282,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 		//now former retired section became garbage buffer, retire it officially.
 		dev->areaMgmt.retireArea(dev->activeArea[AreaType::garbageBuffer]);
 		dev->activeArea[AreaType::garbageBuffer] = 0;
-		if(trace_mask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
+		if(traceMask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
 			printf("Info: \n");
 			for(unsigned int i = 0; i < dev->param->areasNo; i++){
 				printf("\tArea %d on %u as %10s with %u erases\n", i, dev->areaMap[i].position, area_names[dev->areaMap[i].type], dev->areaMap[i].erasecount);

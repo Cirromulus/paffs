@@ -27,5 +27,6 @@ set_target_properties(paffs PROPERTIES
 	COMPILE_FLAGS "-Wall"
 )
 
+target_link_libraries(paffs simuDriver)
 
 add_subdirectory(tests)

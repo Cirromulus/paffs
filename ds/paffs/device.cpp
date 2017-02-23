@@ -34,52 +34,10 @@ Device::~Device(){
 	delete driver;
 }
 
-Result Device::initializeDevice(){
-	param = &driver->param;
-	param->areasNo = param->blocks / 2;	//For now: 16 b -> 8 Areas
-	param->blocksPerArea = param->blocks / param->areasNo;
-	param->dataBytesPerPage = param->totalBytesPerPage - param->oobBytesPerPage;
-	param->totalPagesPerArea = param->pagesPerBlock * param->blocksPerArea;
-	unsigned int needed_pages_for_AS = 1;	//Todo: actually calculate
-	param->dataPagesPerArea = param->totalPagesPerArea - needed_pages_for_AS;
-	areaMap = new Area[param->areasNo];
-	memset(areaMap, 0, sizeof(Area) * param->areasNo);
-
-	activeArea[AreaType::superblock] = 0;
-	activeArea[AreaType::index] = 0;
-	activeArea[AreaType::journal] = 0;
-	activeArea[AreaType::data] = 0;
-
-	if(param->blocksPerArea < 2){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device too small, at least 12 Blocks are needed!");
-		return Result::einval;
-	}
-
-	if(param->dataBytesPerPage != dataBytesPerPage){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Total bytes per Page differs between "
-				"calculation and global define! (%d, %d)",
-				param->dataBytesPerPage, dataBytesPerPage);
-		return Result::einval;
-	}
-
-	if(param->dataPagesPerArea != dataPagesPerArea){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "'Data pages per Area' differs between "
-				"calculation and global define! (%d, %d)",
-				param->dataPagesPerArea, dataBytesPerPage);
-		return Result::einval;
-	}
-
-	return Result::ok;
-}
-
-Result Device::destroyDevice(){
-	delete[] areaMap;
-	areaMap = 0;
-	memset(activeArea, 0, sizeof(AreaPos)*AreaType::no);
-	return Result::ok;
-}
 
 Result Device::format(){
+	if(areaMap != 0)
+		return Result::alrMounted;
 	Result r = initializeDevice();
 	if(r != Result::ok)
 		return r;
@@ -147,7 +105,8 @@ Result Device::format(){
 }
 
 Result Device::mnt(){
-
+	if(areaMap != 0)
+		return Result::alrMounted;
 	Result r = initializeDevice();
 	if(r != Result::ok)
 		return r;
@@ -171,8 +130,9 @@ Result Device::mnt(){
 	return r;
 }
 Result Device::unmnt(){
-
-	if(trace_mask && PAFFS_TRACE_AREA){
+	if(areaMap == 0)
+		return Result::notMounted;
+	if(traceMask && PAFFS_TRACE_AREA){
 		printf("Info: \n");
 		for(unsigned int i = 0; i < param->areasNo; i++){
 			printf("\tArea %d on %u as %10s from page %4d %s\n"
@@ -488,6 +448,8 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 }
 
 Result Device::mkDir(const char* fullPath, Permission mask){
+	if(areaMap == 0)
+		return Result::notMounted;
 	unsigned int lastSlash = 0;
 
 	Inode parDir;
@@ -507,6 +469,10 @@ Result Device::mkDir(const char* fullPath, Permission mask){
 }
 
 Dir* Device::openDir(const char* path){
+	if(areaMap == 0){
+		lasterr = Result::notMounted;
+		return NULL;
+		}
 	if(path[0] == 0){
 		lasterr = Result::einval;
 		return NULL;
@@ -587,6 +553,8 @@ Dir* Device::openDir(const char* path){
 }
 
 Result Device::closeDir(Dir* dir){
+	if(areaMap == 0)
+		return Result::notMounted;
 	if(dir->childs == NULL)
 		return Result::einval;
 	for(int i = 0; i < dir->no_entrys; i++){
@@ -606,6 +574,10 @@ Result Device::closeDir(Dir* dir){
  * TODO: What happens if dir is changed after opendir?
  */
 Dirent* Device::readDir(Dir* dir){
+	if(areaMap == 0){
+		lasterr = Result::notMounted;
+		return NULL;
+	}
 	if(dir->no_entrys == 0)
 		return NULL;
 
@@ -661,6 +633,8 @@ void Device::rewindDir(Dir* dir){
 }
 
 Result Device::createFile(Inode* outFile, const char* fullPath, Permission mask){
+	if(areaMap == 0)
+		return Result::notMounted;
 	unsigned int lastSlash = 0;
 
 	Inode parDir;
@@ -679,6 +653,10 @@ Result Device::createFile(Inode* outFile, const char* fullPath, Permission mask)
 }
 
 Obj* Device::open(const char* path, Fileopenmask mask){
+	if(areaMap == 0){
+		lasterr = Result::notMounted;
+		return nullptr;
+	}
 	Inode file;
 	Result r = getInodeOfElem(&file, path);
 	if(r == Result::nf){
@@ -737,6 +715,8 @@ Obj* Device::open(const char* path, Fileopenmask mask){
 }
 
 Result Device::close(Obj* obj){
+	if(areaMap == 0)
+		return Result::notMounted;
 	if(obj == NULL)
 		return Result::einval;
 	flush(obj);
@@ -749,6 +729,8 @@ Result Device::close(Obj* obj){
 }
 
 Result Device::touch(const char* path){
+	if(areaMap == 0)
+		return Result::notMounted;
 	Inode file;
 	Result r = getInodeOfElem(&file, path);
 	if(r == Result::nf){
@@ -769,6 +751,8 @@ Result Device::touch(const char* path){
 
 
 Result Device::getObjInfo(const char *fullPath, ObjInfo* nfo){
+	if(areaMap == 0)
+		return Result::notMounted;
 	Inode object;
 	Result r;
 	if((r = getInodeOfElem(&object, fullPath)) != Result::ok){
@@ -783,6 +767,8 @@ Result Device::getObjInfo(const char *fullPath, ObjInfo* nfo){
 }
 
 Result Device::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read){
+	if(areaMap == 0)
+		return Result::notMounted;
 	if(obj == NULL)
 		return lasterr = Result::einval;
 
@@ -811,6 +797,8 @@ Result Device::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned in
 }
 
 Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written){
+	if(areaMap == 0)
+		return Result::notMounted;
 	if(obj == NULL)
 		return Result::einval;
 
@@ -842,6 +830,8 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 }
 
 Result Device::seek(Obj* obj, int m, Seekmode mode){
+	if(areaMap == 0)
+		return Result::notMounted;
 	switch(mode){
 	case Seekmode::set :
 		if(m < 0)
@@ -861,10 +851,14 @@ Result Device::seek(Obj* obj, int m, Seekmode mode){
 
 
 Result Device::flush(Obj* obj){
+	if(areaMap == 0)
+		return Result::notMounted;
 	return Result::ok;
 }
 
 Result Device::chmod(const char* path, Permission perm){
+	if(areaMap == 0)
+		return Result::notMounted;
 	Inode object;
 	Result r;
 	if((r = getInodeOfElem(&object, path)) != Result::ok){
@@ -874,6 +868,8 @@ Result Device::chmod(const char* path, Permission perm){
 	return tree.updateExistingInode(&object);
 }
 Result Device::remove(const char* path){
+	if(areaMap == 0)
+		return Result::notMounted;
 	Inode object;
 	Result r;
 	if((r = getInodeOfElem(&object, path)) != Result::ok)
@@ -899,6 +895,54 @@ Result Device::remove(const char* path){
 	return tree.deleteInode(object.no);
 }
 
+Result Device::initializeDevice(){
+	if(areaMap != 0)
+		return Result::alrMounted;
+	param = &driver->param;
+	param->areasNo = param->blocks / 2;	//For now: 16 b -> 8 Areas
+	param->blocksPerArea = param->blocks / param->areasNo;
+	param->dataBytesPerPage = param->totalBytesPerPage - param->oobBytesPerPage;
+	param->totalPagesPerArea = param->pagesPerBlock * param->blocksPerArea;
+	unsigned int needed_pages_for_AS = 1;	//Todo: actually calculate
+	param->dataPagesPerArea = param->totalPagesPerArea - needed_pages_for_AS;
+	areaMap = new Area[param->areasNo];
+	memset(areaMap, 0, sizeof(Area) * param->areasNo);
+
+	activeArea[AreaType::superblock] = 0;
+	activeArea[AreaType::index] = 0;
+	activeArea[AreaType::journal] = 0;
+	activeArea[AreaType::data] = 0;
+
+	if(param->blocksPerArea < 2){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device too small, at least 12 Blocks are needed!");
+		return Result::einval;
+	}
+
+	if(param->dataBytesPerPage != dataBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Total bytes per Page differs between "
+				"calculation and global define! (%d, %d)",
+				param->dataBytesPerPage, dataBytesPerPage);
+		return Result::einval;
+	}
+
+	if(param->dataPagesPerArea != dataPagesPerArea){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "'Data pages per Area' differs between "
+				"calculation and global define! (%d, %d)",
+				param->dataPagesPerArea, dataBytesPerPage);
+		return Result::einval;
+	}
+
+	return Result::ok;
+}
+
+Result Device::destroyDevice(){
+	if(areaMap == 0)
+		return Result::notMounted;
+	delete[] areaMap;
+	areaMap = 0;
+	memset(activeArea, 0, sizeof(AreaPos)*AreaType::no);
+	return Result::ok;
+}
+
+
 };
-
-

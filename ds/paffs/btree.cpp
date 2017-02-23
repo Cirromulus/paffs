@@ -70,7 +70,7 @@ Result Btree::findFirstFreeNo(InodeNo* outNumber){
 		return r;
 	while(!c->raw.is_leaf){
 		r = cache.getTreeNodeAtIndexFrom(c->raw.num_keys, c, &c);
-		if(r != Result::ok && r != Result::flushedcache)
+		if(r != Result::ok)
 			return r;
 	}
 	if(c->raw.num_keys > 0){
@@ -108,7 +108,7 @@ int Btree::height(TreeCacheNode * root ) {
 	TreeCacheNode *curr = root;
 	while (!curr->raw.is_leaf) {
 		Result r = cache.getTreeNodeAtIndexFrom(0, curr, &curr);
-		if(r != Result::ok && r != Result::flushedcache){
+		if(r != Result::ok){
 			dev->lasterr = r;
 			return -1;
 		}
@@ -154,7 +154,7 @@ Result Btree::find_branch(TreeCacheNode* target, TreeCacheNode** outtreeCacheNod
 
 		//printf("%d ->\n", i);
 		Result r = cache.getTreeNodeAtIndexFrom(i, c, &c);
-		if(r != Result::ok && r != Result::flushedcache)
+		if(r != Result::ok)
 			return r;
 	}
 
@@ -189,7 +189,7 @@ Result Btree::find_leaf(InodeNo key, TreeCacheNode** outtreeCacheNode) {
 		}
 
 		Result r = cache.getTreeNodeAtIndexFrom(i, c, &c);
-		if(r != Result::ok && r != Result::flushedcache)
+		if(r != Result::ok)
 			return r;
 	}
 
@@ -293,10 +293,7 @@ Result Btree::insert_into_leaf_after_splitting(TreeCacheNode * leaf, Inode * new
 
 	cache.lockTreeCacheNode(leaf);
 	Result r = cache.addNewCacheNode(&new_leaf);
-	if(r == Result::flushedcache){
-
-	}
-	else if(r != Result::ok)
+	if(r != Result::ok)
 		return r;
 	cache.unlockTreeCacheNode(leaf);
 
@@ -393,7 +390,7 @@ Result Btree::insert_into_node_after_splitting(TreeCacheNode * old_node, int lef
 	cache.lockTreeCacheNode(old_node);
 	cache.lockTreeCacheNode(right);
 	Result r = cache.addNewCacheNode(&new_node);
-	if(r != Result::flushedcache && r != Result::ok)
+	if(r != Result::ok)
 		return r;
 	cache.unlockTreeCacheNode(old_node);
 	cache.unlockTreeCacheNode(right);
@@ -507,7 +504,7 @@ Result Btree::insert_into_new_root(TreeCacheNode * left, InodeNo key, TreeCacheN
 	cache.lockTreeCacheNode(left);
 	cache.lockTreeCacheNode(right);
 	Result r = cache.addNewCacheNode(&new_root);
-	if(r != Result::ok && r != Result::flushedcache){
+	if(r != Result::ok){
 		return r;
 	}
 	cache.unlockTreeCacheNode(left);
@@ -969,7 +966,7 @@ Result Btree::delete_entry(TreeCacheNode * n, InodeNo key){
 	k_prime = n->parent->raw.as.branch.keys[k_prime_index];
 	r = neighbor_index == -1 ? cache.getTreeNodeAtIndexFrom(1, n->parent, &neighbor) :
 			cache.getTreeNodeAtIndexFrom(neighbor_index, n->parent, &neighbor);
-	if(r != Result::ok && r != Result::flushedcache)
+	if(r != Result::ok)
 		return r;
 
 	capacity = neighbor->raw.is_leaf ? leafOrder : branchOrder -1;
@@ -1015,7 +1012,7 @@ void Btree::print_leaves(TreeCacheNode* c) {
 		for(int i = 0; i <= c->raw.num_keys; i++){
 			TreeCacheNode *n = NULL;
 			Result r = cache.getTreeNodeAtIndexFrom(i, c, &n);
-			if(r != Result::ok && r != Result::flushedcache){
+			if(r != Result::ok){
 				printf("%s!\n", err_msg(r));
 				return;
 			}
@@ -1047,7 +1044,7 @@ void Btree::print_queued_keys_r(queue_s* q){
 					return;
 				}
 				r = cache.getTreeNodeAtIndexFrom(i, n_cache, &nn);
-				if(r != Result::ok && r != Result::flushedcache){
+				if(r != Result::ok){
 					printf("%s!\n", err_msg(r));
 					return;
 				}

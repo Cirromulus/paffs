@@ -23,8 +23,9 @@ enum class Result : uint8_t{
 	lowmem,
 	noperm,
 	dirnotempty,
-	flushedcache,
 	badflash,
+	notMounted,
+	alrMounted,
 	num_result
 };
 

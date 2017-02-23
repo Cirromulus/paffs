@@ -16,7 +16,7 @@
 
 namespace paffs{
 
-unsigned int trace_mask =
+unsigned int traceMask =
 	PAFFS_TRACE_AREA |
 	PAFFS_TRACE_ERROR |
 	PAFFS_TRACE_BUG |
@@ -44,8 +44,9 @@ const char* resultMsg[] = {
 		"Not enough RAM for cache",
 		"Operation not permitted",
 		"Directory is not empty",
-		"Cache had to be flushed, any current TCN can be invalidated now",
-		"Flash needs retirement.",
+		"Flash needs retirement",
+		"Device is not mounted",
+		"Device is already mounted",
 		"You should not be seeing this..."
 };
 
@@ -71,10 +72,10 @@ Result Paffs::format(const char* devicename){
 	return device.format();
 }
 
-Result Paffs::mnt(const char* devicename){
+Result Paffs::mount(const char* devicename){
 	return device.mnt();
 }
-Result Paffs::unmnt(const char* devicename){
+Result Paffs::unmount(const char* devicename){
 	return device.unmnt();
 }
 
@@ -142,6 +143,10 @@ Result Paffs::remove(const char* path){
 //ONLY FOR DEBUG
 Device* Paffs::getDevice(){
 	return &device;
+}
+
+void Paffs::setTraceMask(unsigned int mask){
+	traceMask = mask;
 }
 
 }

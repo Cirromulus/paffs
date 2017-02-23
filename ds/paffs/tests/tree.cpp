@@ -26,7 +26,10 @@
 
 
 int main( int argc, char ** argv ) {
-	printf("Branch-Order: %u, Leaf-Order: %u\nSpace in Pointers: %u Byte, Sizeof pInode: %u Byte\n", BRANCH_ORDER, LEAF_ORDER, BRANCH_ORDER * sizeof(p_addr), sizeof(pInode));
+	printf("Branch-Order: %u, Leaf-Order: %u\n"
+			"Space in Pointers: %u Byte, "
+			"Sizeof pInode: %u Byte\n", BRANCH_ORDER, LEAF_ORDER,
+			BRANCH_ORDER * sizeof(p_addr), sizeof(pInode));
 	printf("Size of TreeNode: %u\n", sizeof(treeNode));
 	printf("Size of TreeCacheNode: %u\n", sizeof(treeCacheNode));
 

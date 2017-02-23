@@ -11,6 +11,8 @@
 
 namespace paffs{
 
+extern unsigned int traceMask;
+
 class Paffs{
 	Device device;
 
@@ -20,8 +22,8 @@ public:
 	~Paffs();
 
 	Result format(const char* devicename);
-	Result mnt(const char* devicename);
-	Result unmnt(const char* devicename);
+	Result mount(const char* devicename);
+	Result unmount(const char* devicename);
 	Result getLastErr();
 	void resetLastErr();
 
@@ -48,6 +50,7 @@ public:
 
 	//ONLY FOR DEBUG
 	Device* getDevice();
+	void setTraceMask(unsigned int mask);
 
 };
 }

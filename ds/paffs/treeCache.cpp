@@ -93,7 +93,7 @@ Result TreeCache::addNewCacheNode(TreeCacheNode** newTcn){
 		return Result::bug;
 	}
 
-	if(trace_mask & PAFFS_TRACE_CACHE){
+	if(traceMask & PAFFS_TRACE_CACHE){
 		printTreeCache();
 	}
 
@@ -105,10 +105,10 @@ Result TreeCache::addNewCacheNode(TreeCacheNode** newTcn){
 		return dev->lasterr;
 	r = tryAddNewCacheNode(newTcn);
 	if(r == Result::ok){
-		if(trace_mask & PAFFS_TRACE_CACHE){
+		if(traceMask & PAFFS_TRACE_CACHE){
 			printTreeCache();
 		}
-		return Result::flushedcache;
+		return Result::ok;
 	}
 	if(r != Result::lowmem)
 		return r;
@@ -119,10 +119,10 @@ Result TreeCache::addNewCacheNode(TreeCacheNode** newTcn){
 		return dev->lasterr;
 	r = tryAddNewCacheNode(newTcn);
 	if(r == Result::ok){
-		if(trace_mask & PAFFS_TRACE_CACHE){
+		if(traceMask & PAFFS_TRACE_CACHE){
 			printTreeCache();
 		}
-		return Result::flushedcache;
+		return Result::ok;
 	}
 	if(r != Result::lowmem)
 		return r;
@@ -132,10 +132,10 @@ Result TreeCache::addNewCacheNode(TreeCacheNode** newTcn){
 	commitCache();
 	r = tryAddNewCacheNode(newTcn);
 	if(r == Result::ok){
-		if(trace_mask & PAFFS_TRACE_CACHE){
+		if(traceMask & PAFFS_TRACE_CACHE){
 			printTreeCache();
 		}
-		return Result::flushedcache;
+		return Result::ok;
 	}
 	return r;
 }
@@ -389,7 +389,7 @@ void TreeCache::cleanFreeLeafNodes(){
 
 	//debug ---->
 	uint16_t usedCache;
-	if(trace_mask & PAFFS_TRACE_CACHE){
+	if(traceMask & PAFFS_TRACE_CACHE){
 		usedCache = getCacheUsage();
 	}
 	//<---- debug
@@ -408,7 +408,7 @@ void TreeCache::cleanFreeLeafNodes(){
 	}
 
 	//debug ---->
-	if(trace_mask & PAFFS_TRACE_CACHE){
+	if(traceMask & PAFFS_TRACE_CACHE){
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "CleanTreeCacheLeaves freed %d Leaves.", usedCache - getCacheUsage());
 	}
 	//<---- debug
@@ -421,7 +421,7 @@ void TreeCache::cleanFreeNodes(){
 	//TODO: This only removes one layer of clean nodes, should check whole path to root
 	//debug ---->
 	uint16_t usedCache;
-	if(trace_mask & PAFFS_TRACE_CACHE){
+	if(traceMask & PAFFS_TRACE_CACHE){
 		if(!isTreeCacheValid()){
 			dev->lasterr = Result::bug;
 			return;
@@ -442,7 +442,7 @@ void TreeCache::cleanFreeNodes(){
 	}
 
 	//debug ---->
-	if(trace_mask & PAFFS_TRACE_CACHE){
+	if(traceMask & PAFFS_TRACE_CACHE){
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "CleanTreeCache freed %d Nodes.", usedCache - getCacheUsage());
 	}
 	//<---- debug
@@ -508,7 +508,7 @@ Result TreeCache::commitCache(){
 
 	//debug ---->
 	uint16_t usedCache;
-	if(trace_mask & PAFFS_TRACE_CACHE){
+	if(traceMask & PAFFS_TRACE_CACHE){
 		usedCache = getCacheUsage();
 	}
 	//<---- debug
@@ -532,7 +532,7 @@ Result TreeCache::commitCache(){
 		cleanFreeNodes();	//if tree cache did not contain any leaves (unlikely)
 
 	//debug ---->
-	if(trace_mask & PAFFS_TRACE_CACHE){
+	if(traceMask & PAFFS_TRACE_CACHE){
 		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "flushTreeCache freed %d Nodes.", usedCache - getCacheUsage());
 	}
 	//<---- debug
@@ -684,7 +684,7 @@ Result TreeCache::getTreeNodeAtIndexFrom(unsigned char index,
 
 	lockTreeCacheNode(parent);
 	Result r = addNewCacheNode(&target);
-	if(r == Result::flushedcache){
+	if(r == Result::ok){
 
 	}else if(r != Result::ok){
 		unlockTreeCacheNode(parent);

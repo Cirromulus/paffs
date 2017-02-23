@@ -132,7 +132,7 @@ Result AreaManagement::findFirstFreePage(unsigned int* p_out, unsigned int area)
 
 Result AreaManagement::manageActiveAreaFull(AreaPos *area, AreaType areaType){
 	Result r;
-	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
+	if(traceMask & PAFFS_TRACE_VERIFY_AS){
 		for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
 			if(dev->sumCache.getPageStatus(*area, i,&r) > SummaryEntry::dirty)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries (%s)!", *area, resultMsg[(int)r]);

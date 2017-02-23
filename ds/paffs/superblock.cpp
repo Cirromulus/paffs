@@ -156,7 +156,7 @@ Result Superblock::commitSuperIndex(superIndex *newIndex){
 	newIndex->rootNode = rootnode_addr;
 	newIndex->areaMap = dev->areaMap;	//This should already be done in cachefunction
 
-	if(trace_mask & PAFFS_TRACE_SUPERBLOCK){
+	if(traceMask & PAFFS_TRACE_SUPERBLOCK){
 		printf("write Super Index:\n");
 		printSuperIndex(newIndex);
 	}
@@ -193,7 +193,7 @@ Result Superblock::readSuperIndex(superIndex* index){
 		return r;
 	}
 
-	if(trace_mask & PAFFS_TRACE_SUPERBLOCK){
+	if(traceMask & PAFFS_TRACE_SUPERBLOCK){
 		printf("Read Super Index:\n");
 		printSuperIndex(index);
 	}

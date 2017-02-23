@@ -204,7 +204,7 @@ Result DataIO::readInodeData(Inode* inode,
 			return Result::bug;
 		}
 		Result r;
-		if(trace_mask && PAFFS_TRACE_VERIFY_AS){
+		if(traceMask && PAFFS_TRACE_VERIFY_AS){
 			SummaryEntry e = dev->sumCache.getPageStatus(extractLogicalArea(inode->direct[page + pageFrom])
 					,extractPage(inode->direct[page + pageFrom]), &r);
 			if(r != Result::ok){
@@ -396,7 +396,7 @@ Result DataIO::readTreeNode(Addr addr, TreeNode* node){
 
 
 	Result r;
-	if(trace_mask && PAFFS_TRACE_VERIFY_AS){
+	if(traceMask && PAFFS_TRACE_VERIFY_AS){
 		if(dev->sumCache.getPageStatus(extractLogicalArea(addr), extractPage(addr),&r) == SummaryEntry::dirty){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "READ operation of obsoleted data at %X:%X", extractLogicalArea(addr), extractPage(addr));
 			return Result::bug;
