@@ -18,7 +18,7 @@ set(SOURCES
 add_library(gtest ${GTEST_SOURCES})
 
 add_executable(unittests ${SOURCES})
-target_link_libraries(unittests pthread gtest)
+target_link_libraries(unittests paffs pthread gtest)
 
 add_executable(dir_test dirtest.cpp)
 target_link_libraries(dir_test paffs simu)

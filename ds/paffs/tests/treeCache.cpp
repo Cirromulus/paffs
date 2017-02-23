@@ -6,15 +6,24 @@
  */
 
 #include <math.h>
+#include <iostream>
 #include "googletest/gtest/gtest.h"
 
-TEST (SquareRootTest, PositiveNos) {
-    EXPECT_EQ (18.0, sqrt (324.0));
-    EXPECT_EQ (25.4, sqrt (645.16));
-    EXPECT_EQ (50.332, sqrt (2533.310224));
-}
+#include "../paffs.hpp"
 
-TEST (SquareRootTest, ZeroAndNegativeNos) {
-    ASSERT_EQ (0.0, sqrt (0.0));
-    ASSERT_EQ (-1, sqrt (-22.0));
+class TreeTest : public testing::Test{
+public:
+	//automatically loads default driver "1" with default flash
+	paffs::Paffs fs;
+	TreeTest(){
+		paffs::Result r = fs.format("1");
+		if(r != paffs::Result::ok)
+			std::cerr << "Could not format device!" << std::endl;
+	}
+};
+
+TEST_F (TreeTest, Sizes) {
+	EXPECT_LE(sizeof(paffs::TreeNode), paffs::dataBytesPerPage);
+	EXPECT_LE(paffs::leafOrder * sizeof(paffs::Inode), sizeof(paffs::TreeNode));
+	EXPECT_LE(paffs::branchOrder * sizeof(paffs::Addr), sizeof(paffs::TreeNode));
 }
