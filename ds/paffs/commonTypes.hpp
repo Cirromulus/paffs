@@ -34,18 +34,18 @@ extern const char* resultMsg[];		//Initialized in paffs.cpp
 
 typedef uint8_t Permission;
 
-static const Permission R = 0x1;
-static const Permission W = 0x2;
-static const Permission X = 0x4;
-static const Permission permMask = 0b111;
+const Permission R = 0x1;
+const Permission W = 0x2;
+const Permission X = 0x4;
+const Permission permMask = 0b111;
 
 typedef uint8_t Fileopenmask;
-static const Fileopenmask FR = 0x01;	//file read
-static const Fileopenmask FW = 0x02;	//file write
-static const Fileopenmask FEX= 0x04;	//file execute
-static const Fileopenmask FA = 0x08;	//file append
-static const Fileopenmask FE = 0x10;	//file open only existing
-static const Fileopenmask FC = 0x20;	//file create
+const Fileopenmask FR = 0x01;	//file read
+const Fileopenmask FW = 0x02;	//file write
+const Fileopenmask FEX= 0x04;	//file execute
+const Fileopenmask FA = 0x08;	//file append
+const Fileopenmask FE = 0x10;	//file open only existing
+const Fileopenmask FC = 0x20;	//file create
 
 enum class Seekmode{
 	set = 0,
@@ -76,6 +76,9 @@ typedef uint32_t FileSize; 	  //~ 4 GB per file
 typedef uint32_t InodeNo;		  //~ 4 Million files
 typedef uint16_t DirEntryCount; //65,535 Entries per Directory
 typedef uint8_t  DirEntryLength; //255 characters per Directory entry
+
+//Together with area = 0, it is used to mark an unused page in Inode
+const uint32_t unusedMarker = 0xFFFFFFFF;
 
 enum class InodeType : uint8_t{
 	file,
@@ -110,6 +113,7 @@ struct Obj{
 	bool rdnly;
 	Dirent* dirent;
 	unsigned int fp;	//Current filepointer
+	Fileopenmask fo;	//TODO actually use this for read/write
 };
 
 struct Dir{

@@ -691,7 +691,7 @@ Obj* Device::open(const char* path, Fileopenmask mask){
 		return nullptr;
 	}
 
-	if((file.perm & (mask & permMask)) != (mask & permMask)){
+	if((file.perm | (mask & permMask)) != (file.perm & permMask)){
 		lasterr = Result::noperm;
 		return nullptr;
 	}

@@ -12,8 +12,10 @@ set(GTEST_SOURCES
 
 set(SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/unittests.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/commonTest.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/treeCache.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/device.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/superblock.cpp
 	
 )
 

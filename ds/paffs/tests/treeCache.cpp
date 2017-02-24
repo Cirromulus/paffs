@@ -6,27 +6,11 @@
  */
 
 #include <iostream>
-#include "googletest/gtest/gtest.h"
 
-#include "../paffs.hpp"
+#include "commonTest.hpp"
 
-class TreeTest : public testing::Test{
-public:
-	//automatically loads default driver "1" with default flash
-	paffs::Paffs fs;
-	TreeTest(){
-		fs.setTraceMask(0);
-		paffs::Result r = fs.format("1");
-				if(r != paffs::Result::ok)
-					std::cerr << "Could not format device!" << std::endl;
-		r = fs.mount("1");
-				if(r != paffs::Result::ok)
-					std::cerr << "Could not mount device!" << std::endl;
-	}
+class TreeTest : public InitFs{
 
-	virtual ~TreeTest(){
-		fs.unmount("1");
-	}
 };
 
 TEST_F (TreeTest, Sizes) {

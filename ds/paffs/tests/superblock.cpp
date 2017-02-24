@@ -1,0 +1,73 @@
+/*
+ * superblock.cpp
+ *
+ *  Created on: 24 Feb 2017
+ *      Author: rooot
+ */
+
+#include "commonTest.hpp"
+
+class SuperBlock : public InitFs{};
+
+TEST_F(SuperBlock, multipleRemounts){
+	paffs::Obj *fil;
+	paffs::Dir *dir;
+	paffs::Result r;
+	char txt[] = "Hallo";
+	char buf[6];
+	unsigned int bw;
+
+	fil = fs.open("/file", paffs::FC);
+	ASSERT_NE(fil, nullptr);
+	fs.resetLastErr();
+
+	r = fs.write(fil, txt, strlen(txt), &bw);
+	EXPECT_EQ(bw, strlen(txt));
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	r = fs.close(fil);
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	r = fs.unmount("1");
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	r = fs.touch("/a");
+	ASSERT_EQ(r, paffs::Result::notMounted);
+
+	r = fs.mount("1");
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	r = fs.mkDir("/a", paffs::R | paffs::W);
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	fil = fs.open("/file", paffs::FC);
+	ASSERT_NE(fil, nullptr);
+	fs.resetLastErr();
+	r = fs.read(fil, buf, strlen(txt), &bw);
+	ASSERT_EQ(r, paffs::Result::ok);
+	ASSERT_EQ(bw, strlen(txt));
+	buf[5] = 0;
+	ASSERT_TRUE(ArraysMatch(buf, txt));
+
+	r = fs.close(fil);
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	r = fs.unmount("1");
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	r = fs.mount("1");
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	dir = fs.openDir("/a");
+	ASSERT_NE(dir, nullptr);
+}
+
+TEST_F(SuperBlock, fillAreas){
+	paffs::Obj *fil;
+	paffs::Result r;
+	char txt[] = "Hallo";
+	char buf[6];
+	unsigned int bw;
+
+
+}

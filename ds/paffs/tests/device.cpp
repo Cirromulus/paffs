@@ -5,59 +5,56 @@
  *      Author: rooot
  */
 #include <iostream>
-#include "googletest/gtest/gtest.h"
-#include "googletest/gmock/gmock.h"
 
-#include "../paffs.hpp"
+#include "commonTest.hpp"
 
+class FileTest : public InitFs{
 
-class FileTest : public testing::Test{
-public:
-	//automatically loads default driver "1" with default flash
-	paffs::Paffs fs;
-	FileTest(){
-		fs.setTraceMask(0);
-		paffs::Result r = fs.format("1");
-				if(r != paffs::Result::ok)
-					std::cerr << "Could not format device!" << std::endl;
-		r = fs.mount("1");
-				if(r != paffs::Result::ok)
-					std::cerr << "Could not mount device!" << std::endl;
-	}
-
-	virtual ~FileTest(){
-		fs.unmount("1");
-	}
 };
 
-//stack overflow, Fraser '12
-template<typename T, size_t size>
-::testing::AssertionResult ArraysMatch(const T (&expected)[size],
-                                       const T (&actual)[size]){
-    for (size_t i(0); i < size; ++i){
-        if (expected[i] != actual[i]){
-            return ::testing::AssertionFailure() << "array[" << i
-                << "] (" << actual[i] << ") != expected[" << i
-                << "] (" << expected[i] << ")";
-        }
-    }
+TEST_F(FileTest, seekReadWrite){
+	paffs::Obj *fil;
+	paffs::Result r;
+	char txt[] = "Hallo";
+	char buf[6];
+	unsigned int bw;
 
-    return ::testing::AssertionSuccess();
-}
+	fil = fs.open("/file", paffs::FW | paffs::FC);
+	ASSERT_NE(fil, nullptr);
 
-::testing::AssertionResult StringsMatch(const char *a, const char*b){
-	if(strlen(a) != strlen(b))
-		return ::testing::AssertionFailure() << "Size differs, " << strlen(a)
-				<< " != " << strlen(b);
+	r = fs.seek(fil, paffs::dataBytesPerPage + 20, paffs::Seekmode::set);
+	ASSERT_EQ(r, paffs::Result::ok);
 
-	for(size_t i(0); i < strlen(a); i++){
-        if (a[i] != b[i]){
-            return ::testing::AssertionFailure() << "array[" << i
-                << "] (" << a[i] << ") != expected[" << i
-                << "] (" << b[i] << ")";
-        }
-	}
-	return ::testing::AssertionSuccess();
+	r = fs.write(fil, txt, strlen(txt), &bw);
+	EXPECT_EQ(bw, strlen(txt));
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	r = fs.seek(fil, -strlen(txt), paffs::Seekmode::cur);
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	r = fs.read(fil, buf, strlen(txt), &bw);
+	EXPECT_EQ(bw, strlen(txt));
+	ASSERT_EQ(r, paffs::Result::ok);
+	ASSERT_TRUE(ArraysMatch(txt, buf, strlen(txt)));
+
+	r = fs.seek(fil, 20, paffs::Seekmode::set);
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	r = fs.read(fil, buf, 1, &bw);
+	EXPECT_EQ(bw, (unsigned int)1);
+	ASSERT_EQ(r, paffs::Result::ok);
+	ASSERT_EQ(buf[0], 0);
+
+	r = fs.seek(fil, -strlen(txt), paffs::Seekmode::end);
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	r = fs.read(fil, buf, strlen(txt), &bw);
+	EXPECT_EQ(bw, strlen(txt));
+	ASSERT_EQ(r, paffs::Result::ok);
+	ASSERT_TRUE(ArraysMatch(txt, buf, strlen(txt)));
+
+
+
 }
 
 TEST_F(FileTest, createReadWriteFile){
@@ -65,6 +62,9 @@ TEST_F(FileTest, createReadWriteFile){
 	char t[] = ".                         Text";	//30 chars
 	char tl[filesize];
 	char buf[filesize];
+	char quer[] = "..--";
+	paffs::Result r;
+	paffs::ObjInfo info;
 	int i;
 	for(i = 0; i * strlen(t) < filesize; i++){
 		memcpy(&tl[i * strlen(t)], t, strlen(t));
@@ -77,11 +77,11 @@ TEST_F(FileTest, createReadWriteFile){
 
 	//write
 	unsigned int bytes = 0;
-	paffs::Result r = fs.write(fil, tl, filesize, &bytes);
+	r = fs.write(fil, tl, filesize, &bytes);
 	EXPECT_EQ(bytes, filesize);
 	ASSERT_EQ(r, paffs::Result::ok);
 
-	paffs::ObjInfo info;
+
 	r = fs.getObjInfo("/file", &info);
 	ASSERT_EQ(r, paffs::Result::ok);
 	ASSERT_EQ(info.isDir, false);
@@ -96,7 +96,6 @@ TEST_F(FileTest, createReadWriteFile){
 	EXPECT_TRUE(ArraysMatch(buf, tl));
 
 	//misaligned write
-	char quer[] = "..--";
 	memcpy(&tl[paffs::dataBytesPerPage - strlen(quer) / 2], quer, strlen(quer));
 	r = fs.seek(fil, paffs::dataBytesPerPage - strlen(quer) / 2, paffs::Seekmode::set);
 	ASSERT_EQ(r, paffs::Result::ok);
@@ -218,6 +217,6 @@ TEST_F(FileTest, permissions){
 	ASSERT_NE(fil, nullptr);
 
 	r = fs.write(fil, txt, strlen(txt), &bw);
-	EXPECT_EQ(bw, 0);
+	EXPECT_EQ(bw, (unsigned int) 0);
 	ASSERT_EQ(r, paffs::Result::noperm);
 }

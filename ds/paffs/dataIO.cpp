@@ -21,17 +21,24 @@ Result DataIO::writeInodeData(Inode* inode,
 					const char* data){
 
 	if(offs+bytes == 0){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Write size 0! Bug?");
-		return dev->lasterr = Result::einval;
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Write size 0! Bug?");
+		return Result::einval;
 	}
 
 	unsigned int pageFrom = offs/dev->param->dataBytesPerPage;
 	unsigned int pageTo = (offs + bytes - 1) / dev->param->dataBytesPerPage;
 
-	if(pageTo - pageFrom > 11){
+	if(pageTo > 11){
 		//Would use first indirection Layer
 		PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Write would use first indirection layer, too big!");
 		return dev->lasterr = Result::nimpl;
+	}
+
+	for(unsigned int i = 0; i < pageFrom; i++){
+		if(inode->direct[i] == 0){
+			//we jumped over pages, so mark them as not (yet) used
+			inode->direct[i] = combineAddress(0, unusedMarker);
+		}
 	}
 
 	unsigned int pageOffs = offs % dev->param->dataBytesPerPage;
@@ -65,6 +72,8 @@ Result DataIO::writeInodeData(Inode* inode,
 		}
 
 		//Prepare buffer and calculate bytes to write
+		//FIXME: If write has offset, misaligned is still false
+		//so no leading zeros are inserted
 		char* buf = &((char*)data)[page*dev->param->dataBytesPerPage];
 		unsigned int btw = bytes - *bytes_written;
 		if((bytes+pageOffs) > dev->param->dataBytesPerPage){
@@ -75,7 +84,8 @@ Result DataIO::writeInodeData(Inode* inode,
 
 
 
-		if(inode->direct[page+pageFrom] != 0){
+		if(inode->direct[page+pageFrom] != 0
+				&& inode->direct[page+pageFrom] != combineAddress(0, unusedMarker)){
 			//We are overriding existing data
 			//mark old Page in Areamap
 			unsigned long oldArea = extractLogicalArea(inode->direct[page+pageFrom]);
@@ -198,8 +208,15 @@ Result DataIO::readInodeData(Inode* inode,
 						(bytes + pageOffs) - page*dev->param->dataBytesPerPage;
 		}
 
-		AreaPos area = extractLogicalArea(inode->direct[page + pageFrom]);
+		AreaPos area = extractLogicalArea(inode->direct[pageFrom + page]);
 		if(dev->areaMap[area].type != AreaType::data){
+			if(inode->direct[pageFrom + page] == combineAddress(0, unusedMarker)){
+				//This Page is currently not written to flash
+				//because it contains just empty space
+				memset(buf, 0, btr+pageOffs);
+				*bytes_read += btr;
+				continue;
+			}
 			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid area at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
 			return Result::bug;
 		}
@@ -226,7 +243,7 @@ Result DataIO::readInodeData(Inode* inode,
 			}
 		}
 
-		unsigned long long addr = getPageNumber(inode->direct[page + pageFrom], dev);
+		Addr addr = getPageNumber(inode->direct[page + pageFrom], dev);
 		r = dev->driver->readPage(addr, buf, btr);
 		if(r != Result::ok){
 			if(misaligned)
