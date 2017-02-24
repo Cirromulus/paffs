@@ -37,9 +37,9 @@ typedef uint8_t Permission;
 static const Permission R = 0x1;
 static const Permission W = 0x2;
 static const Permission X = 0x4;
-static const Permission PERM_MASK = 0b111;
+static const Permission permMask = 0b111;
 
-typedef char Fileopenmask;
+typedef uint8_t Fileopenmask;
 static const Fileopenmask FR = 0x01;	//file read
 static const Fileopenmask FW = 0x02;	//file write
 static const Fileopenmask FEX= 0x04;	//file execute

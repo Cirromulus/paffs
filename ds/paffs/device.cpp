@@ -22,7 +22,7 @@ Device::Device(Driver* driver) : driver(driver),
 };
 
 Device::~Device(){
-	if(areaMap != NULL){
+	if(areaMap != nullptr){
 		std::cerr << "Destroyed Device-Object without unmouning! "
 				"This will most likely destroy "
 				"the filesystem on flash." << std::endl;
@@ -166,7 +166,7 @@ Result Device::createInode(Inode* outInode, Permission mask){
 	if(r != Result::ok)
 		return r;
 
-	outInode->perm = (mask & PERM_MASK);
+	outInode->perm = (mask & permMask);
 	if(mask & W)
 		outInode->perm |= R;
 	outInode->size = 0;
@@ -313,7 +313,7 @@ Result Device::getInodeOfElem(Inode* outInode, const char* fullPath){
 	char *fnP;
 	fnP = strtok(fullPathC, delimiter);
 
-	while(fnP != NULL){
+	while(fnP != nullptr){
 		if(strlen(fnP) == 0){   //is first '/'
 			continue;
 		}
@@ -330,7 +330,7 @@ Result Device::getInodeOfElem(Inode* outInode, const char* fullPath){
 		}
 		curr = outInode;
 		//todo: Dirent cachen
-		fnP = strtok(NULL, delimiter);
+		fnP = strtok(nullptr, delimiter);
 	}
 
 	free(fullPathC);
@@ -339,7 +339,7 @@ Result Device::getInodeOfElem(Inode* outInode, const char* fullPath){
 
 
 Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem){
-	if(contDir == NULL){
+	if(contDir == nullptr){
 		lasterr = Result::bug;
 		return Result::bug;
 	}
@@ -394,7 +394,7 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 
 //TODO: mark deleted treeCacheNodes as dirty
 Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
-	if(contDir == NULL){
+	if(contDir == nullptr){
 		lasterr = Result::bug;
 		return Result::bug;
 	}
@@ -471,11 +471,11 @@ Result Device::mkDir(const char* fullPath, Permission mask){
 Dir* Device::openDir(const char* path){
 	if(areaMap == 0){
 		lasterr = Result::notMounted;
-		return NULL;
+		return nullptr;
 		}
 	if(path[0] == 0){
 		lasterr = Result::einval;
-		return NULL;
+		return nullptr;
 	}
 
 	Inode dirPinode;
@@ -485,7 +485,7 @@ Dir* Device::openDir(const char* path){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "Result::bug? '%s'", err_msg(r));
 		}
 		lasterr = r;
-		return NULL;
+		return nullptr;
 	}
 
 	char* dirData = (char*) malloc(dirPinode.size);
@@ -494,7 +494,7 @@ Dir* Device::openDir(const char* path){
 		r = dataIO.readInodeData(&dirPinode, 0, dirPinode.size, &br, dirData);
 		if(r != Result::ok || br != dirPinode.size){
 			lasterr = r;
-			return NULL;
+			return nullptr;
 		}
 	}else{
 		memset(dirData, 0, dirPinode.size);
@@ -505,7 +505,7 @@ Dir* Device::openDir(const char* path){
 	dir->self->name = (char*) "not_impl.";
 	dir->self->node = (Inode*) malloc(sizeof(Inode));
 	*dir->self->node = dirPinode;
-	dir->self->parent = NULL;	//no caching, so we pobably dont have the parent
+	dir->self->parent = nullptr;	//no caching, so we pobably dont have the parent
 	dir->no_entrys = dirData[0];
 	dir->childs = (Dirent**) malloc(dir->no_entrys * sizeof(Dirent*));
 	dir->pos = 0;
@@ -529,11 +529,11 @@ Dir* Device::openDir(const char* path){
 			free(dir->self->node);
 			free(dir);
 			lasterr = Result::bug;
-			return NULL;
+			return nullptr;
 		}
 		p += sizeof(DirEntryLength);
 		memcpy(&dir->childs[entry]->no, &dirData[p], sizeof(InodeNo));
-		dir->childs[entry]->node = NULL;
+		dir->childs[entry]->node = nullptr;
 		p += sizeof(InodeNo);
 		dir->childs[entry]->name = (char*) malloc(dirnamel+2);    //+2 weil 1. Nullbyte und 2. Vielleicht ein Zeichen '/' dazukommt
 		memcpy(dir->childs[entry]->name, &dirData[p], dirnamel);
@@ -546,7 +546,7 @@ Dir* Device::openDir(const char* path){
 	if(entry != dir->no_entrys){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Directory stated it had %u entries, but has actually %u!", dir->no_entrys, entry);
 		lasterr = Result::bug;
-		return NULL;
+		return nullptr;
 	}
 
 	return dir;
@@ -555,11 +555,11 @@ Dir* Device::openDir(const char* path){
 Result Device::closeDir(Dir* dir){
 	if(areaMap == 0)
 		return Result::notMounted;
-	if(dir->childs == NULL)
+	if(dir->childs == nullptr)
 		return Result::einval;
 	for(int i = 0; i < dir->no_entrys; i++){
 		free(dir->childs[i]->name);
-		if(dir->childs[i]->node != NULL)
+		if(dir->childs[i]->node != nullptr)
 			free(dir->childs[i]->node);
 		free(dir->childs[i]);
 	}
@@ -576,45 +576,45 @@ Result Device::closeDir(Dir* dir){
 Dirent* Device::readDir(Dir* dir){
 	if(areaMap == 0){
 		lasterr = Result::notMounted;
-		return NULL;
+		return nullptr;
 	}
 	if(dir->no_entrys == 0)
-		return NULL;
+		return nullptr;
 
 	if(dir->pos == dir->no_entrys){
-		return NULL;
+		return nullptr;
 	}
 
-	if(dir->childs == NULL){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ DIR on dir with NULL dirents");
+	if(dir->childs == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ DIR on dir with nullptr dirents");
 		lasterr = Result::bug;
-		return NULL;
+		return nullptr;
 	}
 
 	if(dir->pos > dir->no_entrys){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ DIR on dir that points further than its contents");
 		lasterr = Result::bug;
-		return NULL;
+		return nullptr;
 	}
 
-	if(dir->childs[dir->pos] == NULL){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ DIR on dir with NULL Dirent no. %d", dir->pos);
+	if(dir->childs[dir->pos] == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ DIR on dir with nullptr Dirent no. %d", dir->pos);
 		lasterr = Result::bug;
-		return NULL;
+		return nullptr;
 	}
 
-	if(dir->childs[dir->pos]->node != NULL){
+	if(dir->childs[dir->pos]->node != nullptr){
 		return dir->childs[dir->pos++];
 	}
 	Inode item;
 	Result r = tree.getInode(dir->childs[dir->pos]->no, &item);
 	if(r != Result::ok){
 	   lasterr = Result::bug;
-	   return NULL;
+	   return nullptr;
 	}
 	if((item.perm & R) == 0){
 		lasterr = Result::noperm;
-		return NULL;
+		return nullptr;
 	}
 
 
@@ -663,35 +663,37 @@ Obj* Device::open(const char* path, Fileopenmask mask){
 		//create new file
 		if(mask & FC){
 			//use standard mask
+			//FIXME: Use standard mask or the mask provided?
 			r = createFile(&file, path, R | W);
 			if(r != Result::ok){
 				lasterr = r;
-				return NULL;
+				return nullptr;
 			}
 		}else{
-			lasterr = Result::exists;	//not exsist
-			return NULL;
+			//does not exist, no filecreation bit is given
+			lasterr = Result::nf;
+			return nullptr;
 		}
 	}else if(r != Result::ok){
 		lasterr = r;
-		return NULL;
+		return nullptr;
 	}
 
 	if(file.type == InodeType::lnk){
 		//LINKS are not supported yet
 		lasterr = Result::nimpl;
-		return NULL;
+		return nullptr;
 	}
 
 	if(file.type == InodeType::dir){
 		//tried to open directory as file
 		lasterr = Result::einval;
-		return NULL;
+		return nullptr;
 	}
 
-	if((file.perm & (mask & PERM_MASK)) != (mask & PERM_MASK)){
+	if((file.perm & (mask & permMask)) != (mask & permMask)){
 		lasterr = Result::noperm;
-		return NULL;
+		return nullptr;
 	}
 
 	Obj* obj = (Obj*) malloc(sizeof(Obj));
@@ -699,7 +701,7 @@ Obj* Device::open(const char* path, Fileopenmask mask){
 	obj->dirent->name = (char*) malloc(strlen(path));
 	obj->dirent->node = (Inode*) malloc(sizeof(Inode));
 	*obj->dirent->node = file;
-	obj->dirent->parent = NULL;		//TODO: Sollte aus cache gesucht werden, erstellt in "getInodeOfElem(path))" ?
+	obj->dirent->parent = nullptr;		//TODO: Sollte aus cache gesucht werden, erstellt in "getInodeOfElem(path))" ?
 
 	memcpy((void*)obj->dirent->name, path, strlen(path));
 
@@ -717,7 +719,7 @@ Obj* Device::open(const char* path, Fileopenmask mask){
 Result Device::close(Obj* obj){
 	if(areaMap == 0)
 		return Result::notMounted;
-	if(obj == NULL)
+	if(obj == nullptr)
 		return Result::einval;
 	flush(obj);
 	free(obj->dirent->node);
@@ -769,7 +771,7 @@ Result Device::getObjInfo(const char *fullPath, ObjInfo* nfo){
 Result Device::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read){
 	if(areaMap == 0)
 		return Result::notMounted;
-	if(obj == NULL)
+	if(obj == nullptr)
 		return lasterr = Result::einval;
 
 	if(obj->dirent->node->type == InodeType::dir){
@@ -797,9 +799,10 @@ Result Device::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned in
 }
 
 Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written){
+	*bytes_written = 0;
 	if(areaMap == 0)
 		return Result::notMounted;
-	if(obj == NULL)
+	if(obj == nullptr)
 		return Result::einval;
 
 	if(obj->dirent->node->type == InodeType::dir){

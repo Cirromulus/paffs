@@ -5,7 +5,6 @@
  *      Author: user
  */
 
-#include <math.h>
 #include <iostream>
 #include "googletest/gtest/gtest.h"
 
