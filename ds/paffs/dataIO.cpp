@@ -41,6 +41,7 @@ Result DataIO::writeInodeData(Inode* inode,
 		}
 	}
 
+	//Will be set to zero after offset is applied
 	unsigned int pageOffs = offs % dev->param->dataBytesPerPage;
 	*bytes_written = 0;
 
@@ -85,7 +86,8 @@ Result DataIO::writeInodeData(Inode* inode,
 
 
 		if(inode->direct[page+pageFrom] != 0
-				&& inode->direct[page+pageFrom] != combineAddress(0, unusedMarker)){
+				&& inode->direct[page+pageFrom] != combineAddress(0, unusedMarker)
+				|| pageOffs != 0){
 			//We are overriding existing data
 			//mark old Page in Areamap
 			unsigned long oldArea = extractLogicalArea(inode->direct[page+pageFrom]);
@@ -99,19 +101,24 @@ Result DataIO::writeInodeData(Inode* inode,
 				//fill write buffer with valid Data
 				misaligned = true;
 				buf = (char*)malloc(dev->param->dataBytesPerPage);
-				memset(buf, 0xFF, dev->param->dataBytesPerPage);
+				memset(buf, 0x0, dev->param->dataBytesPerPage);
 
 				unsigned int btr = dev->param->dataBytesPerPage;
 
+				//limit maximum bytes to read if file is smaller than actual page
 				if((pageFrom+1+page)*dev->param->dataBytesPerPage > inode->size){
 					btr = inode->size - (pageFrom+page) * dev->param->dataBytesPerPage;
 				}
 
-				unsigned int bytes_read = 0;
-				Result r = readInodeData(inode, (pageFrom+page)*dev->param->dataBytesPerPage, btr, &bytes_read, buf);
-				if(r != Result::ok || bytes_read != btr){
-					free(buf);
-					return Result::bug;
+				if(inode->direct[page+pageFrom] != 0
+						&& inode->direct[page+pageFrom] != combineAddress(0, unusedMarker)){
+					//We are overriding real data, not just empty space
+					unsigned int bytes_read = 0;
+					Result r = readInodeData(inode, (pageFrom+page)*dev->param->dataBytesPerPage, btr, &bytes_read, buf);
+					if(r != Result::ok || bytes_read != btr){
+						free(buf);
+						return Result::bug;
+					}
 				}
 
 				//Handle pageOffset
@@ -130,12 +137,15 @@ Result DataIO::writeInodeData(Inode* inode,
 				*bytes_written += btw;
 			}
 
-			//Mark old pages dirty
-			res = dev->sumCache.setPageStatus(oldArea, oldPage, SummaryEntry::dirty);
-			if(res != Result::ok){
-				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[(int)res]);
+			//if we overwrote an existing page
+			if(inode->direct[page+pageFrom] != 0
+					&& inode->direct[page+pageFrom] != combineAddress(0, unusedMarker)){
+				//Mark old pages dirty
+				res = dev->sumCache.setPageStatus(oldArea, oldPage, SummaryEntry::dirty);
+				if(res != Result::ok){
+					PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[(int)res]);
+				}
 			}
-
 		}else{
 			//we are writing to a new page
 			*bytes_written += btw;

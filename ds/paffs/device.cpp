@@ -849,6 +849,9 @@ Result Device::seek(Obj* obj, int m, Seekmode mode){
 		break;
 	}
 
+	if(obj->fp > obj->dirent->node->size)
+		obj->dirent->node->size = obj->fp;
+
 	return Result::ok;
 }
 
