@@ -237,6 +237,7 @@ Result Superblock::findMostRecentEntryInBlock(uint32_t area, uint8_t block, uint
 	uint32_t* maximum = out_index;
 	*maximum = 0;
 	*out_pos = 0;
+	bool overflow = false;
 	uint32_t page_offs = dev->param->pagesPerBlock * block;
 	for(unsigned int i = 0; i < dev->param->pagesPerBlock; i++) {
 		Addr addr = combineAddress(area, i + page_offs);
@@ -246,12 +247,14 @@ Result Superblock::findMostRecentEntryInBlock(uint32_t area, uint8_t block, uint
 			return r;
 		if(no == 0xFFFFFFFF){
 			// Unprogrammed, therefore empty
-			if(*maximum != 0)
+			if(*maximum != 0 || overflow)
 				return Result::ok;
 			return Result::nf;
 		}
 
+
 		if(no > *maximum || no == 0){		//==0 if overflow occured
+			overflow = no == 0;
 			*out_pos = i + page_offs;
 			*maximum = no;
 		}
