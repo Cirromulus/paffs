@@ -97,10 +97,10 @@ Result SummaryCache::setPageStatus(AreaPos area, uint8_t page, SummaryEntry stat
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dev->param->dataPagesPerArea);
 	}
 	setPackedStatus(translation[area], page, state);
-	if(state == SummaryEntry::dirty && traceMask && PAFFS_WRITE_VERIFY_AS){
+	if(state == SummaryEntry::dirty && traceMask & PAFFS_WRITE_VERIFY_AS){
 		char* buf = (char*) malloc(dev->param->totalBytesPerPage);
 		memset(buf, 0xFF, dev->param->dataBytesPerPage);
-		memset(&buf[dev->param->dataBytesPerPage], 0xAA, dev->param->oobBytesPerPage);
+		memset(&buf[dev->param->dataBytesPerPage], 0xA0, dev->param->oobBytesPerPage);
 		Addr addr = combineAddress(area, page);
 		dev->driver->writePage(getPageNumber(addr, dev), buf, dev->param->totalBytesPerPage);
 		free(buf);
