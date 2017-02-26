@@ -53,8 +53,8 @@ TEST_F(FileTest, seekReadWrite){
 	ASSERT_EQ(r, paffs::Result::ok);
 	ASSERT_TRUE(ArraysMatch(txt, buf, strlen(txt)));
 
-
-
+	r = fs.close(fil);
+	ASSERT_EQ(r, paffs::Result::ok);
 }
 
 TEST_F(FileTest, createReadWriteFile){
@@ -66,7 +66,7 @@ TEST_F(FileTest, createReadWriteFile){
 	paffs::Result r;
 	paffs::ObjInfo info;
 	int i;
-	for(i = 0; i * strlen(t) < filesize; i++){
+	for(i = 0; (i + 1) * strlen(t) < filesize; i++){
 		memcpy(&tl[i * strlen(t)], t, strlen(t));
 	}
 	//fill Rest
@@ -219,4 +219,7 @@ TEST_F(FileTest, permissions){
 	r = fs.write(fil, txt, strlen(txt), &bw);
 	EXPECT_EQ(bw, (unsigned int) 0);
 	ASSERT_EQ(r, paffs::Result::noperm);
+
+	r = fs.close(fil);
+	ASSERT_EQ(r, paffs::Result::ok);
 }

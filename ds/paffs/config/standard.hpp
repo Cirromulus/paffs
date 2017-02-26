@@ -4,7 +4,7 @@
  *  Created on: Feb 14, 2017
  *      Author: user
  */
-
+#include <stdint.h>
 #pragma once
 
 namespace paffs{

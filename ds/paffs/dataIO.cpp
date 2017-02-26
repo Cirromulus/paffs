@@ -205,7 +205,7 @@ Result DataIO::readInodeData(Inode* inode,
 	bool misaligned = false;
 	if(pageOffs > 0){
 		misaligned = true;
-		wrap = (char*) malloc(bytes + offs);
+		wrap = (char*) malloc(bytes + pageOffs);
 	}
 
 	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
@@ -223,7 +223,7 @@ Result DataIO::readInodeData(Inode* inode,
 			if(inode->direct[pageFrom + page] == combineAddress(0, unusedMarker)){
 				//This Page is currently not written to flash
 				//because it contains just empty space
-				memset(buf, 0, btr+pageOffs);
+				memset(buf, 0, btr);
 				*bytes_read += btr;
 				continue;
 			}

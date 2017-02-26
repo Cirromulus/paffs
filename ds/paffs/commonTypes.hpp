@@ -5,7 +5,7 @@
  *      Author: Pascal Pieper
  */
 #include <stdint.h>
-#include "config/standard.hpp"
+#include "./config/standard.hpp"
 #pragma once
 
 namespace paffs {
@@ -30,7 +30,7 @@ enum class Result : uint8_t{
 };
 
 extern char* areaNames[];		//Initialized in dataIO.cpp
-extern const char* resultMsg[];		//Initialized in paffs.cpp
+extern const char* resultMsg[];	//Initialized in paffs.cpp
 
 typedef uint8_t Permission;
 

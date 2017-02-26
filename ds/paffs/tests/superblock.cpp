@@ -6,6 +6,7 @@
  */
 
 #include "commonTest.hpp"
+#include <stdio.h>
 
 class SuperBlock : public InitFs{};
 
@@ -60,6 +61,9 @@ TEST_F(SuperBlock, multipleRemounts){
 
 	dir = fs.openDir("/a");
 	ASSERT_NE(dir, nullptr);
+
+	r = fs.closeDir(dir);
+	ASSERT_EQ(r, paffs::Result::ok);
 }
 
 TEST_F(SuperBlock, fillAreas){
@@ -68,6 +72,28 @@ TEST_F(SuperBlock, fillAreas){
 	char txt[] = "Hallo";
 	char buf[6];
 	unsigned int bw;
+	int i;
+	char filename[11];
 
+	//fill areas
+	for(i = 0; ; i++){
+		sprintf(filename, "/%09d", i);
+		fil = fs.open(filename, paffs::FC);
+		if(fil == nullptr){
+			std::cout << paffs::err_msg(r) << std::endl;
+			ASSERT_EQ(fs.getLastErr(), paffs::Result::nosp);
+			break;
+		}
+		ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
+
+		r = fs.write(fil, txt, strlen(txt), &bw);
+		EXPECT_EQ(bw, strlen(txt));
+		ASSERT_EQ(r, paffs::Result::ok);
+
+		r = fs.close(fil);
+		ASSERT_EQ(r, paffs::Result::ok);
+
+	}
+	//todo: check if valid
 
 }
