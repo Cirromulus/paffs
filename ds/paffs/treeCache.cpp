@@ -465,7 +465,10 @@ Result TreeCache::updateFlashAddressInParent(TreeCacheNode* node){
 	return Result::nf;
 }
 
+//Only valid if resolveDirtyPaths has been called before
 Result TreeCache::commitNodesRecursively(TreeCacheNode* node) {
+	if(!node->dirty)
+		return Result::ok;
 	Result r;
 	if(node->raw.is_leaf){
 		r = dev->dataIO.writeTreeNode(&node->raw);
@@ -510,6 +513,7 @@ Result TreeCache::commitCache(){
 	uint16_t usedCache;
 	if(traceMask & PAFFS_TRACE_CACHE){
 		usedCache = getCacheUsage();
+		printTreeCache();
 	}
 	//<---- debug
 

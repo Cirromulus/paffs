@@ -44,7 +44,7 @@ TEST_F(SuperBlock, multipleRemounts){
 
 		fil = fs.open("/file", paffs::FC);
 		ASSERT_NE(fil, nullptr);
-		fs.resetLastErr();
+
 		r = fs.read(fil, buf, strlen(txt), &bw);
 		ASSERT_EQ(r, paffs::Result::ok);
 		ASSERT_EQ(bw, strlen(txt));
