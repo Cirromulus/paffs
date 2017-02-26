@@ -1,0 +1,9 @@
+Filesystems -paffs- and -yaffs1- with Test -fileIO-
+FAILPARAM - Mean Erases: 100, Erase-Deviation: 0, Mean Ionizing Dose: 0, Ionizing Dose Deviation: 0
+"Userdata Flashsize", "Read/Write cycles"
+512,15754
+512,19390
+1024,38512
+1024,40075
+2048,92716
+2048,81445
