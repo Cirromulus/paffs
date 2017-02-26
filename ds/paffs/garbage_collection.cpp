@@ -119,6 +119,7 @@ Result GarbageCollection::deleteArea(AreaPos area){
  * the other areatype consumes all space without needing it. It would have to
  * be rewritten in terms of crawling through all addresses and changing their target...
  * Costly!
+ * Possible solution: Unify INDEX and DATA to be written in a single AreaType
  *
  * Changes active Area to one of the new freed areas.
  */
@@ -148,6 +149,14 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 		if(deletion_target == 0){
 			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not find any GC'able pages for type %s!", area_names[targetType]);
 
+			//TODO: Only use this Mode for the "higher needs", i.e. unmounting.
+			//might as well be for INDEX also, as tree is cached and needs to be
+			//committed even for read operations.
+
+			if(targetType != AreaType::index){
+				PAFFS_DBG_S(PAFFS_TRACE_GC, "And we reserve the DESPERATE MODE for INDEX only.");
+				return Result::nosp;
+			}
 
 			if(desperateMode){
 				PAFFS_DBG_S(PAFFS_TRACE_GC, "... and additionally we already gave up GC_BUFFER!");

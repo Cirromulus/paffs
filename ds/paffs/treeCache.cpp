@@ -129,7 +129,10 @@ Result TreeCache::addNewCacheNode(TreeCacheNode** newTcn){
 
 	//Ok, we have to flush the cache now
 	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Flushing cache.");
-	commitCache();
+	r = commitCache();
+	if(r != Result::ok)
+		return r;
+
 	r = tryAddNewCacheNode(newTcn);
 	if(r == Result::ok){
 		if(traceMask & PAFFS_TRACE_CACHE){
@@ -688,9 +691,7 @@ Result TreeCache::getTreeNodeAtIndexFrom(unsigned char index,
 
 	lockTreeCacheNode(parent);
 	Result r = addNewCacheNode(&target);
-	if(r == Result::ok){
-
-	}else if(r != Result::ok){
+	if(r != Result::ok){
 		unlockTreeCacheNode(parent);
 		return r;
 	}

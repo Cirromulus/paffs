@@ -222,10 +222,10 @@ Result Btree::find(InodeNo key, Inode* outInode){
  * split a TreeCacheNode that is too big into two.
  */
 int Btree::cut( int length ) {
-        if (length % 2 == 0)
-                return length/2;
-        else
-                return length/2 + 1;
+	if (length % 2 == 0)
+		return length/2;
+	else
+		return length/2 + 1;
 }
 
 

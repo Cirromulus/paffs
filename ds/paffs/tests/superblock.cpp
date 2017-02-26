@@ -64,7 +64,7 @@ TEST_F(SuperBlock, multipleRemounts){
 	}
 }
 
-TEST_F(SuperBlock, fillAreas){
+TEST_F(SuperBlock, fillFlashAndVerify){
 	paffs::Obj *fil;
 	paffs::Result r;
 	char txt[] = "Hallo";
@@ -78,7 +78,7 @@ TEST_F(SuperBlock, fillAreas){
 		sprintf(filename, "/%09d", i);
 		fil = fs.open(filename, paffs::FC);
 		if(fil == nullptr){
-			std::cout << paffs::err_msg(r) << std::endl;
+			std::cout << paffs::err_msg(fs.getLastErr()) << std::endl;
 			ASSERT_EQ(fs.getLastErr(), paffs::Result::nosp);
 			break;
 		}
@@ -97,7 +97,7 @@ TEST_F(SuperBlock, fillAreas){
 		sprintf(filename, "/%09d", i);
 		fil = fs.open(filename, paffs::FC);
 		if(fil == nullptr){
-			std::cout << paffs::err_msg(r) << std::endl;
+			std::cout << paffs::err_msg(fs.getLastErr()) << std::endl;
 			ASSERT_EQ(fs.getLastErr(), paffs::Result::nosp);
 			break;
 		}

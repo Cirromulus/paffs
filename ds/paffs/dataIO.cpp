@@ -366,6 +366,7 @@ Result DataIO::writeTreeNode(TreeNode* node){
 	dev->lasterr = Result::ok;
 	dev->activeArea[AreaType::index] = dev->areaMgmt.findWritableArea(AreaType::index);
 	if(dev->lasterr != Result::ok){
+		//TODO: Reset former pagestatus, so that FS will be in a safe state
 		return dev->lasterr;
 	}
 
