@@ -92,8 +92,25 @@ TEST_F(SuperBlock, fillAreas){
 
 		r = fs.close(fil);
 		ASSERT_EQ(r, paffs::Result::ok);
-
 	}
-	//todo: check if valid
 
+	//check if valid
+	for(i--;i >= 0; i--){
+		sprintf(filename, "/%09d", i);
+		fil = fs.open(filename, paffs::FC);
+		if(fil == nullptr){
+			std::cout << paffs::err_msg(r) << std::endl;
+			ASSERT_EQ(fs.getLastErr(), paffs::Result::nosp);
+			break;
+		}
+		ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
+
+		r = fs.read(fil, buf, strlen(txt), &bw);
+		EXPECT_EQ(bw, strlen(txt));
+		ASSERT_EQ(r, paffs::Result::ok);
+		ASSERT_TRUE(ArraysMatch(txt, buf, strlen(txt)));
+
+		r = fs.close(fil);
+		ASSERT_EQ(r, paffs::Result::ok);
+	}
 }

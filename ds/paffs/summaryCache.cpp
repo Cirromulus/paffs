@@ -85,7 +85,7 @@ Result SummaryCache::setPageStatus(AreaPos area, uint8_t page, SummaryEntry stat
 	if(translation.find(area) == translation.end()){
 		int nextEntry = findNextFreeCacheEntry();
 		if(nextEntry < 0){
-			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not find free Cache Entry for summaryCache, "
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free Cache Entry for summaryCache, "
 					"and flush is not supported yet");
 			return Result::nimpl;
 		}
@@ -104,7 +104,7 @@ SummaryEntry SummaryCache::getPageStatus(AreaPos area, uint8_t page, Result *res
 	if(translation.find(area) == translation.end()){
 		int nextEntry = findNextFreeCacheEntry();
 		if(nextEntry < 0){
-			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not find free Cache Entry for summaryCache, "
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free Cache Entry for summaryCache, "
 					"and flush is not supported yet");
 			*result = Result::nimpl;
 			return SummaryEntry::error;
@@ -136,7 +136,7 @@ Result SummaryCache::getSummaryStatus(AreaPos area, SummaryEntry* summary){
 	if(translation.find(area) == translation.end()){
 		int nextEntry = findNextFreeCacheEntry();
 		if(nextEntry < 0){
-			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not find free Cache Entry for summaryCache, "
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free Cache Entry for summaryCache, "
 					"and flush is not supported yet");
 			return Result::nimpl;
 		}
@@ -152,7 +152,7 @@ Result SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary){
 	if(translation.find(area) == translation.end()){
 		int nextEntry = findNextFreeCacheEntry();
 		if(nextEntry < 0){
-			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not find free Cache Entry for summaryCache, "
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free Cache Entry for summaryCache, "
 					"and flush is not supported yet");
 			return Result::nimpl;
 		}
