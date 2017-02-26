@@ -29,41 +29,39 @@ TEST_F(SuperBlock, multipleRemounts){
 	r = fs.close(fil);
 	ASSERT_EQ(r, paffs::Result::ok);
 
+	r = fs.mkDir("/a", paffs::R | paffs::W);
+	ASSERT_EQ(r, paffs::Result::ok);
+
 	r = fs.unmount("1");
 	ASSERT_EQ(r, paffs::Result::ok);
 
 	r = fs.touch("/a");
 	ASSERT_EQ(r, paffs::Result::notMounted);
 
-	r = fs.mount("1");
-	ASSERT_EQ(r, paffs::Result::ok);
+	for(unsigned int i = 0; i < 3 * fs.getDevice()->param->totalPagesPerArea; i++){
+		r = fs.mount("1");
+		ASSERT_EQ(r, paffs::Result::ok);
 
-	r = fs.mkDir("/a", paffs::R | paffs::W);
-	ASSERT_EQ(r, paffs::Result::ok);
+		fil = fs.open("/file", paffs::FC);
+		ASSERT_NE(fil, nullptr);
+		fs.resetLastErr();
+		r = fs.read(fil, buf, strlen(txt), &bw);
+		ASSERT_EQ(r, paffs::Result::ok);
+		ASSERT_EQ(bw, strlen(txt));
+		ASSERT_TRUE(ArraysMatch(buf, txt, strlen(txt)));
 
-	fil = fs.open("/file", paffs::FC);
-	ASSERT_NE(fil, nullptr);
-	fs.resetLastErr();
-	r = fs.read(fil, buf, strlen(txt), &bw);
-	ASSERT_EQ(r, paffs::Result::ok);
-	ASSERT_EQ(bw, strlen(txt));
-	buf[5] = 0;
-	ASSERT_TRUE(ArraysMatch(buf, txt));
+		r = fs.close(fil);
+		ASSERT_EQ(r, paffs::Result::ok);
 
-	r = fs.close(fil);
-	ASSERT_EQ(r, paffs::Result::ok);
+		dir = fs.openDir("/a");
+		ASSERT_NE(dir, nullptr);
 
-	r = fs.unmount("1");
-	ASSERT_EQ(r, paffs::Result::ok);
+		r = fs.closeDir(dir);
+		ASSERT_EQ(r, paffs::Result::ok);
 
-	r = fs.mount("1");
-	ASSERT_EQ(r, paffs::Result::ok);
-
-	dir = fs.openDir("/a");
-	ASSERT_NE(dir, nullptr);
-
-	r = fs.closeDir(dir);
-	ASSERT_EQ(r, paffs::Result::ok);
+		r = fs.unmount("1");
+		ASSERT_EQ(r, paffs::Result::ok);
+	}
 }
 
 TEST_F(SuperBlock, fillAreas){

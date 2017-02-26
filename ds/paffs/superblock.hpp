@@ -32,6 +32,7 @@ typedef struct JumpPadEntry{
 typedef struct superIndex{
 	SerialNo no;	//This only has to hold as many numbers as there are pages in superblock area.
 					//Values Zero and 0xFF... are reserved.
+					//Zero to indicate overflow, 0xFF.. to indicate empty page
 	Addr rootNode;
 	Area* areaMap;	//Size can be calculated via dev->param
 	AreaPos asPositions[2];

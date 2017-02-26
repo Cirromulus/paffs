@@ -150,6 +150,9 @@ Result Superblock::commitSuperIndex(superIndex *newIndex){
 		r = readSuperPageIndex(lastEntry, &lastIndex, false);
 		if(r != Result::ok)
 			return r;
+	}else{
+		//Index starts at 1 to handle overflow
+		lastIndex.no = 1;
 	}
 
 	newIndex->no = lastIndex.no+1;
@@ -170,7 +173,7 @@ Result Superblock::commitSuperIndex(superIndex *newIndex){
 		return deleteAnchorBlock(0, 0);
 	}
 
-	if(r1 == Result::nf){
+	if(r2 == Result::nf){
 		return deleteAnchorBlock(0, 1);
 	}
 
@@ -248,7 +251,7 @@ Result Superblock::findMostRecentEntryInBlock(uint32_t area, uint8_t block, uint
 			return Result::nf;
 		}
 
-		if(no > *maximum){
+		if(no > *maximum || no == 0){		//==0 if overflow occured
 			*out_pos = i + page_offs;
 			*maximum = no;
 		}
