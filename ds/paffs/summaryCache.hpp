@@ -38,7 +38,6 @@ public:
 	Result commitAreaSummaries();
 
 private:
-
 	SummaryEntry getPackedStatus(uint16_t position, uint16_t page);
 
 	void setPackedStatus(uint16_t position, uint16_t page, SummaryEntry value);
@@ -52,6 +51,10 @@ private:
 	void setDirty(uint16_t position, bool value=true);
 
 	int findNextFreeCacheEntry();
+
+	Result loadUnbufferedArea(AreaPos area);
+
+	Result freeNextBestSummaryCacheEntry();
 
 	Result readAreasummary(AreaPos area, SummaryEntry* out_summary, bool complete);
 

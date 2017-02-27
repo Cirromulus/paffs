@@ -85,8 +85,8 @@ Result DataIO::writeInodeData(Inode* inode,
 
 
 
-		if(inode->direct[page+pageFrom] != 0
-				&& inode->direct[page+pageFrom] != combineAddress(0, unusedMarker)
+		if((inode->direct[page+pageFrom] != 0
+				&& inode->direct[page+pageFrom] != combineAddress(0, unusedMarker))
 				|| pageOffs != 0){
 			//We are overriding existing data
 			//mark old Page in Areamap
@@ -94,9 +94,9 @@ Result DataIO::writeInodeData(Inode* inode,
 			unsigned long oldPage = extractPage(inode->direct[page+pageFrom]);
 
 
-			if((btw + pageOffs < dev->param->dataBytesPerPage &&
-				page*dev->param->dataBytesPerPage + btw < inode->size) ||  //End Misaligned
-				(pageOffs > 0 && page == 0)){				//Start Misaligned
+			if((btw + pageOffs < dev->param->dataBytesPerPage) &&
+				(page*dev->param->dataBytesPerPage + btw < inode->size) ||  //End Misaligned
+				pageOffs > 0 && page == 0){									//Start Misaligned
 
 				//fill write buffer with valid Data
 				misaligned = true;
