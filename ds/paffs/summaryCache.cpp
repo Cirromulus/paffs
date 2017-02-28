@@ -76,7 +76,7 @@ Result SummaryCache::setPageStatus(AreaPos area, uint8_t page, SummaryEntry stat
 	if(state == SummaryEntry::dirty && traceMask & PAFFS_WRITE_VERIFY_AS){
 		char* buf = (char*) malloc(dev->param->totalBytesPerPage);
 		memset(buf, 0xFF, dev->param->dataBytesPerPage);
-		memset(&buf[dev->param->dataBytesPerPage], 0xA0, dev->param->oobBytesPerPage);
+		memset(&buf[dev->param->dataBytesPerPage], 0x0A, dev->param->oobBytesPerPage);
 		Addr addr = combineAddress(area, page);
 		dev->driver->writePage(getPageNumber(addr, dev), buf, dev->param->totalBytesPerPage);
 		free(buf);
@@ -145,7 +145,7 @@ Result SummaryCache::deleteSummary(AreaPos area){
 
 Result SummaryCache::loadAreaSummaries(){
 	for(AreaPos i = 0; i < 2; i++){
-		memset(summaryCache[i], 0, dev->param->dataPagesPerArea*sizeof(SummaryEntry));
+		memset(summaryCache[i], 0, dev->param->dataPagesPerArea / 4 + 1);
 	}
 	SummaryEntry tmp[2][dataPagesPerArea];
 	superIndex index = {0};
@@ -291,7 +291,7 @@ Result SummaryCache::writeAreasummary(AreaPos area, SummaryEntry* summary){
 
 //FIXME: readAreasummary is untested, b/c areaSummaries remain in RAM during unmount
 Result SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bool complete){
-	char buf[areaSummarySize];
+	unsigned char buf[areaSummarySize];
 	memset(buf, 0, areaSummarySize);
 	unsigned int needed_pages = 1 + areaSummarySize / dataBytesPerPage;
 	if(needed_pages != dev->param->totalPagesPerArea - dev->param->dataPagesPerArea){
