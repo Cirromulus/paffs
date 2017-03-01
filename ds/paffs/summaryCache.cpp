@@ -13,7 +13,9 @@
 
 namespace paffs {
 
-SummaryCache::SummaryCache(Device* dev) : dev(dev){}
+SummaryCache::SummaryCache(Device* mdev) : dev(mdev){
+	translation.reserve(areaSummaryCacheSize+1);
+}
 
 SummaryEntry SummaryCache::getPackedStatus(uint16_t position, uint16_t page){
 	return (SummaryEntry)((summaryCache[position][page/4] & (0b11 << (page % 4)*2)) >> (page % 4)*2);
@@ -53,6 +55,10 @@ int SummaryCache::findNextFreeCacheEntry(){
 	bool used[areaSummaryCacheSize] = {0};
 	for(auto it = translation.cbegin(), end = translation.cend();
 			it != end; ++it){
+		if(used[it->second] != false){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "Multiple Areas point to same location in Cache!");
+			return -1;
+		}
 		used[it->second] = true;
 	}
 	for(int i = 0; i < areaSummaryCacheSize; i++){
@@ -148,7 +154,7 @@ Result SummaryCache::loadAreaSummaries(){
 		memset(summaryCache[i], 0, dev->param->dataPagesPerArea / 4 + 1);
 	}
 	SummaryEntry tmp[2][dataPagesPerArea];
-	superIndex index = {0};
+	SuperIndex index = {0};
 	index.areaMap = dev->areaMap;
 	index.areaSummary[0] = tmp[0];
 	index.areaSummary[1] = tmp[1];
@@ -175,7 +181,7 @@ Result SummaryCache::commitAreaSummaries(){
 
 	unsigned char pos = 0;
 	SummaryEntry tmp[2][dataPagesPerArea];
-	superIndex index = {0};
+	SuperIndex index = {0};
 	index.areaMap = dev->areaMap;
 	index.areaSummary[0] = tmp[0];
 	index.areaSummary[1] = tmp[1];
@@ -233,6 +239,10 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(){
 	bool deletedSomething = false;
 	for(auto it = translation.cbegin(), end = translation.cend();
 			it != end; ++it){
+		if(used[it->second] != false){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "Multiple Areas point to same location in Cache!");
+			return Result::bug;
+		}
 		used[it->second] = true;
 		pos[it->second] = it->first;
 	}

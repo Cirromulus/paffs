@@ -18,13 +18,13 @@ class SimuDriver : public Driver{
 	bool selfLoaded = false;
 	unsigned char *buf;
 public:
-	SimuDriver(){
+	SimuDriver(outpost::time::Clock& mclock) : Driver(mclock){
 		selfLoaded = true;
 		cell = new FlashCell();
 		init();
 	}
-	SimuDriver(void *c){
-		cell = (FlashCell*) c;
+	SimuDriver(outpost::time::Clock& mclock, void *c) : Driver(mclock){
+		cell = static_cast<FlashCell*>(c);
 		init();
 	};
 
@@ -41,9 +41,9 @@ public:
 	Result markBad(uint32_t block_no);
 	Result checkBad(uint32_t block_no);
 private:
-	NANDADRESS translatePageToAddress(uint64_t sector, FlashCell* fc);
+	Nandaddress translatePageToAddress(uint64_t sector, FlashCell* fc);
 
-	NANDADRESS translateBlockToAddress(uint32_t block, FlashCell* fc);
+	Nandaddress translateBlockToAddress(uint32_t block, FlashCell* fc);
 
 	void init();
 };

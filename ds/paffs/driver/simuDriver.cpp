@@ -31,7 +31,7 @@ Result SimuDriver::writePage(uint64_t page_no,
 	}
 	memcpy(buf, data, data_len);
 
-	NANDADRESS d = translatePageToAddress(page_no, cell);
+	Nandaddress d = translatePageToAddress(page_no, cell);
 
 	if(cell->writePage(d.plane, d.block, d.page, (unsigned char*)buf) < 0){
 		free(buf);
@@ -45,7 +45,7 @@ Result SimuDriver::readPage(uint64_t page_no,
 		return Result::fail;
 
 
-	NANDADRESS d = translatePageToAddress(page_no, cell);
+	Nandaddress d = translatePageToAddress(page_no, cell);
 
 	if(cell->readPage(d.plane, d.block, d.page, buf) < 0){
 		return Result::fail;
@@ -57,13 +57,13 @@ Result SimuDriver::eraseBlock(uint32_t block_no){
 	if(!cell)
 		return Result::fail;
 
-	NANDADRESS d = translateBlockToAddress(block_no, cell);
+	Nandaddress d = translateBlockToAddress(block_no, cell);
 	return cell->eraseBlock(d.plane, d.block) == 0 ? Result::ok : Result::fail;
 }
 Result SimuDriver::markBad(uint32_t block_no){
 	memset(buf, 0, param.totalBytesPerPage);
 	for(unsigned page = 0; page < param.pagesPerBlock; page++){
-		NANDADRESS d = translatePageToAddress(block_no * param.pagesPerBlock + page, cell);
+		Nandaddress d = translatePageToAddress(block_no * param.pagesPerBlock + page, cell);
 		if(cell->writePage(d.plane, d.block, d.page, buf) < 0){
 			//ignore return Result::fail;
 		}
@@ -75,16 +75,16 @@ Result SimuDriver::checkBad(uint32_t block_no){
 	return Result::nimpl;
 }
 
-NANDADRESS SimuDriver::translatePageToAddress(uint64_t page, FlashCell* fc){
-	NANDADRESS r;
+Nandaddress SimuDriver::translatePageToAddress(uint64_t page, FlashCell* fc){
+	Nandaddress r;
 	r.page = page % fc->blockSize;
 	r.block = (page / fc->blockSize) % fc->planeSize;
 	r.plane = (page / fc->blockSize) / fc->planeSize;
 	return r;
 }
 
-NANDADRESS SimuDriver::translateBlockToAddress(uint32_t block, FlashCell* fc){
-	NANDADRESS r;
+Nandaddress SimuDriver::translateBlockToAddress(uint32_t block, FlashCell* fc){
+	Nandaddress r;
 	r.plane = block / fc->planeSize;
 	r.block = block % fc->planeSize;
 	r.page = 0;

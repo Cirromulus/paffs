@@ -15,10 +15,10 @@ envGlobal.Tool('compiler_hosted_gcc')
 envGlobal.Tool('settings_buildpath')
 envGlobal['BUILDPATH'] = os.path.abspath(os.path.join(buildfolder, 'unittest'))
 envGlobal['CXXFLAGS_language'] = ['-std=c++11']
+envGlobal['CCFLAGS_optimize'] = ['-O0']
 
 envGlobal.SConscript([
 		os.path.join(outpost_core_path, 'modules/SConscript.library'),
-
 		os.path.join(rootpath, 'ds/paffs/SConscript'),
 		os.path.join(rootpath, 'ds/paffs/driver/SConscript'),
 		os.path.join(rootpath, 'simu/SConscript'),
@@ -35,11 +35,6 @@ env.Append(CPPPATH=[
 	os.path.abspath(os.path.join(rootpath, "ds")),
 ])
 
-env.AppendUnique(LIBS=[
-	'outpost_rtos',
-	'outpost_time',
-    'outpost_utils',
-])
 
 files  = env.Glob('*.cpp')
 

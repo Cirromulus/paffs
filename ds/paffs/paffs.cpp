@@ -70,13 +70,16 @@ void Paffs::resetLastErr(){
 }
 
 Result Paffs::format(const char* devicename){
+	(void) devicename;
 	return device.format();
 }
 
 Result Paffs::mount(const char* devicename){
+	(void) devicename;
 	return device.mnt();
 }
 Result Paffs::unmount(const char* devicename){
+	(void) devicename;
 	return device.unmnt();
 }
 

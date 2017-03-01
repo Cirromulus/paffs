@@ -15,7 +15,7 @@ class GarbageCollection{
 	Device *dev;
 
 public:
-	GarbageCollection(Device *dev) : dev(dev) {};
+	GarbageCollection(Device *mdev) : dev(mdev) {};
 
 	Result collectGarbage(AreaType target);
 

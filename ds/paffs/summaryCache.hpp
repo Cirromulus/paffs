@@ -19,7 +19,7 @@ class SummaryCache{
 
 public:
 
-	SummaryCache(Device* dev);
+	SummaryCache(Device* mdev);
 
 	Result setPageStatus(AreaPos area, uint8_t page, SummaryEntry state);
 

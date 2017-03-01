@@ -6,6 +6,8 @@
  */
 #include <stdint.h>
 #include "./config/standard.hpp"
+#include <outpost/time/time_epoch.h>
+
 #pragma once
 
 namespace paffs {
@@ -67,9 +69,6 @@ struct Param{
 	unsigned int dataPagesPerArea;
 };
 
-
-typedef unsigned long Date;
-
 typedef uint64_t Addr;
 typedef uint32_t AreaPos;
 typedef uint32_t FileSize; 	  //~ 4 GB per file
@@ -90,8 +89,8 @@ struct Inode{
 	InodeNo no;
 	InodeType type;//:2;
 	Permission perm:3;
-	Date crea;
-	Date mod;
+	uint64_t crea;
+	uint64_t mod;
 	FileSize reservedSize;	//Space on filesystem used in bytes
 	FileSize size;			//Space on filesystem needed in bytes
 	Addr direct[11];
@@ -103,7 +102,7 @@ struct Inode{
 //could be later used for caching file paths
 struct Dirent{
 	InodeNo no; //This is used for lazy loading of Inode
-	Inode* node; //can be NULL if not loadet yet
+	Inode* node; //can be NULL if not loaded yet
 	Dirent* parent;
 	char* name;
 };
@@ -125,8 +124,8 @@ struct Dir{
 
 struct ObjInfo{
 	FileSize size;
-	Date created;
-	Date modified;
+	outpost::time::GpsTime created;
+	outpost::time::GpsTime modified;
 	bool isDir;
 	Permission perm;
 };

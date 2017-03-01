@@ -9,23 +9,19 @@
 #include "paffs_trace.hpp"
 #include "driver/driver.hpp"
 
-#include <iostream>
-
 namespace paffs{
 
-Device::Device(Driver* driver) : driver(driver),
+Device::Device(Driver* mdriver) : driver(mdriver),
 		tree(Btree(this)), sumCache(SummaryCache(this)),
-		areaMgmt(this), dataIO(this), superblock(this){
-	areaMap = 0;
-	param = 0;
-	lasterr = Result::ok;
-};
+		areaMgmt(this), dataIO(this), superblock(this),
+		areaMap(0), param(0), lasterr(Result::ok)
+{};
 
 Device::~Device(){
 	if(areaMap != nullptr){
-		std::cerr << "Destroyed Device-Object without unmouning! "
+		fprintf(stderr, "Destroyed Device-Object without unmouning! "
 				"This will most likely destroy "
-				"the filesystem on flash." << std::endl;
+				"the filesystem on flash.\n");
 		Result r = destroyDevice();
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not (gracefully) destroy Device!");
@@ -171,7 +167,7 @@ Result Device::createInode(Inode* outInode, Permission mask){
 		outInode->perm |= R;
 	outInode->size = 0;
 	outInode->reservedSize = 0;
-	outInode->crea = time(0);
+	outInode->crea = driver->clock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
 	outInode->mod = outInode->crea;
 	return Result::ok;
 }
@@ -745,7 +741,7 @@ Result Device::touch(const char* path){
 	}else{
 		if(r != Result::ok)
 			return r;
-		file.mod = time(0);
+		file.mod = driver->clock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
 		return tree.updateExistingInode(&file);
 	}
 
@@ -760,8 +756,8 @@ Result Device::getObjInfo(const char *fullPath, ObjInfo* nfo){
 	if((r = getInodeOfElem(&object, fullPath)) != Result::ok){
 		return lasterr = r;
 	}
-	nfo->created = object.crea;
-	nfo->modified = object.mod;
+	nfo->created = outpost::time::GpsTime::afterEpoch(outpost::time::Milliseconds(object.crea));
+	nfo->modified = outpost::time::GpsTime::afterEpoch(outpost::time::Milliseconds(object.crea));;
 	nfo->perm = object.perm;
 	nfo->size = object.size;
 	nfo->isDir = object.type == InodeType::dir;
@@ -819,7 +815,7 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 		return r;
 	}
 
-	obj->dirent->node->mod = time(0);
+	obj->dirent->node->mod = driver->clock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
 
 	obj->fp += *bytes_written;
 	if(obj->fp > obj->dirent->node->size){
@@ -857,6 +853,7 @@ Result Device::seek(Obj* obj, int m, Seekmode mode){
 
 
 Result Device::flush(Obj* obj){
+	(void) obj;
 	if(areaMap == 0)
 		return Result::notMounted;
 	return Result::ok;

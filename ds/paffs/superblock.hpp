@@ -14,22 +14,22 @@ namespace paffs{
 
 typedef uint32_t SerialNo;
 
-typedef struct AnchorEntry{
+struct AnchorEntry{
 	SerialNo no;	//This only has to hold as many numbers as there are pages in superblock area
 					//Value Zero and 0xFF... is reserved.
 	uint8_t fs_version;
 	Param param;
 	uint32_t jump_pad_area;
 	//Todo: Still space free
-} anchorEntry;
+};
 
-typedef struct JumpPadEntry{
+struct JumpPadEntry{
 	SerialNo no;	//This only has to hold as many numbers as there are pages in superblock area
 					//Value Zero and 0xFF... is reserved.
 	uint32_t nextArea;
-} jumpPadEntry;
+};
 
-typedef struct superIndex{
+struct SuperIndex{
 	SerialNo no;	//This only has to hold as many numbers as there are pages in superblock area.
 					//Values Zero and 0xFF... are reserved.
 					//Zero to indicate overflow, 0xFF.. to indicate empty page
@@ -37,7 +37,7 @@ typedef struct superIndex{
 	Area* areaMap;	//Size can be calculated via dev->param
 	AreaPos asPositions[2];
 	SummaryEntry* areaSummary[2];
-} superIndex;
+};
 
 class Superblock{
 	Device* dev;
@@ -45,14 +45,14 @@ class Superblock{
 	bool rootnode_dirty = 0;
 
 public:
-	Superblock(Device *dev) : dev(dev){};
+	Superblock(Device *mdev) : dev(mdev){};
 	Result registerRootnode(Addr addr);
 	Addr getRootnodeAddr();
 
 	//returns PAFFS_NF if no superindex is in flash
-	Result readSuperIndex(superIndex* index);
-	Result commitSuperIndex(superIndex* index);
-	void printSuperIndex(superIndex* ind);
+	Result readSuperIndex(SuperIndex* index);
+	Result commitSuperIndex(SuperIndex* index);
+	void printSuperIndex(SuperIndex* ind);
 
 private:
 
@@ -69,8 +69,8 @@ private:
 	Result writeJumpPadEntry(Addr addr, JumpPadEntry* entry);
 	Result readJumpPadEntry(Addr addr, JumpPadEntry* entry);
 
-	Result writeSuperPageIndex(Addr addr, superIndex* entry);
-	Result readSuperPageIndex(Addr addr, superIndex* entry, bool withAreaMap);
+	Result writeSuperPageIndex(Addr addr, SuperIndex* entry);
+	Result readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap);
 
 };
 

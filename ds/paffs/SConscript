@@ -11,5 +11,10 @@ files  = env.Glob('*.cpp')
 
 library = env.StaticLibrary('paffs', files)
 
-envGlobal.Append(LIBS=['paffs', 'simuDriver'])
+envGlobal.Append(LIBS=['paffs',
+					   'simuDriver',
+					   'outpost_rtos',
+					   'outpost_time',
+#					   'outpost_utils',
+])
 envGlobal.Install('$BUILDPATH/lib', library)

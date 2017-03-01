@@ -27,7 +27,7 @@ class TreeCache{
 
 public:
 
-	TreeCache(Device *dev) : dev(dev){};
+	TreeCache(Device *mdev) : dev(mdev){};
 
 	/**
 	 * Commits complete Tree to Flash

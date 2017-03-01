@@ -29,4 +29,4 @@ set_target_properties(paffs PROPERTIES
 
 target_link_libraries(paffs simuDriver)
 
-add_subdirectory(tests)
+#add_subdirectory(tests)

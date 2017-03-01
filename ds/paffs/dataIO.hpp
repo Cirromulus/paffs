@@ -17,7 +17,7 @@ namespace paffs{
 class DataIO{
 	Device *dev;
 public:
-	DataIO(Device *dev) : dev(dev){};
+	DataIO(Device *mdev) : dev(mdev){};
 //Updates changes to treeCache as well
 Result writeInodeData(Inode* inode,
 					unsigned int offs, unsigned int bytes,unsigned int *bytes_written,

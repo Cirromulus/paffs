@@ -22,7 +22,6 @@ class Device{
 	unsigned char Dirents_buf_used = 0;
 	*/
 
-
 public:
 	Param *param;
 	AreaPos activeArea[AreaType::no];

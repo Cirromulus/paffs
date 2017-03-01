@@ -21,7 +21,7 @@ class Btree{
 	Device* dev;
 public:
 	TreeCache cache;
-	Btree(Device* dev): dev(dev), cache(TreeCache(dev)){};
+	Btree(Device* mdev): dev(mdev), cache(TreeCache(mdev)){};
 
 	Result insertInode(Inode* inode);
 	Result getInode(InodeNo number, Inode* outInode);

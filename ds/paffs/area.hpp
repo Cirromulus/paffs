@@ -24,7 +24,7 @@ class AreaManagement{
 	Device *dev;
 public:
 	GarbageCollection gc;
-	AreaManagement(Device *dev): dev(dev), gc(dev){};
+	AreaManagement(Device *mdev): dev(mdev), gc(mdev){};
 
 	//Returns same area if there is still writable Space left
 	unsigned int findWritableArea(AreaType areaType);

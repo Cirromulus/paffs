@@ -391,7 +391,7 @@ void TreeCache::deletePathToRoot(TreeCacheNode* tcn){
 void TreeCache::cleanFreeLeafNodes(){
 
 	//debug ---->
-	uint16_t usedCache;
+	uint16_t usedCache = 0;
 	if(traceMask & PAFFS_TRACE_CACHE){
 		usedCache = getCacheUsage();
 	}
@@ -423,7 +423,7 @@ void TreeCache::cleanFreeLeafNodes(){
 void TreeCache::cleanFreeNodes(){
 	//TODO: This only removes one layer of clean nodes, should check whole path to root
 	//debug ---->
-	uint16_t usedCache;
+	uint16_t usedCache = 0;
 	if(traceMask & PAFFS_TRACE_CACHE){
 		if(!isTreeCacheValid()){
 			dev->lasterr = Result::bug;
@@ -513,7 +513,7 @@ Result TreeCache::commitCache(){
 	}
 
 	//debug ---->
-	uint16_t usedCache;
+	uint16_t usedCache = 0;
 	if(traceMask & PAFFS_TRACE_CACHE){
 		usedCache = getCacheUsage();
 		printTreeCache();
@@ -669,7 +669,7 @@ Result TreeCache::getTreeNodeAtIndexFrom(unsigned char index,
 	if(target != NULL){
 		*child = target;
 		cache_hits++;
-		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache hit, found target %p (position %d)", target, target - cache);
+		PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Cache hit, found target %p (position %ld)", target, target - cache);
 		return Result::ok;	//cache hit
 	}
 

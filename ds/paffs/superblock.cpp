@@ -31,7 +31,7 @@ Addr Superblock::getRootnodeAddr(){
 }
 
 
-void Superblock::printSuperIndex(superIndex* ind){
+void Superblock::printSuperIndex(SuperIndex* ind){
 	printf("No:\t\t%d\n", ind->no);
 	printf("Rootnode addr.: \t%u:%u\n",
 			extractLogicalArea(ind->rootNode),
@@ -82,7 +82,7 @@ Result Superblock::getAddrOfMostRecentSuperIndex(Addr *out){
 	return Result::ok;
 }
 
-Result Superblock::commitSuperIndex(superIndex *newIndex){
+Result Superblock::commitSuperIndex(SuperIndex *newIndex){
 	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
 				dev->param->areasNo * sizeof(Area)
 				+ 2 * dev->param->dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
@@ -144,7 +144,7 @@ Result Superblock::commitSuperIndex(superIndex *newIndex){
 		return r;
 	}
 
-	superIndex lastIndex = {0};
+	SuperIndex lastIndex = {0};
 
 	if(r != Result::nf){
 		r = readSuperPageIndex(lastEntry, &lastIndex, false);
@@ -156,6 +156,9 @@ Result Superblock::commitSuperIndex(superIndex *newIndex){
 	}
 
 	newIndex->no = lastIndex.no+1;
+	if(newIndex->no == 0xFFFFFFFF){
+		newIndex->no = 0;
+	}
 	newIndex->rootNode = rootnode_addr;
 	newIndex->areaMap = dev->areaMap;	//This should already be done in cachefunction
 
@@ -182,7 +185,7 @@ Result Superblock::commitSuperIndex(superIndex *newIndex){
 	return Result::ok;
 }
 
-Result Superblock::readSuperIndex(superIndex* index){
+Result Superblock::readSuperIndex(SuperIndex* index){
 	Addr addr;
 	Result r = getAddrOfMostRecentSuperIndex(&addr);
 	if(r != Result::ok)
@@ -295,7 +298,7 @@ Result Superblock::readJumpPadEntry(Addr addr, JumpPadEntry* entry){
 
 
 //todo: Make sure that free space is sufficient!
-Result Superblock::writeSuperPageIndex(Addr addr, superIndex* entry){
+Result Superblock::writeSuperPageIndex(Addr addr, SuperIndex* entry){
 	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
 		return Result::bug;
@@ -360,7 +363,7 @@ Result Superblock::writeSuperPageIndex(Addr addr, superIndex* entry){
 	return Result::ok;
 }
 
-Result Superblock::readSuperPageIndex(Addr addr, superIndex* entry, bool withAreaMap){
+Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap){
 	if(!withAreaMap)
 		 return dev->driver->readPage(getPageNumber(addr, dev), entry, sizeof(uint32_t) + sizeof(Addr));
 
