@@ -8,9 +8,9 @@
 #ifndef SOURCE_DIRECTORY__DS_PAFFS_TESTS_COMMONTEST_HPP_
 #define SOURCE_DIRECTORY__DS_PAFFS_TESTS_COMMONTEST_HPP_
 
-#include "../paffs.hpp"
-#include "googletest/gmock/gmock.h"
-#include "googletest/gtest/gtest.h"
+#include <paffs/paffs.hpp>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 class InitFs : public testing::Test{
 public:
