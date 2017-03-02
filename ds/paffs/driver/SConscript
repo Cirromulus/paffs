@@ -1,9 +1,11 @@
-
+#Paffs Simudriver
 import os
 
 Import('envGlobal')
 
-envGlobal.Append(CPPPATH=[os.path.abspath('.')])
+print("SIMUDRIVER")
+
+#envGlobal.Append(CPPPATH=[os.path.abspath('.')])
 
 env = envGlobal.Clone()
 
@@ -11,5 +13,8 @@ files  = env.Glob('*.cpp')
 
 library = env.StaticLibrary('simuDriver', files)
 
-envGlobal.Append(LIBS=['simuDriver', 'simu'])
+envGlobal.Append(LIBS=[
+	'simuDriver',
+	'simu'
+])
 envGlobal.Install('$BUILDPATH/lib', library)

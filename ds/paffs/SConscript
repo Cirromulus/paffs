@@ -1,8 +1,14 @@
-
+#Paffs
 import os
 
 Import('envGlobal')
+Import('rootpath')
+Import('outpost_core_path')
 
+envGlobal.SConscript([
+	os.path.join(rootpath, 'ds/paffs/driver/SConscript')
+	], exports='envGlobal')
+	
 envGlobal.Append(CPPPATH=[os.path.abspath('.')])
 
 env = envGlobal.Clone()
@@ -11,10 +17,14 @@ files  = env.Glob('*.cpp')
 
 library = env.StaticLibrary('paffs', files)
 
-envGlobal.Append(LIBS=['paffs',
-					   'simuDriver',
-					   'outpost_rtos',
-					   'outpost_time',
-#					   'outpost_utils',
+envGlobal.SConscript(
+	os.path.join(outpost_core_path, 'modules/SConscript.test'),
+exports='envGlobal')
+
+envGlobal.Append(LIBS=[
+	'paffs',
+	'simuDriver',
+	'outpost_rtos',
+	'outpost_time',
 ])
 envGlobal.Install('$BUILDPATH/lib', library)
