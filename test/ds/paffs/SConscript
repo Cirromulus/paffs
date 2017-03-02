@@ -1,0 +1,11 @@
+#test build
+import os
+
+Import('envGlobal')
+
+files  = Glob('*.cpp')
+
+program = envGlobal.Program('unittest', files)
+
+envGlobal.Install('$BUILDPATH', program)
+envGlobal.Alias('test', program)
