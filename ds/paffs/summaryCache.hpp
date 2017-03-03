@@ -9,10 +9,20 @@
 #include "commonTypes.hpp"
 #include <unordered_map>
 
+#ifndef TEST_FRIENDS
+#define TEST_FRIENDS
+#endif
+
+//#define STR_HELPER(x) #x
+//#define STR(x) STR_HELPER(x)
+//#pragma message "TEST_FRIENDS: " STR(TEST_FRIENDS)
+
 namespace paffs {
 
 class SummaryCache{
-	unsigned char summaryCache[areaSummaryCacheSize][dataPagesPerArea / 4 + 1]; //excess bit is for dirty marker
+public:
+	TEST_FRIENDS;
+	unsigned char summaryCache[areaSummaryCacheSize][dataPagesPerArea / 4 + 2]; //excess byte is for dirty marker
 
 	std::unordered_map<AreaPos, uint16_t> translation;	//from area number to array offset
 	Device* dev;
@@ -37,7 +47,7 @@ public:
 
 	Result commitAreaSummaries();
 
-private:
+//private:
 	SummaryEntry getPackedStatus(uint16_t position, uint16_t page);
 
 	void setPackedStatus(uint16_t position, uint16_t page, SummaryEntry value);

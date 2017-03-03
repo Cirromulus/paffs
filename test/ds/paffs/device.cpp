@@ -41,7 +41,7 @@ TEST_F(FileTest, seekReadWrite){
 	ASSERT_EQ(r, paffs::Result::ok);
 
 	r = fs.read(fil, buf, 1, &bw);
-	EXPECT_EQ(bw, (unsigned int)1);
+	EXPECT_EQ(bw, static_cast<unsigned int>(1));
 	ASSERT_EQ(r, paffs::Result::ok);
 	ASSERT_EQ(buf[0], 0);
 

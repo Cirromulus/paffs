@@ -18,13 +18,13 @@ SummaryCache::SummaryCache(Device* mdev) : dev(mdev){
 }
 
 SummaryEntry SummaryCache::getPackedStatus(uint16_t position, uint16_t page){
-	return (SummaryEntry)((summaryCache[position][page/4] & (0b11 << (page % 4)*2)) >> (page % 4)*2);
+	return static_cast<SummaryEntry>((summaryCache[position][page/4] & (0b11 << (page % 4)*2)) >> (page % 4)*2);
 }
 
 void SummaryCache::setPackedStatus(uint16_t position, uint16_t page, SummaryEntry value){
 	summaryCache[position][page/4] =
 			(summaryCache[position][page/4] & ~(0b11 << (page % 4)*2)) |
-			((int)value << (page % 4) * 2);
+			(static_cast<int>(value) << (page % 4) * 2);
 }
 
 bool SummaryCache::isDirty(uint16_t position){
@@ -35,7 +35,7 @@ void SummaryCache::setDirty(uint16_t position, bool value){
 	if(value)
 		summaryCache[position][dataPagesPerArea / 4 + 1] |= 1;
 	else
-		summaryCache[position][dataPagesPerArea / 4 + 1] &= 0;
+		summaryCache[position][dataPagesPerArea / 4 + 1] &= ~1;
 }
 
 void SummaryCache::unpackStatusArray(uint16_t position, SummaryEntry* arr){
@@ -80,12 +80,12 @@ Result SummaryCache::setPageStatus(AreaPos area, uint8_t page, SummaryEntry stat
 	}
 	setPackedStatus(translation[area], page, state);
 	if(state == SummaryEntry::dirty && traceMask & PAFFS_WRITE_VERIFY_AS){
-		char* buf = (char*) malloc(dev->param->totalBytesPerPage);
+		char* buf = new char[dev->param->totalBytesPerPage];
 		memset(buf, 0xFF, dev->param->dataBytesPerPage);
 		memset(&buf[dev->param->dataBytesPerPage], 0x0A, dev->param->oobBytesPerPage);
 		Addr addr = combineAddress(area, page);
 		dev->driver->writePage(getPageNumber(addr, dev), buf, dev->param->totalBytesPerPage);
-		free(buf);
+		delete buf;
 	}
 	return Result::ok;
 }
@@ -222,6 +222,7 @@ Result SummaryCache::loadUnbufferedArea(AreaPos area){
 		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Loaded existing AreaSummary of %d to cache", area);
 	}
 	else if(r == Result::nf){
+		memset(summaryCache[translation[area]], 0xFF, dev->param->dataPagesPerArea / 4 + 1); //DEBUG
 		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea / 4 + 1);
 		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Loaded new AreaSummary for %d", area);
 	}
@@ -299,7 +300,6 @@ Result SummaryCache::writeAreasummary(AreaPos area, SummaryEntry* summary){
 	return Result::ok;
 }
 
-//FIXME: readAreasummary is untested, b/c areaSummaries remain in RAM during unmount
 Result SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bool complete){
 	unsigned char buf[areaSummarySize];
 	memset(buf, 0, areaSummarySize);
