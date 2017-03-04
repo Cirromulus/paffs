@@ -33,8 +33,7 @@ Result SimuDriver::writePage(uint64_t page_no,
 
 	Nandaddress d = translatePageToAddress(page_no, cell);
 
-	if(cell->writePage(d.plane, d.block, d.page, (unsigned char*)buf) < 0){
-		free(buf);
+	if(cell->writePage(d.plane, d.block, d.page, static_cast<unsigned char*>(buf)) < 0){
 		return Result::fail;
 	}
 	return Result::ok;
@@ -72,6 +71,7 @@ Result SimuDriver::markBad(uint32_t block_no){
 }
 
 Result SimuDriver::checkBad(uint32_t block_no){
+	(void*) block_no;
 	return Result::nimpl;
 }
 

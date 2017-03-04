@@ -38,6 +38,17 @@ void SummaryCache::setDirty(uint16_t position, bool value){
 		summaryCache[position][dataPagesPerArea / 4 + 1] &= ~1;
 }
 
+bool SummaryCache::wasASWritten(uint16_t position){
+	return summaryCache[position][dataPagesPerArea / 4 + 1] & 0b10;
+}
+
+void SummaryCache::setASWritten(uint16_t position, bool value){
+	if(value)
+			summaryCache[position][dataPagesPerArea / 4 + 1] |= 0b10;
+		else
+			summaryCache[position][dataPagesPerArea / 4 + 1] &= ~0b10;
+}
+
 void SummaryCache::unpackStatusArray(uint16_t position, SummaryEntry* arr){
 	for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
 		arr[i] = getPackedStatus(position, i);
@@ -65,6 +76,10 @@ int SummaryCache::findNextFreeCacheEntry(){
 		if(!used[i])
 			return i;
 	}
+	return -1;
+}
+
+int SummaryCache::findLeastProbableUsedCacheEntry(){
 	return -1;
 }
 
@@ -119,6 +134,8 @@ SummaryEntry SummaryCache::getPageStatus(AreaPos area, uint8_t page, Result *res
 
 Result SummaryCache::getSummaryStatus(AreaPos area, SummaryEntry* summary){
 	if(translation.find(area) == translation.end()){
+		//TODO: This one does not have to be copied into Cache
+		//		Because it is just for a one-shot of Garbage collection looking for the best area
 		Result r = loadUnbufferedArea(area);
 		if(r != Result::ok)
 			return r;
@@ -145,8 +162,26 @@ Result SummaryCache::deleteSummary(AreaPos area){
 	}
 
 	translation.erase(area);
-	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Deleted cache entry of area %d", area);
+	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Deleted cache entry of area %d", area);
 	return Result::ok;
+}
+
+//For Garbage collection to consider committed AS-Areas before others
+bool SummaryCache::wasASWritten(AreaPos area){
+	if(translation.find(area) == translation.end()){
+		PAFFS_DBG(PAFFS_TRACE_ASCACHE, "Tried to question nonexistent Area %d. This is probably not a bug.", area);
+		return false;
+	}
+	return wasASWritten(translation[area]);
+}
+
+//For Garbage collection that has deleted the AS too
+void SummaryCache::resetASWritten(AreaPos area){
+	if(translation.find(area) == translation.end()){
+		PAFFS_DBG(PAFFS_TRACE_ASCACHE, "Tried to reset AS-Record of nonexistent Area %d. This _is_ probably a bug.", area);
+		return;
+	}
+	setASWritten(translation[area], false);
 }
 
 Result SummaryCache::loadAreaSummaries(){
@@ -214,6 +249,8 @@ Result SummaryCache::loadUnbufferedArea(AreaPos area){
 			return Result::bug;
 		}
 	}
+	//TODO: Abstractify loading of AreaSumary to give the ability
+	//		to load into other destinations than Cache
 	translation[area] = nextEntry;
 	SummaryEntry buf[dataPagesPerArea];
 	r = readAreasummary(area, buf, true);
@@ -222,14 +259,13 @@ Result SummaryCache::loadUnbufferedArea(AreaPos area){
 		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Loaded existing AreaSummary of %d to cache", area);
 	}
 	else if(r == Result::nf){
-		memset(summaryCache[translation[area]], 0xFF, dev->param->dataPagesPerArea / 4 + 1); //DEBUG
 		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea / 4 + 1);
 		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Loaded new AreaSummary for %d", area);
 	}
 	else
 		return r;
 
-	PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Created cache entry for area %d", area);
+	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Created cache entry for area %d", area);
 	return Result::ok;
 }
 
@@ -250,7 +286,7 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(){
 	for(int i = 0; i < areaSummaryCacheSize; i++){
 		if(used[i] && !isDirty(i)){
 			translation.erase(pos[i]);
-			PAFFS_DBG_S(PAFFS_TRACE_CACHE, "Deleted cache entry of area %d", pos[i]);
+			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Deleted cache entry of area %d", pos[i]);
 			deletedSomething = true;
 		}
 	}

@@ -378,6 +378,8 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 	directoryEntryCount ++;
 	memcpy (dirData, &directoryEntryCount, sizeof(DirEntryCount));
 
+	//TODO: If write more than one page, split in start and end page to reduce
+	//unnecessary writes on intermediate pages.
 	r = dataIO.writeInodeData(contDir, 0, contDir->size + direntryl, &bytes, dirData);
 	delete[] dirData;
 	delete[] buf;

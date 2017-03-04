@@ -52,8 +52,12 @@ AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_s
 				//We can't find a block with more dirty pages in it
 				favourite_area = i;
 				*srcAreaContainsData = false;
+				fav_dirty_pages = dirty_pages;
 				memcpy(out_summary, curr, dev->param->dataPagesPerArea);
-				break;
+
+				if(dev->sumCache.wasASWritten(i))
+					//Convenient: we can reset an AS to free up cache space
+					break;
 			}
 
 			if(dev->areaMap[i].type != target)
@@ -90,7 +94,7 @@ Result GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstAre
 			}
 			r = dev->driver->writePage(dst, buf, dev->param->totalBytesPerPage);
 			if(r != Result::ok){
-				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not write page n° %lu!", (long unsigned) dst);
+				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not write page n° %lu!", static_cast<long unsigned> (dst));
 				return Result::badflash;
 			}
 		}else{
@@ -110,6 +114,7 @@ Result GarbageCollection::deleteArea(AreaPos area){
 		}
 	}
 	dev->areaMap[area].erasecount++;
+	dev->sumCache.resetASWritten(area);
 	return Result::ok;
 }
 
@@ -243,12 +248,6 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 			//Notify for used Pages
 			dev->areaMap[deletion_target].status = AreaStatus::active;	//Safe, because we can assume deletion targetType is same Type as we want (from getNextBestArea)
 		}else{
-			/*memset(summary, (char) SummaryEntry::free, dev->param->dataPagesPerArea);
-			r = dev->sumCache.setSummaryStatus(deletion_target, summary);
-			if(r != Result::ok){
-				PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not free AS of area %d", deletion_target);
-				return r;
-			}*/
 			r = dev->sumCache.deleteSummary(deletion_target);
 			if(r != Result::ok){
 				PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not free AS of area %d", deletion_target);

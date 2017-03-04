@@ -21,7 +21,8 @@ namespace paffs {
 
 class SummaryCache{
 	TEST_FRIENDS;
-	unsigned char summaryCache[areaSummaryCacheSize][dataPagesPerArea / 4 + 2]; //excess byte is for dirty marker
+	//excess byte is for dirty- and wasASWritten marker
+	unsigned char summaryCache[areaSummaryCacheSize][dataPagesPerArea / 4 + 2];
 
 	std::unordered_map<AreaPos, uint16_t> translation;	//from area number to array offset
 	Device* dev;
@@ -41,6 +42,12 @@ public:
 	//for retired or unused Areas
 	Result deleteSummary(AreaPos area);
 
+	//For Garbage collection to consider committed AS-Areas before others
+	bool wasASWritten(AreaPos area);
+
+	//For Garbage collection that has deleted the AS too
+	void resetASWritten(AreaPos area);
+
 	//Loads all unclosed AreaSummaries in RAM upon Mount
 	Result loadAreaSummaries();
 
@@ -59,7 +66,13 @@ private:
 
 	void setDirty(uint16_t position, bool value=true);
 
+	bool wasASWritten(uint16_t position);
+
+	void setASWritten(uint16_t position, bool value=true);
+
 	int findNextFreeCacheEntry();
+
+	int findLeastProbableUsedCacheEntry();
 
 	Result loadUnbufferedArea(AreaPos area);
 

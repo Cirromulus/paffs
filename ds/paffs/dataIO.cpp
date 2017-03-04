@@ -51,6 +51,9 @@ Result DataIO::writeInodeData(Inode* inode,
 		bool misaligned = false;
 		dev->activeArea[AreaType::data] = dev->areaMgmt.findWritableArea(AreaType::data);
 		if(dev->lasterr != Result::ok){
+			//TODO: Return to a safe state by trying to resurrect dirty marked pages
+			//		Mark fresh written pages as dirty. If old pages have been deleted,
+			//		use the Journal to resurrect (not currently used)
 			return dev->lasterr;
 		}
 
