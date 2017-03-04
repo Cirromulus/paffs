@@ -12,9 +12,9 @@
 namespace paffs{
 
 Device::Device(Driver* mdriver) : driver(mdriver),
+		param(0), areaMap(0), lasterr(Result::ok),
 		tree(Btree(this)), sumCache(SummaryCache(this)),
-		areaMgmt(this), dataIO(this), superblock(this),
-		areaMap(0), param(0), lasterr(Result::ok)
+		 areaMgmt(this), dataIO(this), superblock(this)
 {};
 
 Device::~Device(){
@@ -75,7 +75,7 @@ Result Device::format(){
 	if(r != Result::ok)
 		return r;
 
-	Inode rootDir = {0};
+	Inode rootDir = {};
 	r = createDirInode(&rootDir, R | W | X);
 	if(r != Result::ok){
 		destroyDevice();
@@ -197,7 +197,7 @@ Result Device::createFilInode(Inode* outInode, Permission mask){
 
 void Device::destroyInode(Inode* node){
 	dataIO.deleteInodeData(node, 0);
-	free(node);
+	delete node;
 }
 
 Result Device::getParentDir(const char* fullPath, Inode* parDir, unsigned int *lastSlash){
@@ -217,12 +217,12 @@ Result Device::getParentDir(const char* fullPath, Inode* parDir, unsigned int *l
 	}
 
 
-	char* pathC = (char*) malloc(*lastSlash+1);
+	char* pathC = new char[*lastSlash+1];
 	memcpy(pathC, fullPath, *lastSlash);
 	pathC[*lastSlash] = 0;
 
 	Result r = getInodeOfElem(parDir, pathC);
-	free(pathC);
+	delete[] pathC;
 	return r;
 }
 
@@ -237,11 +237,11 @@ Result Device::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 		return Result::nf;
 	}
 
-	char* buf = (char*) malloc(folder->size);
+	char* buf = new char[folder->size];
 	unsigned int bytes_read = 0;
 	Result r = dataIO.readInodeData(folder, 0, folder->size, &bytes_read, buf);
 	if(r != Result::ok || bytes_read != folder->size){
-		free(buf);
+		delete[] buf;
 		return r == Result::ok ? Result::bug : r;
 	}
 
@@ -250,25 +250,25 @@ Result Device::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 			DirEntryLength direntryl = buf[p];
 			if(direntryl < sizeof(DirEntryLength) + sizeof(InodeNo)){
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Directory size of Folder %u is unplausible! (was: %d, should: >%d)", folder->no, direntryl, sizeof(DirEntryLength) + sizeof(InodeNo));
-				free(buf);
+				delete[] buf;
 				return Result::bug;
 			}
 			if(direntryl > folder->size){
 				PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: direntry length of Folder %u not plausible (was: %d, should: >%d)!", folder->no, direntryl, folder->size);
-				free(buf);
+				delete[] buf;
 				return Result::bug;
 			}
 			unsigned int dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
 			if(dirnamel > folder->size){
 				PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: dirname length of Inode %u not plausible (was: %d, should: >%d)!", folder->no, folder->size, p + dirnamel);
-				free(buf);
+				delete[] buf;
 				return Result::bug;
 			}
 			p += sizeof(DirEntryLength);
 			InodeNo tmp_no;
 			memcpy(&tmp_no, &buf[p], sizeof(InodeNo));
 			p += sizeof(InodeNo);
-			char* tmpname = (char*) malloc((dirnamel+1) * sizeof(char));
+			char* tmpname =  new char[dirnamel+1];
 			memcpy(tmpname, &buf[p], dirnamel);
 			tmpname[dirnamel] = 0;
 			p += dirnamel;
@@ -276,17 +276,17 @@ Result Device::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 				//Eintrag gefunden
 				if(tree.getInode(tmp_no, outInode) != Result::ok){
 					PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Found Element '%s' in dir, but did not find its Inode (No. %d) in Index!", tmpname, tmp_no);
-					free(tmpname);
-					free(buf);
+					delete[] tmpname;
+					delete[] buf;
 					return Result::bug;
 				}
-				free(tmpname);
-				free(buf);
+				delete[] tmpname;
+				delete[] buf;
 				return Result::ok;
 			}
-			free(tmpname);
+			delete[] tmpname;
 	}
-	free(buf);
+	delete[] buf;
 	return Result::nf;
 
 }
@@ -301,8 +301,8 @@ Result Device::getInodeOfElem(Inode* outInode, const char* fullPath){
 	*curr = root;
 
 	unsigned int fpLength = strlen(fullPath);
-	char* fullPathC = (char*) malloc(fpLength * sizeof(char) +1);
-	memcpy(fullPathC, fullPath, fpLength * sizeof(char));
+	char* fullPathC = new char[fpLength + 1];
+	memcpy(fullPathC, fullPath, fpLength);
 	fullPathC[fpLength] = 0;
 
 	char delimiter[] = "/";
@@ -315,13 +315,13 @@ Result Device::getInodeOfElem(Inode* outInode, const char* fullPath){
 		}
 
 		if(curr->type != InodeType::dir){
-			free(fullPathC);
+			delete[] fullPathC;
 			return Result::einval;
 		}
 
 		Result r;
 		if((r = getInodeInDir(outInode, curr, fnP)) != Result::ok){
-			free(fullPathC);
+			delete[] fullPathC;
 			return r;
 		}
 		curr = outInode;
@@ -329,7 +329,7 @@ Result Device::getInodeOfElem(Inode* outInode, const char* fullPath){
 		fnP = strtok(nullptr, delimiter);
 	}
 
-	free(fullPathC);
+	delete[] fullPathC;
 	return Result::ok;
 }
 
@@ -349,21 +349,21 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 
 	DirEntryLength direntryl = sizeof(DirEntryLength) + sizeof(InodeNo) + dirnamel;	//Size of the new directory entry
 
-	unsigned char *buf = (unsigned char*) malloc(direntryl);
+	unsigned char *buf = new unsigned char [direntryl];
 	buf[0] = direntryl;
 	memcpy(&buf[sizeof(DirEntryLength)], &newElem->no, sizeof(InodeNo));
 
 	memcpy(&buf[sizeof(DirEntryLength) + sizeof(InodeNo)], name, dirnamel);
 
-	char* dirData = (char*) malloc(contDir->size +  direntryl);
+	char* dirData = new char[contDir->size + direntryl];
 	unsigned int bytes = 0;
 	Result r;
 	if(contDir->reservedSize > 0){		//if Directory is not empty
 		r = dataIO.readInodeData(contDir, 0, contDir->size, &bytes, dirData);
 		if(r != Result::ok || bytes != contDir->size){
 			lasterr = r;
-			free(dirData);
-			free(buf);
+			delete dirData;
+			delete buf;
 			return r;
 		}
 	}else{
@@ -379,8 +379,8 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 	memcpy (dirData, &directoryEntryCount, sizeof(DirEntryCount));
 
 	r = dataIO.writeInodeData(contDir, 0, contDir->size + direntryl, &bytes, dirData);
-	free(dirData);
-	free(buf);
+	delete[] dirData;
+	delete[] buf;
 	if(bytes != contDir->size)
 		r = r == Result::ok ? Result::bug : r;
 	return r;
@@ -395,26 +395,26 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 		return Result::bug;
 	}
 
-	char* dirData = (char*) malloc(contDir->size);
+	char* dirData = new char[contDir->size];
 	unsigned int bytes = 0;
 	Result r;
 	if(contDir->reservedSize > 0){		//if Directory is not empty
 		r = dataIO.readInodeData(contDir, 0, contDir->size, &bytes, dirData);
 		if(r != Result::ok || bytes != contDir->size){
 			lasterr = r;
-			free(dirData);
+			delete[] dirData;
 			return r;
 		}
 	}else{
-		free(dirData);
+		delete[] dirData;
 		return Result::nf;	//did not find directory entry, because dir is empty
 	}
 
 
-	DirEntryCount *entries = (DirEntryCount*) &dirData[0];
+	DirEntryCount *entries = reinterpret_cast<DirEntryCount*> (&dirData[0]);
 	FileSize pointer = sizeof(DirEntryCount);
 	while(pointer < contDir->size){
-		DirEntryLength entryl = (DirEntryLength) dirData[pointer];
+		DirEntryLength entryl = static_cast<DirEntryLength> (dirData[pointer]);
 		if(memcmp(&dirData[pointer + sizeof(DirEntryLength)], &(elem->no), sizeof(InodeNo)) == 0){
 			//Found
 			unsigned int newSize = contDir->size - entryl;
@@ -434,12 +434,12 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 
 			unsigned int bw = 0;
 			r = dataIO.writeInodeData(contDir, 0, newSize, &bw, dirData);
-			free(dirData);
+			delete[] dirData;
 			return r;
 		}
 		pointer += entryl;
 	}
-	free(dirData);
+	delete[] dirData;
 	return Result::nf;
 }
 
@@ -484,7 +484,7 @@ Dir* Device::openDir(const char* path){
 		return nullptr;
 	}
 
-	char* dirData = (char*) malloc(dirPinode.size);
+	char* dirData = new char[dirPinode.size];
 	unsigned int br = 0;
 	if(dirPinode.reservedSize > 0){
 		r = dataIO.readInodeData(&dirPinode, 0, dirPinode.size, &br, dirData);
@@ -496,48 +496,43 @@ Dir* Device::openDir(const char* path){
 		memset(dirData, 0, dirPinode.size);
 	}
 
-	Dir* dir = (Dir*) malloc(sizeof(Dir));
-	dir->self = (Dirent*) malloc(sizeof(Dirent));
-	dir->self->name = (char*) "not_impl.";
-	dir->self->node = (Inode*) malloc(sizeof(Inode));
+	Dir* dir = new Dir;
+	dir->self = new Dirent;
+	dir->self->name = const_cast<char*>("not_impl.");
+	dir->self->node = new Inode;
 	*dir->self->node = dirPinode;
 	dir->self->parent = nullptr;	//no caching, so we pobably dont have the parent
 	dir->no_entrys = dirData[0];
-	dir->childs = (Dirent**) malloc(dir->no_entrys * sizeof(Dirent*));
+	dir->childs = new Dirent [dir->no_entrys]{};
 	dir->pos = 0;
 
 	unsigned int p = sizeof(DirEntryCount);
 	unsigned int entry;
 	for(entry = 0; p < dirPinode.size; entry++){
-
-		dir->childs[entry] = (Dirent*) malloc (sizeof(Dirent));
-		memset(dir->childs[entry], 0, sizeof(Dirent));
 		DirEntryLength direntryl = dirData[p];
 		unsigned int dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
 		if(dirnamel > 1 << sizeof(DirEntryLength) * 8){
 			//We have an error while reading
 			PAFFS_DBG(PAFFS_TRACE_BUG, "Dirname length was bigger than possible (%u)!", dirnamel);
-			for(unsigned int i = 0; i <= entry; i++)
-				free(dir->childs[i]);
-			free(dir->childs);
-			free(dirData);
-			free(dir->self);
-			free(dir->self->node);
-			free(dir);
+			delete[] dir->childs;
+			delete[] dirData;
+			delete dir->self->node;
+			delete dir->self;
+			delete dir;
 			lasterr = Result::bug;
 			return nullptr;
 		}
 		p += sizeof(DirEntryLength);
-		memcpy(&dir->childs[entry]->no, &dirData[p], sizeof(InodeNo));
-		dir->childs[entry]->node = nullptr;
+		memcpy(&dir->childs[entry].no, &dirData[p], sizeof(InodeNo));
+		dir->childs[entry].node = nullptr;
 		p += sizeof(InodeNo);
-		dir->childs[entry]->name = (char*) malloc(dirnamel+2);    //+2 weil 1. Nullbyte und 2. Vielleicht ein Zeichen '/' dazukommt
-		memcpy(dir->childs[entry]->name, &dirData[p], dirnamel);
-		dir->childs[entry]->name[dirnamel] = 0;
+		dir->childs[entry].name = new char[dirnamel+2];    //+2 weil 1. Nullbyte und 2. Vielleicht ein Zeichen '/' dazukommt
+		memcpy(dir->childs[entry].name, &dirData[p], dirnamel);
+		dir->childs[entry].name[dirnamel] = 0;
 		p += dirnamel;
 	}
 
-	free(dirData);
+	delete[] dirData;
 
 	if(entry != dir->no_entrys){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Directory stated it had %u entries, but has actually %u!", dir->no_entrys, entry);
@@ -554,15 +549,15 @@ Result Device::closeDir(Dir* dir){
 	if(dir->childs == nullptr)
 		return Result::einval;
 	for(int i = 0; i < dir->no_entrys; i++){
-		free(dir->childs[i]->name);
-		if(dir->childs[i]->node != nullptr)
-			free(dir->childs[i]->node);
-		free(dir->childs[i]);
+		delete dir->childs[i].name;
+		if(dir->childs[i].node != nullptr)
+			delete dir->childs[i].node;
+		//delete dir->childs[i];
 	}
-	free(dir->childs);
-	free(dir->self->node);
-	free(dir->self);
-	free(dir);
+	delete[] dir->childs;
+	delete dir->self->node;
+	delete dir->self;
+	delete dir;
 	return Result::ok;
 }
 
@@ -581,11 +576,11 @@ Dirent* Device::readDir(Dir* dir){
 		return nullptr;
 	}
 
-	if(dir->childs == nullptr){
+/*	if(dir->childs == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ DIR on dir with nullptr dirents");
 		lasterr = Result::bug;
 		return nullptr;
-	}
+	}*/
 
 	if(dir->pos > dir->no_entrys){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ DIR on dir that points further than its contents");
@@ -593,17 +588,17 @@ Dirent* Device::readDir(Dir* dir){
 		return nullptr;
 	}
 
-	if(dir->childs[dir->pos] == nullptr){
+	/*if(dir->childs[dir->pos] == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ DIR on dir with nullptr Dirent no. %d", dir->pos);
 		lasterr = Result::bug;
 		return nullptr;
-	}
+	}*/
 
-	if(dir->childs[dir->pos]->node != nullptr){
-		return dir->childs[dir->pos++];
+	if(dir->childs[dir->pos].node != nullptr){
+		return &dir->childs[dir->pos++];
 	}
 	Inode item;
-	Result r = tree.getInode(dir->childs[dir->pos]->no, &item);
+	Result r = tree.getInode(dir->childs[dir->pos].no, &item);
 	if(r != Result::ok){
 	   lasterr = Result::bug;
 	   return nullptr;
@@ -614,14 +609,14 @@ Dirent* Device::readDir(Dir* dir){
 	}
 
 
-	dir->childs[dir->pos]->node = (Inode*) malloc(sizeof(Inode));
-	*dir->childs[dir->pos]->node = item;
-	if(dir->childs[dir->pos]->node->type == InodeType::dir){
-		int namel = strlen(dir->childs[dir->pos]->name);
-		dir->childs[dir->pos]->name[namel] = '/';
-		dir->childs[dir->pos]->name[namel+1] = 0;
+	dir->childs[dir->pos].node = new Inode;
+	*dir->childs[dir->pos].node = item;
+	if(dir->childs[dir->pos].node->type == InodeType::dir){
+		int namel = strlen(dir->childs[dir->pos].name);
+		dir->childs[dir->pos].name[namel] = '/';
+		dir->childs[dir->pos].name[namel+1] = 0;
 	}
-	return dir->childs[dir->pos++];
+	return &dir->childs[dir->pos++];
 }
 
 void Device::rewindDir(Dir* dir){
@@ -692,14 +687,14 @@ Obj* Device::open(const char* path, Fileopenmask mask){
 		return nullptr;
 	}
 
-	Obj* obj = (Obj*) malloc(sizeof(Obj));
-	obj->dirent = (Dirent*) malloc(sizeof(Dirent));
-	obj->dirent->name = (char*) malloc(strlen(path));
-	obj->dirent->node = (Inode*) malloc(sizeof(Inode));
+	Obj* obj = new Obj;
+	obj->dirent = new Dirent;
+	obj->dirent->name = new char[strlen(path)];
+	obj->dirent->node = new Inode;
 	*obj->dirent->node = file;
 	obj->dirent->parent = nullptr;		//TODO: Sollte aus cache gesucht werden, erstellt in "getInodeOfElem(path))" ?
 
-	memcpy((void*)obj->dirent->name, path, strlen(path));
+	memcpy(obj->dirent->name, path, strlen(path));
 
 	if(mask & FA){
 		obj->fp = file.size;
@@ -718,10 +713,10 @@ Result Device::close(Obj* obj){
 	if(obj == nullptr)
 		return Result::einval;
 	flush(obj);
-	free(obj->dirent->node);
-	free((void*)obj->dirent->name);
-	free(obj->dirent);
-	free(obj);
+	delete obj->dirent->node;
+	delete obj->dirent->name;
+	delete obj->dirent;
+	delete obj;
 
 	return Result::ok;
 }

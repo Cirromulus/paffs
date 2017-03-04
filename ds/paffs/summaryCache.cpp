@@ -154,7 +154,7 @@ Result SummaryCache::loadAreaSummaries(){
 		memset(summaryCache[i], 0, dev->param->dataPagesPerArea / 4 + 1);
 	}
 	SummaryEntry tmp[2][dataPagesPerArea];
-	SuperIndex index = {0};
+	SuperIndex index = {};
 	index.areaMap = dev->areaMap;
 	index.areaSummary[0] = tmp[0];
 	index.areaSummary[1] = tmp[1];
@@ -181,7 +181,7 @@ Result SummaryCache::commitAreaSummaries(){
 
 	unsigned char pos = 0;
 	SummaryEntry tmp[2][dataPagesPerArea];
-	SuperIndex index = {0};
+	SuperIndex index = {};
 	index.areaMap = dev->areaMap;
 	index.areaSummary[0] = tmp[0];
 	index.areaSummary[1] = tmp[1];

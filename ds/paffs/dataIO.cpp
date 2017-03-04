@@ -69,13 +69,13 @@ Result DataIO::writeInodeData(Inode* inode,
 		Addr pageAddress = combineAddress(dev->activeArea[AreaType::data], firstFreePage);
 		res = dev->sumCache.setPageStatus(dev->activeArea[AreaType::data], firstFreePage, SummaryEntry::used);
 		if(res != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[(int)res]);
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[static_cast<int>(res)]);
 		}
 
 		//Prepare buffer and calculate bytes to write
 		//FIXME: If write has offset, misaligned is still false
 		//so no leading zeros are inserted
-		char* buf = &((char*)data)[page*dev->param->dataBytesPerPage];
+		char* buf = &const_cast<char*>(data)[page*dev->param->dataBytesPerPage];
 		unsigned int btw = bytes - *bytes_written;
 		if((bytes+pageOffs) > dev->param->dataBytesPerPage){
 			btw = (bytes+pageOffs) > (page+1)*dev->param->dataBytesPerPage ?
@@ -100,7 +100,7 @@ Result DataIO::writeInodeData(Inode* inode,
 
 				//fill write buffer with valid Data
 				misaligned = true;
-				buf = (char*)malloc(dev->param->dataBytesPerPage);
+				buf = new char[dev->param->dataBytesPerPage];
 				memset(buf, 0x0, dev->param->dataBytesPerPage);
 
 				unsigned int btr = dev->param->dataBytesPerPage;
@@ -116,7 +116,7 @@ Result DataIO::writeInodeData(Inode* inode,
 					unsigned int bytes_read = 0;
 					Result r = readInodeData(inode, (pageFrom+page)*dev->param->dataBytesPerPage, btr, &bytes_read, buf);
 					if(r != Result::ok || bytes_read != btr){
-						free(buf);
+						delete[] buf;
 						return Result::bug;
 					}
 				}
@@ -143,7 +143,7 @@ Result DataIO::writeInodeData(Inode* inode,
 				//Mark old pages dirty
 				res = dev->sumCache.setPageStatus(oldArea, oldPage, SummaryEntry::dirty);
 				if(res != Result::ok){
-					PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[(int)res]);
+					PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[static_cast<int>(res)]);
 				}
 			}
 		}else{
@@ -156,11 +156,11 @@ Result DataIO::writeInodeData(Inode* inode,
 		res = dev->driver->writePage(getPageNumber(pageAddress, dev), buf, btw);
 
 		if(misaligned)
-			free(buf);
+			delete[] buf;
 
-		PAFFS_DBG_S(PAFFS_TRACE_WRITE, "write r.P: %d/%d, phy.P: %llu", page+1, pageTo+1, (long long unsigned int) getPageNumber(pageAddress, dev));
+		PAFFS_DBG_S(PAFFS_TRACE_WRITE, "write r.P: %d/%d, phy.P: %llu", page+1, pageTo+1, static_cast<long long unsigned int> (getPageNumber(pageAddress, dev)));
 		if(res != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "ERR: write returned FAIL at phy.P: %llu", (long long unsigned int) getPageNumber(pageAddress, dev));
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "ERR: write returned FAIL at phy.P: %llu", static_cast<long long unsigned int> (getPageNumber(pageAddress, dev)));
 			return Result::fail;
 		}
 
@@ -191,7 +191,7 @@ Result DataIO::readInodeData(Inode* inode,
 
 
 	if(offs + bytes > inode->size){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read bigger than size of object! (was: %d, max: %lu)", offs+bytes, (long unsigned) inode->size);
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read bigger than size of object! (was: %d, max: %lu)", offs+bytes, static_cast<long unsigned>(inode->size));
 		//TODO: return less bytes_read
 		return Result::nimpl;
 	}
@@ -205,7 +205,7 @@ Result DataIO::readInodeData(Inode* inode,
 	bool misaligned = false;
 	if(pageOffs > 0){
 		misaligned = true;
-		wrap = (char*) malloc(bytes + pageOffs);
+		wrap = new char[bytes + pageOffs];
 	}
 
 	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
@@ -257,7 +257,7 @@ Result DataIO::readInodeData(Inode* inode,
 		r = dev->driver->readPage(addr, buf, btr);
 		if(r != Result::ok){
 			if(misaligned)
-				free (wrap);
+				delete[] wrap;
 			return dev->lasterr = r;
 		}
 		*bytes_read += btr;
@@ -267,7 +267,7 @@ Result DataIO::readInodeData(Inode* inode,
 	if(misaligned) {
 		memcpy(data, &wrap[pageOffs], bytes);
 		*bytes_read -= pageOffs;
-		free (wrap);
+		delete[] wrap;
 	}
 
 	return Result::ok;

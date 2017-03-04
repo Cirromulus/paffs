@@ -153,7 +153,7 @@ Result Btree::find_branch(TreeCacheNode* target, TreeCacheNode** outtreeCacheNod
 		}
 
 		//printf("%d ->\n", i);
-		Result r = cache.getTreeNodeAtIndexFrom(i, c, &c);
+		r = cache.getTreeNodeAtIndexFrom(i, c, &c);
 		if(r != Result::ok)
 			return r;
 	}
@@ -188,7 +188,7 @@ Result Btree::find_leaf(InodeNo key, TreeCacheNode** outtreeCacheNode) {
 			else break;
 		}
 
-		Result r = cache.getTreeNodeAtIndexFrom(i, c, &c);
+		r = cache.getTreeNodeAtIndexFrom(i, c, &c);
 		if(r != Result::ok)
 			return r;
 	}
@@ -635,7 +635,7 @@ Result Btree::remove_entry_from_node(TreeCacheNode * n, InodeNo key) {
 	while (n->raw.as.branch.keys[i] != key  && i < n->raw.num_keys)		//as.branch is OK, because it is same memory as as.leaf
 		i++;
 	if(key < n->raw.as.branch.keys[i-1]){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Key to delete (%lu) not found!", (long unsigned) key);
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Key to delete (%lu) not found!", static_cast<long unsigned> (key));
 		return Result::bug;
 	}
 
@@ -1007,7 +1007,7 @@ void Btree::print_leaves(TreeCacheNode* c) {
 	if(c->raw.is_leaf){
 		printf("| ");
 		for(int i = 0; i < c->raw.num_keys; i++)
-			printf("%" PRIu32 " ", (uint32_t) c->raw.as.leaf.pInodes[i].no);
+			printf("%" PRIu32 " ", static_cast<uint32_t> (c->raw.as.leaf.pInodes[i].no));
 	}else{
 		for(int i = 0; i <= c->raw.num_keys; i++){
 			TreeCacheNode *n = NULL;
@@ -1029,7 +1029,7 @@ void Btree::print_queued_keys_r(queue_s* q){
 	queue_s* new_q = queue_new();
 	printf("|");
 	while(!queue_empty(q)){
-		TreeCacheNode *n = (TreeCacheNode*) queue_dequeue(q);
+		TreeCacheNode *n = static_cast<TreeCacheNode*> (queue_dequeue(q));
 		for(int i = 0; i <= n->raw.num_keys; i++){
 			if(!n->raw.is_leaf){
 				TreeCacheNode *nn = NULL;			//next node
@@ -1048,20 +1048,20 @@ void Btree::print_queued_keys_r(queue_s* q){
 					printf("%s!\n", err_msg(r));
 					return;
 				}
-				TreeCacheNode* nn_copy = (TreeCacheNode*) malloc(sizeof(TreeCacheNode));
+				TreeCacheNode* nn_copy = new TreeCacheNode;
 				*nn_copy = *nn;
 				queue_enqueue(new_q, nn_copy);
 				if(i == 0)
 					printf(".");
-				if(i < n->raw.num_keys) printf("%" PRIu32 ".", (uint32_t) n->raw.as.branch.keys[i]);
+				if(i < n->raw.num_keys) printf("%" PRIu32 ".", static_cast<uint32_t> (n->raw.as.branch.keys[i]));
 			}else{
 				if(i == 0)
 					printf(" ");
-				if(i < n->raw.num_keys) printf("%" PRIu32 " ", (uint32_t) n->raw.as.leaf.keys[i]);
+				if(i < n->raw.num_keys) printf("%" PRIu32 " ", static_cast<uint32_t> (n->raw.as.leaf.keys[i]));
 			}
 		}
 		printf("|");
-		free(n);
+		delete n;
 	}
 	printf("\n");
 	queue_destroy(q);
@@ -1073,7 +1073,7 @@ void Btree::print_queued_keys_r(queue_s* q){
 
 void Btree::print_keys(TreeCacheNode* c){
 	queue_s* q = queue_new();
-	TreeCacheNode* c_copy = (TreeCacheNode*) malloc(sizeof(TreeCacheNode));
+	TreeCacheNode* c_copy = new TreeCacheNode;
 	*c_copy = *c;
 	queue_enqueue(q, c_copy);
 	print_queued_keys_r(q);

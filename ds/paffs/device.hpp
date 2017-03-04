@@ -23,10 +23,10 @@ class Device{
 	*/
 
 public:
+	Driver *driver;
 	Param *param;
 	AreaPos activeArea[AreaType::no];
 	Area *areaMap;
-	Driver *driver;
 	Result lasterr;
 
 	Btree tree;

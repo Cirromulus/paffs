@@ -31,7 +31,7 @@ public:
 	}
 };
 
-//stack overflow, Fraser '12
+//Source: stack overflow, Fraser '12
 template<typename T, size_t size>
 ::testing::AssertionResult ArraysMatch(const T (&expected)[size],
                                        const T (&actual)[size]){

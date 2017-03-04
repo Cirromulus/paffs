@@ -20,7 +20,6 @@
 namespace paffs {
 
 class SummaryCache{
-public:
 	TEST_FRIENDS;
 	unsigned char summaryCache[areaSummaryCacheSize][dataPagesPerArea / 4 + 2]; //excess byte is for dirty marker
 
@@ -47,7 +46,7 @@ public:
 
 	Result commitAreaSummaries();
 
-//private:
+private:
 	SummaryEntry getPackedStatus(uint16_t position, uint16_t page);
 
 	void setPackedStatus(uint16_t position, uint16_t page, SummaryEntry value);

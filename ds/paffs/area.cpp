@@ -44,7 +44,7 @@ uint64_t getPageNumber(Addr addr, Device* dev){
 Addr combineAddress(uint32_t logical_area, uint32_t page){
 	Addr addr = 0;
 	memcpy(&addr, &page, sizeof(uint32_t));
-	memcpy(&((char*)&addr)[sizeof(uint32_t)], &logical_area, sizeof(uint32_t));
+	memcpy(&reinterpret_cast<char*>(&addr)[sizeof(uint32_t)], &logical_area, sizeof(uint32_t));
 
 	return addr;
 }
@@ -63,7 +63,7 @@ unsigned int extractPage(Addr addr){
 
 unsigned int extractLogicalArea(Addr addr){
 	unsigned int area = 0;
-	memcpy(&area, &((char*)&addr)[sizeof(uint32_t)], sizeof(uint32_t));
+	memcpy(&area, &reinterpret_cast<char*>(&addr)[sizeof(uint32_t)], sizeof(uint32_t));
 	return area;
 }
 unsigned int extractPage(Addr addr){
@@ -135,7 +135,7 @@ Result AreaManagement::manageActiveAreaFull(AreaPos *area, AreaType areaType){
 	if(traceMask & PAFFS_TRACE_VERIFY_AS){
 		for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
 			if(dev->sumCache.getPageStatus(*area, i,&r) > SummaryEntry::dirty)
-				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries (%s)!", *area, resultMsg[(int)r]);
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries (%s)!", *area, resultMsg[static_cast<int>(r)]);
 		}
 	}
 
@@ -161,7 +161,7 @@ Result AreaManagement::manageActiveAreaFull(AreaPos *area, AreaType areaType){
 
 //TODO: Add initAreaAs(...) to handle typical areaMap[abc].type = def; initArea(...);
 void AreaManagement::initArea(AreaPos area){
-	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %u (pos %u) as %s.", (unsigned int)area, (unsigned int)dev->areaMap[area].position, area_names[dev->areaMap[area].type]);
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %u (pos %u) as %s.", static_cast<unsigned int>(area), static_cast<unsigned int>(dev->areaMap[area].position), area_names[dev->areaMap[area].type]);
 	dev->areaMap[area].status = AreaStatus::active;
 }
 

@@ -85,7 +85,7 @@ Result GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstAre
 			char buf[dev->param->totalBytesPerPage];
 			Result r = dev->driver->readPage(src, buf, dev->param->totalBytesPerPage);
 			if(r != Result::ok){
-				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not read page n° %lu!", (long unsigned) src);
+				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not read page n° %lu!", static_cast<long unsigned> (src));
 				return r;
 			}
 			r = dev->driver->writePage(dst, buf, dev->param->totalBytesPerPage);

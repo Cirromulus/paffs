@@ -144,7 +144,7 @@ Result Superblock::commitSuperIndex(SuperIndex *newIndex){
 		return r;
 	}
 
-	SuperIndex lastIndex = {0};
+	SuperIndex lastIndex = {};
 
 	if(r != Result::nf){
 		r = readSuperPageIndex(lastEntry, &lastIndex, false);
@@ -269,10 +269,14 @@ Result Superblock::findMostRecentEntryInBlock(uint32_t area, uint8_t block, uint
 
 Result Superblock::writeAnchorEntry(Addr addr, AnchorEntry* entry){
 	//Currently not implemented to simplify Find-Strategy
+	(void) addr;
+	(void) entry;
 	return Result::nimpl;
 }
 Result Superblock::readAnchorEntry(Addr addr, AnchorEntry* entry){
 	//Currently not implemented to simplify Find-Strategy
+	(void) addr;
+	(void) entry;
 	return Result::nimpl;
 }
 
@@ -288,11 +292,15 @@ Result Superblock::deleteAnchorBlock(uint32_t area, uint8_t block) {
 
 Result Superblock::writeJumpPadEntry(Addr addr, JumpPadEntry* entry){
 	//Currently not implemented to simplify Find-Strategy
+	(void) addr;
+	(void) entry;
 	return Result::nimpl;
 }
 
 Result Superblock::readJumpPadEntry(Addr addr, JumpPadEntry* entry){
 	//Currently not implemented to simplify Find-Strategy
+	(void) addr;
+	(void) entry;
 	return Result::nimpl;
 }
 

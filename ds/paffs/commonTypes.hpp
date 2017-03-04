@@ -117,7 +117,7 @@ struct Obj{
 
 struct Dir{
 	Dirent* self;
-	Dirent** childs;
+	Dirent* childs;
 	DirEntryCount no_entrys;
 	DirEntryCount pos;
 };

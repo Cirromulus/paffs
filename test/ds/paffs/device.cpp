@@ -217,7 +217,7 @@ TEST_F(FileTest, permissions){
 	ASSERT_NE(fil, nullptr);
 
 	r = fs.write(fil, txt, strlen(txt), &bw);
-	EXPECT_EQ(bw, (unsigned int) 0);
+	EXPECT_EQ(bw, static_cast<unsigned int>(0));
 	ASSERT_EQ(r, paffs::Result::noperm);
 
 	r = fs.close(fil);
