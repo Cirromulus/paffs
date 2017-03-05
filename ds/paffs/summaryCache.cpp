@@ -254,6 +254,8 @@ Result SummaryCache::loadUnbufferedArea(AreaPos area){
 	r = readAreasummary(area, buf, true);
 	if(r == Result::ok){
 		packStatusArray(translation[area], buf);
+		setASWritten(translation[area]);
+		setDirty(translation[area], false);
 		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of %d to cache", area);
 	}
 	else if(r == Result::nf){
@@ -289,7 +291,7 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(){
 		if(used[i]){
 			if(!isDirty(i)){
 				translation.erase(pos[i]);
-				PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Deleted cache entry of area %d", pos[i]);
+				PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Deleted non-dirty cache entry of area %d", pos[i]);
 				fav = i;
 			}
 		}else{
@@ -314,8 +316,9 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(){
 		SummaryEntry buf[dataPagesPerArea];
 		unpackStatusArray(fav, buf);
 		writeAreasummary(pos[fav], buf);
-		setDirty(fav, false);
-		setASWritten(fav);
+		//setDirty(fav, false); not needed if erasure is applied
+		//setASWritten(fav);
+		translation.erase(pos[fav]);
 		return Result::ok;
 	}
 
@@ -347,6 +350,8 @@ Result SummaryCache::writeAreasummary(AreaPos area, SummaryEntry* summary){
 	 *		allow roughly 1000 pages per Area. Usually big pages come with big Blocks,
 	 *		so a Block would be ~500 pages, so an area would be limited to two Blocks.
 	 */
+	//TODO: Check if areaOOB is clean, and maybe Verify written data
+	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Committing AreaSummary to Area %d", area);
 
 	for(unsigned int j = 0; j < dev->param->dataPagesPerArea; j++){
 		if(summary[j] != SummaryEntry::dirty)
