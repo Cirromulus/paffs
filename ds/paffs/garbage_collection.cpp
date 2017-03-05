@@ -23,6 +23,7 @@ uint32_t GarbageCollection::countDirtyPages(SummaryEntry* summary){
 	return dirty;
 }
 
+//Special Case 'unset': Find any Type and also extremely favour Areas with committed AS
 AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_summary, bool* srcAreaContainsData){
 	AreaPos favourite_area = 0;
 	uint32_t fav_dirty_pages = 0;
@@ -52,14 +53,24 @@ AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_s
 					break;
 			}
 
-			if(dev->areaMap[i].type != target)
-				continue; 	//We cant change types yet if area is not completely empty
+			if(target != AreaType::unset){
+				//normal case
+				if(dev->areaMap[i].type != target)
+					continue; 	//We cant change types if area is not completely empty
 
-			if(dirty_pages > fav_dirty_pages ||
-					(dev->sumCache.wasASWritten(i) && dirty_pages == fav_dirty_pages)){
-				favourite_area = i;
-				fav_dirty_pages = dirty_pages;
-				memcpy(out_summary, curr, dev->param->dataPagesPerArea);
+				if(dirty_pages > fav_dirty_pages ||
+						(dev->sumCache.wasASWritten(i) && dirty_pages == fav_dirty_pages)){
+					favourite_area = i;
+					fav_dirty_pages = dirty_pages;
+					memcpy(out_summary, curr, dev->param->dataPagesPerArea);
+				}
+			}else{
+				//Special Case for freeing committed AreaSummaries
+				if(dev->sumCache.wasASWritten(i) && dirty_pages > fav_dirty_pages){
+					favourite_area = i;
+					fav_dirty_pages = dirty_pages;
+					memcpy(out_summary, curr, dev->param->dataPagesPerArea);
+				}
 			}
 
 		}
@@ -120,6 +131,8 @@ Result GarbageCollection::deleteArea(AreaPos area){
  * Possible solution: Unify INDEX and DATA to be written in a single AreaType
  *
  * Changes active Area to one of the new freed areas.
+ * Necessary to not have any get/setPageStatus calls!
+ * This could lead to a Cache Flush which could itself cause a call on collectGarbage again
  */
 Result GarbageCollection::collectGarbage(AreaType targetType){
 	SummaryEntry summary[dev->param->dataPagesPerArea];
@@ -172,16 +185,16 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 			if(lastDeletionTarget == 0){
 				//this is first round, no possible chunks found.
 				//Just init and return garbageBuffer.
-				dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].type = targetType;
+				dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].type = dev->areaMap[deletion_target].type;
 				dev->areaMgmt.initArea(dev->activeArea[AreaType::garbageBuffer]);
-				dev->activeArea[targetType] = dev->activeArea[AreaType::garbageBuffer];
+				dev->activeArea[dev->areaMap[deletion_target].type] = dev->activeArea[AreaType::garbageBuffer];
 
 				dev->activeArea[AreaType::garbageBuffer] = 0;	//No GC_BUFFER left
 				return Result::ok;
 			}
 
 			//Resurrect area, fill it with the former summary. In end routine, positions will be swapped.
-			dev->areaMap[lastDeletionTarget].type = targetType;
+			dev->areaMap[lastDeletionTarget].type = dev->areaMap[deletion_target].type;
 			dev->areaMgmt.initArea(lastDeletionTarget);
 			r = dev->sumCache.setSummaryStatus(lastDeletionTarget, summary);
 			if(r != Result::ok){
@@ -239,7 +252,9 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 				return r;
 			}
 			//Notify for used Pages
-			dev->areaMap[deletion_target].status = AreaStatus::active;	//Safe, because we can assume deletion targetType is same Type as we want (from getNextBestArea)
+			if(targetType != AreaType::unset)
+				//Safe, because we can assume deletion targetType is same Type as we want (from getNextBestArea)
+				dev->areaMap[deletion_target].status = AreaStatus::active;
 		}else{
 			r = dev->sumCache.deleteSummary(deletion_target);
 			if(r != Result::ok){
@@ -291,7 +306,8 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 		}
 	}
 
-	dev->activeArea[targetType] = deletion_target;
+	if(targetType != AreaType::unset)
+		dev->activeArea[targetType] = deletion_target;
 
 	PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "Garbagecollection erased pos %u and gave area %u pos %u.", dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].position, dev->activeArea[targetType], dev->areaMap[dev->activeArea[targetType]].position);
 

@@ -141,7 +141,7 @@ enum AreaType : uint8_t{
 	no
 };
 
-enum AreaStatus : uint8_t{
+enum class AreaStatus : uint8_t{
 	closed = 0,
 	active,
 	empty

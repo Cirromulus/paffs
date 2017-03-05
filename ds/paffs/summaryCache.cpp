@@ -303,7 +303,7 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(){
 
 	//Look for the least probable Area to be used that has no committed AS
 	for(int i = 0; i < areaSummaryCacheSize; i++){
-		if(used[i] && !wasASWrittenByCachePosition(i)){
+		if(used[i] && !wasASWrittenByCachePosition(i) && dev->areaMap[pos[i]].status != AreaStatus::active){
 			uint32_t tmp = countDirtyPages(i);
 			if(tmp > maxDirtyPages){
 				fav = i;
@@ -322,8 +322,6 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(){
 		return Result::ok;
 	}
 
-	//Expensive: No committable Area found, we have to activate GC
-	PAFFS_DBG_S(PAFFS_TRACE_BUG, "No committable Area found, GC not implemented yet");
 	return Result::nimpl;
 }
 
