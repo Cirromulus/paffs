@@ -234,7 +234,7 @@ Result DataIO::readInodeData(Inode* inode,
 			return Result::bug;
 		}
 		Result r;
-		if(traceMask && PAFFS_TRACE_VERIFY_AS){
+		if(traceMask & PAFFS_TRACE_VERIFY_AS){
 			SummaryEntry e = dev->sumCache.getPageStatus(extractLogicalArea(inode->direct[page + pageFrom])
 					,extractPage(inode->direct[page + pageFrom]), &r);
 			if(r != Result::ok){

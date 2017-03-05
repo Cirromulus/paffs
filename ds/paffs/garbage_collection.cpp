@@ -14,19 +14,11 @@
 
 namespace paffs{
 
-/**
- * It could be possible that closed area contains free pages which count as
- * dirty in this case.
- */
-uint32_t GarbageCollection::countDirtyPages(AreaPos area){
+uint32_t GarbageCollection::countDirtyPages(SummaryEntry* summary){
 	uint32_t dirty = 0;
-	Result r;
 	for(uint32_t i = 0; i < dev->param->dataPagesPerArea; i++){
-		if(dev->sumCache.getPageStatus(area, i, &r) != SummaryEntry::used)
+		if(summary[i] != SummaryEntry::used)
 			dirty++;
-		if(r != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not determine Pagestatus for Garbagecollection!");
-		}
 	}
 	return dirty;
 }
@@ -42,8 +34,8 @@ AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_s
 		if(dev->areaMap[i].status == AreaStatus::closed &&
 				(dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)){
 
-			uint32_t dirty_pages = countDirtyPages(i);
 			Result r = dev->sumCache.getSummaryStatus(i, curr);
+			uint32_t dirty_pages = countDirtyPages(curr);
 			if(r != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Could not load Summary of Area %d for Garbage collection!", i);
 				return 0;
@@ -63,7 +55,8 @@ AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_s
 			if(dev->areaMap[i].type != target)
 				continue; 	//We cant change types yet if area is not completely empty
 
-			if(dirty_pages > fav_dirty_pages){
+			if(dirty_pages > fav_dirty_pages ||
+					(dev->sumCache.wasASWritten(i) && dirty_pages == fav_dirty_pages)){
 				favourite_area = i;
 				fav_dirty_pages = dirty_pages;
 				memcpy(out_summary, curr, dev->param->dataPagesPerArea);

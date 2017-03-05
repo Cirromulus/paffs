@@ -69,6 +69,8 @@ Result TreeCache::tryAddNewCacheNode(TreeCacheNode** newTcn){
 	int16_t index = findFirstFreeIndex();
 	if(index < 0){
 		PAFFS_DBG_S(PAFFS_TRACE_TREECACHE, "Cache is full!");
+		if(traceMask & PAFFS_TRACE_TREECACHE)
+			printTreeCache();
 		return Result::lowmem;
 	}
 	*newTcn = &cache[index];
@@ -88,7 +90,7 @@ Result TreeCache::addNewCacheNode(TreeCacheNode** newTcn){
 		return r;
 	if(r != Result::lowmem)
 		return r;
-	if(!isTreeCacheValid()){
+	if(traceMask & PAFFS_TRACE_VERIFY_TC && !isTreeCacheValid()){
 		printTreeCache();
 		return Result::bug;
 	}
@@ -272,7 +274,6 @@ bool TreeCache::isSubTreeValid(TreeCacheNode* node, uint8_t* cache_node_reachabl
 
 bool TreeCache::isTreeCacheValid(){
 	//Just for debugging purposes
-	//TODO: Switch to deactivate this costly but safer execution
 	uint8_t cache_node_reachable[(treeNodeCacheSize/8)+1];
 	memset(cache_node_reachable, 0, (treeNodeCacheSize/8)+1);	//See c. 162
 
@@ -284,6 +285,7 @@ bool TreeCache::isTreeCacheValid(){
 	if(!isSubTreeValid(&cache[cache_root], cache_node_reachable, 0, 0))
 		return false;
 
+	bool valid = true;
 	if(memcmp(cache_node_reachable,cache_usage, (treeNodeCacheSize/8)+1)){
 		for(int i = 0; i <= treeNodeCacheSize/8; i++){
 			for(int j = 0; j < 8; j++){
@@ -293,14 +295,26 @@ bool TreeCache::isTreeCacheValid(){
 				}
 				if((cache_usage[i*8] & 1 << j % 8) > (cache_node_reachable[i*8] & 1 << j % 8)){
 					if(!cache[i*8+j].locked && !cache[i*8+j].inheritedLock){
-						PAFFS_DBG(PAFFS_TRACE_BUG, "Cache contains unreachable node %d!", i*8 + j);
-						return false;
+						//it is allowed if we are moving a parent around
+						bool parentLocked = false;
+						TreeCacheNode* par = cache[i*8+j].parent;
+						while(par != par->parent){
+							if(par->locked){
+								parentLocked = true;
+								break;
+							}
+							par = par->parent;
+						}
+						if(!parentLocked){
+							PAFFS_DBG(PAFFS_TRACE_BUG, "Cache contains unreachable node %d!", i*8 + j);
+							valid = false;
+						}
 					}
 				}
 			}
 		}
 	}
-	return true;
+	return valid;
 }
 
 /**
@@ -425,7 +439,7 @@ void TreeCache::cleanFreeNodes(){
 	//debug ---->
 	uint16_t usedCache = 0;
 	if(traceMask & PAFFS_TRACE_TREECACHE){
-		if(!isTreeCacheValid()){
+		if(traceMask & PAFFS_TRACE_VERIFY_TC && !isTreeCacheValid()){
 			dev->lasterr = Result::bug;
 			return;
 		}
@@ -508,7 +522,7 @@ Result TreeCache::commitNodesRecursively(TreeCacheNode* node) {
 
 Result TreeCache::commitCache(){
 
-	if(!isTreeCacheValid()){
+	if(traceMask & PAFFS_TRACE_VERIFY_TC && !isTreeCacheValid()){
 		return Result::bug;
 	}
 
@@ -554,7 +568,7 @@ Result TreeCache::commitCache(){
 Result TreeCache::TreeCache::lockTreeCacheNode(TreeCacheNode* tcn){
 	tcn->locked = true;
 	if(tcn->parent == NULL)
-		return Result::ok;	//FIXME: Is it allowed to violate the treerules?
+		return Result::ok;
 
 	TreeCacheNode* curr = tcn->parent;
 	while(curr->parent != curr){
@@ -669,7 +683,7 @@ Result TreeCache::getTreeNodeAtIndexFrom(unsigned char index,
 	if(target != NULL){
 		*child = target;
 		cache_hits++;
-		PAFFS_DBG_S(PAFFS_TRACE_TREECACHE, "Cache hit, found target %p (position %ld)", target, target - cache);
+		PAFFS_DBG_S(PAFFS_TRACE_TREECACHE, "Cache hit, found target %p (position %d)", target, target - cache);
 		return Result::ok;	//cache hit
 	}
 

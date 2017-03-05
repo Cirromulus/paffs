@@ -38,7 +38,7 @@ void SummaryCache::setDirty(uint16_t position, bool value){
 		summaryCache[position][dataPagesPerArea / 4 + 1] &= ~1;
 }
 
-bool SummaryCache::wasASWritten(uint16_t position){
+bool SummaryCache::wasASWrittenByCachePosition(uint16_t position){
 	return summaryCache[position][dataPagesPerArea / 4 + 1] & 0b10;
 }
 
@@ -79,10 +79,6 @@ int SummaryCache::findNextFreeCacheEntry(){
 	return -1;
 }
 
-int SummaryCache::findLeastProbableUsedCacheEntry(){
-	return -1;
-}
-
 Result SummaryCache::setPageStatus(AreaPos area, uint8_t page, SummaryEntry state){
 	if(translation.find(area) == translation.end()){
 		Result r = loadUnbufferedArea(area);
@@ -118,34 +114,36 @@ SummaryEntry SummaryCache::getPageStatus(AreaPos area, uint8_t page, Result *res
 		*result = Result::einval;
 		return SummaryEntry::error;
 	}
-/*
-	if(trace_mask & PAFFS_TRACE_VERIFY_AS){
-		for(unsigned int j = 0; j < dev->param->data_pages_per_area; j++){
-			if(curr[j] > SummaryEntry::dirty)
-				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries!", j);
-		}
-	}
-*/
 
 	*result = Result::ok;
-	SummaryEntry ergebnis = getPackedStatus(translation[area], page);
-	return ergebnis;
+	return getPackedStatus(translation[area], page);
 }
 
-Result SummaryCache::getSummaryStatus(AreaPos area, SummaryEntry* summary){
+Result SummaryCache::getSummaryStatus(AreaPos area, SummaryEntry* summary, bool complete){
 	if(translation.find(area) == translation.end()){
-		//TODO: This one does not have to be copied into Cache
-		//		Because it is just for a one-shot of Garbage collection looking for the best area
-		Result r = loadUnbufferedArea(area);
-		if(r != Result::ok)
-			return r;
+		//This one does not have to be copied into Cache
+		//Because it is just for a one-shot of Garbage collection looking for the best area
+		Result r = readAreasummary(area, summary, complete);
+		if(r == Result::ok){
+			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of Area %d", area);
+		}
+		else if(r == Result::nf){
+			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded empty AreaSummary of Area %d", area);
+			r = Result::ok;
+		}
+		return r;
 	}
 	unpackStatusArray(translation[area], summary);
 	return Result::ok;
 }
 
+Result SummaryCache::getEstimatedSummaryStatus(AreaPos area, SummaryEntry* summary){
+	return getSummaryStatus(area, summary, false);
+}
+
 Result SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary){
-	setDirty(translation[area]);
+	//Dont set Dirty, because GC just deleted AS and dirty Pages
+	//This area ist most likely to be used soon
 	if(translation.find(area) == translation.end()){
 		Result r = loadUnbufferedArea(area);
 		if(r != Result::ok)
@@ -157,8 +155,9 @@ Result SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary){
 
 Result SummaryCache::deleteSummary(AreaPos area){
 	if(translation.find(area) == translation.end()){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete nonexisting Area %d", area);
-		return Result::einval;
+		//This is not a bug, because an uncached area can be deleted
+		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Tried to delete nonexisting Area %d", area);
+		return Result::ok;
 	}
 
 	translation.erase(area);
@@ -172,7 +171,7 @@ bool SummaryCache::wasASWritten(AreaPos area){
 		PAFFS_DBG(PAFFS_TRACE_ASCACHE, "Tried to question nonexistent Area %d. This is probably not a bug.", area);
 		return false;
 	}
-	return wasASWritten(translation[area]);
+	return wasASWrittenByCachePosition(translation[area]);
 }
 
 //For Garbage collection that has deleted the AS too
@@ -185,6 +184,7 @@ void SummaryCache::resetASWritten(AreaPos area){
 }
 
 Result SummaryCache::loadAreaSummaries(){
+	//Assumes unused Summary Cache
 	for(AreaPos i = 0; i < 2; i++){
 		memset(summaryCache[i], 0, dev->param->dataPagesPerArea / 4 + 1);
 	}
@@ -249,18 +249,16 @@ Result SummaryCache::loadUnbufferedArea(AreaPos area){
 			return Result::bug;
 		}
 	}
-	//TODO: Abstractify loading of AreaSumary to give the ability
-	//		to load into other destinations than Cache
 	translation[area] = nextEntry;
 	SummaryEntry buf[dataPagesPerArea];
 	r = readAreasummary(area, buf, true);
 	if(r == Result::ok){
 		packStatusArray(translation[area], buf);
-		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Loaded existing AreaSummary of %d to cache", area);
+		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of %d to cache", area);
 	}
 	else if(r == Result::nf){
 		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea / 4 + 1);
-		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Loaded new AreaSummary for %d", area);
+		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded new AreaSummary for %d", area);
 	}
 	else
 		return r;
@@ -273,7 +271,9 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(){
 	//from summaryCache to AreaPosition
 	bool used[areaSummaryCacheSize] = {0};
 	AreaPos pos[areaSummaryCacheSize] = {0};
-	bool deletedSomething = false;
+	int fav = -1;
+	uint32_t maxDirtyPages = 0;
+
 	for(auto it = translation.cbegin(), end = translation.cend();
 			it != end; ++it){
 		if(used[it->second] != false){
@@ -283,19 +283,54 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(){
 		used[it->second] = true;
 		pos[it->second] = it->first;
 	}
+
+	//Look for unchanged cache entries, the easiest way
 	for(int i = 0; i < areaSummaryCacheSize; i++){
-		if(used[i] && !isDirty(i)){
-			translation.erase(pos[i]);
-			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Deleted cache entry of area %d", pos[i]);
-			deletedSomething = true;
+		if(used[i]){
+			if(!isDirty(i)){
+				translation.erase(pos[i]);
+				PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Deleted cache entry of area %d", pos[i]);
+				fav = i;
+			}
+		}else{
+			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "freeNextBestCache ignored empty pos %d", i);
 		}
 	}
-	if(deletedSomething)
+	if(fav > -1)
 		return Result::ok;
-	PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free Cache Entry for summaryCache, "
-			"and flush is not supported yet");
 
+	//Look for the least probable Area to be used that has no committed AS
+	for(int i = 0; i < areaSummaryCacheSize; i++){
+		if(used[i] && !wasASWrittenByCachePosition(i)){
+			uint32_t tmp = countDirtyPages(i);
+			if(tmp > maxDirtyPages){
+				fav = i;
+				maxDirtyPages = tmp;
+			}
+		}
+	}
+	if(fav > -1){
+		//Commit AS to Area OOB
+		SummaryEntry buf[dataPagesPerArea];
+		unpackStatusArray(fav, buf);
+		writeAreasummary(pos[fav], buf);
+		setDirty(fav, false);
+		setASWritten(fav);
+		return Result::ok;
+	}
+
+	//Expensive: No committable Area found, we have to activate GC
+	PAFFS_DBG_S(PAFFS_TRACE_BUG, "No committable Area found, GC not implemented yet");
 	return Result::nimpl;
+}
+
+uint32_t SummaryCache::countDirtyPages(uint16_t position){
+	uint32_t dirty = 0;
+	for(uint32_t i = 0; i < dev->param->dataPagesPerArea; i++){
+		if(getPackedStatus(position, i) != SummaryEntry::used)
+			dirty++;
+	}
+	return dirty;
 }
 
 Result SummaryCache::writeAreasummary(AreaPos area, SummaryEntry* summary){
@@ -311,11 +346,8 @@ Result SummaryCache::writeAreasummary(AreaPos area, SummaryEntry* summary){
 	 *		AreaSummary is without optimization 2 bit per page. 2 Kib per Page would
 	 *		allow roughly 1000 pages per Area. Usually big pages come with big Blocks,
 	 *		so a Block would be ~500 pages, so an area would be limited to two Blocks.
-	 *		Not good.
-	 *
-	 *		Thought 2: GC just cares if dirty or not. Areasummary says exactly that.
-	 *		Win.
 	 */
+
 	for(unsigned int j = 0; j < dev->param->dataPagesPerArea; j++){
 		if(summary[j] != SummaryEntry::dirty)
 			buf[j/8 +1] |= 1 << j%8;
@@ -357,11 +389,11 @@ Result SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bo
 		pointer += btr;
 	}
 	//buffer ready
-	PAFFS_DBG_S(PAFFS_TRACE_AREA, "AreaSummary Buffer was filled with %u Bytes.", pointer);
+	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "AreaSummary Buffer was filled with %u Bytes.", pointer);
 
 	if(buf[0] == 0xFF){
 		//Magic marker not here, so no AS present
-		PAFFS_DBG_S(PAFFS_TRACE_AREA, "And just found an unset AS.");
+		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "And just found an unset AS.");
 		return Result::nf;
 	}
 

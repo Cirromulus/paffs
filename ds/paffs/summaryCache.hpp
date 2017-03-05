@@ -37,7 +37,10 @@ public:
 
 	Result setSummaryStatus(AreaPos area, SummaryEntry* summary);
 
-	Result getSummaryStatus(AreaPos area, SummaryEntry* summary);
+	Result getSummaryStatus(AreaPos area, SummaryEntry* summary, bool complete=true);
+
+	//Does not check if pages are dirty or free
+	Result getEstimatedSummaryStatus(AreaPos area, SummaryEntry* summary);
 
 	//for retired or unused Areas
 	Result deleteSummary(AreaPos area);
@@ -66,17 +69,17 @@ private:
 
 	void setDirty(uint16_t position, bool value=true);
 
-	bool wasASWritten(uint16_t position);
+	bool wasASWrittenByCachePosition(uint16_t position);
 
 	void setASWritten(uint16_t position, bool value=true);
 
 	int findNextFreeCacheEntry();
 
-	int findLeastProbableUsedCacheEntry();
-
 	Result loadUnbufferedArea(AreaPos area);
 
 	Result freeNextBestSummaryCacheEntry();
+
+	uint32_t countDirtyPages(uint16_t position);
 
 	Result readAreasummary(AreaPos area, SummaryEntry* out_summary, bool complete);
 

@@ -657,7 +657,7 @@ Obj* Device::open(const char* path, Fileopenmask mask){
 		if(mask & FC){
 			//use standard mask
 			//FIXME: Use standard mask or the mask provided?
-			r = createFile(&file, path, R | W);
+  			r = createFile(&file, path, R | W);
 			if(r != Result::ok){
 				lasterr = r;
 				return nullptr;
