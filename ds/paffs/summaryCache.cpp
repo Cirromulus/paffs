@@ -81,7 +81,7 @@ int SummaryCache::findNextFreeCacheEntry(){
 
 Result SummaryCache::setPageStatus(AreaPos area, uint8_t page, SummaryEntry state){
 	if(translation.find(area) == translation.end()){
-		Result r = loadUnbufferedArea(area);
+		Result r = loadUnbufferedArea(area, true);
 		if(r != Result::ok)
 			return r;
 	}
@@ -103,9 +103,24 @@ Result SummaryCache::setPageStatus(AreaPos area, uint8_t page, SummaryEntry stat
 
 SummaryEntry SummaryCache::getPageStatus(AreaPos area, uint8_t page, Result *result){
 	if(translation.find(area) == translation.end()){
-		Result r = loadUnbufferedArea(area);
+		Result r = loadUnbufferedArea(area, false);
+		if(r == Result::nf){
+			//load one-shot AS in read only
+			SummaryEntry buf[dataPagesPerArea];
+			r = readAreasummary(area, buf, true);
+			if(r == Result::ok){
+				PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of %d without caching", area);
+				*result = Result::ok;
+				return buf[page];
+			}
+			else if(r == Result::nf){
+				PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded free AreaSummary of %d without caching", area);
+				*result = Result::ok;
+				return SummaryEntry::free;
+			}
+		}
 		if(r != Result::ok){
-			*result = Result::nimpl;
+			*result = r;
 			return SummaryEntry::error;
 		}
 	}
@@ -236,11 +251,15 @@ Result SummaryCache::commitAreaSummaries(){
 	return dev->superblock.commitSuperIndex(&index);
 }
 
-Result SummaryCache::loadUnbufferedArea(AreaPos area){
-	Result r;
+Result SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent){
+	Result r = Result::ok;
 	int nextEntry = findNextFreeCacheEntry();
 	if(nextEntry < 0){
-		r = freeNextBestSummaryCacheEntry();
+		r = freeNextBestSummaryCacheEntry(urgent);
+		if(!urgent && r == Result::nf){
+			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Nonurgent Cacheclean did not return free space, activating read-only");
+			return Result::nf;
+		}
 		if(r != Result::ok)
 			return r;
 		nextEntry = findNextFreeCacheEntry();
@@ -269,7 +288,7 @@ Result SummaryCache::loadUnbufferedArea(AreaPos area){
 	return Result::ok;
 }
 
-Result SummaryCache::freeNextBestSummaryCacheEntry(){
+Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 	//from summaryCache to AreaPosition
 	bool used[areaSummaryCacheSize] = {0};
 	AreaPos pos[areaSummaryCacheSize] = {0};
@@ -301,6 +320,32 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(){
 	if(fav > -1)
 		return Result::ok;
 
+	//TODO: Deteremine if non-urgent abort is better here or before GC
+	if(!urgent)
+		return Result::nf;
+
+	//Look for the least probable Area to be used that has no committed AS
+ 	for(int i = 0; i < areaSummaryCacheSize; i++){
+		if(used[i] && !wasASWrittenByCachePosition(i) && dev->areaMap[pos[i]].status != AreaStatus::active){
+			uint32_t tmp = countDirtyPages(i);
+			if(tmp > maxDirtyPages){
+				fav = i;
+				maxDirtyPages = tmp;
+			}
+		}
+	}
+	if(fav > -1){
+		//Commit AS to Area OOB
+		SummaryEntry buf[dataPagesPerArea];
+		unpackStatusArray(fav, buf);
+		writeAreasummary(pos[fav], buf);
+		translation.erase(pos[fav]);
+		return Result::ok;
+	}
+
+	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "freeNextBestCache found no uncommitted Area, activating Garbage collection");
+	dev->areaMgmt.gc.collectGarbage(AreaType::unset);
+
 	//Look for the least probable Area to be used that has no committed AS
 	for(int i = 0; i < areaSummaryCacheSize; i++){
 		if(used[i] && !wasASWrittenByCachePosition(i) && dev->areaMap[pos[i]].status != AreaStatus::active){
@@ -316,13 +361,12 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(){
 		SummaryEntry buf[dataPagesPerArea];
 		unpackStatusArray(fav, buf);
 		writeAreasummary(pos[fav], buf);
-		//setDirty(fav, false); not needed if erasure is applied
-		//setASWritten(fav);
 		translation.erase(pos[fav]);
 		return Result::ok;
 	}
 
-	return Result::nimpl;
+	PAFFS_DBG(PAFFS_TRACE_ERROR, "Garbage collection could not free any Areas! No possibility to commit AS");
+	return Result::nf;
 }
 
 uint32_t SummaryCache::countDirtyPages(uint16_t position){

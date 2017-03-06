@@ -185,9 +185,9 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 			if(lastDeletionTarget == 0){
 				//this is first round, no possible chunks found.
 				//Just init and return garbageBuffer.
-				dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].type = dev->areaMap[deletion_target].type;
+				dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].type = AreaType::index;
 				dev->areaMgmt.initArea(dev->activeArea[AreaType::garbageBuffer]);
-				dev->activeArea[dev->areaMap[deletion_target].type] = dev->activeArea[AreaType::garbageBuffer];
+				dev->activeArea[AreaType::index] = dev->activeArea[AreaType::garbageBuffer];
 
 				dev->activeArea[AreaType::garbageBuffer] = 0;	//No GC_BUFFER left
 				return Result::ok;
