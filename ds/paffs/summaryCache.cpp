@@ -14,7 +14,11 @@
 namespace paffs {
 
 SummaryCache::SummaryCache(Device* mdev) : dev(mdev){
-	translation.reserve(areaSummaryCacheSize+1);
+	if(areaSummaryCacheSize < 3){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummaryCacheSize is less than 3!\n"
+				"\tThis is not recommended, as Errors can happen.");
+	}
+	translation.reserve(areaSummaryCacheSize);
 }
 
 SummaryEntry SummaryCache::getPackedStatus(uint16_t position, uint16_t page){
