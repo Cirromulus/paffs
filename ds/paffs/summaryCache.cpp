@@ -160,7 +160,7 @@ Result SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary){
 	//Dont set Dirty, because GC just deleted AS and dirty Pages
 	//This area ist most likely to be used soon
 	if(translation.find(area) == translation.end()){
-		Result r = loadUnbufferedArea(area);
+		Result r = loadUnbufferedArea(area, true);
 		if(r != Result::ok)
 			return r;
 	}
@@ -322,7 +322,7 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 
 	//TODO: Deteremine if non-urgent abort is better here or before GC
 	if(!urgent)
-		return Result::nf;
+ 		return Result::nf;
 
 	//Look for the least probable Area to be used that has no committed AS
  	for(int i = 0; i < areaSummaryCacheSize; i++){

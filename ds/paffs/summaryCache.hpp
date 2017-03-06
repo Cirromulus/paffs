@@ -75,9 +75,9 @@ private:
 
 	int findNextFreeCacheEntry();
 
-	Result loadUnbufferedArea(AreaPos area, bool urgent = false);
+	Result loadUnbufferedArea(AreaPos area, bool urgent);
 
-	Result freeNextBestSummaryCacheEntry(bool urgent = false);
+	Result freeNextBestSummaryCacheEntry(bool urgent);
 
 	uint32_t countDirtyPages(uint16_t position);
 
