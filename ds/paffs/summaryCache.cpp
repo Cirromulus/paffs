@@ -187,7 +187,7 @@ Result SummaryCache::deleteSummary(AreaPos area){
 //For Garbage collection to consider committed AS-Areas before others
 bool SummaryCache::wasASWritten(AreaPos area){
 	if(translation.find(area) == translation.end()){
-		PAFFS_DBG(PAFFS_TRACE_ASCACHE, "Tried to question nonexistent Area %d. This is probably not a bug.", area);
+		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Tried to question nonexistent Area %d. This is probably not a bug.", area);
 		return false;
 	}
 	return wasASWrittenByCachePosition(translation[area]);
@@ -324,10 +324,6 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 	if(fav > -1)
 		return Result::ok;
 
-	//TODO: Deteremine if non-urgent abort is better here or before GC
-	if(!urgent)
- 		return Result::nf;
-
 	//Look for the least probable Area to be used that has no committed AS
  	for(int i = 0; i < areaSummaryCacheSize; i++){
 		if(used[i] && !wasASWrittenByCachePosition(i) && dev->areaMap[pos[i]].status != AreaStatus::active){
@@ -347,8 +343,14 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 		return Result::ok;
 	}
 
+	//TODO: Deteremine if non-urgent abort is better here or before GC
+	if(!urgent)
+ 		return Result::nf;
+
 	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "freeNextBestCache found no uncommitted Area, activating Garbage collection");
-	dev->areaMgmt.gc.collectGarbage(AreaType::unset);
+	Result r = dev->areaMgmt.gc.collectGarbage(AreaType::unset);
+	if(r != Result::ok)
+		return r;
 
 	//Look for the least probable Area to be used that has no committed AS
 	for(int i = 0; i < areaSummaryCacheSize; i++){

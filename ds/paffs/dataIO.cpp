@@ -361,8 +361,8 @@ Result DataIO::writeTreeNode(TreeNode* node){
 		//We have to invalidate former position first
 		Result r = dev->sumCache.setPageStatus(extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);
 		if(r != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate old Page!");
-			return r;
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate old Page! Ignoring Errors to continue...");
+			//return r;
 		}
 	}
 
