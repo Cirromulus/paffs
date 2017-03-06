@@ -196,7 +196,7 @@ bool SummaryCache::wasASWritten(AreaPos area){
 //For Garbage collection that has deleted the AS too
 void SummaryCache::resetASWritten(AreaPos area){
 	if(translation.find(area) == translation.end()){
-		PAFFS_DBG(PAFFS_TRACE_ASCACHE, "Tried to reset AS-Record of nonexistent Area %d. This _is_ probably a bug.", area);
+		PAFFS_DBG(PAFFS_TRACE_ASCACHE, "Tried to reset AS-Record of nonexistent Area %d. This is probably not a bug.", area);
 		return;
 	}
 	setASWritten(translation[area], false);
