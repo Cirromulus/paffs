@@ -1,0 +1,7 @@
+-paffs- in different ASCache sizes with Test -fileIO-
+FAILPARAM - Mean Erases: 100, Erase-Deviation: 0, Mean Ionizing Dose: 0, Ionizing Dose Deviation: 0
+"Cache Size", "Read/Write cycles"
+2,32759
+3,63962
+4,63962
+5,63962
