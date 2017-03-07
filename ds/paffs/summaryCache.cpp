@@ -86,8 +86,10 @@ int SummaryCache::findNextFreeCacheEntry(){
 Result SummaryCache::setPageStatus(AreaPos area, uint8_t page, SummaryEntry state){
 	if(translation.find(area) == translation.end()){
 		Result r = loadUnbufferedArea(area, true);
-		if(r != Result::ok)
+		if(r != Result::ok){
+			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not load AS of area %d!", area);
 			return r;
+		}
 	}
 	setDirty(translation[area]);
 	if(page > dev->param->dataPagesPerArea){
@@ -274,8 +276,10 @@ Result SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent){
 			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Nonurgent Cacheclean did not return free space, activating read-only");
 			return Result::nf;
 		}
-		if(r != Result::ok)
+		if(r != Result::ok){
+			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Urgent Cacheclean did not return free space, expect errors");
 			return r;
+		}
 		nextEntry = findNextFreeCacheEntry();
 		if(nextEntry < 0){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "freeNextBestSummaryCacheEntry did not free space!");
@@ -359,8 +363,10 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 
 	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "freeNextBestCache found no uncommitted Area, activating Garbage collection");
 	Result r = dev->areaMgmt.gc.collectGarbage(AreaType::unset);
-	if(r != Result::ok)
+	if(r != Result::ok){
+		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Garbage collection could not free any Areas! No possibility to commit AS");
 		return r;
+	}
 
 	//Look for the least probable Area to be used that has no committed AS
 	for(int i = 0; i < areaSummaryCacheSize; i++){

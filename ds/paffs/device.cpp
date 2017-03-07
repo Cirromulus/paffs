@@ -508,7 +508,6 @@ Dir* Device::openDir(const char* path){
 	dir->self->parent = nullptr;	//no caching, so we pobably dont have the parent
 	dir->no_entrys = dirData[0];
 	dir->childs = new Dirent [dir->no_entrys];
-	memset(dir->childs, 0, sizeof(Dirent));
 	dir->pos = 0;
 
 	unsigned int p = sizeof(DirEntryCount);

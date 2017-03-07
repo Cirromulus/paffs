@@ -98,7 +98,6 @@ Result Paffs::format(const char* devicename){
 
 Result Paffs::mount(const char* devicename){
 	(void) devicename;
-	traceMask = 0;
 	return device.mnt();
 }
 Result Paffs::unmount(const char* devicename){
