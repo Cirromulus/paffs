@@ -1,0 +1,65 @@
+import os
+
+rootpath = Dir('../../').abspath
+extpath = os.path.join(rootpath, 'ext')
+outpost_core_path = os.path.join(extpath, 'outpost-core')
+
+print("Integration Test")
+
+envGlobal = Environment(toolpath=[os.path.join(extpath, 'scons-build-tools/site_tools')],
+                        tools=['compiler_sparc_rtems_gcc', 'settings_buildpath', 'utils_buildsize', 'utils_buildformat'],
+                        OS='rtems',
+                        BOARD='nexys3',
+                        DEVICE_SIZE={
+                            'name' : 'Eu:CROPIS CDH OBC SDM',
+                            'flash': 2097151,
+                            'ram'  : 134217728,
+                        },
+                        ENV=os.environ)
+
+buildfolder = os.path.join(rootpath, 'release')
+envGlobal['CCFLAGS_optimize'] = ['-O2']
+envGlobal['COMPILERPATH'] = '/opt/rtems-4.11/bin/'
+envGlobal['COMPILERPREFIX'] = 'sparc-rtems4.11-'
+envGlobal['RTEMS_BSP_FOLDER'] = '/opt/rtems-4.11/sparc-rtems4.11/leon3/lib'
+envGlobal['CCFLAGS_target'] = [
+    '-mcpu=v8', '-msoft-float',
+    '-B$RTEMS_BSP_FOLDER',
+    '-I$RTEMS_BSP_FOLDER/include/',
+    '--specs=$RTEMS_BSP_FOLDER/bsp_specs',
+    '-qrtems']
+    
+envGlobal.Tool('compiler_sparc_rtems_gcc')
+envGlobal.Tool('settings_buildpath')
+envGlobal['BASEPATH'] = rootpath 
+envGlobal['BUILDPATH'] = os.path.abspath(buildfolder)
+envGlobal['CXXFLAGS_language'] = ['-std=c++11']
+#envGlobal['CXXFLAGS_language'] = ['-std=c++0x']
+
+
+envGlobal.Append(CPPPATH=[
+    rootpath,
+    os.path.abspath(os.path.join(rootpath, "ds")),
+])
+
+envGlobal.SConscript([
+        os.path.join(outpost_core_path, 'modules/SConscript.library'),
+        os.path.join(rootpath, 'ds/paffs/SConscript'),
+    ],
+    exports=['envGlobal', 'outpost_core_path'])
+
+env = envGlobal.Clone()
+env.Append(LIBS=[
+    # libCOBC
+    'cobc_log', 'cobc_cdh', 'cobc_pus', 'cobc_spp', 'cobc_smpc', 'cobc_rtos', 'cobc_time', 'cobc_utils', 'cobc_hal', #'sodium',
+])
+
+files = env.Glob('*.cpp')
+
+programElf = env.Program('office.elf', files)
+programBin = env.Bin(programElf) 
+
+envGlobal.Alias('build', programBin)
+envGlobal.Install('$BUILDPATH', programElf)
+envGlobal.Install('$BUILDPATH', programBin)
+envGlobal.Default('build')

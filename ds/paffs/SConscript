@@ -2,11 +2,9 @@
 import os
 
 Import('envGlobal')
-Import('rootpath')
-Import('outpost_core_path')
 
 envGlobal.SConscript([
-	os.path.join(rootpath, 'ds/paffs/driver/SConscript')
+	os.path.join(os.path.abspath('.'), 'driver/SConscript')
 	], exports='envGlobal')
 	
 envGlobal.Append(CPPPATH=[os.path.abspath('.')])
@@ -16,10 +14,6 @@ env = envGlobal.Clone()
 files  = env.Glob('*.cpp')
 
 library = env.StaticLibrary('paffs', files)
-
-envGlobal.SConscript(
-	os.path.join(outpost_core_path, 'modules/SConscript.test'),
-exports='envGlobal')
 
 envGlobal.Append(LIBS=[
 	'paffs',

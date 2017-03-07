@@ -230,7 +230,14 @@ Result SummaryCache::loadAreaSummaries(){
 }
 
 Result SummaryCache::commitAreaSummaries(){
-	//TODO: commit all Areas except two of the emptiest
+	//commit all Areas except the active ones (and maybe some others)
+	Result r;
+	while(translation.size() > 2){
+		r = freeNextBestSummaryCacheEntry(true);
+		if(r != Result::ok)
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not free a cached AreaSummary.\n"
+					"\teeThis is ignored, because we have to unmount.");
+	}
 
 
 	unsigned char pos = 0;
@@ -246,7 +253,7 @@ Result SummaryCache::commitAreaSummaries(){
 				&& dev->areaMap[i].status == AreaStatus::active){
 			if(pos >= 2){
 				PAFFS_DBG(PAFFS_TRACE_BUG, "More than two active Areas! This is not handled.");
-				return Result::nimpl;
+				return Result::bug;
 			}
 			index.asPositions[pos] = i;
 			unpackStatusArray(translation[i], index.areaSummary[pos++]);

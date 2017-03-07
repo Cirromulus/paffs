@@ -920,15 +920,15 @@ Result Device::initializeDevice(){
 
 	if(param->dataBytesPerPage != dataBytesPerPage){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Total bytes per Page differs between "
-				"calculation and global define! (%d, %d)",
+				"calculation and global define! (calc %d, define %d)",
 				param->dataBytesPerPage, dataBytesPerPage);
 		return Result::einval;
 	}
 
 	if(param->dataPagesPerArea != dataPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "'Data pages per Area' differs between "
-				"calculation and global define! (%d, %d)",
-				param->dataPagesPerArea, dataBytesPerPage);
+				"calculation and global define! (calc %d, define %d)",
+				param->dataPagesPerArea, dataPagesPerArea);
 		return Result::einval;
 	}
 

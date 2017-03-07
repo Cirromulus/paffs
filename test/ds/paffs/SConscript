@@ -2,10 +2,17 @@
 import os
 
 Import('envGlobal')
+Import('outpost_core_path')
 
 files  = Glob('*.cpp')
 
+env = envGlobal.Clone()
+
 program = envGlobal.Program('unittest', files)
 
-envGlobal.Install('$BUILDPATH', program)
-envGlobal.Alias('test', '$BUILDPATH')
+env.SConscript(
+    os.path.join(outpost_core_path, 'modules/SConscript.test'),
+exports='envGlobal')
+
+install = env.Install('$BUILDPATH', program)
+envGlobal.Alias('test', install)
