@@ -26,4 +26,7 @@ namespace paffs{
 		virtual Result checkBad (uint32_t block_no) = 0;
 	};
 
+	Driver* getDriver(const char* devicename);
+
+	Driver* getDriverSpecial(const char* devicename, void* fc);
 }

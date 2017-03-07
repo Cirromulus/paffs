@@ -208,7 +208,8 @@ Result SummaryCache::loadAreaSummaries(){
 		memset(summaryCache[i], 0, dev->param->dataPagesPerArea / 4 + 1);
 	}
 	SummaryEntry tmp[2][dataPagesPerArea];
-	SuperIndex index = {};
+	SuperIndex index;
+	memset(&index, 0, sizeof(SuperIndex));
 	index.areaMap = dev->areaMap;
 	index.areaSummary[0] = tmp[0];
 	index.areaSummary[1] = tmp[1];
@@ -234,15 +235,17 @@ Result SummaryCache::commitAreaSummaries(){
 	Result r;
 	while(translation.size() > 2){
 		r = freeNextBestSummaryCacheEntry(true);
-		if(r != Result::ok)
+		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not free a cached AreaSummary.\n"
-					"\teeThis is ignored, because we have to unmount.");
+					"\tThis is ignored, because we have to unmount.");
+			break;
+		}
 	}
-
 
 	unsigned char pos = 0;
 	SummaryEntry tmp[2][dataPagesPerArea];
-	SuperIndex index = {};
+	SuperIndex index;
+	memset(&index, 0, sizeof(SuperIndex));
 	index.areaMap = dev->areaMap;
 	index.areaSummary[0] = tmp[0];
 	index.areaSummary[1] = tmp[1];

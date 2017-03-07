@@ -122,7 +122,7 @@ int Btree::height(TreeCacheNode * root ) {
  * of the path from any TreeCacheNode to the root.
  */
 int Btree::length_to_root(TreeCacheNode * child ){
-	unsigned int length;
+	unsigned int length = 0;
 	while(child->parent != child){
 		length++;
 		child = child->parent;

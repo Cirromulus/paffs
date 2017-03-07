@@ -75,7 +75,9 @@ Result Device::format(){
 	if(r != Result::ok)
 		return r;
 
-	Inode rootDir = {};
+	Inode rootDir;
+	memset(&rootDir, 0, sizeof(Inode));
+
 	r = createDirInode(&rootDir, R | W | X);
 	if(r != Result::ok){
 		destroyDevice();
@@ -249,7 +251,7 @@ Result Device::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 	while(p < folder->size){
 			DirEntryLength direntryl = buf[p];
 			if(direntryl < sizeof(DirEntryLength) + sizeof(InodeNo)){
-				PAFFS_DBG(PAFFS_TRACE_BUG, "Directory size of Folder %u is unplausible! (was: %d, should: >%d)", folder->no, direntryl, sizeof(DirEntryLength) + sizeof(InodeNo));
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Directory size of Folder %u is unplausible! (was: %d, should: >%lu)", folder->no, direntryl, sizeof(DirEntryLength) + sizeof(InodeNo));
 				delete[] buf;
 				return Result::bug;
 			}
@@ -505,7 +507,8 @@ Dir* Device::openDir(const char* path){
 	*dir->self->node = dirPinode;
 	dir->self->parent = nullptr;	//no caching, so we pobably dont have the parent
 	dir->no_entrys = dirData[0];
-	dir->childs = new Dirent [dir->no_entrys]{};
+	dir->childs = new Dirent [dir->no_entrys];
+	memset(dir->childs, 0, sizeof(Dirent));
 	dir->pos = 0;
 
 	unsigned int p = sizeof(DirEntryCount);

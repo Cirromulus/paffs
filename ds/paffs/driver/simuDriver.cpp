@@ -71,7 +71,7 @@ Result SimuDriver::markBad(uint32_t block_no){
 }
 
 Result SimuDriver::checkBad(uint32_t block_no){
-	(void*) block_no;
+	(void) block_no;
 	return Result::nimpl;
 }
 

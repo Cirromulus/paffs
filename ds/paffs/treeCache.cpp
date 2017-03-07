@@ -683,7 +683,7 @@ Result TreeCache::getTreeNodeAtIndexFrom(unsigned char index,
 	if(target != NULL){
 		*child = target;
 		cache_hits++;
-		PAFFS_DBG_S(PAFFS_TRACE_TREECACHE, "Cache hit, found target %p (position %d)", target, target - cache);
+		PAFFS_DBG_S(PAFFS_TRACE_TREECACHE, "Cache hit, found target %p (position %ld)", target, target - cache);
 		return Result::ok;	//cache hit
 	}
 

@@ -141,7 +141,7 @@ enum AreaType : uint8_t{
 	no
 };
 
-enum class AreaStatus : uint8_t{
+enum AreaStatus : uint8_t{
 	closed = 0,
 	active,
 	empty
@@ -155,8 +155,10 @@ enum class SummaryEntry : uint8_t{
 };
 
 struct Area{	//TODO: Maybe packed? Slow, but less RAM
-	AreaType type:4;
-	AreaStatus status:2;
+	//AreaType type:4;
+	//AreaStatus status:2;
+	AreaType type;
+	AreaStatus status;
 	uint32_t erasecount:17;	//Overflow at 132.000 is acceptable (assuming less than 100k erase cycles)
 	AreaPos position;	//physical position, not logical
 };	//4 + 2 + 17 + 32 = 55 Bit = 7 Byte (8 on RAM)

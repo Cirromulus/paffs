@@ -97,9 +97,9 @@ Result DataIO::writeInodeData(Inode* inode,
 			unsigned long oldPage = extractPage(inode->direct[page+pageFrom]);
 
 
-			if((btw + pageOffs < dev->param->dataBytesPerPage) &&
-				(page*dev->param->dataBytesPerPage + btw < inode->size) ||  //End Misaligned
-				pageOffs > 0 && page == 0){									//Start Misaligned
+			if((btw + pageOffs < dev->param->dataBytesPerPage &&
+				page*dev->param->dataBytesPerPage + btw < inode->size) ||  //End Misaligned
+				(pageOffs > 0 && page == 0)){									//Start Misaligned
 
 				//fill write buffer with valid Data
 				misaligned = true;
@@ -353,7 +353,7 @@ Result DataIO::writeTreeNode(TreeNode* node){
 	}
 	if(sizeof(TreeNode) > dev->param->dataBytesPerPage){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page"
-				" (Was %u, should %u)", sizeof(TreeNode), dev->param->dataBytesPerPage);
+				" (Was %lu, should %u)", sizeof(TreeNode), dev->param->dataBytesPerPage);
 		return Result::bug;
 	}
 
@@ -411,7 +411,7 @@ Result DataIO::readTreeNode(Addr addr, TreeNode* node){
 		return Result::bug;
 	}
 	if(sizeof(TreeNode) > dev->param->dataBytesPerPage){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page (Was %u, should %u)", sizeof(TreeNode), dev->param->dataBytesPerPage);
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page (Was %lu, should %u)", sizeof(TreeNode), dev->param->dataBytesPerPage);
 		return Result::bug;
 	}
 

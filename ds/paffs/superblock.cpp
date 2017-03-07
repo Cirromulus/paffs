@@ -144,7 +144,8 @@ Result Superblock::commitSuperIndex(SuperIndex *newIndex){
 		return r;
 	}
 
-	SuperIndex lastIndex = {};
+	SuperIndex lastIndex;
+	memset(&lastIndex, 0, sizeof(SuperIndex));
 
 	if(r != Result::nf){
 		r = readSuperPageIndex(lastEntry, &lastIndex, false);
