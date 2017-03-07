@@ -15,7 +15,7 @@ extern unsigned int traceMask;
 
 class Paffs{
 	Device device;
-
+	void printCacheSizes();
 public:
 	Paffs();
 	Paffs(void* fc);

@@ -32,6 +32,7 @@ namespace paffs{
 		}\
 	} while(0)
 
+#define PAFFS_TRACE_INFO		0x00000001
 #define PAFFS_TRACE_OS			0x00000002
 #define PAFFS_TRACE_ALLOCATE	0x00000004
 #define PAFFS_TRACE_SCAN		0x00000008

@@ -17,6 +17,7 @@
 namespace paffs{
 
 unsigned int traceMask =
+	PAFFS_TRACE_INFO |
 	PAFFS_TRACE_AREA |
 	PAFFS_TRACE_ERROR |
 	PAFFS_TRACE_BUG |
@@ -57,9 +58,28 @@ const char* err_msg(Result pr){
 	return resultMsg[static_cast<int>(pr)];
 }
 
+void Paffs::printCacheSizes(){
+	PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------------------");
+	PAFFS_DBG_S(PAFFS_TRACE_INFO,
+			"TreeNode size: %lu Byte, TreeCacheNode size: %lu Byte. Cachable Nodes: %d.\n"
+			"\tOverall TreeCache size: %lu Byte.",
+				sizeof(TreeNode), sizeof(TreeCacheNode), treeNodeCacheSize, treeNodeCacheSize*sizeof(TreeCacheNode)
+	);
 
-Paffs::Paffs() : device(getDriver("1")){}
-Paffs::Paffs(void* fc) : device(getDriverSpecial("1", fc)){}
+	PAFFS_DBG_S(PAFFS_TRACE_INFO,
+			"Packed AreaSummary size: %lu Byte. Cacheable Summaries: %d.\n"
+			"\tOverall AreaSummary cache size: %lu Byte.",
+			sizeof(dataPagesPerArea / 4 + 2), areaSummaryCacheSize,
+			sizeof(dataPagesPerArea / 4 + 2) * areaSummaryCacheSize
+	);
+	PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------------------");
+}
+Paffs::Paffs() : device(getDriver("1")){
+	printCacheSizes();
+}
+Paffs::Paffs(void* fc) : device(getDriverSpecial("1", fc)){
+	printCacheSizes();
+}
 Paffs::~Paffs(){};
 
 
@@ -78,6 +98,7 @@ Result Paffs::format(const char* devicename){
 
 Result Paffs::mount(const char* devicename){
 	(void) devicename;
+	traceMask = 0;
 	return device.mnt();
 }
 Result Paffs::unmount(const char* devicename){
