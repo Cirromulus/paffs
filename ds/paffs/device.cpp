@@ -169,7 +169,7 @@ Result Device::createInode(Inode* outInode, Permission mask){
 		outInode->perm |= R;
 	outInode->size = 0;
 	outInode->reservedSize = 0;
-	outInode->crea = driver->clock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
+	outInode->crea = systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
 	outInode->mod = outInode->crea;
 	return Result::ok;
 }
@@ -740,7 +740,7 @@ Result Device::touch(const char* path){
 	}else{
 		if(r != Result::ok)
 			return r;
-		file.mod = driver->clock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
+		file.mod = systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
 		return tree.updateExistingInode(&file);
 	}
 
@@ -814,7 +814,7 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 		return r;
 	}
 
-	obj->dirent->node->mod = driver->clock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
+	obj->dirent->node->mod = systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
 
 	obj->fp += *bytes_written;
 	if(obj->fp > obj->dirent->node->size){

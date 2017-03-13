@@ -5,7 +5,6 @@
  *      Author: Pascal Pieper
  */
 #include "../commonTypes.hpp"
-#include <outpost/time/clock.h>
 #pragma once
 
 namespace paffs{
@@ -13,8 +12,7 @@ namespace paffs{
 	class Driver {
 	public:
 		Param param;
-		const outpost::time::Clock& clock;
-		Driver(outpost::time::Clock& mclock) : clock(mclock){};
+		Driver(){};
 		virtual ~Driver(){};
 
 		virtual Result writePage (uint64_t page_no,

@@ -12,10 +12,10 @@
 #include <outpost/rtos/clock.h>
 
 namespace paffs {
-	outpost::rtos::SystemClock clock;
+	outpost::rtos::SystemClock systemClock;
 
 	Driver* getDriver(const char* devicename){
-		Driver* out = new SimuDriver(clock);
+		Driver* out = new SimuDriver();
 		out->param.name = devicename;
 		return out;
 	}
@@ -25,7 +25,7 @@ namespace paffs {
 			std::cerr << "Invalid flashCell pointer given!" << std::endl;
 			return NULL;
 		}
-		Driver* out = new SimuDriver(clock, fc);
+		Driver* out = new SimuDriver(fc);
 		out->param.name = devicename;
 		return out;
 	}

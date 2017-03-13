@@ -50,7 +50,7 @@ extern const char* bsp_boot_cmdline;
 // C++ requires at least one Semaphore for the constructor calls and the
 // initialization of static member variables.
 #define	CONFIGURE_MAXIMUM_SEMAPHORES		300
-#define	CONFIGURE_MAXIMUM_POSIX_MUTEXES		100
+//#define	CONFIGURE_MAXIMUM_POSIX_MUTEXES		100
 
 // ----------------------------------------------------------------------------
 // Timer support

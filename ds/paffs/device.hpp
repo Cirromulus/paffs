@@ -11,10 +11,14 @@
 #include "dataIO.hpp"
 #include "superblock.hpp"
 #include "summaryCache.hpp"
+#include <outpost/rtos/clock.h>
+#include <outpost/time/clock.h>
 
 #pragma once
 
 namespace paffs {
+
+extern outpost::rtos::SystemClock systemClock;
 
 class Device{
 	//Dirents zur schnelleren verfügung

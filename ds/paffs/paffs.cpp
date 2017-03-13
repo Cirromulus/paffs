@@ -8,10 +8,7 @@
 #include "driver/driverconf.hpp"
 
 #include <stdio.h>
-#include <linux/string.h>
-#include <time.h>
 #include <stdlib.h>
-
 
 
 namespace paffs{
@@ -61,14 +58,14 @@ const char* err_msg(Result pr){
 void Paffs::printCacheSizes(){
 	PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------------------");
 	PAFFS_DBG_S(PAFFS_TRACE_INFO,
-			"TreeNode size: %lu Byte, TreeCacheNode size: %lu Byte. Cachable Nodes: %d.\n"
-			"\tOverall TreeCache size: %lu Byte.",
+			"TreeNode size: %zu Byte, TreeCacheNode size: %zu Byte. Cachable Nodes: %d.\n"
+			"\tOverall TreeCache size: %zu Byte.",
 				sizeof(TreeNode), sizeof(TreeCacheNode), treeNodeCacheSize, treeNodeCacheSize*sizeof(TreeCacheNode)
 	);
 
 	PAFFS_DBG_S(PAFFS_TRACE_INFO,
-			"Packed AreaSummary size: %lu Byte. Cacheable Summaries: %d.\n"
-			"\tOverall AreaSummary cache size: %lu Byte.",
+			"Packed AreaSummary size: %zu Byte. Cacheable Summaries: %d.\n"
+			"\tOverall AreaSummary cache size: %zu Byte.",
 			sizeof(dataPagesPerArea / 4 + 2), areaSummaryCacheSize,
 			sizeof(dataPagesPerArea / 4 + 2) * areaSummaryCacheSize
 	);

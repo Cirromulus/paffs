@@ -5,8 +5,6 @@ Import('envGlobal')
 
 print("SIMUDRIVER")
 
-#envGlobal.Append(CPPPATH=[os.path.abspath('.')])
-
 env = envGlobal.Clone()
 
 files  = env.Glob('*.cpp')

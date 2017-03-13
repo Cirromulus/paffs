@@ -49,10 +49,6 @@ envGlobal.SConscript([
     exports=['envGlobal', 'outpost_core_path'])
 
 env = envGlobal.Clone()
-env.Append(LIBS=[
-    # libCOBC
-    'cobc_log', 'cobc_cdh', 'cobc_pus', 'cobc_spp', 'cobc_smpc', 'cobc_rtos', 'cobc_time', 'cobc_utils', 'cobc_hal', #'sodium',
-])
 
 files = env.Glob('*.cpp')
 

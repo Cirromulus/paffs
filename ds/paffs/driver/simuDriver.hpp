@@ -18,12 +18,12 @@ class SimuDriver : public Driver{
 	bool selfLoaded = false;
 	unsigned char *buf;
 public:
-	SimuDriver(outpost::time::Clock& mclock) : Driver(mclock){
+	SimuDriver(){
 		selfLoaded = true;
 		cell = new FlashCell();
 		init();
 	}
-	SimuDriver(outpost::time::Clock& mclock, void *c) : Driver(mclock){
+	SimuDriver(void *c){
 		cell = static_cast<FlashCell*>(c);
 		init();
 	};
