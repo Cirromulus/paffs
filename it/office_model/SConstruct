@@ -18,17 +18,17 @@ envGlobal = Environment(toolpath=[os.path.join(extpath, 'scons-build-tools/site_
                         ENV=os.environ)
 
 buildfolder = os.path.join(rootpath, 'release')
-envGlobal['CCFLAGS_optimize'] = ['-O2']
 envGlobal['COMPILERPATH'] = '/opt/rtems-4.11/bin/'
 envGlobal['COMPILERPREFIX'] = 'sparc-rtems4.11-'
 envGlobal['RTEMS_BSP_FOLDER'] = '/opt/rtems-4.11/sparc-rtems4.11/leon3/lib'
-envGlobal['CCFLAGS_target'] = [
-    '-mcpu=v8sch', '-msoft-float',
+envGlobal.Append(CCFLAGS_target = [
     '-B$RTEMS_BSP_FOLDER',
     '-I$RTEMS_BSP_FOLDER/include/',
     '--specs=$RTEMS_BSP_FOLDER/bsp_specs',
-    '-qrtems']
-    
+    '-qrtems',
+    #'-v',
+])
+
 envGlobal.Tool('compiler_sparc_rtems_gcc')
 envGlobal.Tool('settings_buildpath')
 envGlobal['BASEPATH'] = rootpath 

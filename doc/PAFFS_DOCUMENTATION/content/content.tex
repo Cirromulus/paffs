@@ -13,16 +13,15 @@ Another big challenge is to reduce wear. Every change to data has to be written 
 \subsection{Areas}
 \label{areas}
 \paragraph{Overview}
-To separate between different Types of Data. Is the logical combination of two or more erase blocks.
+An Area is a logical group of erase blocks. The number of contained blocks is a trade-off between RAM usage (less Areas) and garbage collection effectiveness (less overhead). Areas also separate different types of data and simplify handling of addresses after moving data. At the end of each Area, some amount of pages (usually not more than one) are reserved for an area summary (see chapter \ref{summary}). 
 \begin{itemize}
 	\item \texttt{AreaType} can be one of Superblock, Index, Data, (Journal). See table \ref{tab:areatypes}.
-	\item Address split in \texttt{logical area n°} and \texttt{page n°}, to give way for a simple garbage collector (see  fig. \ref{fig:area_address})
-	\item \texttt{AreaMap} held in flash (but cached in RAM) translates between \texttt{logical area n°} and \texttt{physical area n°}
-	\item \texttt{AreaMap} also keeps record of corresponding types and usage statistics for garbage collection
-	\item\texttt{AreaStatus} can be one of \texttt{closed}, \texttt{active} and \texttt{empty}. 
+	\item Address split in \texttt{logical area n°} and \texttt{page n°}, to give way for a simple garbage collector (see  fig. \ref{fig:area_address}).
+	\item \texttt{AreaMap} held in flash (but cached in RAM) translates between \texttt{logical area n°} and \texttt{physical area n°}. It also keeps record of corresponding types and usage statistics for garbage collection.
+	\item\texttt{AreaStatus} can be one of \texttt{closed} (probably full, no guaranteed \texttt{area summary} in cache), \texttt{active} (\texttt{area summary} in cache, free pages) and \texttt{empty} (no \texttt{AreaType} set, no used pages). 
 \end{itemize}
 
-\paragraph{Area types}
+\subsection{Area types}
 \begin{table}[htbp]
 \caption{Area types}
 \label{tab:areatypes}
@@ -30,34 +29,46 @@ To separate between different Types of Data. Is the logical combination of two o
 \toprule
 Type & Description\\
 \midrule
-Superblock & One superblock area is automatically on the first area of flash, the rest is dynamically allocated. It contains the anchor blocks as well as jump pads and a superpage. See chapter \ref{sub:chainedSB} \\
-Index & The index areas will contain only tree nodes (storing inodes). See chapter \ref{b+tree}.\\
-Data & Data areas contain data chunks of files, directories and softlinks referenced by the index.\\
-Journal & The single journal area (some when) will contain uncommitted changes to the index.\\
+Superblock & One superblock area is on the first area of flash, the rest is dynamically allocated. It contains the anchor blocks as well as jump pads and a superpage. See chapter \ref{sub:chainedSB} \\
+Index & The index areas will only contain tree nodes (some of them storing inodes). See chapter \ref{b+tree}.\\
+Data & Data areas contain data chunks of files, directory entries and softlinks referenced by the index.\\
+Journal & The single journal area (some when) will contain uncommitted changes of the \texttt{area Summary}.\\
 \bottomrule
 \end{tabularx}
 \end{table} 
 
-\paragraph{Area map / Addresses}
-Due to the nature of flash, any deletion is delayed as long as possible. But when free space runs low, a garbage collector has to delete dirty pages while keeping addresses valid. This is why addresses consist of two parts; a logical area number, and page offset inside this area. To read chunk of data at an address, the logical area number has to be translated to a physical area via the \texttt{AreaMap}. It is stored in the superpage (see chapter \ref{sub:chainedSB}), but is cached in RAM.\\
-This area map grows linear in size with area count which is by itself depended by block count divided by area size.\\
+\subsection{Area map / Addresses}
+Due to the nature of flash, any deletion is delayed as long as possible. But when free space runs low, a garbage collector has to delete dirty pages while keeping addresses valid. This is why addresses consist of two parts; a logical area number, and page offset inside this area. To read a chunk of data at an address, the logical area number has to be translated to a physical area via the \texttt{AreaMap}. It is stored in the superpage (see chapter \ref{sub:chainedSB}), but is cached in RAM.\\
+This area map grows linear in size with the number of areas which is defined as block count divided by area size.\\
 The size of an area is a trade-off between low RAM usage (big areas) and a more efficient garbage collection (small areas). In this test environment, an area size of two erase blocks is chosen\footnote{Which should be the minimum size, because the anchor area has to be two blocks in size.}. With a normal 2GB flash chip\footnote{2048 Byte user data per page, 1024 pages per block, $\approx 2^21$ blocks.}, this configuration would use $(3+2+16+32+32) / 8 * 2^{21} / 2 = 11141120$ Byte $= 10,625$ MB RAM. Increasing the size of an area to 8 erase blocks would result in 2,65 MB usage, which would suit the requirements better.
 
-\paragraph{Area summary}
-To distinguish between \texttt{free}, \texttt{used} and \texttt{dirty} pages, a per-area list is held in area summary cache. The Information is used by the garbage collection copying only used pages to a new area, by the function looking for free pages for writing data or index chunks, and by runtime sanity checks. The Caching techniques are described in chapter \ref{ascache}.
+\subsection{Area summary}
+\paragraph{Overview}
+\label{summary}
+To distinguish between \texttt{free}, \texttt{used} and \texttt{dirty} pages, a per-area list is held in cache. The Information is used by the garbage collection copying only used pages to a new area, by the function looking for free pages for writing data or index chunks, and by runtime sanity checks. The Caching techniques are described in chapter \ref{ascache}. If the cache runs low or an unmount is requested, a packed area summary is written to the last pages of an area. Due to the nature of flash, this can only be done once until the area is garbage collected and therefore committable again.
+\paragraph{Functionality}
+For saving space, the information of \texttt{free}, \texttt{used} and \texttt{dirty} pages is truncated to only hold the information \texttt{used} or \texttt{other} for each page. The missing knowledge can be reattained by sweeping the whole area upon unpacking. If a page is empty, it is considered \texttt{free}; \texttt{dirty} if not.
 
 \subsection{Garbage collection}
-\paragraph{Functionality}
-The garbage collection needs at least one free area to copy valid data to. At first, one or more of the \texttt{closed} areas are inspected (as the \texttt{active} areas are still in use), sorted by textt{dirty} pages and eventually chosen for garbage collection. All valid pages are copied from the old area to the new area in their same relative positions. After that, the old area is erased, and the \texttt{AreaMap} is updated so that the logical areas swap their physical positions. The new area is marked \textit{active}, and the \texttt{AreaSummary} is deleted from Flash, thus giving way for a new commit of an area summary. If the previous way is not sufficient, the \texttt{garbage buffer} is given up for storing the last information. This procedure can not be reverted, and is reserved for \texttt{index} type only to enable a safe unmount without information loss.
+\paragraph{Overview}
+The garbage collection needs at least one free area to copy valid data to. At first, one or more of the \texttt{closed} areas are inspected (as the \texttt{active} areas are still in use), sorted by textt{dirty} pages and eventually chosen for garbage collection. All valid pages are copied from the old area to the new area in their same relative positions. After that, the old area is erased, and the \texttt{AreaMap} is updated so that the logical areas swap their physical positions. The new area is marked \textit{active}, and the \texttt{AreaSummary} is deleted from Flash, thus giving way for a new commit of an area summary. If the previous way is not sufficient, the \texttt{garbage buffer} is given up for storing the more information. This procedure can not be reverted, and is reserved for \texttt{index} type only to enable a safe unmount without information loss.
 \begin{figure}[ht]
   \centering\includegraphics[width=\textwidth]{Areas_address.png}
   \caption{Basic process of garbage collection with areas}
   \label{fig:area_address}
 \end{figure}
 
+\paragraph{Functionality}
+Besides of looking for the most dirty blocks, the garbage collection also keeps the committed area summaries in mind. Depending on the mode (just looking for free space or trying to delete a committed area summary), it prefers or exclusively looks at areas with a committed area summary. This procedure helps the area summary cache freeing old entries.
+
 \subsection{Area Summary Cache}
 \label{ascache}
-Yes.
+\paragraph{Overview}
+The area summary caches read and write accesses to the area summaries of any area. Due to the limitation of RAM, the filesystem can't keep the status of every page in every area accessible. Every accessed area summary is loaded from cache (if previously committed to area) or created, until cache runs full. To free cache entries, the area containing the most dirty pages is committed to flash and deleted in cache. The minimum number of available cache entries is three, as two are needed for the \texttt{active} areas of \texttt{data} and \texttt{index} type, and one for simultaneously invalidating obsolete data. It is possible without the third cache entry, but the performance and long-term stability is very poor. A good cache size depends on simultaneously opened files for increased speed, however 5-10 entries will be sufficient for most Applications. Depending on the number of data pages per Area, a single entry uses between 32 and 256 bytes.
+
+\paragraph{Functionality}
+There are three different caching strategies implemented. When enough cache is available, every read or write access to a new area loads its contents to cache. If no free cache entries remain, and no cache entry is uncommitted (and therefore easy to delete), two possibilities remain. If a read access is queried, the corresponding area summary is loaded in a one-shot read without loading it to cache\footnote{Experiments show that there is less response-time and no improvement in wear leveling if the one-shot mode is used earlier, i.e. when no free cache entries remain without considering to commit areas.}. If it is a write access, the garbage collection is called in \texttt{urgent} mode to free any cached area from its obsolete (dirty) area summary\footnote{This also frees all other dirty pages as well.}. After that, a cache entry can be freed and the new one can be loaded. If garbage collection returns no committable Area (when free space is extremely low), the write access is ignored and an error is thrown. This only happens to an invalidation (former \texttt{used} page \texttt{dirty}), so the filesystem would not break, but gain unreachable pages that wont be deleted. The other transitions (from \texttt{free} to \texttt{used} and from any to \texttt{free}) are not possible to throw an error. The transition \texttt{free} to \texttt{used} only occurs on write actions in \texttt{active} areas which are guaranteed to have an entry in cache, the other one occurs in garbage collection freeing the whole area and thus deleting the whole cache entry.
+Due to the layout of any commonly used processor, the size of an array element is mostly over 8 bit. To reduce the amount of RAM used, four 2 bit elements are packed into one byte. This quadruples the number of cacheable areas.
 
 \subsection{Chained superblock}
 \label{sub:chainedSB}
