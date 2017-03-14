@@ -5,6 +5,8 @@
  *      Author: Pascal Pieper
  */
 #include "../commonTypes.hpp"
+#include <outpost/rtos/timer.h>
+#include <outpost/rtos/clock.h>
 #pragma once
 
 namespace paffs{
@@ -23,6 +25,8 @@ namespace paffs{
 		virtual Result markBad (uint32_t block_no) = 0;
 		virtual Result checkBad (uint32_t block_no) = 0;
 	};
+
+	extern outpost::rtos::SystemClock systemClock;
 
 	Driver* getDriver(const char* devicename);
 

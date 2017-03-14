@@ -8,7 +8,7 @@
 #ifndef SOURCE_DIRECTORY__DS_PAFFS_TESTS_COMMONTEST_HPP_
 #define SOURCE_DIRECTORY__DS_PAFFS_TESTS_COMMONTEST_HPP_
 
-#include "../../../ds/paffs/paffs.hpp"
+#include <paffs.hpp>
 #include "../../../ext/outpost-core/modules/utils/ext/googletest-1.8.0-fused/gmock/gmock.h"
 #include "../../../ext/outpost-core/modules/utils/ext/googletest-1.8.0-fused/gtest/gtest.h"
 

@@ -3,8 +3,11 @@ import os
 
 Import('envGlobal')
 
+print("PAFFS")
+
 envGlobal.SConscript([
-	os.path.join(os.path.abspath('.'), 'driver/SConscript')
+	os.path.join('$OUTPOST_CORE_PATH', 'modules/SConscript.library'),
+	os.path.join(os.path.abspath('.'), 'driver/SConscript'),
 	], exports='envGlobal')
 	
 envGlobal.Append(CPPPATH=[os.path.abspath('.')])
@@ -17,7 +20,6 @@ library = env.StaticLibrary('paffs', files)
 
 envGlobal.Append(LIBS=[
 	'paffs',
-	'simuDriver',
 	'outpost_rtos',
 	'outpost_time',
 ])

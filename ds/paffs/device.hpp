@@ -18,8 +18,6 @@
 
 namespace paffs {
 
-extern outpost::rtos::SystemClock systemClock;
-
 class Device{
 	//Dirents zur schnelleren verfügung
 	/*Dirent* Dirent_buf[Dirent_BUFSIZE];

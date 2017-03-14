@@ -2,7 +2,6 @@ import os
 
 rootpath = Dir('../../').abspath
 extpath = os.path.join(rootpath, 'ext')
-outpost_core_path = os.path.join(extpath, 'outpost-core')
 
 print("Integration Test")
 
@@ -18,21 +17,24 @@ envGlobal = Environment(toolpath=[os.path.join(extpath, 'scons-build-tools/site_
                         ENV=os.environ)
 
 buildfolder = os.path.join(rootpath, 'release')
-envGlobal['COMPILERPATH'] = '/opt/rtems-4.11/bin/'
+envGlobal['RTEMS_ROOT_FOLDER'] = '/opt/rtems-4.11'
+envGlobal['COMPILERPATH'] = '$RTEMS_ROOT_FOLDER/bin/'
+envGlobal['RTEMS_BSP_FOLDER'] = '$RTEMS_ROOT_FOLDER/sparc-rtems4.11/leon3/lib'
 envGlobal['COMPILERPREFIX'] = 'sparc-rtems4.11-'
-envGlobal['RTEMS_BSP_FOLDER'] = '/opt/rtems-4.11/sparc-rtems4.11/leon3/lib'
 envGlobal.Append(CCFLAGS_target = [
+    #'-I$RTEMS_ROOT_FOLDER/include/',
     '-B$RTEMS_BSP_FOLDER',
     '-I$RTEMS_BSP_FOLDER/include/',
     '--specs=$RTEMS_BSP_FOLDER/bsp_specs',
     '-qrtems',
-    #'-v',
+    '-v',
 ])
 
 envGlobal.Tool('compiler_sparc_rtems_gcc')
 envGlobal.Tool('settings_buildpath')
 envGlobal['BASEPATH'] = rootpath 
 envGlobal['BUILDPATH'] = os.path.abspath(buildfolder)
+envGlobal['OUTPOST_CORE_PATH'] = os.path.join(extpath, 'outpost-core')
 envGlobal['CXXFLAGS_language'] = ['-std=c++11']
 #envGlobal['CXXFLAGS_language'] = ['-std=c++0x']
 
@@ -43,14 +45,16 @@ envGlobal.Append(CPPPATH=[
 ])
 
 envGlobal.SConscript([
-        os.path.join(outpost_core_path, 'modules/SConscript.library'),
         os.path.join(rootpath, 'ds/paffs/SConscript'),
     ],
-    exports=['envGlobal', 'outpost_core_path'])
+    exports=['envGlobal'])
 
 env = envGlobal.Clone()
 
 files = env.Glob('*.cpp')
+env.Append(LIBS=[
+	'nullDriver'
+])
 
 programElf = env.Program('office.elf', files)
 programBin = env.Bin(programElf) 

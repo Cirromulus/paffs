@@ -5,7 +5,6 @@
 
 #include "paffs.hpp"
 #include "device.hpp"
-#include "driver/driverconf.hpp"
 
 #include <stdio.h>
 #include <stdlib.h>

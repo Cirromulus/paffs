@@ -5,13 +5,13 @@
  *      Author: Pascal Pieper
  */
 
-
+extern "C"{
 #include <rtems.h>
-
 // For device driver prototypes
 #include <bsp.h>
-
 #include <outpost/rtos/failure_handler.h>
+
+}
 
 extern "C" void
 fatalErrorHandler(Internal_errors_Source source,
@@ -128,4 +128,3 @@ fatalErrorHandler(Internal_errors_Source source,
     {
     }
 }
-

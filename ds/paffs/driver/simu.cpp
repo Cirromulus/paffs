@@ -4,7 +4,7 @@
  *  Created on: 21.06.2016
  *      Author: urinator
  */
-#include "simuDriver.hpp"
+#include "simu.hpp"
 
 #include "../commonTypes.hpp"
 #include "../paffs_trace.hpp"
@@ -13,6 +13,24 @@
 
 
 namespace paffs{
+
+outpost::rtos::SystemClock systemClock;
+
+Driver* getDriver(const char* devicename){
+	Driver* out = new SimuDriver();
+	out->param.name = devicename;
+	return out;
+}
+
+Driver* getDriverSpecial(const char* devicename, void* fc){
+	if(fc == NULL){
+		std::cerr << "Invalid flashCell pointer given!" << std::endl;
+		return NULL;
+	}
+	Driver* out = new SimuDriver(fc);
+	out->param.name = devicename;
+	return out;
+}
 
 
 Result SimuDriver::writePage(uint64_t page_no,
