@@ -24,6 +24,7 @@ envGlobal['CXXFLAGS_language'] = ['-std=c++11']
 envGlobal.SConscript([
     os.path.join(rootpath, 'ds/paffs/SConscript'),
     os.path.join(outpost_core_path, 'modules/SConscript.test'),
+    os.path.join(rootpath, 'simu/SConscript'),
     ],
 	exports='envGlobal'
 )
@@ -33,15 +34,26 @@ env = envGlobal.Clone()
 env.Append(LIBS=[
 	'simuDriver',
 ])
+
+#Dirty Hack. I dont understand why this is needed twice, 
+#normal build succeedes with same library order
+env.Append(LIBS=[
+	'simu',
+])
+
+
 env.Append(CCFLAGS_target = [
-	'-v'
+	#'-v'
 ])
 
 files  = Glob('*.cpp')
 
-print("Libs von UNITTEST: " + str(env['LIBS']))
+#print("Libs von UNITTEST: " + str(env['LIBS']))
 program = env.Program('unittests', files)
 
-#install = env.Install('$BUILDPATH', program)
-envGlobal.Alias('test', program)
-envGlobal.Default('test')
+#'files' is a dirty hack copying all cpp's to install dir.
+#But at least unittests appear there. If it was replaced by 'program'
+#it would not work 
+install = env.Install('$BUILDPATH', files)
+env.Alias('test', '$BUILDPATH')
+env.Default('test')
