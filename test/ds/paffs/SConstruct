@@ -21,25 +21,23 @@ envGlobal['ROOTPATH'] = rootpath
 envGlobal['OUTPOST_CORE_PATH'] = outpost_core_path
 envGlobal['CXXFLAGS_language'] = ['-std=c++11']
 
+
 envGlobal.SConscript([
     os.path.join(rootpath, 'ds/paffs/SConscript'),
+    os.path.join(rootpath, 'ds/paffs/driver/SConscript.simudriver'),
     os.path.join(outpost_core_path, 'modules/SConscript.test'),
-    os.path.join(rootpath, 'simu/SConscript'),
     ],
 	exports='envGlobal'
 )
 
 env = envGlobal.Clone()
 
-env.Append(LIBS=[
-	'simuDriver',
-])
 
 #Dirty Hack. I dont understand why this is needed twice, 
 #normal build succeedes with same library order
-env.Append(LIBS=[
-	'simu',
-])
+#env.Append(LIBS=[
+#	'simu',
+#])
 
 
 env.Append(CCFLAGS_target = [

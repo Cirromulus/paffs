@@ -6,9 +6,11 @@
  */
 
 extern "C"{
+#include <sys/time.h>
 #include <rtems.h>
 // For device driver prototypes
 #include <bsp.h>
+#include <rtems/bspIo.h> //For printk
 #include <outpost/rtos/failure_handler.h>
 
 }
@@ -116,11 +118,13 @@ fatalErrorHandler(Internal_errors_Source source,
 
         case INTERNAL_ERROR_CORE:
         case INTERNAL_ERROR_POSIX_API:
-        case INTERNAL_ERROR_ITRON_API:
+        //case INTERNAL_ERROR_ITRON_API: undefined under 4.12
             printk("Other\n\n");
             printk("Source: %i, %i\n", source, isInternal);
             printk("Code  : 0x%08X\n", errorCode);
             break;
+        default:
+        	printk("UNKNOWN: %u\n", static_cast<unsigned int>(source));
     }
     printk("----------------------------------------\n\n");
 

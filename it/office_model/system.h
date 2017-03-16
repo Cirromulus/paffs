@@ -19,11 +19,11 @@
 // Configuration information
 #define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define	CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
+//#define	CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER //only one driver is allowed
 
 // ----------------------------------------------------------------------------
 // Tasks
-#define CONFIGURE_MAXIMUM_TASKS             50
+#define CONFIGURE_MAXIMUM_TASKS             3
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
 #define CONFIGURE_EXTRA_TASK_STACKS         (3 * RTEMS_MINIMUM_STACK_SIZE)
 
@@ -66,14 +66,14 @@ extern const char* bsp_boot_cmdline;
 
 // ----------------------------------------------------------------------------
 // Configure user defined error handler for fatal failures
-void
-fatalErrorHandler(Internal_errors_Source source, bool isInternal, uint32_t errorCode);
+void //changed uint32_t to unsigned int
+fatalErrorHandler(Internal_errors_Source source, bool isInternal, unsigned int errorCode);
 
 #define CONFIGURE_INITIAL_EXTENSIONS  { NULL, NULL, NULL, NULL, NULL, NULL, NULL, fatalErrorHandler }
 
 #define CONFIGURE_INIT
 // ----------------------------------------------------------------------------
-// Enable task stack checker extension
+// disable task stack checker extension
 #define CONFIGURE_STACK_CHECKER_ENABLED
 
 // ----------------------------------------------------------------------------

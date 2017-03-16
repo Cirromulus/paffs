@@ -7,6 +7,7 @@
 
 extern "C"
 {
+#include <sys/time.h>
 #include "system.h"
 }
 #include <paffs/paffs.hpp>

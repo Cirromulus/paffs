@@ -5,12 +5,11 @@ Import('envGlobal')
 
 print("PAFFS")
 
+envGlobal.Append(CPPPATH=[os.path.abspath('.')])
+
 envGlobal.SConscript([
 	os.path.join('$OUTPOST_CORE_PATH', 'modules/SConscript.library'),
-	os.path.join(os.path.abspath('.'), 'driver/SConscript'),
 	], exports='envGlobal')
-	
-envGlobal.Append(CPPPATH=[os.path.abspath('.')])
 
 env = envGlobal.Clone()
 
@@ -23,4 +22,5 @@ envGlobal.Append(LIBS=[
 	'outpost_rtos',
 	'outpost_time',
 ])
+
 envGlobal.Install('$BUILDPATH/lib', library)
