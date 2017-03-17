@@ -130,7 +130,7 @@ Result Device::mnt(){
 Result Device::unmnt(){
 	if(areaMap == 0)
 		return Result::notMounted;
-	if(traceMask && PAFFS_TRACE_AREA){
+	if(traceMask & PAFFS_TRACE_AREA){
 		printf("Info: \n");
 		for(unsigned int i = 0; i < param->areasNo; i++){
 			printf("\tArea %d on %u as %10s from page %4d %s\n"

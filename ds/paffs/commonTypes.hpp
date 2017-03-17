@@ -5,7 +5,7 @@
  *      Author: Pascal Pieper
  */
 #include <stdint.h>
-#include "./config/standard.hpp"
+#include "config/minimal_testconfig.hpp"
 #include <outpost/time/time_epoch.h>
 
 #pragma once
