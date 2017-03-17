@@ -81,7 +81,7 @@ fatalErrorHandler(Internal_errors_Source source, bool isInternal, unsigned int e
 
 // Add Timer and UART Driver
 #define CONFIGURE_DRIVER_AMBAPP_GAISLER_GPTIMER
-#define CONFIGURE_DRIVER_AMBAPP_GAISLER_APBUART
+//#define CONFIGURE_DRIVER_AMBAPP_GAISLER_APBUART
 
 #include <drvmgr/drvmgr_confdefs.h>
 
