@@ -3,20 +3,6 @@ import os
 
 Import('envGlobal')
 
-print("SIMUDRIVER")
-
-envGlobal.Append(LIBS=[
-	'simu'
-])
-
-env = envGlobal.Clone()
-
-files  = env.Glob('simu.cpp')
-
-library = env.StaticLibrary('simuDriver', files)
-
-envGlobal.Install('$BUILDPATH/lib', library)
-
 print("NULLDRIVER")
 
 env = envGlobal.Clone()
@@ -26,5 +12,6 @@ files  = env.Glob('null.cpp')
 library = env.StaticLibrary('nullDriver', files)
 
 envGlobal.Append(LIBS=[
+	'nullDriver',
 ])
 envGlobal.Install('$BUILDPATH/lib', library)

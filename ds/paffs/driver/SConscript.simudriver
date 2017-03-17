@@ -1,0 +1,24 @@
+#Paffs drivers
+import os
+
+Import('envGlobal')
+
+print("SIMUDRIVER")
+
+env = envGlobal.Clone()
+
+files  = env.Glob('simu.cpp')
+
+envGlobal.SConscript([
+		os.path.join('$ROOTPATH', 'simu/SConscript'),
+	],
+exports=['envGlobal'])
+
+envGlobal.Append(LIBS=[
+	'simuDriver',
+	'simu',
+])
+
+library = env.StaticLibrary('simuDriver', files)
+
+envGlobal.Install('$BUILDPATH/lib', library)

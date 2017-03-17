@@ -27,7 +27,7 @@ envGlobal.Append(CCFLAGS_target = [
     '-I$RTEMS_BSP_FOLDER/include/',
     '--specs=$RTEMS_BSP_FOLDER/bsp_specs',
     '-qrtems',
-    '-v',
+    #'-v',
 ])
 
 envGlobal.Tool('compiler_sparc_rtems_gcc')
@@ -46,13 +46,18 @@ envGlobal.Append(CPPPATH=[
 envGlobal.SConscript([
         os.path.join(rootpath, 'ds/paffs/SConscript'),
         os.path.join(rootpath, 'ds/paffs/driver/SConscript.nulldriver'),
-        
     ],
     exports=['envGlobal'])
+
+envGlobal.Append(LIBS=[
+	
+])
 
 env = envGlobal.Clone()
 
 files = env.Glob('*.cpp')
+
+print(env['LIBS'])
 
 programElf = env.Program('office.elf', files)
 programBin = env.Bin(programElf) 
