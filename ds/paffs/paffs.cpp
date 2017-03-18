@@ -82,7 +82,7 @@ Paffs::Paffs(std::vector<Driver*> &deviceDrivers){
 	for(std::vector<Driver*>::iterator it = deviceDrivers.begin();
 			it != deviceDrivers.end();it++,i++){
 		if(i >= maxNumberOfDevices){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Too much device Drivers given! Accepting max %d.", maxNumberOfDevices);
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Too many device Drivers given! Accepting max %d.", maxNumberOfDevices);
 			break;
 		}
 		validDevices[i] = true;

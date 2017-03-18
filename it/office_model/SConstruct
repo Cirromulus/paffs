@@ -35,6 +35,7 @@ envGlobal.Tool('settings_buildpath')
 envGlobal['BASEPATH'] = rootpath 
 envGlobal['BUILDPATH'] = os.path.abspath(buildfolder)
 envGlobal['OUTPOST_CORE_PATH'] = os.path.join(extpath, 'outpost-core')
+envGlobal['EXTPATH'] = extpath
 envGlobal['CXXFLAGS_language'] = ['-std=gnu++11']
 
 
@@ -45,12 +46,12 @@ envGlobal.Append(CPPPATH=[
 
 envGlobal.SConscript([
         os.path.join(rootpath, 'ds/paffs/SConscript'),
-        os.path.join(rootpath, 'ds/paffs/driver/SConscript.nulldriver'),
+        os.path.join(rootpath, 'ds/paffs/driver/SConscript.office_model_nexys3'),
     ],
     exports=['envGlobal'])
 
 envGlobal.Append(LIBS=[
-	
+	#nix
 ])
 
 env = envGlobal.Clone()

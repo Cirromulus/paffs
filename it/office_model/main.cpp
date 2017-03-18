@@ -16,5 +16,7 @@ rtems_task
 task_system_init(rtems_task_argument)
 {
 	printf("WORSTBRART\n");
-	paffs::Paffs fs;
+	std::vector<paffs::Driver*> drv;
+	drv.push_back(paffs::getDriver(0));
+	paffs::Paffs fs(drv);
 }

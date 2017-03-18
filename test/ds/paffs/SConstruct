@@ -19,6 +19,7 @@ envGlobal.Tool('settings_buildpath')
 envGlobal['BUILDPATH'] = os.path.abspath(buildfolder)
 envGlobal['ROOTPATH'] = rootpath
 envGlobal['OUTPOST_CORE_PATH'] = outpost_core_path
+envGlobal['EXTPATH'] = os.path.join(extpath, 'outpost-core')
 envGlobal['CXXFLAGS_language'] = ['-std=c++11']
 
 

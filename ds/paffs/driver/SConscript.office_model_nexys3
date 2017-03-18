@@ -1,0 +1,22 @@
+#Paffs drivers
+import os
+
+Import('envGlobal')
+
+print("NEXYSDRIVER")
+
+envGlobal.Append(CPPPATH=[
+	os.path.join('$EXTPATH', 'amap'),
+	os.path.join('$EXTPATH', 'nand'),
+])
+
+env = envGlobal.Clone()
+
+files  = env.Glob('office_model_nexys3.cpp')
+
+library = env.StaticLibrary('nexysDriver', files)
+
+envGlobal.Append(LIBS=[
+	'nexysDriver',
+])
+envGlobal.Install('$BUILDPATH/lib', library)
