@@ -13,4 +13,5 @@ namespace paffs{
 	static constexpr uint8_t  treeNodeCacheSize = 10;		//max. 1,5 * dataBytesPerPage(TreeNode) Bytes per Entry
 	static constexpr uint8_t  areaSummaryCacheSize = 16;		//Currently  2 Bit per dataPagesPerArea
 	static constexpr uint16_t areaSummarySize = 1 + dataPagesPerArea / 8 + 1;
+	static constexpr uint8_t  maxNumberOfDevices = 2;
 }

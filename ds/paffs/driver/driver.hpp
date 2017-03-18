@@ -28,7 +28,7 @@ namespace paffs{
 
 	extern outpost::rtos::SystemClock systemClock;
 
-	Driver* getDriver(const char* devicename);
+	Driver* getDriver(const uint8_t deviceId);
 
-	Driver* getDriverSpecial(const char* devicename, void* fc);
+	Driver* getDriverSpecial(const uint8_t deviceId, void* fc);
 }

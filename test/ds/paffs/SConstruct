@@ -13,7 +13,7 @@ envGlobal = Environment(toolpath=[os.path.join(extpath, 'scons-build-tools/site_
                         ENV=os.environ)
 
 buildfolder = os.path.join(rootpath, 'release')
-envGlobal['CCFLAGS_optimize'] = ['-O2']
+envGlobal['CCFLAGS_optimize'] = ['-O0']
 envGlobal.Tool('compiler_hosted_gcc')
 envGlobal.Tool('settings_buildpath')
 envGlobal['BUILDPATH'] = os.path.abspath(buildfolder)
@@ -39,8 +39,8 @@ env.Append(CCFLAGS_target = [
 files  = Glob('*.cpp')
 
 #print("Libs von UNITTEST: " + str(env['LIBS']))
-program = env.Program('unittests', files)
+program = env.Program('unittest', files)
 
-install = env.InstallAs('$BUILDPATH/unittest', program)
+#sinstall = env.InstallAs('$BUILDPATH/unittest', program)
 env.Alias('test', '$BUILDPATH')
 env.Default('test')

@@ -15,8 +15,6 @@ extern "C"
 rtems_task
 task_system_init(rtems_task_argument)
 {
-	//(void) rtems_task_argument;
 	printf("WORSTBRART\n");
 	paffs::Paffs fs;
-
 }

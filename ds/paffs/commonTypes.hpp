@@ -12,6 +12,7 @@
 
 namespace paffs {
 
+//TODO: Elaborate certain order of badness
 enum class Result : uint8_t{
 	ok = 0,
 	fail,
@@ -56,7 +57,7 @@ enum class Seekmode{
 };
 
 struct Param{
-	const char *name;
+	uint8_t deviceId;
 	unsigned int totalBytesPerPage;
 	unsigned int oobBytesPerPage;
 	unsigned int pagesPerBlock;

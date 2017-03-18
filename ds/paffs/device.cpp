@@ -11,13 +11,23 @@
 
 namespace paffs{
 
-Device::Device(Driver* mdriver) : driver(mdriver),
-		param(0), areaMap(0), lasterr(Result::ok),
+/*Device::Device() : driver(nullptr),
+		param(nullptr), areaMap(nullptr), lasterr(Result::ok),
 		tree(Btree(this)), sumCache(SummaryCache(this)),
-		 areaMgmt(this), dataIO(this), superblock(this)
-{};
+		 areaMgmt(this), dataIO(this), superblock(this){
+	printf("Device %p inited without driver.\n", this);
+	printf("Driver: %p\n", driver);
+};*/
+
+Device::Device(Driver* mdriver) : driver(mdriver),
+		param(nullptr), areaMap(nullptr), lasterr(Result::ok),
+		tree(Btree(this)), sumCache(SummaryCache(this)),
+		 areaMgmt(this), dataIO(this), superblock(this){
+};
 
 Device::~Device(){
+	if(driver == nullptr)
+		return;
 	if(areaMap != nullptr){
 		fprintf(stderr, "Destroyed Device-Object without unmouning! "
 				"This will most likely destroy "
@@ -32,6 +42,10 @@ Device::~Device(){
 
 
 Result Device::format(){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(areaMap != 0)
 		return Result::alrMounted;
 	Result r = initializeDevice();
@@ -103,6 +117,10 @@ Result Device::format(){
 }
 
 Result Device::mnt(){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(areaMap != 0)
 		return Result::alrMounted;
 	Result r = initializeDevice();
@@ -128,6 +146,10 @@ Result Device::mnt(){
 	return r;
 }
 Result Device::unmnt(){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(areaMap == 0)
 		return Result::notMounted;
 	if(traceMask & PAFFS_TRACE_AREA){
@@ -157,6 +179,10 @@ Result Device::unmnt(){
 }
 
 Result Device::createInode(Inode* outInode, Permission mask){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	memset(outInode, 0, sizeof(Inode));
 
 	//FIXME: is this the best way to find a new number?
@@ -178,6 +204,10 @@ Result Device::createInode(Inode* outInode, Permission mask){
  * creates DirInode ONLY IN RAM
  */
 Result Device::createDirInode(Inode* outInode, Permission mask){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(createInode(outInode, mask) != Result::ok)
 		return Result::bug;
 	outInode->type = InodeType::dir;
@@ -190,6 +220,10 @@ Result Device::createDirInode(Inode* outInode, Permission mask){
  * creates FilInode ONLY IN RAM
  */
 Result Device::createFilInode(Inode* outInode, Permission mask){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(createInode(outInode, mask) != Result::ok){
 		return Result::bug;
 	}
@@ -198,11 +232,19 @@ Result Device::createFilInode(Inode* outInode, Permission mask){
 }
 
 void Device::destroyInode(Inode* node){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return;
+	}
 	dataIO.deleteInodeData(node, 0);
 	delete node;
 }
 
 Result Device::getParentDir(const char* fullPath, Inode* parDir, unsigned int *lastSlash){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(fullPath[0] == 0){
 		lasterr = Result::einval;
 		return Result::einval;
@@ -230,10 +272,14 @@ Result Device::getParentDir(const char* fullPath, Inode* parDir, unsigned int *l
 
 //Currently Linearer Aufwand
 Result Device::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
+
 	if(folder->type != InodeType::dir){
 		return Result::bug;
 	}
-
 	if(folder->size <= sizeof(DirEntryCount)){
 		//Just contains a zero for "No entrys"
 		return Result::nf;
@@ -294,6 +340,10 @@ Result Device::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 }
 
 Result Device::getInodeOfElem(Inode* outInode, const char* fullPath){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	Inode root;
 	if(tree.getInode(0, &root) != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find rootInode! (%s)", resultMsg[static_cast<int>(lasterr)]);
@@ -337,6 +387,10 @@ Result Device::getInodeOfElem(Inode* outInode, const char* fullPath){
 
 
 Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(contDir == nullptr){
 		lasterr = Result::bug;
 		return Result::bug;
@@ -394,6 +448,10 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 
 //TODO: mark deleted treeCacheNodes as dirty
 Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(contDir == nullptr){
 		lasterr = Result::bug;
 		return Result::bug;
@@ -448,6 +506,10 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 }
 
 Result Device::mkDir(const char* fullPath, Permission mask){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(areaMap == 0)
 		return Result::notMounted;
 	unsigned int lastSlash = 0;
@@ -469,6 +531,11 @@ Result Device::mkDir(const char* fullPath, Permission mask){
 }
 
 Dir* Device::openDir(const char* path){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		lasterr = Result::fail;
+		return nullptr;
+	}
 	if(areaMap == 0){
 		lasterr = Result::notMounted;
 		return nullptr;
@@ -548,6 +615,10 @@ Dir* Device::openDir(const char* path){
 }
 
 Result Device::closeDir(Dir* dir){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(areaMap == 0)
 		return Result::notMounted;
 	if(dir->childs == nullptr)
@@ -569,6 +640,11 @@ Result Device::closeDir(Dir* dir){
  * TODO: What happens if dir is changed after opendir?
  */
 Dirent* Device::readDir(Dir* dir){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		lasterr = Result::fail;
+		return nullptr;
+	}
 	if(areaMap == 0){
 		lasterr = Result::notMounted;
 		return nullptr;
@@ -624,10 +700,19 @@ Dirent* Device::readDir(Dir* dir){
 }
 
 void Device::rewindDir(Dir* dir){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		lasterr = Result::fail;
+		return;
+	}
     dir->pos = 0;
 }
 
 Result Device::createFile(Inode* outFile, const char* fullPath, Permission mask){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(areaMap == 0)
 		return Result::notMounted;
 	unsigned int lastSlash = 0;
@@ -648,6 +733,11 @@ Result Device::createFile(Inode* outFile, const char* fullPath, Permission mask)
 }
 
 Obj* Device::open(const char* path, Fileopenmask mask){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		lasterr = Result::fail;
+		return nullptr;
+	}
 	if(areaMap == 0){
 		lasterr = Result::notMounted;
 		return nullptr;
@@ -712,6 +802,10 @@ Obj* Device::open(const char* path, Fileopenmask mask){
 }
 
 Result Device::close(Obj* obj){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(areaMap == 0)
 		return Result::notMounted;
 	if(obj == nullptr)
@@ -726,6 +820,10 @@ Result Device::close(Obj* obj){
 }
 
 Result Device::touch(const char* path){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(areaMap == 0)
 		return Result::notMounted;
 	Inode file;
@@ -748,6 +846,10 @@ Result Device::touch(const char* path){
 
 
 Result Device::getObjInfo(const char *fullPath, ObjInfo* nfo){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(areaMap == 0)
 		return Result::notMounted;
 	Inode object;
@@ -764,6 +866,10 @@ Result Device::getObjInfo(const char *fullPath, ObjInfo* nfo){
 }
 
 Result Device::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(areaMap == 0)
 		return Result::notMounted;
 	if(obj == nullptr)
@@ -794,6 +900,10 @@ Result Device::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned in
 }
 
 Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	*bytes_written = 0;
 	if(areaMap == 0)
 		return Result::notMounted;
@@ -828,6 +938,10 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 }
 
 Result Device::seek(Obj* obj, int m, Seekmode mode){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(areaMap == 0)
 		return Result::notMounted;
 	switch(mode){
@@ -852,6 +966,10 @@ Result Device::seek(Obj* obj, int m, Seekmode mode){
 
 
 Result Device::flush(Obj* obj){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	(void) obj;
 	if(areaMap == 0)
 		return Result::notMounted;
@@ -870,6 +988,10 @@ Result Device::chmod(const char* path, Permission perm){
 	return tree.updateExistingInode(&object);
 }
 Result Device::remove(const char* path){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(areaMap == 0)
 		return Result::notMounted;
 	Inode object;
@@ -898,6 +1020,10 @@ Result Device::remove(const char* path){
 }
 
 Result Device::initializeDevice(){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(areaMap != 0)
 		return Result::alrMounted;
 	param = &driver->param;
@@ -938,6 +1064,10 @@ Result Device::initializeDevice(){
 }
 
 Result Device::destroyDevice(){
+	if(driver == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		return Result::fail;
+	}
 	if(areaMap == 0)
 		return Result::notMounted;
 	delete[] areaMap;

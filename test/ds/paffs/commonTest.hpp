@@ -13,22 +13,28 @@
 #include "../../../ext/outpost-core/modules/utils/ext/googletest-1.8.0-fused/gtest/gtest.h"
 
 class InitFs : public testing::Test{
+	static std::vector<paffs::Driver*> &collectDrivers(){
+		static std::vector<paffs::Driver*> drv;
+		drv.clear();
+		drv.push_back(paffs::getDriver(0));
+		return drv;
+	}
 public:
 	//automatically loads default driver "1" with default flash
 	paffs::Paffs fs;
-	InitFs(){
+	InitFs() : fs(collectDrivers()){
 		fs.setTraceMask(0);
-		paffs::Result r = fs.format("1");
-				if(r != paffs::Result::ok)
-					std::cerr << "Could not format device!" << std::endl;
-		r = fs.mount("1");
-				if(r != paffs::Result::ok)
-					std::cerr << "Could not mount device!" << std::endl;
+		paffs::Result r = fs.format();
+		if(r != paffs::Result::ok)
+			std::cerr << "Could not format device!" << std::endl;
+		r = fs.mount();
+		if(r != paffs::Result::ok)
+			std::cerr << "Could not mount device!" << std::endl;
 		fs.setTraceMask(PAFFS_TRACE_ERROR | PAFFS_TRACE_BUG);
 	}
 
 	virtual ~InitFs(){
-		fs.unmount("1");
+		fs.unmount();
 	}
 };
 

@@ -13,16 +13,16 @@ namespace paffs{
 
 outpost::rtos::SystemClock systemClock;
 
-Driver* getDriver(const char* devicename){
+Driver* getDriver(const uint8_t deviceId){
 	Driver* out = new NullDriver();
-	out->param.name = devicename;
+	out->param.deviceId = deviceId;
 	return out;
 }
 
-Driver* getDriverSpecial(const char* devicename, void* fc){
+Driver* getDriverSpecial(const uint8_t deviceId, void* fc){
 	(void) fc;
 	Driver* out = new NullDriver();
-	out->param.name = devicename;
+	out->param.deviceId = deviceId;
 	return out;
 }
 

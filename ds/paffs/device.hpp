@@ -37,6 +37,10 @@ public:
 	DataIO dataIO;
 	Superblock superblock;
 
+	/*
+	 * Default constructor is for uninitialized Devices only
+	 */
+	//Device();
 	Device(Driver* driver);
 	~Device();
 

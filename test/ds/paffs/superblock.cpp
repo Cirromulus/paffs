@@ -32,14 +32,14 @@ TEST_F(SuperBlock, multipleRemounts){
 	r = fs.mkDir("/a", paffs::R | paffs::W);
 	ASSERT_EQ(r, paffs::Result::ok);
 
-	r = fs.unmount("1");
+	r = fs.unmount();
 	ASSERT_EQ(r, paffs::Result::ok);
 
 	r = fs.touch("/a");
 	ASSERT_EQ(r, paffs::Result::notMounted);
 
 	for(unsigned int i = 0; i < 3 * fs.getDevice()->param->totalPagesPerArea; i++){
-		r = fs.mount("1");
+		r = fs.mount();
 		ASSERT_EQ(r, paffs::Result::ok);
 
 		fil = fs.open("/file", paffs::FC);
@@ -59,7 +59,7 @@ TEST_F(SuperBlock, multipleRemounts){
 		r = fs.closeDir(dir);
 		ASSERT_EQ(r, paffs::Result::ok);
 
-		r = fs.unmount("1");
+		r = fs.unmount();
 		ASSERT_EQ(r, paffs::Result::ok);
 	}
 }

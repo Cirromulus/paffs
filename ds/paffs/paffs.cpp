@@ -55,116 +55,176 @@ const char* err_msg(Result pr){
 }
 
 void Paffs::printCacheSizes(){
-	PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------------------");
-	PAFFS_DBG_S(PAFFS_TRACE_INFO,
-			"TreeNode size: %zu Byte, TreeCacheNode size: %zu Byte. Cachable Nodes: %d.\n"
-			"\tOverall TreeCache size: %zu Byte.",
-				sizeof(TreeNode), sizeof(TreeCacheNode), treeNodeCacheSize, treeNodeCacheSize*sizeof(TreeCacheNode)
-	);
+	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
+		if(validDevices[i]){
+			PAFFS_DBG_S(PAFFS_TRACE_INFO, "---------DEVICE %d--------------", i);
+			PAFFS_DBG_S(PAFFS_TRACE_INFO,
+					"TreeNode size: %zu Byte, TreeCacheNode size: %zu Byte. Cachable Nodes: %d.\n"
+					"\tOverall TreeCache size: %zu Byte.",
+						sizeof(TreeNode), sizeof(TreeCacheNode), treeNodeCacheSize, treeNodeCacheSize*sizeof(TreeCacheNode)
+			);
 
-	PAFFS_DBG_S(PAFFS_TRACE_INFO,
-			"Packed AreaSummary size: %zu Byte. Cacheable Summaries: %d.\n"
-			"\tOverall AreaSummary cache size: %zu Byte.",
-			sizeof(dataPagesPerArea / 4 + 2), areaSummaryCacheSize,
-			sizeof(dataPagesPerArea / 4 + 2) * areaSummaryCacheSize
-	);
-	PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------------------");
+			PAFFS_DBG_S(PAFFS_TRACE_INFO,
+					"Packed AreaSummary size: %zu Byte. Cacheable Summaries: %d.\n"
+					"\tOverall AreaSummary cache size: %zu Byte.",
+					sizeof(dataPagesPerArea / 4 + 2), areaSummaryCacheSize,
+					sizeof(dataPagesPerArea / 4 + 2) * areaSummaryCacheSize
+			);
+			PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------------------");
+		}
+	}
 }
-Paffs::Paffs() : device(getDriver("1")){
-	printCacheSizes();
+
+Paffs::Paffs(std::vector<Driver*> &deviceDrivers){
+	memset(validDevices, false, maxNumberOfDevices * sizeof(bool));
+	memset(devices, 0, maxNumberOfDevices * sizeof(void*));
+	int i = 0;
+	for(std::vector<Driver*>::iterator it = deviceDrivers.begin();
+			it != deviceDrivers.end();it++,i++){
+		if(i >= maxNumberOfDevices){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Too much device Drivers given! Accepting max %d.", maxNumberOfDevices);
+			break;
+		}
+		validDevices[i] = true;
+		devices[i] = new Device(*it);
+	}
 }
-Paffs::Paffs(void* fc) : device(getDriverSpecial("1", fc)){
-	printCacheSizes();
-}
-Paffs::~Paffs(){};
+Paffs::~Paffs(){
+	for(int i = 0; i < maxNumberOfDevices; i++){
+		if(devices[i] != nullptr)
+			delete devices[i];
+	}
+};
 
 
 Result Paffs::getLastErr(){
-	return device.lasterr;
+	//TODO: Actually choose which error to display
+	return devices[0]->lasterr;
 }
 
 void Paffs::resetLastErr(){
-	device.lasterr = Result::ok;
+	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
+		if(validDevices[i])
+			devices[i]->lasterr = Result::ok;
+	}
 }
 
-Result Paffs::format(const char* devicename){
-	(void) devicename;
-	return device.format();
+Result Paffs::format(){
+	//TODO: Handle errors
+	Result r = Result::ok;
+	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
+		if(validDevices[i]){
+			Result r_ = devices[i]->format();
+			if(r == Result::ok)
+				r = r_;
+				r = r_;
+		}
+	}
+	return r;
 }
 
-Result Paffs::mount(const char* devicename){
-	(void) devicename;
-	return device.mnt();
+Result Paffs::mount(){
+	//TODO: Handle errors
+	Result r = Result::ok;
+	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
+		if(validDevices[i]){
+			Result r_ = devices[i]->mnt();
+			if(r == Result::ok)
+				r = r_;
+		}
+	}
+	return r;
 }
-Result Paffs::unmount(const char* devicename){
-	(void) devicename;
-	return device.unmnt();
+Result Paffs::unmount(){
+	//TODO: Handle errors
+	Result r = Result::ok;
+	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
+		if(validDevices[i]){
+			Result r_ = devices[i]->unmnt();
+			if(r == Result::ok)
+				r = r_;
+		}
+	}
+	return r;
 }
 
 Result Paffs::mkDir(const char* fullPath, Permission mask){
-	return device.mkDir(fullPath, mask);
+	//TODO: Handle errors
+	Result r = Result::ok;
+	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
+		if(validDevices[i]){
+			Result r_ = devices[i]->mkDir(fullPath, mask);
+			if(r == Result::ok)
+				r = r_;
+		}
+	}
+	return r;
 }
 
 Dir* Paffs::openDir(const char* path){
-	return device.openDir(path);
+	//TODO: Handle multiple positions
+	return devices[0]->openDir(path);
 }
 
 Result Paffs::closeDir(Dir* dir){
-	return device.closeDir(dir);
+	//TODO: Handle multiple positions
+	return devices[0]->closeDir(dir);
 }
 
 
 Dirent* Paffs::readDir(Dir* dir){
-	return device.readDir(dir);
+	//TODO: Handle multiple positions
+	return devices[0]->readDir(dir);
 }
 
 void Paffs::rewindDir(Dir* dir){
-	device.rewindDir(dir);
+	//TODO: Handle multiple positions
+	devices[0]->rewindDir(dir);
 }
 
 
 Obj* Paffs::open(const char* path, Fileopenmask mask){
-	return device.open(path, mask);
+	return devices[0]->open(path, mask);
 }
 
 Result Paffs::close(Obj* obj){
-	return device.close(obj);
+	return devices[0]->close(obj);
 }
 
 Result Paffs::touch(const char* path){
-	return device.touch(path);
+	return devices[0]->touch(path);
 }
 
 Result Paffs::getObjInfo(const char *fullPath, ObjInfo* nfo){
-	return device.getObjInfo(fullPath, nfo);
+	return devices[0]->getObjInfo(fullPath, nfo);
 }
 
 Result Paffs::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read){
-	return device.read(obj, buf, bytes_to_read, bytes_read);
+	return devices[0]->read(obj, buf, bytes_to_read, bytes_read);
 }
 
 Result Paffs::write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written){
-	return device.write(obj, buf, bytes_to_write, bytes_written);
+	return devices[0]->write(obj, buf, bytes_to_write, bytes_written);
 }
 
 Result Paffs::seek(Obj* obj, int m, Seekmode mode){
-	return device.seek(obj, m, mode);
+	return devices[0]->seek(obj, m, mode);
 }
 
 Result Paffs::flush(Obj* obj){
-	return device.flush(obj);
+	return devices[0]->flush(obj);
 }
 
 Result Paffs::chmod(const char* path, Permission perm){
-	return device.chmod(path, perm);
+	return devices[0]->chmod(path, perm);
 }
 Result Paffs::remove(const char* path){
-	return device.remove(path);
+	return devices[0]->remove(path);
 }
 
 //ONLY FOR DEBUG
 Device* Paffs::getDevice(){
-	return &device;
+	return devices[0];
 }
 
 void Paffs::setTraceMask(unsigned int mask){

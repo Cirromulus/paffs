@@ -8,22 +8,24 @@
 #include "commonTypes.hpp"
 #include "paffs_trace.hpp"
 #include "device.hpp"
+#include <vector>
 
 namespace paffs{
 
 extern unsigned int traceMask;
 
 class Paffs{
-	Device device;
+	//TODO: Devices on stack rather than on heap
+	Device *devices[maxNumberOfDevices] = {};
+	bool validDevices[maxNumberOfDevices] = {};
 	void printCacheSizes();
 public:
-	Paffs();
-	Paffs(void* fc);
+	Paffs(std::vector<Driver*> &deviceDrivers);
 	~Paffs();
 
-	Result format(const char* devicename);
-	Result mount(const char* devicename);
-	Result unmount(const char* devicename);
+	Result format();
+	Result mount();
+	Result unmount();
 	Result getLastErr();
 	void resetLastErr();
 
