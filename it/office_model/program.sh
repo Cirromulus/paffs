@@ -5,7 +5,7 @@ BAUD=460800
 
 if [ -e $GRMON ]; then
 #GRMON="/opt/grmon-eval/bin/grmon"
-GRMON="/opt/grmon-eval-2.0.81/linux64/bin/grmon"
+GRMON="/opt/grmon-eval-2.0.83/linux64/bin/grmon"
 fi
 
 if [ -z $2 ]; then

@@ -8,6 +8,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdio.h>
 #include "driver.hpp"
 
 //This seems to be discontinued in outpost?
@@ -17,39 +18,40 @@
 
 #include <amap.h>
 #include <nand.h>
-#include <outpost/hal/spacewire.h>
+#include <spacewire_light.h>
+#include <sevensegment.h>
+#include <gpio.h>
 
 namespace paffs{
 
 using namespace outpost::hal;
 using namespace outpost::iff;
-
+using namespace outpost::leon3;
 
 class OfficeModelNexys3Driver : public Driver{
 	unsigned char *buf;
-	SpaceWire spacewire;
+	unsigned int bank, device;
+	SpaceWireLight spacewire;
 	Nand *nand;
 	Amap *if_fpga;
-	unsigned int bank, device;
 public:
 	OfficeModelNexys3Driver(unsigned int _bank, unsigned int _device)
-			: bank(_bank), device(_device){
+			: bank(_bank), device(_device), spacewire(0){
 		//Configure parameters of flash
-	    param.totalBytesPerPage = cell->pageSize;
-	    param.oobBytesPerPage = cell->pageSize - cell->pageDataSize;
-	    param.pagesPerBlock = cell->blockSize;
-	    param.blocks = cell->planeSize * cell->cellSize;
+	    param.totalBytesPerPage = 4096+128;
+	    param.oobBytesPerPage = 128;
+	    param.pagesPerBlock = 0;
+	    param.blocks = 0;
 
 		buf = new unsigned char[param.totalBytesPerPage];
 
 		initBoard();
-		if(!initSpaceWire(&spacewire)){
+		if(!initSpaceWire()){
 			printf("Spacewire connection failed!");
 		}
 
 		if_fpga = new Amap(spacewire);
-		pingAmap(if_fpga);
-		nand = new Nand(if_fpga, 0x00200000);
+		nand = new Nand(*if_fpga, 0x00200000);
 		nand->enableLatchUpProtection();
 	}
 
@@ -66,7 +68,7 @@ public:
 	Result checkBad(uint32_t block_no);
 private:
 	bool initBoard();
-	bool initSpaceWire(SpaceWire * spacewire);
+	bool initSpaceWire();
 };
 
 }

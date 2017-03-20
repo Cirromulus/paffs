@@ -37,6 +37,7 @@ envGlobal['BUILDPATH'] = os.path.abspath(buildfolder)
 envGlobal['OUTPOST_CORE_PATH'] = os.path.join(extpath, 'outpost-core')
 envGlobal['EXTPATH'] = extpath
 envGlobal['CXXFLAGS_language'] = ['-std=gnu++11']
+envGlobal['CFLAGS_language'] = ['-std=gnu99']
 
 
 envGlobal.Append(CPPPATH=[

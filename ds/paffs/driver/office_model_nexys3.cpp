@@ -14,16 +14,22 @@
 
 namespace paffs{
 
+using namespace outpost::hal;
+using namespace outpost::iff;
+using namespace outpost::nexys3;
+
 outpost::rtos::SystemClock systemClock;
 
 Driver* getDriver(const uint8_t deviceId){
-	Driver* out = new OfficeModelNexys3Driver();
+	Driver* out = new OfficeModelNexys3Driver(0, deviceId);
 	out->param.deviceId = deviceId;
 	return out;
 }
 
 Driver* getDriverSpecial(const uint8_t deviceId, void* fc){
-	std::cerr << "No Special parameter implemented!" << std::endl;
+	(void) deviceId;
+	(void) fc;
+	printf("No Special parameter implemented!\n");
 	return NULL;
 }
 
@@ -34,7 +40,7 @@ Result OfficeModelNexys3Driver::writePage(uint64_t page_no,
 		memset(buf, 0xFF, param.totalBytesPerPage);
 	}
 	memcpy(buf, data, data_len);
-	nand->writePage(bank, device, page_no, data);
+	nand->writePage(bank, device, page_no, static_cast<uint8_t*>(data));
 	return Result::ok;
 }
 Result OfficeModelNexys3Driver::readPage(uint64_t page_no,
@@ -87,20 +93,21 @@ bool OfficeModelNexys3Driver::initBoard(){
 		Gpio::set(leds);
 		rtems_task_wake_after(50);
 	}
+	return true;
 }
 
 bool
-initSpaceWire(cobc::hal::SpaceWire * spacewire){
-    if (!spacewire->open()){
+OfficeModelNexys3Driver::initSpaceWire(){
+    if (!spacewire.open()){
     	printf("Spacewire connection opening .. ");
         printf("failed\n");
         return false;
     }
 
-    spacewire->up(cobc::time::Milliseconds(0));
+    spacewire.up(outpost::time::Milliseconds(0));
 
 
-    if (!spacewire->isUp()){
+    if (!spacewire.isUp()){
     	printf("check link .. ");
         printf("down\n");
         return false;

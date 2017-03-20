@@ -2,7 +2,7 @@
 #ifndef NAND_H
 #define NAND_H
 
-#include <cobc/device_driver/amap/amap.h>
+#include <amap.h>
 
 /**
  *
@@ -16,7 +16,7 @@
 class Nand
 {
 public:
-	Nand(cobc::iff::Amap& amapInput, uint32_t baseAddressInput);
+	Nand(outpost::iff::Amap& amapInput, uint32_t baseAddressInput);
 
 	bool
 	isReady();
@@ -112,7 +112,7 @@ public:
 	readRamBuffer(uint8_t *buffer, size_t length);
 
 private:
-	cobc::iff::Amap& amap;
+	outpost::iff::Amap& amap;
 	const uint32_t baseAddress;
 	uint32_t lastStatus;
 
