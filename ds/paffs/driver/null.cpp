@@ -15,14 +15,12 @@ outpost::rtos::SystemClock systemClock;
 
 Driver* getDriver(const uint8_t deviceId){
 	Driver* out = new NullDriver();
-	out->param.deviceId = deviceId;
 	return out;
 }
 
 Driver* getDriverSpecial(const uint8_t deviceId, void* fc){
 	(void) fc;
 	Driver* out = new NullDriver();
-	out->param.deviceId = deviceId;
 	return out;
 }
 

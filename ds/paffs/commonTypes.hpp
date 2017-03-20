@@ -5,7 +5,7 @@
  *      Author: Pascal Pieper
  */
 #include <stdint.h>
-#include "config/minimal_testconfig.hpp"
+#include "config/standard.hpp"
 #include <outpost/time/time_epoch.h>
 
 #pragma once
@@ -57,12 +57,11 @@ enum class Seekmode{
 };
 
 struct Param{
-	uint8_t deviceId;
 	unsigned int totalBytesPerPage;
 	unsigned int oobBytesPerPage;
 	unsigned int pagesPerBlock;
 	unsigned int blocks;
-	/*Automatically filled*/
+	//Automatically filled//
 	unsigned int dataBytesPerPage;
 	unsigned long areasNo;
 	unsigned int blocksPerArea;

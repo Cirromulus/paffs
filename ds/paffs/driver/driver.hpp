@@ -13,7 +13,6 @@ namespace paffs{
 
 	class Driver {
 	public:
-		Param param;
 		Driver(){};
 		virtual ~Driver(){};
 

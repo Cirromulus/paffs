@@ -28,8 +28,9 @@ public:
 	Driver *driver;
 	Param *param;
 	AreaPos activeArea[AreaType::no];
-	Area *areaMap;
+	Area areaMap[areasNo];
 	Result lasterr;
+	bool mounted;
 
 	Btree tree;
 	SummaryCache sumCache;

@@ -17,18 +17,18 @@ namespace paffs{
 outpost::rtos::SystemClock systemClock;
 
 Driver* getDriver(const uint8_t deviceId){
+	(void) deviceId;
 	Driver* out = new SimuDriver();
-	out->param.deviceId = deviceId;
 	return out;
 }
 
 Driver* getDriverSpecial(const uint8_t deviceId, void* fc){
+	(void) deviceId;
 	if(fc == NULL){
 		std::cerr << "Invalid flashCell pointer given!" << std::endl;
 		return NULL;
 	}
 	Driver* out = new SimuDriver(fc);
-	out->param.deviceId = deviceId;
 	return out;
 }
 
@@ -38,14 +38,14 @@ Result SimuDriver::writePage(uint64_t page_no,
 	if(!cell)
 		return Result::fail;
 
-	if(data_len > param.totalBytesPerPage){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write %u Bytes to a page of %u!", data_len, param.totalBytesPerPage);
+	if(data_len > totalBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write %u Bytes to a page of %u!", data_len, totalBytesPerPage);
 		return Result::fail;
 	}
 
 
-	if(param.totalBytesPerPage != data_len){
-		memset(buf, 0xFF, param.totalBytesPerPage);
+	if(totalBytesPerPage != data_len){
+		memset(buf, 0xFF, totalBytesPerPage);
 	}
 	memcpy(buf, data, data_len);
 
@@ -78,9 +78,9 @@ Result SimuDriver::eraseBlock(uint32_t block_no){
 	return cell->eraseBlock(d.plane, d.block) == 0 ? Result::ok : Result::fail;
 }
 Result SimuDriver::markBad(uint32_t block_no){
-	memset(buf, 0, param.totalBytesPerPage);
-	for(unsigned page = 0; page < param.pagesPerBlock; page++){
-		Nandaddress d = translatePageToAddress(block_no * param.pagesPerBlock + page, cell);
+	memset(buf, 0, totalBytesPerPage);
+	for(unsigned page = 0; page < pagesPerBlock; page++){
+		Nandaddress d = translatePageToAddress(block_no * pagesPerBlock + page, cell);
 		if(cell->writePage(d.plane, d.block, d.page, buf) < 0){
 			//ignore return Result::fail;
 		}
@@ -110,14 +110,7 @@ Nandaddress SimuDriver::translateBlockToAddress(uint32_t block, FlashCell* fc){
 }
 
 void SimuDriver::init(){
-	//Configure parameters of flash
-    param.totalBytesPerPage = cell->pageSize;
-    param.oobBytesPerPage = cell->pageSize - cell->pageDataSize;
-    param.pagesPerBlock = cell->blockSize;
-    param.blocks = cell->planeSize * cell->cellSize;
-
-	buf = new unsigned char[param.totalBytesPerPage];
-	memset(buf, 0xFF, param.totalBytesPerPage);
+	memset(buf, 0xFF, totalBytesPerPage);
 }
 
 }

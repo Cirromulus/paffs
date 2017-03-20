@@ -20,7 +20,7 @@ namespace paffs{
 };*/
 
 Device::Device(Driver* mdriver) : driver(mdriver),
-		param(nullptr), areaMap(nullptr), lasterr(Result::ok),
+		param(nullptr), lasterr(Result::ok), mounted(false),
 		tree(Btree(this)), sumCache(SummaryCache(this)),
 		 areaMgmt(this), dataIO(this), superblock(this){
 };
@@ -28,7 +28,7 @@ Device::Device(Driver* mdriver) : driver(mdriver),
 Device::~Device(){
 	if(driver == nullptr)
 		return;
-	if(areaMap != nullptr){
+	if(mounted){
 		fprintf(stderr, "Destroyed Device-Object without unmouning! "
 				"This will most likely destroy "
 				"the filesystem on flash.\n");
@@ -46,7 +46,7 @@ Result Device::format(){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	if(areaMap != 0)
+	if(mounted)
 		return Result::alrMounted;
 	Result r = initializeDevice();
 	if(r != Result::ok)
@@ -121,8 +121,9 @@ Result Device::mnt(){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	if(areaMap != 0)
+	if(mounted)
 		return Result::alrMounted;
+
 	Result r = initializeDevice();
 	if(r != Result::ok)
 		return r;
@@ -142,7 +143,7 @@ Result Device::mnt(){
 		//Superblock do not need an active Area,
 		//data and index active areas are extracted by areaSummaryCache
 	}
-
+	mounted = true;
 	return r;
 }
 Result Device::unmnt(){
@@ -150,7 +151,7 @@ Result Device::unmnt(){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	if(areaMap == 0)
+	if(!mounted)
 		return Result::notMounted;
 	if(traceMask & PAFFS_TRACE_AREA){
 		printf("Info: \n");
@@ -174,7 +175,7 @@ Result Device::unmnt(){
 
 	//just for cleanup & tests
 	tree.wipeCache();
-
+	mounted = false;
 	return Result::ok;
 }
 
@@ -510,7 +511,7 @@ Result Device::mkDir(const char* fullPath, Permission mask){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	if(areaMap == 0)
+	if(!mounted)
 		return Result::notMounted;
 	unsigned int lastSlash = 0;
 
@@ -536,7 +537,7 @@ Dir* Device::openDir(const char* path){
 		lasterr = Result::fail;
 		return nullptr;
 	}
-	if(areaMap == 0){
+	if(!mounted){
 		lasterr = Result::notMounted;
 		return nullptr;
 		}
@@ -619,7 +620,7 @@ Result Device::closeDir(Dir* dir){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	if(areaMap == 0)
+	if(!mounted)
 		return Result::notMounted;
 	if(dir->childs == nullptr)
 		return Result::einval;
@@ -645,7 +646,7 @@ Dirent* Device::readDir(Dir* dir){
 		lasterr = Result::fail;
 		return nullptr;
 	}
-	if(areaMap == 0){
+	if(!mounted){
 		lasterr = Result::notMounted;
 		return nullptr;
 	}
@@ -713,7 +714,7 @@ Result Device::createFile(Inode* outFile, const char* fullPath, Permission mask)
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	if(areaMap == 0)
+	if(!mounted)
 		return Result::notMounted;
 	unsigned int lastSlash = 0;
 
@@ -738,7 +739,7 @@ Obj* Device::open(const char* path, Fileopenmask mask){
 		lasterr = Result::fail;
 		return nullptr;
 	}
-	if(areaMap == 0){
+	if(!mounted){
 		lasterr = Result::notMounted;
 		return nullptr;
 	}
@@ -806,7 +807,7 @@ Result Device::close(Obj* obj){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	if(areaMap == 0)
+	if(!mounted)
 		return Result::notMounted;
 	if(obj == nullptr)
 		return Result::einval;
@@ -824,7 +825,7 @@ Result Device::touch(const char* path){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	if(areaMap == 0)
+	if(!mounted)
 		return Result::notMounted;
 	Inode file;
 	Result r = getInodeOfElem(&file, path);
@@ -850,7 +851,7 @@ Result Device::getObjInfo(const char *fullPath, ObjInfo* nfo){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	if(areaMap == 0)
+	if(!mounted)
 		return Result::notMounted;
 	Inode object;
 	Result r;
@@ -870,7 +871,7 @@ Result Device::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned in
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	if(areaMap == 0)
+	if(!mounted)
 		return Result::notMounted;
 	if(obj == nullptr)
 		return lasterr = Result::einval;
@@ -905,7 +906,7 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 		return Result::fail;
 	}
 	*bytes_written = 0;
-	if(areaMap == 0)
+	if(!mounted)
 		return Result::notMounted;
 	if(obj == nullptr)
 		return Result::einval;
@@ -942,7 +943,7 @@ Result Device::seek(Obj* obj, int m, Seekmode mode){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	if(areaMap == 0)
+	if(!mounted)
 		return Result::notMounted;
 	switch(mode){
 	case Seekmode::set :
@@ -971,13 +972,13 @@ Result Device::flush(Obj* obj){
 		return Result::fail;
 	}
 	(void) obj;
-	if(areaMap == 0)
+	if(!mounted)
 		return Result::notMounted;
 	return Result::ok;
 }
 
 Result Device::chmod(const char* path, Permission perm){
-	if(areaMap == 0)
+	if(!mounted)
 		return Result::notMounted;
 	Inode object;
 	Result r;
@@ -992,7 +993,7 @@ Result Device::remove(const char* path){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	if(areaMap == 0)
+	if(!mounted)
 		return Result::notMounted;
 	Inode object;
 	Result r;
@@ -1024,16 +1025,9 @@ Result Device::initializeDevice(){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	if(areaMap != 0)
+	if(mounted)
 		return Result::alrMounted;
-	param = &driver->param;
-	param->areasNo = param->blocks / 2;	//For now: 16 b -> 8 Areas
-	param->blocksPerArea = param->blocks / param->areasNo;
-	param->dataBytesPerPage = param->totalBytesPerPage - param->oobBytesPerPage;
-	param->totalPagesPerArea = param->pagesPerBlock * param->blocksPerArea;
-	unsigned int needed_pages_for_AS = 1;	//Todo: actually calculate
-	param->dataPagesPerArea = param->totalPagesPerArea - needed_pages_for_AS;
-	areaMap = new Area[param->areasNo];
+
 	memset(areaMap, 0, sizeof(Area) * param->areasNo);
 
 	activeArea[AreaType::superblock] = 0;
@@ -1041,22 +1035,15 @@ Result Device::initializeDevice(){
 	activeArea[AreaType::journal] = 0;
 	activeArea[AreaType::data] = 0;
 
-	if(param->blocksPerArea < 2){
+	if(blocksPerArea < 2){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device too small, at least 12 Blocks are needed!");
 		return Result::einval;
 	}
 
-	if(param->dataBytesPerPage != dataBytesPerPage){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Total bytes per Page differs between "
-				"calculation and global define! (calc %d, define %d)",
-				param->dataBytesPerPage, dataBytesPerPage);
-		return Result::einval;
-	}
-
-	if(param->dataPagesPerArea != dataPagesPerArea){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "'Data pages per Area' differs between "
-				"calculation and global define! (calc %d, define %d)",
-				param->dataPagesPerArea, dataPagesPerArea);
+	if(blocksPerArea % blocks != 0){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "'blocksPerArea' does not divide "
+				"%u blocks evenly! (define %u, rest: %u)",
+				blocks, blocksPerArea, blocksPerArea % blocks);
 		return Result::einval;
 	}
 
@@ -1068,10 +1055,6 @@ Result Device::destroyDevice(){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	if(areaMap == 0)
-		return Result::notMounted;
-	delete[] areaMap;
-	areaMap = 0;
 	memset(activeArea, 0, sizeof(AreaPos)*AreaType::no);
 	return Result::ok;
 }

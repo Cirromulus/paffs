@@ -18,9 +18,8 @@
 
 #include <amap.h>
 #include <nand.h>
+#include <outpost/hal/spacewire.h>
 #include <spacewire_light.h>
-#include <sevensegment.h>
-#include <gpio.h>
 
 namespace paffs{
 
@@ -29,7 +28,7 @@ using namespace outpost::iff;
 using namespace outpost::leon3;
 
 class OfficeModelNexys3Driver : public Driver{
-	unsigned char *buf;
+	unsigned char buf[totalBytesPerPage];
 	unsigned int bank, device;
 	SpaceWireLight spacewire;
 	Nand *nand;
@@ -37,15 +36,7 @@ class OfficeModelNexys3Driver : public Driver{
 public:
 	OfficeModelNexys3Driver(unsigned int _bank, unsigned int _device)
 			: bank(_bank), device(_device), spacewire(0){
-		//Configure parameters of flash
-	    param.totalBytesPerPage = 4096+128;
-	    param.oobBytesPerPage = 128;
-	    param.pagesPerBlock = 0;
-	    param.blocks = 0;
 
-		buf = new unsigned char[param.totalBytesPerPage];
-
-		initBoard();
 		if(!initSpaceWire()){
 			printf("Spacewire connection failed!");
 		}
@@ -58,7 +49,6 @@ public:
 	~OfficeModelNexys3Driver(){
 		delete nand;
 		delete if_fpga;
-		delete[] buf;
 	}
 
 	Result writePage(uint64_t page_no, void* data, unsigned int data_len);
@@ -67,7 +57,6 @@ public:
 	Result markBad(uint32_t block_no);
 	Result checkBad(uint32_t block_no);
 private:
-	bool initBoard();
 	bool initSpaceWire();
 };
 

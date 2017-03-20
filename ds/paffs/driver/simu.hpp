@@ -16,7 +16,7 @@ namespace paffs{
 class SimuDriver : public Driver{
 	FlashCell *cell;
 	bool selfLoaded = false;
-	unsigned char *buf;
+	unsigned char buf[totalBytesPerPage];
 public:
 	SimuDriver(){
 		selfLoaded = true;
@@ -31,7 +31,6 @@ public:
 	~SimuDriver(){
 		if(selfLoaded)
 			delete cell;
-		delete[] buf;
 	}
 
 	//See paffs.h struct p_drv
