@@ -16,16 +16,18 @@ envGlobal = Environment(toolpath=[os.path.join(extpath, 'scons-build-tools/site_
                         },
                         ENV=os.environ)
 
-buildfolder = os.path.join(rootpath, 'release/it_build/')
-envGlobal['RTEMS_ROOT_FOLDER'] = '/opt/rtems-4.12'
+buildfolder = os.path.join(rootpath, 'debug/it_build/')
+envGlobal.ParseFlags('-DDEBUG')
+envGlobal['CCFLAGS_optimize'] = ['-O0']
+envGlobal['RTEMS_ROOT_FOLDER'] = '/opt/rtems-4.10.x'
 envGlobal['COMPILERPATH'] = '$RTEMS_ROOT_FOLDER/bin/'
-envGlobal['RTEMS_BSP_FOLDER'] = '$RTEMS_ROOT_FOLDER/sparc-rtems4.12/leon3/lib'
-envGlobal['COMPILERPREFIX'] = 'sparc-rtems4.12-'
+envGlobal['RTEMS_BSP_FOLDER'] = '$RTEMS_ROOT_FOLDER/sparc-rtems4.10.x/leon3/lib'
+envGlobal['COMPILERPREFIX'] = 'sparc-rtems4.10.x-'
 envGlobal.Append(CCFLAGS_target = [
     #'-I$RTEMS_ROOT_FOLDER/include/',
-    '-B$RTEMS_BSP_FOLDER',
-    '-I$RTEMS_BSP_FOLDER/include/',
-    '--specs=$RTEMS_BSP_FOLDER/bsp_specs',
+    #'-B$RTEMS_BSP_FOLDER',
+    #'-I$RTEMS_BSP_FOLDER/include/',
+    #'--specs=$RTEMS_BSP_FOLDER/bsp_specs',
     '-qrtems',
     #'-v',
 ])
@@ -61,7 +63,7 @@ env = envGlobal.Clone()
 
 files = env.Glob('*.cpp')
 
-print(env['LIBS'])
+#print(env['LIBS'])
 
 programElf = env.Program('office.elf', files)
 programBin = env.Bin(programElf) 

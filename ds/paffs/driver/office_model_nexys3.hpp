@@ -43,6 +43,7 @@ public:
 
 		if_fpga = new Amap(spacewire);
 		nand = new Nand(*if_fpga, 0x00200000);
+		printk("ENABLE LATCHUP PROTECTION\n");
 		nand->enableLatchUpProtection();
 	}
 

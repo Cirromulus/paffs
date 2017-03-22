@@ -1,0 +1,3 @@
+target remote :2222
+file /home/user/development/filesystem/debug/it_build/it/office_model/office.elf
+load /home/user/development/filesystem/debug/it_build/it/office_model/office.elf

@@ -8,10 +8,11 @@
 
 using namespace outpost::iff;
 
-//#define AMAP_DEBUG
+#define AMAP_DEBUG
 
 #ifdef AMAP_DEBUG
 #   define DEBUG(x) x
+#	include <inttypes.h>
 #else
 #   define DEBUG(x)
 #endif
@@ -80,30 +81,39 @@ Amap::write(uint32_t address,
             outpost::time::Duration timeout,
             WriteHandler& handler)
 {
+	printk("Amap::write before mutex lock\n");
     // Guard operation against concurrent accesses
     outpost::rtos::MutexGuard lock(mOperationLock);
 
+    printk("Amap::write before flushReceiveBuffer \n");
     // Remove all previously received messages
     mSpacewire.flushReceiveBuffer();
 
     hal::SpaceWire::TransmitBuffer * txBuffer = 0;
+    printk("Amap::write transmit buffer before request: %p\n", txBuffer);
     if (mSpacewire.requestBuffer(txBuffer, timeout) != hal::SpaceWire::Result::success)
     {
         mErrorCounter.writeOperation++;
         return false;
     }
+    printk("Amap::write transmit buffer after request: %p\n", txBuffer);
 
+    printk("Amap::write before write Header with txBuffer->data: %p\n", txBuffer->getData().begin());
     // Write AMAP header
     writeHeader(txBuffer->getData(), OPERATION_WRITE, address, length);
 
+    printk("Amap::write before write main Body\n");
     // Write payload to buffer
     handler.write(&txBuffer->getData()[requestHeaderSize], length * 4);
 
+    printk("Amap::write before CRC calc\n");
+
     const std::size_t index = requestHeaderSize + length * 4;
     txBuffer->getData()[index] = Crc8Ccitt::calculate(
-    		outpost::BoundedArray<uint8_t>
-    		(&txBuffer->getData()[requestHeaderSize],
-			length * 4));
+    		outpost::BoundedArray<uint8_t>(
+    				&txBuffer->getData()[requestHeaderSize],
+					length * 4)
+			);
     txBuffer->setLength(index + 1);
 
 #ifdef AMAP_DEBUG
@@ -115,22 +125,25 @@ Amap::write(uint32_t address,
 
     // Send message
     //spacewire.send(txBuffer);
+    printk("Amap::write before send\n");
     mRetries = 0;
     while (mSpacewire.send(txBuffer) != hal::SpaceWire::Result::success)
     {
-//      printf(".\n");
+      printf(".\n");
         // retry 100 times until packet can be send
         mRetries++;
         if (mRetries > 100)
             break;
     }
 
+    printk("Amap::write before receive Buffer\n");
     // Receive response
     hal::SpaceWire::ReceiveBuffer rxBuffer;
     //rxBuffer.getLength() = length;//FIXME: Receiver length has to be specified for GR712
     //spacewire.receive(rxBuffer, hal::SpaceWire::blocking);
     if (mSpacewire.receive(rxBuffer, timeout) != hal::SpaceWire::Result::success)
     {
+    	printk("Amap::write Could not receive\n");
         // FIXME timeout
         // Could not receive a matching message
         mErrorCounter.writeOperation++;
@@ -138,9 +151,9 @@ Amap::write(uint32_t address,
     }
 
 #ifdef AMAP_DEBUG
-    for(uint_fast16_t i = 0; i < rxbuffer.getLength(); i++)
+    for(uint_fast16_t i = 0; i < rxBuffer.getLength(); i++)
     {
-        printf("AMAP-WR RxBuff[%d]: %d, %X\n", i, rxbuffer.getData()[i], rxbuffer.getData()[i]);
+        printf("AMAP-WR RxBuff[%d]: %d, %X\n", i, rxBuffer.getData()[i], rxBuffer.getData()[i]);
     }
 #endif
 
@@ -217,9 +230,9 @@ Amap::read(uint32_t address,
     }
 
 #ifdef AMAP_DEBUG
-    for(uint_fast16_t i = 0; i < rxbuffer.getLength(); i++)
+    for(uint_fast16_t i = 0; i < rxBuffer.getLength(); i++)
     {
-        printf("AMAP-Read RxBuff[%d]: %d, %X\n", i, rxbuffer.getData()[i], rxbuffer.getData()[i]);
+        printf("AMAP-Read RxBuff[%d]: %d, %X\n", i, rxBuffer.getData()[i], rxBuffer.getData()[i]);
     }
 #endif
 
@@ -283,9 +296,9 @@ Amap::ping(Information& info,
     }
 
 #ifdef AMAP_DEBUG
-    for(uint_fast16_t i = 0; i < rxbuffer.getLength(); i++)
+    for(uint_fast16_t i = 0; i < rxBuffer.getLength(); i++)
     {
-        printf("Buff[%d]: %d, %X\n", i, rxbuffer.getData()[i], rxbuffer.getData()[i]);
+        printf("Buff[%d]: %d, %X\n", i, rxBuffer.getData()[i], rxBuffer.getData()[i]);
     }
 #endif
 
@@ -309,7 +322,8 @@ Amap::writeHeader(outpost::BoundedArray<uint8_t> buffer,
                   uint32_t address,
                   std::size_t length)
 {
-
+	printk("amap::writeHeader with buffer: %p, address %" PRIu32 " and length: %u\n",
+			buffer.begin(), address, length);
     Serialize packet(buffer);
 
     packet.store(targetLogicalAddress);

@@ -117,6 +117,8 @@ outpost::leon3::SpaceWireLight::requestBuffer(
 //    }
 	// TODO buffer management
 	(void) timeout; //TODO: implement timeout
+	printk("SpaceWireLight::requestBuffer mTxBuffer.getData().begin() "
+			"before reclaim at %p \n", mTxBuffer.getData().begin());
 
     if (!mFirstTransmit)
     {

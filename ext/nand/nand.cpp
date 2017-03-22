@@ -9,6 +9,7 @@
 
 #ifdef DEBUG
 #	include <stdint.h>
+#   include <inttypes.h>
 #	define LOG(x)	x
 #	define LOG_BEGIN
 #	define LOG_END
@@ -34,7 +35,7 @@ Nand::isReady()
     uint8_t buffer[4];
 
     uint32_t address = baseAddress + flashAndNandCtrlStatusRegister;
-    if (!amap.read(address, buffer, 1, outpost::time::Milliseconds(0)))
+    if (!amap.read(address, buffer, 1, outpost::time::Milliseconds(2)))
     {
         LOG(printf("NAND: Failure to read 'Flash and nand ctrl status'\n")
         ;);
@@ -77,7 +78,9 @@ Nand::enableLatchUpProtection()
 
     payload.store < uint32_t > ((1 << 3) | (1 << 2) | (1 << 1) | (1 << 0));
     uint32_t address = baseAddress + latchUpProtectionCommandRegister;
-    if (!amap.write(address, buffer, 1, outpost::time::Milliseconds(0)))
+    printk("Now writing with amap. Address: %" PRIu32 " Data at: %p\n",
+    		address, buffer);
+    if (!amap.write(address, buffer, 1, outpost::time::Milliseconds(2)))
     {
         LOG(printf("NAND: Failure in LUP command\n")
         ;
@@ -99,7 +102,7 @@ Serialize payload(buffer);
 
 payload.store < uint32_t > ((1 << 7) | (1 << 6) | (1 << 5) | (1 << 4));
 uint32_t address = baseAddress + latchUpProtectionCommandRegister;
-if (!amap.write(address, buffer, 1, outpost::time::Milliseconds(0)))
+if (!amap.write(address, buffer, 1, outpost::time::Milliseconds(2)))
 {
 LOG(printf("NAND: Failure in LUP command\n")
 ;
@@ -125,7 +128,7 @@ Serialize payload(buffer);
 payload.store < uint32_t
 > ((device << 28) | (bank << 26) | (1 << 2) | (1 << 0));
 uint32_t address = baseAddress + writeFlashCommandRegister;
-if (!amap.write(address, buffer, 1, outpost::time::Milliseconds(0)))
+if (!amap.write(address, buffer, 1, outpost::time::Milliseconds(2)))
 {
 LOG(printf("NAND: Failure to write flash command (request id)\n")
 ;
@@ -146,7 +149,7 @@ while (!isReady())
 
   // reading
 address = baseAddress;
-if (!amap.read(address, buffer, 2, outpost::time::Milliseconds(0)))
+if (!amap.read(address, buffer, 2, outpost::time::Milliseconds(2)))
 {
 return false;
 }
@@ -169,7 +172,7 @@ payload.store < uint32_t
 > ((device << 28) | (bank << 26) | (page << 7) | (1 << 3) | (1 << 0));
 uint32_t address = baseAddress + writeFlashCommandRegister;
 
-if (!amap.write(address, buffer, 1, outpost::time::Milliseconds(0)))
+if (!amap.write(address, buffer, 1, outpost::time::Milliseconds(2)))
 {
 LOG(printf("NAND: Failure to write flash command (read page)\n")
 ;
@@ -188,7 +191,7 @@ while (!Nand::isReady())
   // read page and fill buffer with page data
 address = baseAddress;
 
-if (!amap.read(address, buffer, 4224 / 4, outpost::time::Milliseconds(0)))
+if (!amap.read(address, buffer, 4224 / 4, outpost::time::Milliseconds(2)))
 {
 printf("read failed!\n");
 }
@@ -202,7 +205,7 @@ Nand::writePage(uint8_t bank,
 {
   // write buffer data into RAM buffer
 uint32_t address = baseAddress;
-if (!amap.write(address, buffer, 4224 / 4, outpost::time::Milliseconds(0)))
+if (!amap.write(address, buffer, 4224 / 4, outpost::time::Milliseconds(2)))
 {
 printf("write failed!\n");
 }
@@ -215,7 +218,7 @@ payload.store < uint32_t
 > ((device << 28) | (bank << 26) | (page << 7) | (1 << 4) | (1 << 0));
 address = baseAddress + writeFlashCommandRegister;
 
-if (!amap.write(address, commandBuffer, 1, outpost::time::Milliseconds(0)))
+if (!amap.write(address, commandBuffer, 1, outpost::time::Milliseconds(2)))
 {
 LOG(printf("NAND: Failure to write flash command (write page)\n")
 ;
@@ -244,7 +247,7 @@ payload.store < uint32_t
 > ((device << 28) | (bank << 26) | (block << 13) | (1 << 5) | (1 << 0));
 uint32_t address = baseAddress + writeFlashCommandRegister;
 
-if (!amap.write(address, buffer, 1, outpost::time::Milliseconds(0)))
+if (!amap.write(address, buffer, 1, outpost::time::Milliseconds(2)))
 {
 LOG(printf("NAND: Failure to write flash command (block erase)\n")
 ;
@@ -275,7 +278,7 @@ return;
 }
 
 uint32_t address = baseAddress;
-if (!amap.write(address, buffer, length / 4, outpost::time::Milliseconds(0)))
+if (!amap.write(address, buffer, length / 4, outpost::time::Milliseconds(2)))
 {
 LOG(printf("write RAM buffer failed\n")
 ;
@@ -295,7 +298,7 @@ return;
 }
 
 uint32_t address = baseAddress;
-if (!amap.read(address, buffer, length / 4, outpost::time::Milliseconds(0)))
+if (!amap.read(address, buffer, length / 4, outpost::time::Milliseconds(2)))
 {
 LOG(printf("read RAM buffer failed\n")
 ;

@@ -67,7 +67,8 @@ extern const char* bsp_boot_cmdline;
 // ----------------------------------------------------------------------------
 // Configure user defined error handler for fatal failures
 void //changed uint32_t to unsigned int
-fatalErrorHandler(Internal_errors_Source source, bool isInternal, unsigned int errorCode);
+//fatalErrorHandler(Internal_errors_Source source, bool isInternal, unsigned int errorCode);
+fatalErrorHandler(Internal_errors_Source source, bool isInternal, uint32_t errorCode);
 
 #define CONFIGURE_INITIAL_EXTENSIONS  { NULL, NULL, NULL, NULL, NULL, NULL, NULL, fatalErrorHandler }
 
@@ -81,7 +82,7 @@ fatalErrorHandler(Internal_errors_Source source, bool isInternal, unsigned int e
 
 // Add Timer and UART Driver
 #define CONFIGURE_DRIVER_AMBAPP_GAISLER_GPTIMER
-//#define CONFIGURE_DRIVER_AMBAPP_GAISLER_APBUART
+#define CONFIGURE_DRIVER_AMBAPP_GAISLER_APBUART
 
 #include <drvmgr/drvmgr_confdefs.h>
 
