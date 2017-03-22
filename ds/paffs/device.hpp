@@ -18,6 +18,8 @@
 
 namespace paffs {
 
+extern outpost::rtos::SystemClock systemClock;
+
 class Device{
 	//Dirents zur schnelleren verfügung
 	/*Dirent* Dirent_buf[Dirent_BUFSIZE];
@@ -26,7 +28,6 @@ class Device{
 
 public:
 	Driver *driver;
-	Param *param;
 	AreaPos activeArea[AreaType::no];
 	Area areaMap[areasNo];
 	Result lasterr;

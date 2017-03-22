@@ -25,6 +25,7 @@ Result Superblock::registerRootnode(Addr addr){
 Addr Superblock::getRootnodeAddr(){
 	if(rootnode_addr == 0){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "rootnode_address is 0! Maybe device not mounted?");
+		return 0;
 	}
 
 	return rootnode_addr;
@@ -43,7 +44,7 @@ void Superblock::printSuperIndex(SuperIndex* ind){
 		printf("\tType: %s\n", area_names[ind->areaMap[i].type]);
 		if(asOffs < 2 && i == ind->asPositions[asOffs]){
 			unsigned int free = 0, used = 0, dirty = 0;
-			for(unsigned int j = 0; j < dev->param->dataPagesPerArea; j++){
+			for(unsigned int j = 0; j < dataPagesPerArea; j++){
 				if(ind->areaSummary[asOffs][j] == SummaryEntry::free)
 					free++;
 				if(ind->areaSummary[asOffs][j] == SummaryEntry::used)
@@ -84,8 +85,8 @@ Result Superblock::getAddrOfMostRecentSuperIndex(Addr *out){
 
 Result Superblock::commitSuperIndex(SuperIndex *newIndex){
 	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
-				dev->param->areasNo * sizeof(Area)
-				+ 2 * dev->param->dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
+				areasNo * sizeof(Area)
+				+ 2 * dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
 	unsigned int needed_pages = needed_bytes / dataBytesPerPage + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed to read former SuperIndex: %d (%d bytes, 2 AS'es)", needed_pages, needed_bytes);
 
@@ -135,7 +136,7 @@ Result Superblock::commitSuperIndex(SuperIndex *newIndex){
 		return Result::bug;
 	}
 
-	Addr target = chosen_block == 0 ? combineAddress(0, rel_page1) : combineAddress(0, rel_page2 + dev->param->pagesPerBlock);
+	Addr target = chosen_block == 0 ? combineAddress(0, rel_page1) : combineAddress(0, rel_page2 + pagesPerBlock);
 
 	Addr lastEntry;
  	Result r = getAddrOfMostRecentSuperIndex(&lastEntry);
@@ -214,8 +215,8 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 
 Result Superblock::findFirstFreeEntryInBlock(uint32_t area, uint8_t block, uint32_t* out_pos, unsigned int required_pages){
 	unsigned int in_a_row = 0;
-	uint64_t page_offs = dev->param->pagesPerBlock * block;
-	for(unsigned int i = 0; i < dev->param->pagesPerBlock; i++) {
+	uint64_t page_offs = pagesPerBlock * block;
+	for(unsigned int i = 0; i < pagesPerBlock; i++) {
 		Addr addr = combineAddress(area, i + page_offs);
 		uint32_t no;
 		Result r = dev->driver->readPage(getPageNumber(addr, dev), &no, sizeof(uint32_t));
@@ -242,8 +243,8 @@ Result Superblock::findMostRecentEntryInBlock(uint32_t area, uint8_t block, uint
 	*maximum = 0;
 	*out_pos = 0;
 	bool overflow = false;
-	uint32_t page_offs = dev->param->pagesPerBlock * block;
-	for(unsigned int i = 0; i < dev->param->pagesPerBlock; i++) {
+	uint32_t page_offs = pagesPerBlock * block;
+	for(unsigned int i = 0; i < pagesPerBlock; i++) {
 		Addr addr = combineAddress(area, i + page_offs);
 		uint32_t no;
 		Result r = dev->driver->readPage(getPageNumber(addr, dev), &no, sizeof(uint32_t));
@@ -287,7 +288,7 @@ Result Superblock::deleteAnchorBlock(uint32_t area, uint8_t block) {
 		return Result::bug;
 	}
 	dev->areaMap[area].erasecount++;
-	uint32_t block_offs = dev->areaMap[area].position * dev->param->blocksPerArea;
+	uint32_t block_offs = dev->areaMap[area].position * blocksPerArea;
 	return dev->driver->eraseBlock(block_offs + block);
 }
 
@@ -320,8 +321,8 @@ Result Superblock::writeSuperPageIndex(Addr addr, SuperIndex* entry){
 	}
 
 	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
-		dev->param->areasNo * sizeof(Area)
-		+ neededASes * dev->param->dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
+		areasNo * sizeof(Area)
+		+ neededASes * dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
 
 	unsigned int needed_pages = needed_bytes / dataBytesPerPage + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed to write SuperIndex: %d (%d bytes, %d AS'es)", needed_pages, needed_bytes, neededASes);
@@ -335,7 +336,7 @@ Result Superblock::writeSuperPageIndex(Addr addr, SuperIndex* entry){
 	pointer += sizeof(Addr);
 	unsigned char pospos = 0;	//Stupid name
 
-	for(unsigned int i = 0; i < dev->param->areasNo; i++){
+	for(unsigned int i = 0; i < areasNo; i++){
 		if((entry->areaMap[i].type == AreaType::index || entry->areaMap[i].type == AreaType::data) && entry->areaMap[i].status == AreaStatus::active){
 			entry->asPositions[pospos++] = i;
 		}
@@ -347,11 +348,11 @@ Result Superblock::writeSuperPageIndex(Addr addr, SuperIndex* entry){
 	for(unsigned int i = 0; i < 2; i++){
 		if(entry->asPositions[i] <= 0)
 			continue;
-		for(unsigned int j = 0; j < dev->param->dataPagesPerArea; j++){
+		for(unsigned int j = 0; j < dataPagesPerArea; j++){
 			if(entry->areaSummary[i][j] != SummaryEntry::dirty)
 				buf[pointer + j/8] |= 1 << j%8;
 		}
-		pointer += dev->param->dataPagesPerArea / 8;
+		pointer += dataPagesPerArea / 8;
 	}
 
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "%u bytes have been written to Buffer", pointer);
@@ -360,7 +361,7 @@ Result Superblock::writeSuperPageIndex(Addr addr, SuperIndex* entry){
 	uint64_t page_offs = getPageNumber(addr, dev);
 	Result r;
 	for(unsigned page = 0; page < needed_pages; page++){
-		unsigned int btw = pointer + dev->param->dataBytesPerPage < needed_bytes ? dev->param->dataBytesPerPage
+		unsigned int btw = pointer + dataBytesPerPage < needed_bytes ? dataBytesPerPage
 							: needed_bytes - pointer;
 		r = dev->driver->writePage(page_offs + page, &buf[pointer], btw);
 		if(r != Result::ok)
@@ -380,8 +381,8 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 		return Result::einval;
 
 	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
-		dev->param->areasNo * sizeof(Area)
-		+ 2 * dev->param->dataPagesPerArea / 8; /* One bit per entry, two entries for INDEX and DATA section. Others dont have summaries*/
+		areasNo * sizeof(Area)
+		+ 2 * dataPagesPerArea / 8; /* One bit per entry, two entries for INDEX and DATA section. Others dont have summaries*/
 
 	unsigned int needed_pages = needed_bytes / dataBytesPerPage + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Maximum Pages needed to read SuperIndex: %d (%d bytes, 2 AS'es)", needed_pages, needed_bytes);
@@ -392,7 +393,7 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 	uint64_t page_offs = getPageNumber(addr, dev);
 	Result r;
 	for(unsigned page = 0; page < needed_pages; page++){
-		unsigned int btr = pointer + dev->param->dataBytesPerPage < needed_bytes ? dev->param->dataBytesPerPage
+		unsigned int btr = pointer + dataBytesPerPage < needed_bytes ? dataBytesPerPage
 							: needed_bytes - pointer;
 		r = dev->driver->readPage(page_offs + page, &buf[pointer], btr);
 		if(r != Result::ok)
@@ -411,7 +412,7 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 	entry->asPositions[0] = 0;
 	entry->asPositions[1] = 0;
 	unsigned char pospos = 0;	//Stupid name
-	for(unsigned int i = 0; i < dev->param->areasNo; i++){
+	for(unsigned int i = 0; i < areasNo; i++){
 		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(Area));
 		pointer += sizeof(Area);
 		if((dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)
@@ -424,15 +425,15 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 		if(entry->asPositions[i] <= 0)
 			continue;
 
-		for(unsigned int j = 0; j < dev->param->dataPagesPerArea; j++){
+		for(unsigned int j = 0; j < dataPagesPerArea; j++){
 			if(buf[pointer + j/8] & 1 << j%8){
 				//TODO: Normally, we would check in the OOB for a Checksum or so, which is present all the time
 				Addr tmp = combineAddress(entry->asPositions[i], j);
-				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dev->param->dataBytesPerPage);
+				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dataBytesPerPage);
 				if(r != Result::ok)
 					return r;
 				bool contains_data = false;
-				for(unsigned int byte = 0; byte < dev->param->dataBytesPerPage; byte++){
+				for(unsigned int byte = 0; byte < dataBytesPerPage; byte++){
 					if(pagebuf[byte] != 0xFF){
 						contains_data = true;
 						break;
@@ -446,7 +447,7 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 				entry->areaSummary[i][j] = SummaryEntry::dirty;
 			}
 		}
-		pointer += dev->param->dataPagesPerArea / 8;
+		pointer += dataPagesPerArea / 8;
 	}
 
 	return Result::ok;

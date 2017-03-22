@@ -11,16 +11,10 @@
 
 namespace paffs{
 
-/*Device::Device() : driver(nullptr),
-		param(nullptr), areaMap(nullptr), lasterr(Result::ok),
-		tree(Btree(this)), sumCache(SummaryCache(this)),
-		 areaMgmt(this), dataIO(this), superblock(this){
-	printf("Device %p inited without driver.\n", this);
-	printf("Driver: %p\n", driver);
-};*/
+outpost::rtos::SystemClock systemClock;
 
 Device::Device(Driver* mdriver) : driver(mdriver),
-		param(nullptr), lasterr(Result::ok), mounted(false),
+		lasterr(Result::ok), mounted(false),
 		tree(Btree(this)), sumCache(SummaryCache(this)),
 		 areaMgmt(this), dataIO(this), superblock(this){
 };
@@ -53,7 +47,7 @@ Result Device::format(){
 		return r;
 
 	unsigned char had_areaType = 0;		//Efficiency hack, bc there are less than 2⁸ area types
-	for(unsigned int area = 0; area < param->areasNo; area++){
+	for(unsigned int area = 0; area < areasNo; area++){
 		areaMap[area].status = AreaStatus::empty;
 		areaMap[area].erasecount = 0;
 		areaMap[area].position = area;
@@ -136,7 +130,7 @@ Result Device::mnt(){
 	}
 
 
-	for(AreaPos i = 0; i < param->areasNo; i++){
+	for(AreaPos i = 0; i < areasNo; i++){
 		if(areaMap[i].type == AreaType::garbageBuffer){
 			activeArea[AreaType::garbageBuffer] = i;
 		}
@@ -155,10 +149,10 @@ Result Device::unmnt(){
 		return Result::notMounted;
 	if(traceMask & PAFFS_TRACE_AREA){
 		printf("Info: \n");
-		for(unsigned int i = 0; i < param->areasNo; i++){
+		for(unsigned int i = 0; i < areasNo; i++){
 			printf("\tArea %d on %u as %10s from page %4d %s\n"
 					, i, areaMap[i].position, area_names[areaMap[i].type]
-					, areaMap[i].position*param->blocksPerArea*param->pagesPerBlock
+					, areaMap[i].position*blocksPerArea*pagesPerBlock
 					, areaStatusNames[areaMap[i].status]);
 		}
 	}
@@ -1028,7 +1022,7 @@ Result Device::initializeDevice(){
 	if(mounted)
 		return Result::alrMounted;
 
-	memset(areaMap, 0, sizeof(Area) * param->areasNo);
+	memset(areaMap, 0, sizeof(Area) * areasNo);
 
 	activeArea[AreaType::superblock] = 0;
 	activeArea[AreaType::index] = 0;
@@ -1040,10 +1034,10 @@ Result Device::initializeDevice(){
 		return Result::einval;
 	}
 
-	if(blocksPerArea % blocks != 0){
+	if(blocks % blocksPerArea != 0){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "'blocksPerArea' does not divide "
 				"%u blocks evenly! (define %u, rest: %u)",
-				blocks, blocksPerArea, blocksPerArea % blocks);
+				blocks, blocksPerArea, blocks % blocksPerArea);
 		return Result::einval;
 	}
 

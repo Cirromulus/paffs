@@ -54,13 +54,13 @@ void SummaryCache::setASWritten(uint16_t position, bool value){
 }
 
 void SummaryCache::unpackStatusArray(uint16_t position, SummaryEntry* arr){
-	for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
+	for(unsigned int i = 0; i < dataPagesPerArea; i++){
 		arr[i] = getPackedStatus(position, i);
 	}
 }
 
 void SummaryCache::packStatusArray(uint16_t position, SummaryEntry* arr){
-	for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
+	for(unsigned int i = 0; i < dataPagesPerArea; i++){
 		setPackedStatus(position, i, arr[i]);
 	}
 }
@@ -83,7 +83,11 @@ int SummaryCache::findNextFreeCacheEntry(){
 	return -1;
 }
 
-Result SummaryCache::setPageStatus(AreaPos area, uint8_t page, SummaryEntry state){
+Result SummaryCache::setPageStatus(AreaPos area, uint16_t page, SummaryEntry state){
+	if(page > dataPagesPerArea){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dataPagesPerArea);
+		return Result::einval;
+	}
 	if(translation.find(area) == translation.end()){
 		Result r = loadUnbufferedArea(area, true);
 		if(r != Result::ok){
@@ -92,22 +96,24 @@ Result SummaryCache::setPageStatus(AreaPos area, uint8_t page, SummaryEntry stat
 		}
 	}
 	setDirty(translation[area]);
-	if(page > dev->param->dataPagesPerArea){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dev->param->dataPagesPerArea);
-	}
 	setPackedStatus(translation[area], page, state);
 	if(state == SummaryEntry::dirty && traceMask & PAFFS_WRITE_VERIFY_AS){
-		char* buf = new char[dev->param->totalBytesPerPage];
-		memset(buf, 0xFF, dev->param->dataBytesPerPage);
-		memset(&buf[dev->param->dataBytesPerPage], 0x0A, dev->param->oobBytesPerPage);
+		char* buf = new char[totalBytesPerPage];
+		memset(buf, 0xFF, dataBytesPerPage);
+		memset(&buf[dataBytesPerPage], 0x0A, oobBytesPerPage);
 		Addr addr = combineAddress(area, page);
-		dev->driver->writePage(getPageNumber(addr, dev), buf, dev->param->totalBytesPerPage);
+		dev->driver->writePage(getPageNumber(addr, dev), buf, totalBytesPerPage);
 		delete buf;
 	}
 	return Result::ok;
 }
 
-SummaryEntry SummaryCache::getPageStatus(AreaPos area, uint8_t page, Result *result){
+SummaryEntry SummaryCache::getPageStatus(AreaPos area, uint16_t page, Result *result){
+	if(page > dataPagesPerArea){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dataPagesPerArea);
+		*result = Result::einval;
+		return SummaryEntry::error;
+	}
 	if(translation.find(area) == translation.end()){
 		Result r = loadUnbufferedArea(area, false);
 		if(r == Result::nf){
@@ -130,8 +136,8 @@ SummaryEntry SummaryCache::getPageStatus(AreaPos area, uint8_t page, Result *res
 			return SummaryEntry::error;
 		}
 	}
-	if(page > dev->param->dataPagesPerArea){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dev->param->dataPagesPerArea);
+	if(page > dataPagesPerArea){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dataPagesPerArea);
 		*result = Result::einval;
 		return SummaryEntry::error;
 	}
@@ -207,7 +213,7 @@ void SummaryCache::resetASWritten(AreaPos area){
 Result SummaryCache::loadAreaSummaries(){
 	//Assumes unused Summary Cache
 	for(AreaPos i = 0; i < 2; i++){
-		memset(summaryCache[i], 0, dev->param->dataPagesPerArea / 4 + 1);
+		memset(summaryCache[i], 0, dataPagesPerArea / 4 + 1);
 	}
 	SummaryEntry tmp[2][dataPagesPerArea];
 	SuperIndex index;
@@ -253,7 +259,7 @@ Result SummaryCache::commitAreaSummaries(){
 	index.areaSummary[1] = tmp[1];
 
 	//write the two open AS'es to Superindex
-	for (unsigned int i = 0; i < dev->param->areasNo; i++){
+	for (unsigned int i = 0; i < areasNo; i++){
 		if((dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)
 				&& dev->areaMap[i].status == AreaStatus::active){
 			if(pos >= 2){
@@ -296,7 +302,7 @@ Result SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent){
 		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of %d to cache", area);
 	}
 	else if(r == Result::nf){
-		memset(summaryCache[translation[area]], 0, dev->param->dataPagesPerArea / 4 + 1);
+		memset(summaryCache[translation[area]], 0, dataPagesPerArea / 4 + 1);
 		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded new AreaSummary for %d", area);
 	}
 	else
@@ -393,7 +399,7 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 
 uint32_t SummaryCache::countDirtyPages(uint16_t position){
 	uint32_t dirty = 0;
-	for(uint32_t i = 0; i < dev->param->dataPagesPerArea; i++){
+	for(uint32_t i = 0; i < dataPagesPerArea; i++){
 		if(getPackedStatus(position, i) != SummaryEntry::used)
 			dirty++;
 	}
@@ -404,7 +410,7 @@ Result SummaryCache::writeAreasummary(AreaPos area, SummaryEntry* summary){
 	char buf[areaSummarySize];
 	memset(buf, 0, areaSummarySize);
 	unsigned int needed_pages = 1 + areaSummarySize / dataBytesPerPage;
-	if(needed_pages != dev->param->totalPagesPerArea - dev->param->dataPagesPerArea){
+	if(needed_pages != totalPagesPerArea - dataPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
 		return Result::fail;
 	}
@@ -417,16 +423,16 @@ Result SummaryCache::writeAreasummary(AreaPos area, SummaryEntry* summary){
 	//TODO: Check if areaOOB is clean, and maybe Verify written data
 	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Committing AreaSummary to Area %d", area);
 
-	for(unsigned int j = 0; j < dev->param->dataPagesPerArea; j++){
+	for(unsigned int j = 0; j < dataPagesPerArea; j++){
 		if(summary[j] != SummaryEntry::dirty)
 			buf[j/8 +1] |= 1 << j%8;
 	}
 
 	uint32_t pointer = 0;
-	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param->dataPagesPerArea), dev);
+	uint64_t page_offs = getPageNumber(combineAddress(area, dataPagesPerArea), dev);
 	Result r;
 	for(unsigned int page = 0; page < needed_pages; page++){
-		unsigned int btw = pointer + dev->param->dataBytesPerPage < areaSummarySize ? dev->param->dataBytesPerPage
+		unsigned int btw = pointer + dataBytesPerPage < areaSummarySize ? dataBytesPerPage
 							: areaSummarySize - pointer;
 		r = dev->driver->writePage(page_offs + page, &buf[pointer], btw);
 		if(r != Result::ok)
@@ -441,15 +447,15 @@ Result SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bo
 	unsigned char buf[areaSummarySize];
 	memset(buf, 0, areaSummarySize);
 	unsigned int needed_pages = 1 + areaSummarySize / dataBytesPerPage;
-	if(needed_pages != dev->param->totalPagesPerArea - dev->param->dataPagesPerArea){
+	if(needed_pages != totalPagesPerArea - dataPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
 		return Result::fail;
 	}
 	uint32_t pointer = 0;
-	uint64_t page_offs = getPageNumber(combineAddress(area, dev->param->dataPagesPerArea), dev);
+	uint64_t page_offs = getPageNumber(combineAddress(area, dataPagesPerArea), dev);
 	Result r;
 	for(unsigned int page = 0; page < needed_pages; page++){
-		unsigned int btr = pointer + dev->param->dataBytesPerPage < areaSummarySize ? dev->param->dataBytesPerPage
+		unsigned int btr = pointer + dataBytesPerPage < areaSummarySize ? dataBytesPerPage
 							: areaSummarySize - pointer;
 		r = dev->driver->readPage(page_offs + page, &buf[pointer], btr);
 		if(r != Result::ok)
@@ -466,16 +472,16 @@ Result SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bo
 		return Result::nf;
 	}
 
-	for(unsigned int j = 0; j < dev->param->dataPagesPerArea; j++){
+	for(unsigned int j = 0; j < dataPagesPerArea; j++){
 		if(buf[j/8+1] & 1 << j%8){
 			if(complete){
 				unsigned char pagebuf[dataBytesPerPage];
 				Addr tmp = combineAddress(area, j);
-				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dev->param->dataBytesPerPage);
+				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dataBytesPerPage);
 				if(r != Result::ok)
 					return r;
 				bool contains_data = false;
-				for(unsigned int byte = 0; byte < dev->param->dataBytesPerPage; byte++){
+				for(unsigned int byte = 0; byte < dataBytesPerPage; byte++){
 					if(pagebuf[byte] != 0xFF){
 						contains_data = true;
 						break;

@@ -7,6 +7,7 @@
 
 #include "commonTest.hpp"
 #include <stdio.h>
+#include <config.hpp>
 
 class SuperBlock : public InitFs{};
 
@@ -38,7 +39,7 @@ TEST_F(SuperBlock, multipleRemounts){
 	r = fs.touch("/a");
 	ASSERT_EQ(r, paffs::Result::notMounted);
 
-	for(unsigned int i = 0; i < 3 * fs.getDevice()->param->totalPagesPerArea; i++){
+	for(unsigned int i = 0; i < 3 * paffs::totalPagesPerArea; i++){
 		r = fs.mount();
 		ASSERT_EQ(r, paffs::Result::ok);
 

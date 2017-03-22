@@ -22,6 +22,7 @@ envGlobal['OUTPOST_CORE_PATH'] = outpost_core_path
 envGlobal['EXTPATH'] = os.path.join(extpath, 'outpost-core')
 envGlobal['CXXFLAGS_language'] = ['-std=c++11']
 
+envGlobal['PAFFSCONFIG'] = 'default'
 
 envGlobal.SConscript([
     os.path.join(rootpath, 'ds/paffs/SConscript'),

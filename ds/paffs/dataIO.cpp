@@ -25,8 +25,8 @@ Result DataIO::writeInodeData(Inode* inode,
 		return Result::einval;
 	}
 
-	unsigned int pageFrom = offs/dev->param->dataBytesPerPage;
-	unsigned int pageTo = (offs + bytes - 1) / dev->param->dataBytesPerPage;
+	unsigned int pageFrom = offs/dataBytesPerPage;
+	unsigned int pageTo = (offs + bytes - 1) / dataBytesPerPage;
 
 	if(pageTo > 11){
 		//Would use first indirection Layer
@@ -42,7 +42,7 @@ Result DataIO::writeInodeData(Inode* inode,
 	}
 
 	//Will be set to zero after offset is applied
-	unsigned int pageOffs = offs % dev->param->dataBytesPerPage;
+	unsigned int pageOffs = offs % dataBytesPerPage;
 	*bytes_written = 0;
 
 	Result res;
@@ -78,12 +78,12 @@ Result DataIO::writeInodeData(Inode* inode,
 		//Prepare buffer and calculate bytes to write
 		//FIXME: If write has offset, misaligned is still false
 		//so no leading zeros are inserted
-		char* buf = &const_cast<char*>(data)[page*dev->param->dataBytesPerPage];
+		char* buf = &const_cast<char*>(data)[page*dataBytesPerPage];
 		unsigned int btw = bytes - *bytes_written;
-		if((bytes+pageOffs) > dev->param->dataBytesPerPage){
-			btw = (bytes+pageOffs) > (page+1)*dev->param->dataBytesPerPage ?
-						dev->param->dataBytesPerPage - pageOffs :
-						bytes - page*dev->param->dataBytesPerPage;
+		if((bytes+pageOffs) > dataBytesPerPage){
+			btw = (bytes+pageOffs) > (page+1)*dataBytesPerPage ?
+						dataBytesPerPage - pageOffs :
+						bytes - page*dataBytesPerPage;
 		}
 
 
@@ -97,27 +97,27 @@ Result DataIO::writeInodeData(Inode* inode,
 			unsigned long oldPage = extractPage(inode->direct[page+pageFrom]);
 
 
-			if((btw + pageOffs < dev->param->dataBytesPerPage &&
-				page*dev->param->dataBytesPerPage + btw < inode->size) ||  //End Misaligned
+			if((btw + pageOffs < dataBytesPerPage &&
+				page*dataBytesPerPage + btw < inode->size) ||  //End Misaligned
 				(pageOffs > 0 && page == 0)){									//Start Misaligned
 
 				//fill write buffer with valid Data
 				misaligned = true;
-				buf = new char[dev->param->dataBytesPerPage];
-				memset(buf, 0x0, dev->param->dataBytesPerPage);
+				buf = new char[dataBytesPerPage];
+				memset(buf, 0x0, dataBytesPerPage);
 
-				unsigned int btr = dev->param->dataBytesPerPage;
+				unsigned int btr = dataBytesPerPage;
 
 				//limit maximum bytes to read if file is smaller than actual page
-				if((pageFrom+1+page)*dev->param->dataBytesPerPage > inode->size){
-					btr = inode->size - (pageFrom+page) * dev->param->dataBytesPerPage;
+				if((pageFrom+1+page)*dataBytesPerPage > inode->size){
+					btr = inode->size - (pageFrom+page) * dataBytesPerPage;
 				}
 
 				if(inode->direct[page+pageFrom] != 0
 						&& inode->direct[page+pageFrom] != combineAddress(0, unusedMarker)){
 					//We are overriding real data, not just empty space
 					unsigned int bytes_read = 0;
-					Result r = readInodeData(inode, (pageFrom+page)*dev->param->dataBytesPerPage, btr, &bytes_read, buf);
+					Result r = readInodeData(inode, (pageFrom+page)*dataBytesPerPage, btr, &bytes_read, buf);
 					if(r != Result::ok || bytes_read != btr){
 						delete[] buf;
 						return Result::bug;
@@ -152,7 +152,7 @@ Result DataIO::writeInodeData(Inode* inode,
 		}else{
 			//we are writing to a new page
 			*bytes_written += btw;
-			inode->reservedSize += dev->param->dataBytesPerPage;
+			inode->reservedSize += dataBytesPerPage;
 		}
 		inode->direct[page+pageFrom] = pageAddress;
 
@@ -188,9 +188,9 @@ Result DataIO::readInodeData(Inode* inode,
 	}
 
 	*bytes_read = 0;
-	unsigned int pageFrom = offs/dev->param->dataBytesPerPage;
-	unsigned int pageTo = (offs + bytes - 1) / dev->param->dataBytesPerPage;
-	unsigned int pageOffs = offs % dev->param->dataBytesPerPage;
+	unsigned int pageFrom = offs/dataBytesPerPage;
+	unsigned int pageTo = (offs + bytes - 1) / dataBytesPerPage;
+	unsigned int pageOffs = offs % dataBytesPerPage;
 
 
 	if(offs + bytes > inode->size){
@@ -212,13 +212,13 @@ Result DataIO::readInodeData(Inode* inode,
 	}
 
 	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
-		char* buf = &wrap[page*dev->param->dataBytesPerPage];
+		char* buf = &wrap[page*dataBytesPerPage];
 
 		unsigned int btr = bytes + pageOffs - *bytes_read;
-		if(btr > dev->param->dataBytesPerPage){
-			btr = (bytes + pageOffs) > (page+1)*dev->param->dataBytesPerPage ?
-						dev->param->dataBytesPerPage :
-						(bytes + pageOffs) - page*dev->param->dataBytesPerPage;
+		if(btr > dataBytesPerPage){
+			btr = (bytes + pageOffs) > (page+1)*dataBytesPerPage ?
+						dataBytesPerPage :
+						(bytes + pageOffs) - page*dataBytesPerPage;
 		}
 
 		AreaPos area = extractLogicalArea(inode->direct[pageFrom + page]);
@@ -280,8 +280,8 @@ Result DataIO::readInodeData(Inode* inode,
 //inode->size and inode->reservedSize is altered.
 Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 	//TODO: This calculation contains errors in border cases
-	unsigned int pageFrom = offs/dev->param->dataBytesPerPage;
-	unsigned int pageTo = (inode->size - 1) / dev->param->dataBytesPerPage;
+	unsigned int pageFrom = offs/dataBytesPerPage;
+	unsigned int pageTo = (inode->size - 1) / dataBytesPerPage;
 
 	if(inode->size < offs){
 		//Offset bigger than actual filesize
@@ -299,7 +299,7 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 	if(inode->reservedSize == 0)
 		return Result::ok;
 
-	if(inode->size >= inode->reservedSize - dev->param->dataBytesPerPage)
+	if(inode->size >= inode->reservedSize - dataBytesPerPage)
 		//doesn't leave a whole page blank
 		return Result::ok;
 
@@ -337,7 +337,7 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 			return r;
 		}
 
-		inode->reservedSize -= dev->param->dataBytesPerPage;
+		inode->reservedSize -= dataBytesPerPage;
 		inode->direct[page+pageFrom] = 0;
 
 	}
@@ -351,9 +351,9 @@ Result DataIO::writeTreeNode(TreeNode* node){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode NULL");
 				return Result::bug;
 	}
-	if(sizeof(TreeNode) > dev->param->dataBytesPerPage){
+	if(sizeof(TreeNode) > dataBytesPerPage){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page"
-				" (Was %lu, should %u)", sizeof(TreeNode), dev->param->dataBytesPerPage);
+				" (Was %lu, should %u)", sizeof(TreeNode), dataBytesPerPage);
 		return Result::bug;
 	}
 
@@ -410,8 +410,8 @@ Result DataIO::readTreeNode(Addr addr, TreeNode* node){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode NULL");
 		return Result::bug;
 	}
-	if(sizeof(TreeNode) > dev->param->dataBytesPerPage){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page (Was %lu, should %u)", sizeof(TreeNode), dev->param->dataBytesPerPage);
+	if(sizeof(TreeNode) > dataBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode bigger than Page (Was %lu, should %u)", sizeof(TreeNode), dataBytesPerPage);
 		return Result::bug;
 	}
 

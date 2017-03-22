@@ -14,8 +14,6 @@
 
 namespace paffs{
 
-outpost::rtos::SystemClock systemClock;
-
 Driver* getDriver(const uint8_t deviceId){
 	(void) deviceId;
 	Driver* out = new SimuDriver();

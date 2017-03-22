@@ -41,7 +41,7 @@ task_system_init(rtems_task_argument)
 	printf("WORSTBRART\n");
 	std::vector<paffs::Driver*> drv;
 	drv.push_back(paffs::getDriver(0));
-	paffs::Paffs fs(drv);
+	//paffs::Paffs fs(drv);
 
 	while(1){
 		leds = 0;

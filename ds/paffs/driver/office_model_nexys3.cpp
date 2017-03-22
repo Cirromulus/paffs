@@ -18,8 +18,6 @@ using namespace outpost::hal;
 using namespace outpost::iff;
 using namespace outpost::leon3;
 
-outpost::rtos::SystemClock systemClock;
-
 Driver* getDriver(const uint8_t deviceId){
 	Driver* out = new OfficeModelNexys3Driver(0, deviceId);
 	return out;

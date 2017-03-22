@@ -1,5 +1,6 @@
 #Paffs
 import os
+from cmath import isnan
 
 Import('envGlobal')
 
@@ -10,6 +11,13 @@ envGlobal.Append(CPPPATH=[os.path.abspath('.')])
 envGlobal.SConscript([
 	os.path.join('$OUTPOST_CORE_PATH', 'modules/SConscript.library'),
 	], exports='envGlobal')
+
+envGlobal.Append(CPPPATH=[
+	os.path.join(os.path.abspath("./config/"), '$PAFFSCONFIG')
+])
+
+if not envGlobal['PAFFSCONFIG']:
+	print('No configuration set!')
 
 env = envGlobal.Clone()
 

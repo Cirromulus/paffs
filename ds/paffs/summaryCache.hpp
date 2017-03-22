@@ -31,9 +31,9 @@ public:
 
 	SummaryCache(Device* mdev);
 
-	Result setPageStatus(AreaPos area, uint8_t page, SummaryEntry state);
+	Result setPageStatus(AreaPos area, uint16_t page, SummaryEntry state);
 
-	SummaryEntry getPageStatus(AreaPos area, uint8_t page, Result *result);
+	SummaryEntry getPageStatus(AreaPos area, uint16_t page, Result *result);
 
 	Result setSummaryStatus(AreaPos area, SummaryEntry* summary);
 

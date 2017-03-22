@@ -45,6 +45,8 @@ envGlobal.Append(CPPPATH=[
     os.path.abspath(os.path.join(rootpath, "ds")),
 ])
 
+envGlobal['PAFFSCONFIG'] = 'K9F8G08U0M'
+
 envGlobal.SConscript([
         os.path.join(rootpath, 'ds/paffs/SConscript'),
         os.path.join(rootpath, 'ds/paffs/driver/SConscript.office_model_nexys3'),

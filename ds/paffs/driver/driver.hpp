@@ -25,8 +25,6 @@ namespace paffs{
 		virtual Result checkBad (uint32_t block_no) = 0;
 	};
 
-	extern outpost::rtos::SystemClock systemClock;
-
 	Driver* getDriver(const uint8_t deviceId);
 
 	Driver* getDriverSpecial(const uint8_t deviceId, void* fc);

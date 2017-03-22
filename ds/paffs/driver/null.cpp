@@ -11,8 +11,6 @@
 
 namespace paffs{
 
-outpost::rtos::SystemClock systemClock;
-
 Driver* getDriver(const uint8_t deviceId){
 	Driver* out = new NullDriver();
 	return out;

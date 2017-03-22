@@ -31,9 +31,9 @@ const char* areaStatusNames[] = {
 
 uint64_t getPageNumber(Addr addr, Device* dev){
 	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
-								dev->param->totalPagesPerArea;
+								totalPagesPerArea;
 	page += extractPage(addr);
-	if(page > dev->param->areasNo * dev->param->totalPagesPerArea){
+	if(page > areasNo * totalPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "calculated Page number out of range!");
 		return 0;
 	}
@@ -80,14 +80,14 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 
 	/* This is now done by SummaryCache
 	//Look for active Areas loaded from Superblock
-	for(unsigned int area = 0; area < dev->param->areas_no; area++){
+	for(unsigned int area = 0; area < areas_no; area++){
 		if(dev->areaMap[area].type == areaType && dev->areaMap[area].status == AreaStatus::active){
 			PAFFS_DBG_S(PAFFS_TRACE_AREA, "Active Area %d is chosen for new Target.", area);
 			return area;
 		}
 	}*/
 
-	for(unsigned int area = 0; area < dev->param->areasNo; area++){
+	for(unsigned int area = 0; area < areasNo; area++){
 		if(dev->areaMap[area].type == AreaType::unset){
 			dev->areaMap[area].type = areaType;
 			initArea(area);
@@ -119,7 +119,7 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 
 Result AreaManagement::findFirstFreePage(unsigned int* p_out, unsigned int area){
 	Result r;
-	for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
+	for(unsigned int i = 0; i < dataPagesPerArea; i++){
 		if(dev->sumCache.getPageStatus(area, i,&r) == SummaryEntry::free){
 			*p_out = i;
 			return Result::ok;
@@ -133,14 +133,14 @@ Result AreaManagement::findFirstFreePage(unsigned int* p_out, unsigned int area)
 Result AreaManagement::manageActiveAreaFull(AreaPos *area, AreaType areaType){
 	Result r;
 	if(traceMask & PAFFS_TRACE_VERIFY_AS){
-		for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
+		for(unsigned int i = 0; i < dataPagesPerArea; i++){
 			if(dev->sumCache.getPageStatus(*area, i,&r) > SummaryEntry::dirty)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries (%s)!", *area, resultMsg[static_cast<int>(r)]);
 		}
 	}
 
 	bool isFull = true;
-	for(unsigned int i = 0; i < dev->param->dataPagesPerArea; i++){
+	for(unsigned int i = 0; i < dataPagesPerArea; i++){
 		if(dev->sumCache.getPageStatus(*area, i,&r) == SummaryEntry::free) {
 			isFull = false;
 			break;
@@ -183,8 +183,8 @@ Result AreaManagement::closeArea(AreaPos area){
 void AreaManagement::retireArea(AreaPos area){
 	dev->areaMap[area].status = AreaStatus::closed;
 	dev->areaMap[area].type = AreaType::retired;
-	for(unsigned block = 0; block < dev->param->blocksPerArea; block++)
-			dev->driver->markBad(dev->areaMap[area].position * dev->param->blocksPerArea + block);
+	for(unsigned block = 0; block < blocksPerArea; block++)
+			dev->driver->markBad(dev->areaMap[area].position * blocksPerArea + block);
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %u at pos. %u.", area, dev->areaMap[area].position);
 }
 

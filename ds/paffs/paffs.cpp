@@ -70,6 +70,12 @@ void Paffs::printCacheSizes(){
 					sizeof(dataPagesPerArea / 4 + 2), areaSummaryCacheSize,
 					sizeof(dataPagesPerArea / 4 + 2) * areaSummaryCacheSize
 			);
+
+			PAFFS_DBG_S(PAFFS_TRACE_INFO,
+					"Total static size of PAFFS object: %zu",
+					sizeof(Paffs)
+			);
+
 			PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------------------");
 		}
 	}
