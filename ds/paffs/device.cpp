@@ -46,7 +46,7 @@ Result Device::format(){
 	if(r != Result::ok)
 		return r;
 
-	unsigned char had_areaType = 0;		//Efficiency hack, bc there are less than 2⁸ area types
+	unsigned char had_areaType = 0;
 	for(unsigned int area = 0; area < areasNo; area++){
 		areaMap[area].status = AreaStatus::empty;
 		areaMap[area].erasecount = 0;
@@ -76,7 +76,6 @@ Result Device::format(){
 		}
 
 		areaMap[area].type = AreaType::unset;
-
 	}
 
 	r = tree.start_new_tree();

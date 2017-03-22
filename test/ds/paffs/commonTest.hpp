@@ -20,17 +20,21 @@ class InitFs : public testing::Test{
 		return drv;
 	}
 public:
-	//automatically loads default driver "1" with default flash
+	//automatically loads default driver "0" with default flash
 	paffs::Paffs fs;
 	InitFs() : fs(collectDrivers()){
-		fs.setTraceMask(0);
+		fs.setTraceMask(
+			PAFFS_TRACE_VERIFY_TC |
+			PAFFS_TRACE_VERIFY_AS |
+			PAFFS_TRACE_ERROR |
+			PAFFS_TRACE_BUG
+		);
 		paffs::Result r = fs.format();
 		if(r != paffs::Result::ok)
 			std::cerr << "Could not format device!" << std::endl;
 		r = fs.mount();
 		if(r != paffs::Result::ok)
 			std::cerr << "Could not mount device!" << std::endl;
-		fs.setTraceMask(PAFFS_TRACE_ERROR | PAFFS_TRACE_BUG);
 	}
 
 	virtual ~InitFs(){

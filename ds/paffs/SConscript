@@ -18,6 +18,8 @@ envGlobal.Append(CPPPATH=[
 
 if not envGlobal['PAFFSCONFIG']:
 	print('No configuration set!')
+else:
+	print('Paffs configuration: ' + str(envGlobal['PAFFSCONFIG']))
 
 env = envGlobal.Clone()
 

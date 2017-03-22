@@ -57,7 +57,7 @@ const char* err_msg(Result pr){
 void Paffs::printCacheSizes(){
 	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
 		if(validDevices[i]){
-			PAFFS_DBG_S(PAFFS_TRACE_INFO, "---------DEVICE %d--------------", i);
+			PAFFS_DBG_S(PAFFS_TRACE_INFO, "------------DEVICE %d------------", i);
 			PAFFS_DBG_S(PAFFS_TRACE_INFO,
 					"TreeNode size: %zu Byte, TreeCacheNode size: %zu Byte. Cachable Nodes: %d.\n"
 					"\tOverall TreeCache size: %zu Byte.",
@@ -71,10 +71,10 @@ void Paffs::printCacheSizes(){
 					sizeof(dataPagesPerArea / 4 + 2) * areaSummaryCacheSize
 			);
 
-			PAFFS_DBG_S(PAFFS_TRACE_INFO,
+			/*PAFFS_DBG_S(PAFFS_TRACE_INFO,
 					"Total static size of PAFFS object: %zu",
 					sizeof(Paffs)
-			);
+			);*/
 
 			PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------------------");
 		}
@@ -94,6 +94,7 @@ Paffs::Paffs(std::vector<Driver*> &deviceDrivers){
 		validDevices[i] = true;
 		devices[i] = new Device(*it);
 	}
+	printCacheSizes();
 }
 Paffs::~Paffs(){
 	for(int i = 0; i < maxNumberOfDevices; i++){
