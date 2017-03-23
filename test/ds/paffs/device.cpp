@@ -70,7 +70,7 @@ TEST_F(FileTest, createReadWriteFile){
 		memcpy(&tl[i * strlen(t)], t, strlen(t));
 	}
 	//fill Rest
-	memset(&tl[i * strlen(t)], 0xAA, filesize - (i-1) * strlen(t));
+	memset(&tl[i * strlen(t)], 0xAA, filesize - i * strlen(t));
 
 	paffs::Obj *fil = fs.open("/file", paffs::FW | paffs::FC);
 	ASSERT_NE(fil, nullptr);

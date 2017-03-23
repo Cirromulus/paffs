@@ -412,8 +412,8 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 		r = dataIO.readInodeData(contDir, 0, contDir->size, &bytes, dirData);
 		if(r != Result::ok || bytes != contDir->size){
 			lasterr = r;
-			delete dirData;
-			delete buf;
+			delete[] dirData;
+			delete[] buf;
 			return r;
 		}
 	}else{
@@ -618,7 +618,7 @@ Result Device::closeDir(Dir* dir){
 	if(dir->childs == nullptr)
 		return Result::einval;
 	for(int i = 0; i < dir->no_entrys; i++){
-		delete dir->childs[i].name;
+		delete[] dir->childs[i].name;
 		if(dir->childs[i].node != nullptr)
 			delete dir->childs[i].node;
 		//delete dir->childs[i];
@@ -806,7 +806,7 @@ Result Device::close(Obj* obj){
 		return Result::einval;
 	flush(obj);
 	delete obj->dirent->node;
-	delete obj->dirent->name;
+	delete[] obj->dirent->name;
 	delete obj->dirent;
 	delete obj;
 

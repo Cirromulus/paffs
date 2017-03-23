@@ -427,7 +427,7 @@ Result DataIO::readTreeNode(Addr addr, TreeNode* node){
 
 
 	Result r;
-	if(traceMask && PAFFS_TRACE_VERIFY_AS){
+	if(traceMask & PAFFS_TRACE_VERIFY_AS){
 		if(dev->sumCache.getPageStatus(extractLogicalArea(addr), extractPage(addr),&r) == SummaryEntry::dirty){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "READ operation of obsoleted data at %X:%X", extractLogicalArea(addr), extractPage(addr));
 			return Result::bug;

@@ -5,6 +5,12 @@ rootpath = Dir('../../../').abspath
 extpath = os.path.join(rootpath, 'ext')
 outpost_core_path = os.path.join(extpath, 'outpost-core')
 
+AddOption(
+	'--with-clang',
+	action='store_true',
+	help='clang build',
+	default=False)
+
 print("UNITTESTS")
 
 envGlobal = Environment(toolpath=[os.path.join(extpath, 'scons-build-tools/site_tools')],
@@ -13,8 +19,9 @@ envGlobal = Environment(toolpath=[os.path.join(extpath, 'scons-build-tools/site_
                         ENV=os.environ)
 
 buildfolder = os.path.join(rootpath, 'release')
-envGlobal['CCFLAGS_optimize'] = ['-O0']
-envGlobal.Tool('compiler_hosted_gcc')
+envGlobal['CCFLAGS_optimize'] = ['-O3']
+envGlobal.ParseFlags('-DDEBUG')
+envGlobal.Tool('compiler_hosted_llvm')
 envGlobal.Tool('settings_buildpath')
 envGlobal['BUILDPATH'] = os.path.abspath(buildfolder)
 envGlobal['ROOTPATH'] = rootpath
@@ -34,9 +41,29 @@ envGlobal.SConscript([
 
 env = envGlobal.Clone()
 
-env.Append(CCFLAGS_target = [
-	#'-v'
-])
+clangflags = [
+	'-v',
+	'-stdlib=libc++',
+	'-L/opt/clang/bin/',
+	'-L/opt/clang/lib/',
+	'-I/opt/clang/include/',
+	'-I/opt/clang/include/c++/v1',
+	'-lc++abi',
+	'-lc++',
+	'-lc',
+	#'-fsanitize=address',
+	'-fsanitize=memory',
+	#'-fsanitize=undefined',
+	'-fsanitize-recover=all', #use-of-uninitialized-value',	#Gtest uses unitialized values
+	'-fno-omit-frame-pointer',
+	'-fno-optimize-sibling-calls',
+	'-fsanitize-memory-track-origins'
+]
+
+if GetOption('with_clang'):
+	envGlobal.Append(CCFLAGS_target = clangflags)
+	envGlobal.Append(CXXFLAGS_target = clangflags)
+	envGlobal.Append(LINKFLAGS_target = clangflags)
 
 files  = Glob('*.cpp')
 

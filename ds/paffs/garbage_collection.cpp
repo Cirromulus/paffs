@@ -209,7 +209,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 			//Just for debug, in production AS might be invalid and summary may be incomplete
 			SummaryEntry tmp[dataPagesPerArea];
 			r = dev->sumCache.getSummaryStatus(deletion_target, tmp);
-			if(tmp == NULL || r != Result::ok){
+			if(r != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_VERIFY_AS, "Could not verify AreaSummary of area %d!", deletion_target);
 			}
 			if(memcmp(summary, tmp, dataPagesPerArea) != 0){

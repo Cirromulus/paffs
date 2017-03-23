@@ -103,7 +103,7 @@ Result SummaryCache::setPageStatus(AreaPos area, uint16_t page, SummaryEntry sta
 		memset(&buf[dataBytesPerPage], 0x0A, oobBytesPerPage);
 		Addr addr = combineAddress(area, page);
 		dev->driver->writePage(getPageNumber(addr, dev), buf, totalBytesPerPage);
-		delete buf;
+		delete[] buf;
 	}
 	return Result::ok;
 }
