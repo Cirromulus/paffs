@@ -21,7 +21,10 @@ envGlobal = Environment(toolpath=[os.path.join(extpath, 'scons-build-tools/site_
 buildfolder = os.path.join(rootpath, 'release')
 envGlobal['CCFLAGS_optimize'] = ['-O3']
 envGlobal.ParseFlags('-DDEBUG')
-envGlobal.Tool('compiler_hosted_llvm')
+if GetOption('with_clang'):
+	envGlobal.Tool('compiler_hosted_llvm')
+else:
+	envGlobal.Tool('compiler_hosted_gcc')
 envGlobal.Tool('settings_buildpath')
 envGlobal['BUILDPATH'] = os.path.abspath(buildfolder)
 envGlobal['ROOTPATH'] = rootpath
@@ -30,6 +33,38 @@ envGlobal['EXTPATH'] = os.path.join(extpath, 'outpost-core')
 envGlobal['CXXFLAGS_language'] = ['-std=c++11']
 
 envGlobal['PAFFSCONFIG'] = 'default'
+
+
+clangcflags = [
+	#'-v',
+	'-stdlib=libc++',
+	#'-I' + libc_msan_path + '/include/',
+	#'-fsanitize=address',
+	'-fsanitize=memory',
+	#'-fsanitize=undefined',
+	'-fno-omit-frame-pointer',
+	'-fno-optimize-sibling-calls',
+	'-fsanitize-memory-track-origins'
+]
+
+clangcxflags = [
+	#'-I' + libc_msan_path + '/include/c++/v1',
+]
+clangcxflags.extend(clangcflags)
+
+clanglflags = [
+	'-v',
+	'-stdlib=libc++',
+	#'-L' + libc_msan_path + '/bin/',
+	#'-L' + libc_msan_path + '/lib/',
+]
+
+
+if GetOption('with_clang'):
+	envGlobal.Append(CCFLAGS_target = clangcflags)
+	envGlobal.Append(CXXFLAGS_target = clangcxflags)
+	envGlobal.Append(LINKFLAGS_target = clanglflags)
+
 
 envGlobal.SConscript([
     os.path.join(rootpath, 'ds/paffs/SConscript'),
@@ -40,30 +75,6 @@ envGlobal.SConscript([
 )
 
 env = envGlobal.Clone()
-
-clangflags = [
-	'-v',
-	'-stdlib=libc++',
-	'-L/opt/clang/bin/',
-	'-L/opt/clang/lib/',
-	'-I/opt/clang/include/',
-	'-I/opt/clang/include/c++/v1',
-	'-lc++abi',
-	'-lc++',
-	'-lc',
-	#'-fsanitize=address',
-	'-fsanitize=memory',
-	#'-fsanitize=undefined',
-	'-fsanitize-recover=all', #use-of-uninitialized-value',	#Gtest uses unitialized values
-	'-fno-omit-frame-pointer',
-	'-fno-optimize-sibling-calls',
-	'-fsanitize-memory-track-origins'
-]
-
-if GetOption('with_clang'):
-	envGlobal.Append(CCFLAGS_target = clangflags)
-	envGlobal.Append(CXXFLAGS_target = clangflags)
-	envGlobal.Append(LINKFLAGS_target = clangflags)
 
 files  = Glob('*.cpp')
 
