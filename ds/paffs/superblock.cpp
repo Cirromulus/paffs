@@ -323,6 +323,8 @@ Result Superblock::writeSuperPageIndex(Addr addr, SuperIndex* entry){
 	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
 		areasNo * sizeof(Area)
 		+ neededASes * dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
+	if(dataPagesPerArea % 8 != 0)
+		needed_bytes++;
 
 	unsigned int needed_pages = needed_bytes / dataBytesPerPage + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed to write SuperIndex: %d (%d bytes, %d AS'es)", needed_pages, needed_bytes, neededASes);
@@ -345,6 +347,7 @@ Result Superblock::writeSuperPageIndex(Addr addr, SuperIndex* entry){
 		pointer += sizeof(Area);
 	}
 
+	//Collect area summaries and pack them
 	for(unsigned int i = 0; i < 2; i++){
 		if(entry->asPositions[i] <= 0)
 			continue;

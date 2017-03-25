@@ -19,6 +19,7 @@ SummaryCache::SummaryCache(Device* mdev) : dev(mdev){
 				"\tThis is not recommended, as Errors can happen.");
 	}
 	translation.reserve(areaSummaryCacheSize);
+	memset(summaryCache, 0, areaSummaryCacheSize * areaSummaryEntrySize);
 }
 
 SummaryEntry SummaryCache::getPackedStatus(uint16_t position, uint16_t page){
@@ -213,7 +214,7 @@ void SummaryCache::resetASWritten(AreaPos area){
 Result SummaryCache::loadAreaSummaries(){
 	//Assumes unused Summary Cache
 	for(AreaPos i = 0; i < 2; i++){
-		memset(summaryCache[i], 0, dataPagesPerArea / 4 + 1);
+		memset(summaryCache[i], 0, areaSummaryEntrySize);
 	}
 	SummaryEntry tmp[2][dataPagesPerArea];
 	SuperIndex index;
@@ -302,7 +303,7 @@ Result SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent){
 		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of %d to cache", area);
 	}
 	else if(r == Result::nf){
-		memset(summaryCache[translation[area]], 0, dataPagesPerArea / 4 + 1);
+		memset(summaryCache[translation[area]], 0, areaSummaryEntrySize);
 		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded new AreaSummary for %d", area);
 	}
 	else
@@ -314,8 +315,10 @@ Result SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent){
 
 Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 	//from summaryCache to AreaPosition
-	bool used[areaSummaryCacheSize] = {0};
-	AreaPos pos[areaSummaryCacheSize] = {0};
+	bool used[areaSummaryCacheSize];
+	AreaPos pos[areaSummaryCacheSize];
+	memset(used, false, sizeof(bool) * areaSummaryCacheSize);
+	memset(pos, 0, sizeof(AreaPos) * areaSummaryCacheSize);
 	int fav = -1;
 	uint32_t maxDirtyPages = 0;
 
@@ -346,7 +349,9 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 
 	//Look for the least probable Area to be used that has no committed AS
  	for(int i = 0; i < areaSummaryCacheSize; i++){
-		if(used[i] && !wasASWrittenByCachePosition(i) && dev->areaMap[pos[i]].status != AreaStatus::active){
+		if(used[i]
+				&& !wasASWrittenByCachePosition(i) &&
+				dev->areaMap[pos[i]].status != AreaStatus::active){
 			uint32_t tmp = countDirtyPages(i);
 			if(tmp > maxDirtyPages){
 				fav = i;
@@ -360,6 +365,7 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 		unpackStatusArray(fav, buf);
 		writeAreasummary(pos[fav], buf);
 		translation.erase(pos[fav]);
+		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Committed and deleted cache entry of area %d", pos[fav]);
 		return Result::ok;
 	}
 

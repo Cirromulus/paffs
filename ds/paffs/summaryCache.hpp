@@ -20,9 +20,10 @@
 namespace paffs {
 
 class SummaryCache{
+	static constexpr unsigned int areaSummaryEntrySize = dataPagesPerArea / 4 + 2;
 	TEST_FRIENDS;
 	//excess byte is for dirty- and wasASWritten marker
-	unsigned char summaryCache[areaSummaryCacheSize][dataPagesPerArea / 4 + 2];
+	unsigned char summaryCache[areaSummaryCacheSize][areaSummaryEntrySize];
 
 	std::unordered_map<AreaPos, uint16_t> translation;	//from area number to array offset
 	Device* dev;

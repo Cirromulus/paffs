@@ -10,7 +10,7 @@
 namespace paffs{
 	//Flash config
 	static constexpr uint16_t dataBytesPerPage  = 512;
-	static constexpr uint8_t  oobBytesPerPage = 16;
+	static constexpr uint8_t  oobBytesPerPage = dataBytesPerPage / 32;
 	static constexpr uint16_t pagesPerBlock = 64;
 	static constexpr uint16_t blocks = 16;
 	static constexpr uint8_t  blocksPerArea = 2;
