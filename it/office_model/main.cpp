@@ -19,7 +19,7 @@ using namespace outpost::nexys3;
 rtems_task
 task_system_init(rtems_task_argument)
 {
-	//setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stdout, NULL, _IONBF, 0);
 	printf("Build: " __TIME__ "\n");
 
 	SevenSegment::clear();
@@ -37,10 +37,10 @@ task_system_init(rtems_task_argument)
 		rtems_task_wake_after(100);
 	}
 
-	printf("HALLO2!\n");
+	printf("Before initing FS\n");
 	std::vector<paffs::Driver*> drv;
 	drv.push_back(paffs::getDriver(0));
-	//paffs::Paffs fs(drv);
+	paffs::Paffs fs(drv);
 
 	while(1){
 		for (uint_fast8_t i = 0; i < 12; ++i)

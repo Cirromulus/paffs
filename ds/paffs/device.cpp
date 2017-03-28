@@ -917,6 +917,12 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 	if(r != Result::ok){
 		return r;
 	}
+	if(*bytes_written != bytes_to_write){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write Inode Data in whole! (Should: %d, was: %d)",
+				bytes_to_write, *bytes_written);
+		//TODO: Handle error, maybe rewrite
+		return Result::fail;
+	}
 
 	obj->dirent->node->mod = systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
 
