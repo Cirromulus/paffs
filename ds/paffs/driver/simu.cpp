@@ -87,8 +87,16 @@ Result SimuDriver::markBad(uint32_t block_no){
 }
 
 Result SimuDriver::checkBad(uint32_t block_no){
-	(void) block_no;
-	return Result::nimpl;
+	memset(buf, 0, totalBytesPerPage);
+	for(unsigned page = 0; page < pagesPerBlock; page++){
+		Nandaddress d = translatePageToAddress(block_no * pagesPerBlock + page, cell);
+		if(cell->readPage(d.plane, d.block, d.page, buf) < 0){
+			return Result::badflash;
+		}
+		if(buf[dataBytesPerPage + 5] == 0)
+			return Result::badflash;
+	}
+	return Result::ok;
 }
 
 Nandaddress SimuDriver::translatePageToAddress(uint64_t page, FlashCell* fc){
