@@ -1,5 +1,5 @@
 Filesystem: -yaffs2- Test: -file_append- Result: 429536 Byte
-"sample", "VM", "Resident Set"
+"sample","VM","Resident_Set"
 0,15976,1644
 1,106668,20604
 2,106668,20604

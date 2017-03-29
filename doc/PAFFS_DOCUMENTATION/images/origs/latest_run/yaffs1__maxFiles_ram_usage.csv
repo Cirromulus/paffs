@@ -1,5 +1,5 @@
 Filesystem: -yaffs1- Test: -maxFiles- Result: 447 Files
-"sample", "VM", "Resident Set"
+"sample","VM","Resident_Set"
 0,15976,1736
 1,106668,20564
 2,106668,20564

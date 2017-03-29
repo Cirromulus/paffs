@@ -1,5 +1,5 @@
 Filesystem: -ff11- Test: -maxFiles- Result: 10000 Files
-"sample", "VM", "Resident Set"
+"sample","VM","Resident_Set"
 0,15976,1708
 1,106668,20596
 2,106668,20596

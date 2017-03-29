@@ -154,6 +154,7 @@ This section is under development since the filesystem is unfinished. Meanwhile 
 \appendix
 \section{TODOS}
 \begin{itemize}
+    \item file_append breaks Fs. $\rarrow$ 1. write unittest provoking this behaviour, 2. repair this usecase.
     \item Add possibility to retire subblocks in area?
     \item Read validation and error handling
 	\item When ASCache runs full, some used pages cant be marked as dirty. Build sanity checker, scanning whole FS and marking unreachable pages as such.
