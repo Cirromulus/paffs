@@ -156,7 +156,7 @@ This section is under development since the filesystem is unfinished. Meanwhile 
 \begin{itemize}
     \item file_append breaks Fs. $\rarrow$ 1. write unittest provoking this behaviour, 2. repair this usecase.
     \item Implement simple ECC for correcting two biterrors.
-    \item Read validation and error handling
+    \item Read validation and error handling. If error is found, either repair it automatically or delay it until scrubbing?
 	\item When ASCache runs full, some used pages cant be marked as dirty. Build sanity checker, scanning whole FS and marking unreachable pages as such.
 	\item Implement dynamic count of submitted areas to superpage. (Maybe call it Checkpoint?)
 	\item CRC and ECC. How will a broken FS be transferred into a safe state?
