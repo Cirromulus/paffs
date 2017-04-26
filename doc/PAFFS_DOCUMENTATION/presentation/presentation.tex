@@ -80,7 +80,7 @@
             \tableofcontents[subsectionstyle=show,hideothersubsections,sectionstyle=show/shaded,sections={1-3}]
         \end{column}
         \begin{column}{.5\textwidth}
-            \tableofcontents[subsectionstyle=show,hideothersubsections,sectionstyle=show/shaded,sections={4-}]
+            \tableofcontents[subsectionstyle=show,hideothersubsections,sectionstyle=show/shaded,sections={4-6}]
         \end{column}
     \end{columns}
    \end{frame}
@@ -159,7 +159,7 @@
 \begin{frame}
 \titlepage
 \end{frame}
-\begin{frame}[t]{Inhaltsübersicht}
+\begin{frame}[t]{Table of contents}
     \begin{columns}[t]
         \begin{column}{.5\textwidth}
             \tableofcontents[hideothersubsections,sections={1-3}]
@@ -177,117 +177,97 @@
 \end{frame}
 
 
-\section{Einleitung}
+\section{Introduction}
 \zwischenUebersicht
-\subsection{Problemstellung}
-\begin{frame}{Problemstellung}
-\begin{block}{Computergestützte Raumfahrt}
+\subsection{Overview}
+\begin{frame}{Overview}
+\begin{block}{Computer guided spaceflight}
 \begin{itemize}
-\item Besteht aus vielen Teilsystemen
+\item Consisting of many subparts
 \begin{itemize}
-\item Fokus der Arbeit liegt auf Permanentspeicher
+\item Focus of this work is mass storage
 \end{itemize}
-\item Messergebnisse 
-\item Instruktionen 
-\item Computerprogramme 
+\item Experiment data (payload) 
+\item Instructions 
+\item Program images
 \begin{itemize}
-\item[$\rightarrow$] Vieles muss zwischengespeichert werden
+\item[$\rightarrow$] Many applications for long term memory
 \end{itemize}
-
 \end{itemize}
-
-\note{
-{Computergestützte Raumfahrt}
-\begin{itemize}
-	\item Besteht aus vielen Teilsystemen wie Sensoren, Aktuatoren, Rechenwerken
-	\begin{itemize}
-		\item Fokus der Arbeit liegt auf Permanentspeicher
-	\end{itemize}
-	\item Messergebnisse 
-	\item Instruktionen 
-	\item Computerprogramme 
-	\begin{itemize}
-		\item[$\rightarrow$] Vieles muss zwischengespeichert werden
-	\end{itemize}
-	
-\end{itemize}	
-}
-
 \end{block}
-
 \end{frame}
 
-\begin{frame}{Problemstellung}
-\begin{block}{Negative Einflüsse auf Speicher}
+\begin{frame}{Overview}
+\begin{block}{Negative influences on memory}
 \begin{itemize}
-\item Erschütterungen
-\item Harte Strahlung
-\item große Temperaturschwankungen
-\item Temperaturabführung schwer
+\item Vibrations
+\item Radiation
+\item Rapid temperature changes
+\item Hard heat dissipation
 \end{itemize}
 \end{block}
-
-\note{
-	{Negative Einflüsse auf Speicher}
-		\begin{itemize}
-			\item Erschütterungen
-			\item Harte Strahlung
-			\item große Temperaturschwankungen
-			\item Temperaturabführung schwer, Darf nicht zu viel Wärme produzieren
-		\end{itemize}
-	}
 \end{frame}
 
-\begin{frame}{Problemstellung}
-\begin{block}{Abhilfe}
+\begin{frame}{Overview}
+\begin{block}{Solution}
 \begin{itemize}
-\item Strahlungsresistente oder robuste Speicher
+\item Radiation tolerant and robust memories
 	\begin{itemize}
-	\item<alert@1-> Hohe Anschaffungskosten
+	\item<alert@1-> High cost
 	\end{itemize}
 \end{itemize}
 \end{block}
-\begin{block}{Billige Speicher benutzen}
+\begin{block}{Cheap memories}
 \begin{itemize}
-\item Fehleranfälligkeit durch Dateisystem ausgleichen
-\item Eine Logik optimiert Lebensdauer und Zuverlässigkeit
+\item Compensate error rate with filesystem
+\item Its logic optimizes lifetime and reliability
 \end{itemize}
 \end{block}
 
 \end{frame}
 
-\subsection{Idee}
+\subsection{Idea}
 
-\begin{frame}{Nutzen}
+\begin{frame}{Use}
 \begin{center}
-Günstiger Speicher im Weltraum!
+Cheap memory in space
 \note{Und leichter}
 \end{center}
 \end{frame}
 
-\section{Anforderungen}
-\begin{frame}{Anforderungen}
+\section{Requirements}
+\begin{frame}{NAND Flash}
 	\begin{block}{}
 		\begin{itemize}
-			\item Auf Eigenschaften eines NAND-Flashes eingehen
-			\begin{itemize}
-				\item[$\rightarrow$] Besonders auf die beschränkte Lebensdauer
-			\end{itemize}
-			\item Redundante Speicher parallel verwalten
-			\item Bitfehler sowie Totalausfall einzelner Komponenten verkraften
-			\item Minimalen RAM Verbrauch bei skalierbaren Flashgrößen aufweisen
-			\item POSIX verwandte Dateiverwaltung ermöglichen
-			\item Datenverlust bei spontanem Stromausfall vorbeugen
+			\item Can write a page only once (512-4096 Bytes)
+			\item Can delete only a whole block (16-512 Pages)
+			\item Deletions can only happen rarely (100.000-100 Erases)
 		\end{itemize}
 	\end{block}
 \end{frame}
 
-\begin{frame}{Anforderungen}
+\begin{frame}{Requirements}
+	\begin{block}{}
+		\begin{itemize}
+			\item Take care of NAND specialities
+			\begin{itemize}
+				\item[$\rightarrow$] Especially the low lifetime
+			\end{itemize}
+			\item Manage multiple redundant chips
+			\item Tolerate bit errors as well as total loss of single chips
+			\item Show minimal RAM footprint while being able to scale with increasing size memories
+			\item Offer POSIX related file interface
+			\item Minimize loss of data after unexpected power failure
+		\end{itemize}
+	\end{block}
+\end{frame}
+
+\begin{frame}{Requirements}
 	\begin{block}{Tradeoff}
 		\begin{itemize}
-			\item Lese-/Schreibgeschwindigkeit $\longleftrightarrow$ RAM Verbrauch
-			\item Abnutzungsverringerung $\longleftrightarrow$ RAM Verbrauch, Ausfallsicherheit
-			\item Speichereffizienz $\longleftrightarrow$ RAM Verbrauch, Ausfallsicherheit
+			\item Read-/Writespeed $\longleftrightarrow$ RAM usage
+			\item Wear $\longleftrightarrow$ RAM usage, fail safety
+			\item Efficiency of data storage $\longleftrightarrow$ RAM usage, fail safety
 		\end{itemize}
 	\end{block}
 \end{frame}
@@ -296,25 +276,62 @@ Günstiger Speicher im Weltraum!
 \section{Konzept}
 \zwischenUebersicht
 \subsection{Inodes und Tree Index}
-\begin{frame}{Tree Index}
+\begin{frame}{Inodes}
 	\begin{block}{}
 		\begin{itemize}
-			\item a
+			\item Represent an Object
+			\begin{itemize}
+				\item[$\rightarrow$] File, directory or softlink
+			\end{itemize}
+			\item Point to data chunks containing each objects contents
+			\item ... and some other metadata such as an unique ID and size
 		\end{itemize}
+		
 	\end{block}
 \end{frame}
 
-\subsection{Areas und Garbage Collection}
-\begin{frame}{Areas}
-	\begin{block}{}
+\begin{frame}{Tree Index}
+\begin{block}{Structure}
+	\begin{itemize}
+		\item Contains all Inodes
+		\item Is ordered by Inode ID in a B+Tree
+		\item Branches contain pointers to branches or leaves
+		\item Leaves contain Inodes
+	\end{itemize}
+	
+\end{block}
+\end{frame}
+
+\begin{frame}{Difficulties}
+	\begin{block}{Change in a file}
 		\begin{itemize}
-			\item a
+			\item[$\rightarrow$] changes location of files data
+			\item[$\rightarrow$] changes location of Inode
+			\item[$\rightarrow$]changes location of corresponding leave
+			\item[$\rightarrow$]changes location of every parent branch including root node
+		\end{itemize}
+	\end{block}
+	\begin{block}{How to approach}
+		\begin{itemize}
+			\item Reduce wear by caching a subset of tree index and root node address
+			\item But still: how to find a ever changing root node?
 		\end{itemize}
 	\end{block}
 \end{frame}
 
 \subsection{Superblock}
 \begin{frame}{Superblock}
+	\begin{block}{Chaining}
+		\begin{itemize}
+			\item First two valid Areas contain anchor entries pointing to jump pads
+			\item Jump pads point to other pads until final super page is reached
+			\item Super page contains address of root node and uncommitted area summaries
+		\end{itemize}
+	\end{block}
+\end{frame}
+
+\subsection{Areas und Garbage Collection}
+\begin{frame}{Areas}
 	\begin{block}{}
 		\begin{itemize}
 			\item a

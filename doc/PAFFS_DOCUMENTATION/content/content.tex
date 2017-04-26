@@ -78,7 +78,7 @@ The following structure of a chained superblock provides wear levelling of the f
 For a more detailed explanation see \referenceDocument{JFFS3} Chapter 4.
 
 \paragraph{Functionality}
-The first area of a flash contains two consecutive anchor blocks. The one page with the highest (i.e newest) number inside the anchor blocks is considered valid. This anchor page holds static information like file system version, number of blocks and the like as well as the address to the first jump pad located somewhere in a superblock area. these jump pads reference either a next pad or the superpage which is a page within a superblock area. This page holds frequently changed values like the address to the root node of the index tree and the area map.\\
+The first area of a flash contains two consecutive anchor blocks. The one page with the highest (i.e newest) number inside the anchor blocks is considered valid. This anchor page holds static information like file system version, number of blocks and the like as well as the address to the first jump pad located somewhere in a superblock area. These jump pads reference either a next pad or the superpage which is a page within a superblock area. This page holds frequently changed values like the address to the root node of the index tree and the area map.\\
 
 When a change of the index tree has been committed to flash, the new address of the root node has to be written to a new superpage. The address of the new superpage is then appended to the last jump pad block. If this block is full, it will be erased and the new address is written to a new jump pad block. This requires the next higher-level jump pad to append the address of the new jump pad block, and so on. When one of the anchor blocks is full, first the anchor page is written to the other block, and then the first block is deleted.\\
 
@@ -156,11 +156,11 @@ This section is under development since the filesystem is unfinished. Meanwhile 
 \begin{itemize}
     \item file_append breaks Fs. $\rarrow$ 1. write unittest provoking this behaviour, 2. repair this usecase.
     \item Implement simple ECC for correcting two biterrors.
-    \item Read validation and error handling. If error is found, either repair it automatically or delay it until scrubbing?
+    \item Read validation and error handling. If error is found, either repair it automatically or delay it until scrubbing? Scrubbing would be not very frequent, so on-the-fly would be appreciated.
 	\item When ASCache runs full, some used pages cant be marked as dirty. Build sanity checker, scanning whole FS and marking unreachable pages as such.
-	\item Implement dynamic count of submitted areas to superpage. (Maybe call it Checkpoint?)
+	\item Implement dynamic number of uncommitted areas to superpage. (Maybe call it Checkpoint?)
 	\item CRC and ECC. How will a broken FS be transferred into a safe state?
-	\item Merge DATA and INDEX areas to a single DATA type. Benefits: Less complexity, more efficient space usage, GC desperate mode for unmounting only.
+	\item Merge DATA and INDEX areas to a single DATA type. Benefits: Less complexity, more efficient space usage, GC desperate mode for unmounting only. But maybe too overdone.
 	\item TreeCache - full commit from time to time. (Maybe 'used' marker?)
 	\item GC: Static Wear levelling, keep deletioncount in mind.
 	\item Implement additional driver function for copying pages for optimizing.
