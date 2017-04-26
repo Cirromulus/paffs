@@ -1,0 +1,333 @@
+\documentclass[
+	,footlinenumber
+	,navline=true
+	,footlineauthor
+	,ngerman
+	]{beamer}
+
+\definecolor{coolgray}{rgb}{0.90625,0.8828125,0.8359375}
+\definecolor{BurntOrange}{rgb}{1,0.5,0}
+\definecolor{Brown}{HTML}{C17D11}
+\definecolor{SeaGreen}{HTML}{2e8b57}
+
+\usepackage{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lipsum}
+\usepackage{ifthen}
+\usepackage{multirow}
+\usepackage{tikz}
+\usepackage{color}
+\usepackage{soulutf8}
+\usepackage{marvosym}
+\usepackage{wasysym}
+\usepackage{textcomp}
+\usepackage{multicol}
+\usepackage{etex}	%wegen mehr dimensions..
+\usepackage{filecontents}
+\usepackage{appendixnumberbeamer}
+\usepackage{fancyvrb}
+
+\usepackage{pgfpages}
+%\setbeameroption{show notes on second screen=right}
+\setbeamertemplate{note page}{%
+	\insertnote%
+}
+
+\fvset{fontsize=\small}
+\usepackage{listings}
+\lstset{
+  language=TeX,
+  morekeywords={begin,documentclass,usepackage,section,subsection,subsubsection}, 
+%Umlaute in listings 
+  literate=%
+	{Ö}{{\"O}}1
+	{Ä}{{\"A}}1
+	{Ü}{{\"U}}1
+	{ß}{{\ss}}1
+	{ü}{{\"u}}1
+	{ä}{{\"a}}1
+	{ö}{{\"o}}1,
+	breaklines=true,
+	}
+
+	
+
+\newcommand{\zwischenUebersicht}
+{
+   \begin{frame}
+        \frametitle{\"Ubersicht}
+	\note{
+        \tableofcontents[ 
+    		currentsubsection, 
+%		hideothersections, 
+		hideothersubsections,
+   		sectionstyle=show/hide, 
+%		sectionstyle=show/shaded, 
+%		subsectionstyle=show/hide, 
+		] 
+	}
+%	\tableofcontents[ 
+%    		currentsubsection, 
+%%		hideothersections, 
+%		hideothersubsections,
+%%   		sectionstyle=show/hide, 
+%		sectionstyle=show/shaded, 
+%		subsectionstyle=hide, 
+%		] 
+	\begin{columns}[t]
+        \begin{column}{.5\textwidth}
+            \tableofcontents[subsectionstyle=show,hideothersubsections,sectionstyle=show/shaded,sections={1-3}]
+        \end{column}
+        \begin{column}{.5\textwidth}
+            \tableofcontents[subsectionstyle=show,hideothersubsections,sectionstyle=show/shaded,sections={4-}]
+        \end{column}
+    \end{columns}
+   \end{frame}
+}
+
+
+%Easy Quoteblock
+%Use: \quoteblock{Quoute Adii as manimus.}{Wurstlet}
+\newcommand{\quoteblock}[2]
+{
+\begin{block}{}
+\begin{quote}
+    ``#1''
+  \end{quote}
+  \vskip3mm
+  \hspace*\fill{\small--- #2} 
+\end{block}
+}
+
+\newcommand{\miniblock}[2]
+{
+\hspace*{.1\linewidth}\begin{minipage}{.8\linewidth}
+    \begin{block}{#1}
+      #2
+    \end{block}
+    \end{minipage}
+}
+
+\usepackage{tikz}
+\usetikzlibrary{shapes,snakes,arrows}
+\usetikzlibrary{positioning}
+\usetikzlibrary{arrows}
+\usepackage{pgfplots}
+\usetikzlibrary{calc,fadings,decorations.pathreplacing}
+
+\usepackage{amsmath,amssymb}
+\usepackage{array}
+\usepackage{mathrsfs}
+\usepackage{listings}
+
+\usepackage{boxedminipage}
+
+\graphicspath{{../pictures/}}
+
+\tikzstyle{mybox} = [draw=red, fill=coolgray, very thick,
+    rectangle, rounded corners, inner sep=5pt, inner ysep=10pt,
+	text width=.9\textwidth]
+\tikzstyle{fancytitle} = [fill=red, text=white, rounded corners]
+
+\DeclareMathOperator{\ArcSin}{ArcSin}
+\DeclareMathOperator{\ArcCos}{arc cos}
+
+\mode<presentation>
+{  
+	\usetheme[headlinetitle={geht nicht, siehe outer theme z. 166}]{Bremen}
+	\fbnum{03}
+	\fbname{RY-AVS}
+	\institutelogo{z. 159 im outertheme.}
+	\title{geht nicht, siehe outer theme z. 166}
+}
+
+\usepackage[scaled=.90]{helvet}
+\renewcommand\ttdefault{txtt}
+\usefonttheme[onlymath]{serif}
+
+\title{Protective Avionics Flash File System\\PAFFS}
+\author[Pascal.Pieper@dlr.de]{Pascal Pieper}
+
+\date{\today}
+
+
+\begin{document}
+\setbeamertemplate{caption}{\raggedright\insertcaption\par} %Kein ``Abbildung: `` vor captions
+
+
+\begin{frame}
+\titlepage
+\end{frame}
+\begin{frame}[t]{Inhaltsübersicht}
+    \begin{columns}[t]
+        \begin{column}{.5\textwidth}
+            \tableofcontents[hideothersubsections,sections={1-3}]
+        \end{column}
+        \begin{column}{.5\textwidth}
+            \tableofcontents[hideothersubsections,sections={4-6}]
+        \end{column}
+    \end{columns}
+\note {
+    \begin{multicols}{2}
+    \tableofcontents
+    \end{multicols}
+    
+    }
+\end{frame}
+
+
+\section{Einleitung}
+\zwischenUebersicht
+\subsection{Problemstellung}
+\begin{frame}{Problemstellung}
+\begin{block}{Computergestützte Raumfahrt}
+\begin{itemize}
+\item Besteht aus vielen Teilsystemen
+\begin{itemize}
+\item Fokus der Arbeit liegt auf Permanentspeicher
+\end{itemize}
+\item Messergebnisse 
+\item Instruktionen 
+\item Computerprogramme 
+\begin{itemize}
+\item[$\rightarrow$] Vieles muss zwischengespeichert werden
+\end{itemize}
+
+\end{itemize}
+
+\note{
+{Computergestützte Raumfahrt}
+\begin{itemize}
+	\item Besteht aus vielen Teilsystemen wie Sensoren, Aktuatoren, Rechenwerken
+	\begin{itemize}
+		\item Fokus der Arbeit liegt auf Permanentspeicher
+	\end{itemize}
+	\item Messergebnisse 
+	\item Instruktionen 
+	\item Computerprogramme 
+	\begin{itemize}
+		\item[$\rightarrow$] Vieles muss zwischengespeichert werden
+	\end{itemize}
+	
+\end{itemize}	
+}
+
+\end{block}
+
+\end{frame}
+
+\begin{frame}{Problemstellung}
+\begin{block}{Negative Einflüsse auf Speicher}
+\begin{itemize}
+\item Erschütterungen
+\item Harte Strahlung
+\item große Temperaturschwankungen
+\item Temperaturabführung schwer
+\end{itemize}
+\end{block}
+
+\note{
+	{Negative Einflüsse auf Speicher}
+		\begin{itemize}
+			\item Erschütterungen
+			\item Harte Strahlung
+			\item große Temperaturschwankungen
+			\item Temperaturabführung schwer, Darf nicht zu viel Wärme produzieren
+		\end{itemize}
+	}
+\end{frame}
+
+\begin{frame}{Problemstellung}
+\begin{block}{Abhilfe}
+\begin{itemize}
+\item Strahlungsresistente oder robuste Speicher
+	\begin{itemize}
+	\item<alert@1-> Hohe Anschaffungskosten
+	\end{itemize}
+\end{itemize}
+\end{block}
+\begin{block}{Billige Speicher benutzen}
+\begin{itemize}
+\item Fehleranfälligkeit durch Dateisystem ausgleichen
+\item Eine Logik optimiert Lebensdauer und Zuverlässigkeit
+\end{itemize}
+\end{block}
+
+\end{frame}
+
+\subsection{Idee}
+
+\begin{frame}{Nutzen}
+\begin{center}
+Günstiger Speicher im Weltraum!
+\note{Und leichter}
+\end{center}
+\end{frame}
+
+\section{Anforderungen}
+\begin{frame}{Anforderungen}
+	\begin{block}{}
+		\begin{itemize}
+			\item Auf Eigenschaften eines NAND-Flashes eingehen
+			\begin{itemize}
+				\item[$\rightarrow$] Besonders auf die beschränkte Lebensdauer
+			\end{itemize}
+			\item Redundante Speicher parallel verwalten
+			\item Bitfehler sowie Totalausfall einzelner Komponenten verkraften
+			\item Minimalen RAM Verbrauch bei skalierbaren Flashgrößen aufweisen
+			\item POSIX verwandte Dateiverwaltung ermöglichen
+			\item Datenverlust bei spontanem Stromausfall vorbeugen
+		\end{itemize}
+	\end{block}
+\end{frame}
+
+\begin{frame}{Anforderungen}
+	\begin{block}{Tradeoff}
+		\begin{itemize}
+			\item Lese-/Schreibgeschwindigkeit $\longleftrightarrow$ RAM Verbrauch
+			\item Abnutzungsverringerung $\longleftrightarrow$ RAM Verbrauch, Ausfallsicherheit
+			\item Speichereffizienz $\longleftrightarrow$ RAM Verbrauch, Ausfallsicherheit
+		\end{itemize}
+	\end{block}
+\end{frame}
+
+
+\section{Konzept}
+\zwischenUebersicht
+\subsection{Inodes und Tree Index}
+\begin{frame}{Tree Index}
+	\begin{block}{}
+		\begin{itemize}
+			\item a
+		\end{itemize}
+	\end{block}
+\end{frame}
+
+\subsection{Areas und Garbage Collection}
+\begin{frame}{Areas}
+	\begin{block}{}
+		\begin{itemize}
+			\item a
+		\end{itemize}
+	\end{block}
+\end{frame}
+
+\subsection{Superblock}
+\begin{frame}{Superblock}
+	\begin{block}{}
+		\begin{itemize}
+			\item a
+		\end{itemize}
+	\end{block}
+\end{frame}
+
+\subsection{Fehlerkorrektur und Redundanz}
+\begin{frame}{Fehlerkorrektur}
+	\begin{block}{}
+		\begin{itemize}
+			\item a
+		\end{itemize}
+	\end{block}
+\end{frame}
+\end{document}
