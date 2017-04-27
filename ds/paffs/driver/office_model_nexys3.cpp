@@ -37,7 +37,8 @@ Result OfficeModelNexys3Driver::writePage(uint64_t page_no,
 		memset(buf, 0xFF, totalBytesPerPage);
 	}
 	memcpy(buf, data, data_len);
-	nand->writePage(bank, device, page_no, static_cast<uint8_t*>(data));
+	printf("Write Page at %d, %d, page %d was omitted because of testing\n");
+	//nand->writePage(bank, device, page_no, static_cast<uint8_t*>(data));
 	return Result::ok;
 }
 Result OfficeModelNexys3Driver::readPage(uint64_t page_no,

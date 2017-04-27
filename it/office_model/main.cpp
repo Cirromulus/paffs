@@ -15,12 +15,13 @@ extern "C"
 #include <paffs/paffs.hpp>
 
 using namespace outpost::nexys3;
+using namespace paffs;
 
 rtems_task
 task_system_init(rtems_task_argument)
 {
-	setvbuf(stdout, NULL, _IONBF, 0);
-	printf("Build: " __TIME__ "\n");
+	//setvbuf(stdout, NULL, _IONBF, 0);
+	printf("Build: " __DATE__ " " __TIME__ "\n");
 
 	SevenSegment::clear();
 	SevenSegment::write(0, 'P');
@@ -40,7 +41,13 @@ task_system_init(rtems_task_argument)
 	printf("Before initing FS\n");
 	std::vector<paffs::Driver*> drv;
 	drv.push_back(paffs::getDriver(0));
-	paffs::Paffs fs(drv);
+	Paffs fs(drv);
+
+	printf("Trying to mount FS...\n");
+	Result r = fs.mount();
+	printf("\t %s\n", err_msg(r));
+
+
 
 	while(1){
 		for (uint_fast8_t i = 0; i < 12; ++i)

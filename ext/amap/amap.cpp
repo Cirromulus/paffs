@@ -8,7 +8,7 @@
 
 using namespace outpost::iff;
 
-#define AMAP_DEBUG
+//#define AMAP_DEBUG
 
 #ifdef AMAP_DEBUG
 #   define DEBUG(x) x
@@ -81,32 +81,42 @@ Amap::write(uint32_t address,
             outpost::time::Duration timeout,
             WriteHandler& handler)
 {
-	printk("Amap::write before mutex lock\n");
+#ifdef AMAP_DEBUG
+	printf("Amap::write before mutex lock\n");
+#endif
     // Guard operation against concurrent accesses
     outpost::rtos::MutexGuard lock(mOperationLock);
-
+#ifdef AMAP_DEBUG
     printk("Amap::write before flushReceiveBuffer \n");
+#endif
     // Remove all previously received messages
     mSpacewire.flushReceiveBuffer();
 
     hal::SpaceWire::TransmitBuffer * txBuffer = 0;
+#ifdef AMAP_DEBUG
     printk("Amap::write transmit buffer before request: %p\n", txBuffer);
+#endif
     if (mSpacewire.requestBuffer(txBuffer, timeout) != hal::SpaceWire::Result::success)
     {
+    	printf("Amap::write could not request Buffer from SPWL!\n");
         mErrorCounter.writeOperation++;
         return false;
     }
+#ifdef AMAP_DEBUG
     printk("Amap::write transmit buffer after request: %p\n", txBuffer);
-
     printk("Amap::write before write Header with txBuffer->data: %p\n", txBuffer->getData().begin());
+#endif
+
     // Write AMAP header
     writeHeader(txBuffer->getData(), OPERATION_WRITE, address, length);
-
+#ifdef AMAP_DEBUG
     printk("Amap::write before write main Body\n");
+#endif
     // Write payload to buffer
     handler.write(&txBuffer->getData()[requestHeaderSize], length * 4);
-
+#ifdef AMAP_DEBUG
     printk("Amap::write before CRC calc\n");
+#endif
 
     const std::size_t index = requestHeaderSize + length * 4;
     txBuffer->getData()[index] = Crc8Ccitt::calculate(
@@ -125,25 +135,33 @@ Amap::write(uint32_t address,
 
     // Send message
     //spacewire.send(txBuffer);
+#ifdef AMAP_DEBUG
     printk("Amap::write before send\n");
+#endif
     mRetries = 0;
     while (mSpacewire.send(txBuffer) != hal::SpaceWire::Result::success)
     {
-      printf(".\n");
+    	printf(".\n");
         // retry 100 times until packet can be send
         mRetries++;
         if (mRetries > 100)
             break;
     }
 
-    printk("Amap::write before receive Buffer\n");
+#ifdef AMAP_DEBUG
+    printk("Amap::write before init receive Buffer\n");
+#endif
     // Receive response
     hal::SpaceWire::ReceiveBuffer rxBuffer;
+
+#ifdef AMAP_DEBUG
+    printk("Amap::write before receive Buffer\n");
+#endif
     //rxBuffer.getLength() = length;//FIXME: Receiver length has to be specified for GR712
     //spacewire.receive(rxBuffer, hal::SpaceWire::blocking);
     if (mSpacewire.receive(rxBuffer, timeout) != hal::SpaceWire::Result::success)
     {
-    	printk("Amap::write Could not receive\n");
+        printf("Amap::write Could not receive\n");
         // FIXME timeout
         // Could not receive a matching message
         mErrorCounter.writeOperation++;
@@ -155,10 +173,12 @@ Amap::write(uint32_t address,
     {
         printf("AMAP-WR RxBuff[%d]: %d, %X\n", i, rxBuffer.getData()[i], rxBuffer.getData()[i]);
     }
+    printk("Amap::write before check response Header\n");
 #endif
 
     if (!checkResponseHeader(rxBuffer, 0))
     {
+    	printf("Amap::write got wrong or no response Header\n");
         mErrorCounter.writeOperation++;
         mSpacewire.releaseBuffer(rxBuffer);
         return false;
@@ -322,8 +342,10 @@ Amap::writeHeader(outpost::BoundedArray<uint8_t> buffer,
                   uint32_t address,
                   std::size_t length)
 {
+#ifdef AMAP_DEBUG
 	printk("amap::writeHeader with buffer: %p, address %" PRIu32 " and length: %u\n",
 			buffer.begin(), address, length);
+#endif
     Serialize packet(buffer);
 
     packet.store(targetLogicalAddress);
@@ -331,7 +353,8 @@ Amap::writeHeader(outpost::BoundedArray<uint8_t> buffer,
     packet.store(address);
     packet.store < uint16_t > (length);
     packet.store < uint8_t > (operation);
-    packet.store < uint8_t > (Crc8Ccitt::calculate(buffer)); //, 10 - 1));
+    buffer = outpost::BoundedArray<uint8_t>(buffer.begin(), packet.getPosition());
+    packet.store < uint8_t > (Crc8Ccitt::calculate(buffer));
 
 }
 
@@ -342,6 +365,7 @@ Amap::checkResponseHeader(hal::SpaceWire::ReceiveBuffer& buffer,
     if (buffer.getEndMarker() != hal::SpaceWire::eop || buffer.getLength() < responseHeaderSize)
     {
         // Wrong packet size
+    	printf("Amap::checkResponseHeader : wrong packet size\n");
         mErrorCounter.responsePacketSize++;
         return false;
     }
@@ -350,6 +374,7 @@ Amap::checkResponseHeader(hal::SpaceWire::ReceiveBuffer& buffer,
             || buffer.getData()[1] != protocolIdentifier)
     {
         // Packet is not an AMAP packet or destinated for a different device
+    	printf("Amap::checkResponseHeader : not an AMAP packet or destinated for a different device\n");
         return false;
     }
 
@@ -357,6 +382,7 @@ Amap::checkResponseHeader(hal::SpaceWire::ReceiveBuffer& buffer,
     if (Crc8Ccitt::calculate(buffer.getData()) != 0)
     {
         // Header CRC error
+    	printf("Amap::checkResponseHeader : Header CRC error\n");
         mErrorCounter.responseHeaderCrc++;
         return false;
     }
@@ -366,10 +392,12 @@ Amap::checkResponseHeader(hal::SpaceWire::ReceiveBuffer& buffer,
         if (buffer.getData()[2] == OPERATION_NACK_CRC_WRONG)
         {
             // Operation failed => No payload available
+        	printf("Amap::checkResponseHeader : Target states wrong CRC\n");
             mErrorCounter.responseNackCrc++;
         }
         else
         {
+        	printf("Amap::checkResponseHeader : Undefined NACK response\n");
             mErrorCounter.responseNackUndefined++;
         }
         return false;
@@ -387,6 +415,7 @@ Amap::checkResponseHeader(hal::SpaceWire::ReceiveBuffer& buffer,
     if (buffer.getLength() - 2 != expectedLength)
     {
         mErrorCounter.responsePayloadLength++;
+        printf("Amap::checkResponseHeader : did not get expected length\n");
         return false;
     }
 
@@ -398,6 +427,7 @@ Amap::checkResponseHeader(hal::SpaceWire::ReceiveBuffer& buffer,
 					expectedPayloadLength + 1))
 			!= 0)
     {
+    	printf("Amap::checkResponseHeader : Payload got wrong CRC\n");
         mErrorCounter.responsePayloadCrc++;
         return false;   // Payload CRC errorCounter
     }

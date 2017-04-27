@@ -82,7 +82,7 @@ Nand::enableLatchUpProtection()
     		address, buffer);
     if (!amap.write(address, buffer, 1, outpost::time::Milliseconds(2)))
     {
-        LOG(printf("NAND: Failure in LUP command\n")
+        LOG(printf("NAND: enable LatchUp Prot. Failure in LUP command\n")
         ;
     )
 }

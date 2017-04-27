@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 
+//#define SPWL_DEBUG
 
 // ----------------------------------------------------------------------------
 outpost::leon3::SpaceWireLight::SpaceWireLight(uint32_t index) :
@@ -117,9 +118,10 @@ outpost::leon3::SpaceWireLight::requestBuffer(
 //    }
 	// TODO buffer management
 	(void) timeout; //TODO: implement timeout
+#ifdef SPWL_DEBUG
 	printk("SpaceWireLight::requestBuffer mTxBuffer.getData().begin() "
 			"before reclaim at %p \n", mTxBuffer.getData().begin());
-
+#endif
     if (!mFirstTransmit)
     {
         struct spwl_txbuf* reclaimedBuffer;
