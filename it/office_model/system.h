@@ -14,7 +14,7 @@
 #include <bsp.h>
 
 #define CONFIGURE_INIT_TASK_ATTRIBUTES      RTEMS_FLOATING_POINT
-#define CONFIGURE_INIT_TASK_STACK_SIZE      8192
+#define CONFIGURE_INIT_TASK_STACK_SIZE      64*8192
 
 // Configuration information
 #define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
@@ -23,7 +23,7 @@
 
 // ----------------------------------------------------------------------------
 // Tasks
-#define CONFIGURE_MAXIMUM_TASKS             3
+#define CONFIGURE_MAXIMUM_TASKS             1
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
 #define CONFIGURE_EXTRA_TASK_STACKS         (3 * RTEMS_MINIMUM_STACK_SIZE)
 

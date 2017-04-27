@@ -9,6 +9,7 @@
 using namespace outpost::iff;
 
 //#define AMAP_DEBUG
+//#define AMAP_DEBUG_EXT
 
 #ifdef AMAP_DEBUG
 #   define DEBUG(x) x
@@ -126,7 +127,7 @@ Amap::write(uint32_t address,
 			);
     txBuffer->setLength(index + 1);
 
-#ifdef AMAP_DEBUG
+#ifdef AMAP_DEBUG_EXT
     for(uint_fast16_t i = 0; i < txBuffer->getLength(); i++)
     {
         printf("AMAP-WR TxBuff[%d]: %d, %X\n", i, txBuffer->getData()[i], txBuffer->getData()[i]);
@@ -168,7 +169,7 @@ Amap::write(uint32_t address,
         return false;
     }
 
-#ifdef AMAP_DEBUG
+#ifdef AMAP_DEBUG_EXT
     for(uint_fast16_t i = 0; i < rxBuffer.getLength(); i++)
     {
         printf("AMAP-WR RxBuff[%d]: %d, %X\n", i, rxBuffer.getData()[i], rxBuffer.getData()[i]);
@@ -238,6 +239,8 @@ Amap::read(uint32_t address,
             break;
     }
 
+    DEBUG(printf("Sent txBuffer\n");)
+
     // Receive response
     hal::SpaceWire::ReceiveBuffer rxBuffer;
     //rxBuffer.getLength() = length;//FIXME: Receiver length has to be specified for GR712 (currently defining maximum length)
@@ -245,11 +248,13 @@ Amap::read(uint32_t address,
     {
         // FIXME timeout
         // Could not receive a matching message
+    	printf("Amap:read could not receive anser\n");
         mErrorCounter.readOperation++;
         return false;
     }
 
-#ifdef AMAP_DEBUG
+#ifdef AMAP_DEBUG_EXT
+    printf("Amap:read answer received\n");
     for(uint_fast16_t i = 0; i < rxBuffer.getLength(); i++)
     {
         printf("AMAP-Read RxBuff[%d]: %d, %X\n", i, rxBuffer.getData()[i], rxBuffer.getData()[i]);
@@ -262,6 +267,7 @@ Amap::read(uint32_t address,
         mSpacewire.releaseBuffer(rxBuffer);
         return false;
     }
+    DEBUG(printf("Response Header OK\n");)
 
     handler.read(&rxBuffer.getData()[responseHeaderSize], length * 4);
 
@@ -287,7 +293,7 @@ Amap::ping(Information& info,
     writeHeader(txBuffer->getData(), OPERATION_PING, 0, 0);
     txBuffer->setLength(requestHeaderSize);
 
-#ifdef AMAP_DEBUG
+#ifdef AMAP_DEBUG_EXT
     for(uint_fast16_t i = 0; i < txBuffer->getLength(); i++)
     {
         printf("Buff[%d]: %d, %X\n", i, txBuffer->getData()[i], txBuffer->getData()[i]);
@@ -315,7 +321,7 @@ Amap::ping(Information& info,
         return false;
     }
 
-#ifdef AMAP_DEBUG
+#ifdef AMAP_DEBUG_EXT
     for(uint_fast16_t i = 0; i < rxBuffer.getLength(); i++)
     {
         printf("Buff[%d]: %d, %X\n", i, rxBuffer.getData()[i], rxBuffer.getData()[i]);

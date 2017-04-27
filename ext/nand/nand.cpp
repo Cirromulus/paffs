@@ -78,11 +78,9 @@ Nand::enableLatchUpProtection()
 
     payload.store < uint32_t > ((1 << 3) | (1 << 2) | (1 << 1) | (1 << 0));
     uint32_t address = baseAddress + latchUpProtectionCommandRegister;
-    printk("Now writing with amap. Address: %" PRIu32 " Data at: %p\n",
-    		address, buffer);
     if (!amap.write(address, buffer, 1, outpost::time::Milliseconds(2)))
     {
-        LOG(printf("NAND: enable LatchUp Prot. Failure in LUP command\n")
+        LOG(printf("NAND: Failure in LUP command\n")
         ;
     )
 }
@@ -143,8 +141,10 @@ else
   // wait until flash is ready
 while (!isReady())
 {
-  //rtems_task_wake_after(10);
-//		printf("Status: %04"PRIX32"\n", getStatus());
+	rtems_task_wake_after(10);
+	LOG(printf("Status: %04"PRIX32"\n", getStatus())
+	;
+	)
 }
 
   // reading
@@ -173,14 +173,16 @@ payload.store < uint32_t
 uint32_t address = baseAddress + writeFlashCommandRegister;
 
 if (!amap.write(address, buffer, 1, outpost::time::Milliseconds(2)))
-{
-LOG(printf("NAND: Failure to write flash command (read page)\n")
-;
-)
-}
+	{
+	LOG(printf("NAND: Failure to write flash command (read page)\n")
+	;
+	)
+	}
 else
-{
-//		LOG(printf("NAND: read Page %"PRIu32"\n", page);)
+	{
+	LOG(printf("NAND: read Page %"PRIu32"\n", page)
+	;
+	)
 }
 
 while (!Nand::isReady())
@@ -226,7 +228,7 @@ LOG(printf("NAND: Failure to write flash command (write page)\n")
 }
 else
 {
-//		LOG(printf("NAND: write Page %"PRIu32"\n", page);)
+		LOG(printf("NAND: write Page %"PRIu32"\n", page);)
 }
 
 while (!Nand::isReady())
@@ -255,8 +257,8 @@ LOG(printf("NAND: Failure to write flash command (block erase)\n")
 }
 else
 {
-//		LOG(printf("NAND: Erase block %"PRIu32" (page %"PRIu32"..%"PRIu32")\n",
-//				block, block*64,block*64+63);)
+		LOG(printf("NAND: Erase block %"PRIu32" (page %"PRIu32"..%"PRIu32")\n",
+				block, block*64,block*64+63);)
 }
 
 while (!Nand::isReady())

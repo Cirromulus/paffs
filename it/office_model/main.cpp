@@ -22,6 +22,7 @@ task_system_init(rtems_task_argument)
 {
 	//setvbuf(stdout, NULL, _IONBF, 0);
 	printf("Build: " __DATE__ " " __TIME__ "\n");
+	rtems_stack_checker_report_usage();
 
 	SevenSegment::clear();
 	SevenSegment::write(0, 'P');
@@ -41,12 +42,16 @@ task_system_init(rtems_task_argument)
 	printf("Before initing FS\n");
 	std::vector<paffs::Driver*> drv;
 	drv.push_back(paffs::getDriver(0));
-	Paffs fs(drv);
+	Paffs *fs = new Paffs(drv);
+	fs->setTraceMask(PAFFS_TRACE_ALL);
+
+	rtems_stack_checker_report_usage();
 
 	printf("Trying to mount FS...\n");
-	Result r = fs.mount();
+	Result r = fs->mount();
 	printf("\t %s\n", err_msg(r));
 
+	rtems_stack_checker_report_usage();
 
 
 	while(1){

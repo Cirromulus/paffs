@@ -9,6 +9,10 @@
 #include "paffs_trace.hpp"
 #include "driver/driver.hpp"
 
+//debug
+#include <rtems.h>
+#include <rtems/stackchk.h>
+
 namespace paffs{
 
 outpost::rtos::SystemClock systemClock;
@@ -113,13 +117,22 @@ Result Device::mnt(){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
+	}else{
+		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "mount with valid driver");
 	}
 	if(mounted)
 		return Result::alrMounted;
 
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "not yet mounted");
+
+
 	Result r = initializeDevice();
 	if(r != Result::ok)
 		return r;
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Could init Device");
+
+
+	rtems_stack_checker_report_usage();
 
 	r = sumCache.loadAreaSummaries();
 	if(r == Result::nf){
@@ -127,7 +140,9 @@ Result Device::mnt(){
 		destroyDevice();
 		return r;
 	}
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Area Summaries loaded");
 
+	rtems_stack_checker_report_usage();
 
 	for(AreaPos i = 0; i < areasNo; i++){
 		if(areaMap[i].type == AreaType::garbageBuffer){
@@ -137,6 +152,7 @@ Result Device::mnt(){
 		//data and index active areas are extracted by areaSummaryCache
 	}
 	mounted = true;
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Mount sucessful");
 	return r;
 }
 Result Device::unmnt(){
@@ -1024,10 +1040,13 @@ Result Device::initializeDevice(){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Device has driver set");
 	if(mounted)
 		return Result::alrMounted;
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Device is not yet mounted");
 
 	memset(areaMap, 0, sizeof(Area) * areasNo);
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Cleared %d Byte in Areamap", sizeof(Area) * areasNo);
 
 	activeArea[AreaType::superblock] = 0;
 	activeArea[AreaType::index] = 0;
@@ -1045,7 +1064,7 @@ Result Device::initializeDevice(){
 				blocks, blocksPerArea, blocks % blocksPerArea);
 		return Result::einval;
 	}
-
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Init success");
 	return Result::ok;
 }
 

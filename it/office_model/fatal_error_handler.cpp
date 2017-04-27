@@ -109,6 +109,9 @@ fatalErrorHandler(Internal_errors_Source source,
             {
                 printHwError(errorCode);
             }
+            else if(errorCode == 0x00000081){
+            	printk("Stack overflow\n");
+            }
             else
             {
                 printk("Unknown Error!\n");
@@ -118,7 +121,7 @@ fatalErrorHandler(Internal_errors_Source source,
 
         case INTERNAL_ERROR_CORE:
         case INTERNAL_ERROR_POSIX_API:
-        //case INTERNAL_ERROR_ITRON_API: undefined under 4.12
+        case INTERNAL_ERROR_ITRON_API: //undefined under 4.12
             printk("Other\n\n");
             printk("Source: %i, %i\n", source, isInternal);
             printk("Code  : 0x%08X\n", errorCode);

@@ -11,10 +11,6 @@
 #include <stdio.h>
 #include "driver.hpp"
 
-//This seems to be discontinued in outpost?
-//#include <outpost/nexys3/spacewire_light.h>
-//#include <outpost/nexys3/sevensegment.h>
-//#include <outpost/nexys3/gpio.h>
 
 #include <amap.h>
 #include <nand.h>
@@ -40,10 +36,8 @@ public:
 		if(!initSpaceWire()){
 			printf("Spacewire connection failed!");
 		}
-
 		if_fpga = new Amap(spacewire);
 		nand = new Nand(*if_fpga, 0x00200000);
-		printk("ENABLE LATCHUP PROTECTION\n");
 		nand->enableLatchUpProtection();
 	}
 

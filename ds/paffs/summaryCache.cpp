@@ -11,6 +11,10 @@
 #include "summaryCache.hpp"
 #include "driver/driver.hpp"
 
+//debug
+#include <rtems.h>
+#include <rtems/stackchk.h>
+
 namespace paffs {
 
 SummaryCache::SummaryCache(Device* mdev) : dev(mdev){
@@ -216,23 +220,33 @@ Result SummaryCache::loadAreaSummaries(){
 	for(AreaPos i = 0; i < 2; i++){
 		memset(summaryCache[i], 0, areaSummaryEntrySize);
 	}
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "cleared summary Cache");
 	SummaryEntry tmp[2][dataPagesPerArea];
 	SuperIndex index;
 	memset(&index, 0, sizeof(SuperIndex));
 	index.areaMap = dev->areaMap;
 	index.areaSummary[0] = tmp[0];
 	index.areaSummary[1] = tmp[1];
+
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Inited SuperIndex");
+
+	rtems_stack_checker_report_usage();
+
 	Result r = dev->superblock.readSuperIndex(&index);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "failed to load Area Summaries!");
 		return r;
 	}
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "read superIndex successfully");
+
+	rtems_stack_checker_report_usage();
 
 	for(int i = 0; i < 2; i++){
 		if(index.asPositions[i] > 0){
 			translation[index.asPositions[i]] = i;
 			packStatusArray(i, index.areaSummary[i]);
 			dev->activeArea[dev->areaMap[index.asPositions[i]].type] = dev->areaMap[index.asPositions[i]].position;
+			PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Loaded area summary %d pn %d", index.asPositions[i], dev->areaMap[index.asPositions[i]].position);
 		}
 	}
 

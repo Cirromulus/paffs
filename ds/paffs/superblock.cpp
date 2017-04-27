@@ -63,19 +63,21 @@ void Superblock::printSuperIndex(SuperIndex* ind){
 
 
 Result Superblock::getAddrOfMostRecentSuperIndex(Addr *out){
-
 	uint32_t pos1, index1;
 	Result r1 = findMostRecentEntryInBlock(0, 0, &pos1, &index1);
 	if(r1 != Result::ok && r1 != Result::nf)
 		return r1;
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Analyzed Block 0");
 
 	uint32_t pos2, index2;
 	Result r2 = findMostRecentEntryInBlock(0, 1, &pos2, &index2);
 	if(r2 != Result::ok && r2 != Result::nf)
 		return r2;
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Analyzed Block 1");
 
 	if(r1 == Result::nf && r2 == Result::nf)
 		return Result::nf;
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Found SuperIndex(es)");
 
 	//Special case where block offset is zero
 	*out = index1 >= index2 ? combineAddress(0, pos1) : combineAddress(0, pos2);
@@ -200,6 +202,7 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read Super Index!");
 		return r;
 	}
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Read of SuperPage successful");
 
 	if(traceMask & PAFFS_TRACE_SUPERBLOCK){
 		printf("Read Super Index:\n");
@@ -250,6 +253,7 @@ Result Superblock::findMostRecentEntryInBlock(uint32_t area, uint8_t block, uint
 		Result r = dev->driver->readPage(getPageNumber(addr, dev), &no, sizeof(uint32_t));
 		if(r != Result::ok)
 			return r;
+		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Read Page %ul successful", getPageNumber(addr, dev));
 		if(no == 0xFFFFFFFF){
 			// Unprogrammed, therefore empty
 			if(*maximum != 0 || overflow)
