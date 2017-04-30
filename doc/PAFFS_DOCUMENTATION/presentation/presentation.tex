@@ -302,6 +302,13 @@ Cheap memory in space
 \end{block}
 \end{frame}
 
+\begin{frame}{Tree Index}
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=\textwidth]{../images/btree.png}
+	\end{figure}
+\end{frame}
+
 \begin{frame}{Difficulties}
 	\begin{block}{Change in a file}
 		\begin{itemize}
@@ -319,6 +326,14 @@ Cheap memory in space
 	\end{block}
 \end{frame}
 
+
+\begin{frame}{Tree Index}
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=\textwidth]{../images/btree_2.png}
+	\end{figure}
+\end{frame}
+
 \subsection{Superblock}
 \begin{frame}{Superblock}
 	\begin{block}{Chaining}
@@ -334,9 +349,19 @@ Cheap memory in space
 \begin{frame}{Areas}
 	\begin{block}{}
 		\begin{itemize}
-			\item a
+			\item Combine erase blocks to a logical group
+			\item Act as a single erase block
+			\item Abstract logical and physical position on flash
+			\item Contain only data of one type of \texttt{superblock}, \texttt{index}, \texttt{data} and \texttt{journal}
 		\end{itemize}
 	\end{block}
+\end{frame}
+
+\begin{frame}{Areas}
+	\begin{figure}[H]
+		\centering
+		\includegraphics[height=0.9\textheight]{../images/Areas_address.png}
+	\end{figure}
 \end{frame}
 
 \subsection{Fehlerkorrektur und Redundanz}
