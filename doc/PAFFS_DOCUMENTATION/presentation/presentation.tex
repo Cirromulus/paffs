@@ -298,7 +298,12 @@ Cheap memory in space
 		\item Branches contain pointers to branches or leaves
 		\item Leaves contain Inodes
 	\end{itemize}
-	
+\end{block}
+\begin{block}{Advantages}
+	\begin{itemize}
+		\item All Operations $\mathcal{O}(\log n)$
+		\item Only one tree path is changed upon write, not the whole index (see tables etc)
+	\end{itemize}
 \end{block}
 \end{frame}
 
@@ -312,10 +317,10 @@ Cheap memory in space
 \begin{frame}{Difficulties}
 	\begin{block}{Change in a file}
 		\begin{itemize}
-			\item[$\rightarrow$] changes location of files data
+			\item[$\rightarrow$] changes location of the files data
 			\item[$\rightarrow$] changes location of Inode
-			\item[$\rightarrow$]changes location of corresponding leave
-			\item[$\rightarrow$]changes location of every parent branch including root node
+			\item[$\rightarrow$] changes location of corresponding leave
+			\item[$\rightarrow$] changes location of every parent branch including root node
 		\end{itemize}
 	\end{block}
 	\begin{block}{How to approach}
@@ -353,6 +358,7 @@ Cheap memory in space
 			\item Act as a single erase block
 			\item Abstract logical and physical position on flash
 			\item Contain only data of one type of \texttt{superblock}, \texttt{index}, \texttt{data} and \texttt{journal}
+			\item \textit{Areasummary} and its cache
 		\end{itemize}
 	\end{block}
 \end{frame}
@@ -364,11 +370,30 @@ Cheap memory in space
 	\end{figure}
 \end{frame}
 
-\subsection{Fehlerkorrektur und Redundanz}
-\begin{frame}{Fehlerkorrektur}
-	\begin{block}{}
+\subsection{Error correction and redundancy}
+\begin{frame}{Error correction}
+	\begin{block}{Idea}
 		\begin{itemize}
-			\item a
+			\item Every flash chip maintains its own, valid filesystem
+			\item \textit{OOB} is fully used for ECC (other fs's use the OOB-area to store other metadata as well)
+			\item Check happens on read actions and during periodic scrubbing 
+			\item Bit errors are, if possible, corrected on the fly by rewriting the page to another location
+			\item If bit error is not correctable, a valid copy from another image is taken \note{Only if it was a data chunk, problems in Index, Superblock or Journal require a full copy of FS}
+		\end{itemize}
+	\end{block}
+\end{frame}
+
+\subsection{Journaling}
+\begin{frame}{Journaling}
+	\begin{block}{Idea}
+		\begin{itemize}
+			\item Keeps the filesystem sane when a sudden powerloss occurs
+			\item Logs the intention to modify flash before actual conduct
+			\item For every Action that is performed only in RAM (caching)
+			\begin{itemize}
+				\item And for write operations on flash
+			\end{itemize}
+			\item If filesystem is interrupted, it can either revert changes or continue the last operation
 		\end{itemize}
 	\end{block}
 \end{frame}
