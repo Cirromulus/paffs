@@ -9,10 +9,6 @@
 #include "paffs_trace.hpp"
 #include "driver/driver.hpp"
 
-//debug
-#include <rtems.h>
-#include <rtems/stackchk.h>
-
 namespace paffs{
 
 outpost::rtos::SystemClock systemClock;
@@ -131,9 +127,6 @@ Result Device::mnt(){
 		return r;
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Could init Device");
 
-
-	rtems_stack_checker_report_usage();
-
 	r = sumCache.loadAreaSummaries();
 	if(r == Result::nf){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Tried mounting a device with an empty superblock!");
@@ -141,8 +134,6 @@ Result Device::mnt(){
 		return r;
 	}
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Area Summaries loaded");
-
-	rtems_stack_checker_report_usage();
 
 	for(AreaPos i = 0; i < areasNo; i++){
 		if(areaMap[i].type == AreaType::garbageBuffer){
