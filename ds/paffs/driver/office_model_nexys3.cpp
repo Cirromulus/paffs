@@ -9,10 +9,8 @@
 #include "../commonTypes.hpp"
 #include "../paffs_trace.hpp"
 #include <string.h>
+#include <inttypes.h>
 
-//debug
-#include <rtems.h>
-#include <rtems/stackchk.h>
 
 namespace paffs{
 
@@ -40,39 +38,30 @@ Result OfficeModelNexys3Driver::writePage(uint64_t page_no,
 		return Result::einval;
 	}
 
-	rtems_stack_checker_report_usage();
+	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "Write %u bytes at page %" PRIu64, data_len, page_no);
 
 	if(data_len != totalBytesPerPage){
 		memset(buf, 0xFF, totalBytesPerPage);
 	}
 	memcpy(buf, data, data_len);
-	printf("Write Page at %d, %d, page %d was omitted because of testing\n");
-	//nand->writePage(bank, device, page_no, static_cast<uint8_t*>(data));
+	nand->writePage(bank, device, page_no, static_cast<uint8_t*>(data));
 	return Result::ok;
 }
 Result OfficeModelNexys3Driver::readPage(uint64_t page_no,
 								void* data, unsigned int data_len){
-	PAFFS_DBG_S(PAFFS_TRACE_READ, "Trying to read %d bytes at page %lu ", data_len, page_no);
+	PAFFS_DBG_S(PAFFS_TRACE_READ, "Read %u bytes at page %" PRIu64, data_len, page_no);
 	if(data_len == 0 || data_len > totalBytesPerPage){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid read size (%d)", data_len);
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid read size (%u)", data_len);
 		return Result::einval;
 	}
 
-	PAFFS_DBG_S(PAFFS_TRACE_READ, "reading page...");
-
-	rtems_stack_checker_report_usage();
-
 	nand->readPage(bank, device, page_no, buf);
-
-	rtems_stack_checker_report_usage();
-
-	PAFFS_DBG_S(PAFFS_TRACE_READ, "Did read page");
 	memcpy(data, buf, data_len);
 	return Result::ok;
 }
 Result OfficeModelNexys3Driver::eraseBlock(uint32_t block_no){
 	nand->eraseBlock(bank, device, block_no);
-	return Result::nimpl;
+	return Result::ok;
 }
 Result OfficeModelNexys3Driver::markBad(uint32_t block_no){
 	memset(buf, 0, totalBytesPerPage);

@@ -57,7 +57,7 @@ Result Device::format(bool complete){
 				r = driver->eraseBlock(p + area);
 				if(r != Result::ok){
 					PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
-							"Found bad block %ul during formatting", p + area);
+							"Found bad block %lu during formatting", p + area);
 					areaMap[area].type = AreaType::retired;
 					break;
 				}
@@ -147,7 +147,7 @@ Result Device::mnt(){
 
 	r = sumCache.loadAreaSummaries();
 	if(r == Result::nf){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Tried mounting a device with an empty superblock!");
+		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Tried mounting a device with an empty superblock!");
 		destroyDevice();
 		return r;
 	}

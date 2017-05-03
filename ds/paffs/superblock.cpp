@@ -10,6 +10,7 @@
 #include "device.hpp"
 #include "dataIO.hpp"
 #include "area.hpp"
+#include <inttypes.h>
 #include <stdlib.h>
 
 namespace paffs{
@@ -33,14 +34,14 @@ Addr Superblock::getRootnodeAddr(){
 
 
 void Superblock::printSuperIndex(SuperIndex* ind){
-	printf("No:\t\t%d\n", ind->no);
+	printf("No:\t\t%" PRIu32 "\n", ind->no);
 	printf("Rootnode addr.: \t%u:%u\n",
 			extractLogicalArea(ind->rootNode),
 			extractPage(ind->rootNode));
 	printf("areaMap:\n");
 	AreaPos asOffs = 0;
 	for(AreaPos i = 0; i < 8; i ++){
-		printf("\t%d->%d\n", i, ind->areaMap[i].position);
+		printf("\t%" PRIu32 "->%" PRIu32 "\n", i, ind->areaMap[i].position);
 		printf("\tType: %s\n", area_names[ind->areaMap[i].type]);
 		if(asOffs < 2 && i == ind->asPositions[asOffs]){
 			unsigned int free = 0, used = 0, dirty = 0;
@@ -253,7 +254,7 @@ Result Superblock::findMostRecentEntryInBlock(uint32_t area, uint8_t block, uint
 		Result r = dev->driver->readPage(getPageNumber(addr, dev), &no, sizeof(uint32_t));
 		if(r != Result::ok)
 			return r;
-		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Read Page %lu successful", getPageNumber(addr, dev));
+		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Read Page %" PRIu64 " successful", getPageNumber(addr, dev));
 		if(no == 0xFFFFFFFF){
 			// Unprogrammed, therefore empty
 			if(*maximum != 0 || overflow)
@@ -409,7 +410,7 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 		pointer += btr;
 	}
 	//buffer ready
-	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "SuperIndex Buffer was filled with %u Bytes.", pointer);
+	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "SuperIndex Buffer was filled with %" PRIu32 " Bytes.", pointer);
 
 	pointer = 0;
 	memcpy(&entry->no, buf, sizeof(SerialNo));

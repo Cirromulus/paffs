@@ -21,7 +21,7 @@ rtems_task
 task_system_init(rtems_task_argument)
 {
 	//setvbuf(stdout, NULL, _IONBF, 0);
-	printf("Build: " __DATE__ " " __TIME__ "\n");
+	printf("\n\n\n\nBuild: " __DATE__ " " __TIME__ "\n");
 	rtems_stack_checker_report_usage();
 
 	SevenSegment::clear();
@@ -53,7 +53,34 @@ task_system_init(rtems_task_argument)
 
 	rtems_stack_checker_report_usage();
 
+	if(r == Result::nf){
+		char buf = 0;
+		while(buf != 'y' && buf != 'n' && buf != '\n'){
+			printf("There was no image found. Format?\n(y/N) ");
+			fflush(stdout);
+			scanf("%1c", &buf);
+		}
+		if(buf == 'y'){
+			printf("You chose yes.\n");
+			r = fs->format(/*true*/);
+			if(r == Result::ok){
+				printf("Success.\n");
+			}else{
+				printf("%s!\n", err_msg(r));
+				goto idle;
+			}
+		}else{
+			printf("You chose no. \n");
+			goto idle;
+		}
+	}
 
+	printf("Trying to mount FS again ...\n");
+	r = fs->mount();
+	printf("\t %s\n", err_msg(r));
+
+
+idle:
 	while(1){
 		for (uint_fast8_t i = 0; i < 12; ++i)
 		{

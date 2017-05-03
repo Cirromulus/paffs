@@ -228,7 +228,7 @@ Result SummaryCache::loadAreaSummaries(){
 
 	Result r = dev->superblock.readSuperIndex(&index);
 	if(r != Result::ok){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "failed to load Area Summaries!");
+		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "failed to load Area Summaries!");
 		return r;
 	}
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "read superIndex successfully");
@@ -460,7 +460,8 @@ Result SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bo
 	memset(buf, 0, areaSummarySize);
 	unsigned int needed_pages = 1 + areaSummarySize / dataBytesPerPage;
 	if(needed_pages != totalPagesPerArea - dataPagesPerArea){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!\n"
+				"needed pages: %u, total-dataPagesPerArea: %u", needed_pages, totalPagesPerArea - dataPagesPerArea);
 		return Result::fail;
 	}
 	uint32_t pointer = 0;

@@ -5,7 +5,7 @@
 #include <spacewire_light.h>
 #include <outpost/utils/serialize.h>
 
-#define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 #	include <stdint.h>
@@ -180,7 +180,7 @@ if (!amap.write(address, buffer, 1, outpost::time::Milliseconds(2)))
 	}
 else
 	{
-	LOG(printf("NAND: read Page %"PRIu32"\n", page)
+	LOG(printf("NAND: read Page %" PRIu32 "\n", page)
 	;
 	)
 }
@@ -228,7 +228,7 @@ LOG(printf("NAND: Failure to write flash command (write page)\n")
 }
 else
 {
-		LOG(printf("NAND: write Page %"PRIu32"\n", page);)
+		LOG(printf("NAND: write Page %" PRIu32 "\n", page);)
 }
 
 while (!Nand::isReady())
@@ -257,7 +257,7 @@ LOG(printf("NAND: Failure to write flash command (block erase)\n")
 }
 else
 {
-		LOG(printf("NAND: Erase block %"PRIu32" (page %"PRIu32"..%"PRIu32")\n",
+		LOG(printf("NAND: Erase block %" PRIu32 " (page %" PRIu32 "..%" PRIu32 ")\n",
 				block, block*64,block*64+63);)
 }
 

@@ -62,8 +62,11 @@ void Paffs::printCacheSizes(){
 			PAFFS_DBG_S(PAFFS_TRACE_INFO, "------------DEVICE %d------------", i);
 			PAFFS_DBG_S(PAFFS_TRACE_INFO,
 					"TreeNode size: %zu Byte, TreeCacheNode size: %zu Byte. Cachable Nodes: %d.\n"
+					"Branch order: %zu, Leaf order: %zu\n"
 					"\tOverall TreeCache size: %zu Byte.",
-						sizeof(TreeNode), sizeof(TreeCacheNode), treeNodeCacheSize, treeNodeCacheSize*sizeof(TreeCacheNode)
+						sizeof(TreeNode), sizeof(TreeCacheNode), treeNodeCacheSize,
+						branchOrder, leafOrder,
+						treeNodeCacheSize*sizeof(TreeCacheNode)
 			);
 
 			PAFFS_DBG_S(PAFFS_TRACE_INFO,

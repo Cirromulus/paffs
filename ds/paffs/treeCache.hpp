@@ -56,7 +56,7 @@ public:
 	/**
 	 * Possible cache flush.
 	 */
-	Result getTreeNodeAtIndexFrom(unsigned char index,
+	Result getTreeNodeAtIndexFrom(uint16_t index,
 										TreeCacheNode* parent, TreeCacheNode** child);
 
 	Result removeNode(TreeCacheNode* tcn);

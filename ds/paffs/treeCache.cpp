@@ -9,6 +9,7 @@
 #include "device.hpp"
 #include "dataIO.hpp"
 #include "btree.hpp"
+#include <inttypes.h>
 #include <string.h>
 
 namespace paffs{
@@ -247,7 +248,7 @@ bool TreeCache::isSubTreeValid(TreeCacheNode* node, uint8_t* cache_node_reachabl
 
 
 				if(!first && node->raw.as.branch.keys[i] < last){
-					PAFFS_DBG(PAFFS_TRACE_BUG, "Node n° %d is not sorted (prev: %d, curr: %d)!", getIndexFromPointer(node), node->raw.as.leaf.keys[i], last);
+					PAFFS_DBG(PAFFS_TRACE_BUG, "Node n° %" PRIu16 " is not sorted (prev: %" PRIu32 ", curr: %" PRIu32 ")!", getIndexFromPointer(node), node->raw.as.leaf.keys[i], last);
 					return false;
 				}
 				last = node->raw.as.branch.keys[i];
@@ -666,9 +667,9 @@ Result TreeCache::getRootNodeFromCache(TreeCacheNode** tcn){
 /**
  * Possible cache flush. Tree could be empty except for path to child! (and parent, of course)
  */
-Result TreeCache::getTreeNodeAtIndexFrom(unsigned char index,
+Result TreeCache::getTreeNodeAtIndexFrom(uint16_t index,
 									TreeCacheNode* parent, TreeCacheNode** child){
-	if(index > branchOrder){
+	if(index > branchOrder){	//FIXME index is smaller than branchOder?
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access index greater than branch size!");
 		return Result::bug;
 	}
@@ -772,7 +773,7 @@ void TreeCache::printSubtree(int layer, TreeCacheNode* node){
 		for(int i = 0; i < node->raw.num_keys; i++){
 			if(i > 0)
 				printf(",");
-			printf (" %d", node->raw.as.leaf.keys[i]);
+			printf (" %" PRIu32, node->raw.as.leaf.keys[i]);
 		}
 		printf("]\n");
 	}else{
@@ -784,7 +785,7 @@ void TreeCache::printSubtree(int layer, TreeCacheNode* node){
 		bool isGap = false;
 		for(int i = 1; i <= node->raw.num_keys; i++) {
 			if(!isGap)
-				printf("/%d\\", node->raw.as.branch.keys[i-1]);
+				printf("/%" PRIu32 "\\", node->raw.as.branch.keys[i-1]);
 			if(node->pointers[i] == 0){
 				if(!isGap){
 					printf("...");
