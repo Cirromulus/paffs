@@ -35,7 +35,7 @@ Device::~Device(){
 }
 
 
-Result Device::format(){
+Result Device::format(bool complete){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
@@ -51,6 +51,24 @@ Result Device::format(){
 		areaMap[area].status = AreaStatus::empty;
 		areaMap[area].erasecount = 0;
 		areaMap[area].position = area;
+
+		if(complete){
+			for(int p = 0; p < blocksPerArea; p++){
+				r = driver->eraseBlock(p + area);
+				if(r != Result::ok){
+					PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
+							"Found bad block %ul during formatting", p + area);
+					areaMap[area].type = AreaType::retired;
+					break;
+				}
+			}
+			areaMap[area].erasecount++;
+
+			if(areaMap[area].type == AreaType::retired){
+				continue;
+			}
+		}
+
 
 		if(!(had_areaType & 1 << AreaType::superblock)){
 			activeArea[AreaType::superblock] = area;
@@ -1037,7 +1055,7 @@ Result Device::initializeDevice(){
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Device is not yet mounted");
 
 	memset(areaMap, 0, sizeof(Area) * areasNo);
-	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Cleared %d Byte in Areamap", sizeof(Area) * areasNo);
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Cleared %zu Byte in Areamap", sizeof(Area) * areasNo);
 
 	activeArea[AreaType::superblock] = 0;
 	activeArea[AreaType::index] = 0;

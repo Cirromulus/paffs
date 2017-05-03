@@ -253,7 +253,7 @@ Result Superblock::findMostRecentEntryInBlock(uint32_t area, uint8_t block, uint
 		Result r = dev->driver->readPage(getPageNumber(addr, dev), &no, sizeof(uint32_t));
 		if(r != Result::ok)
 			return r;
-		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Read Page %ul successful", getPageNumber(addr, dev));
+		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Read Page %lu successful", getPageNumber(addr, dev));
 		if(no == 0xFFFFFFFF){
 			// Unprogrammed, therefore empty
 			if(*maximum != 0 || overflow)

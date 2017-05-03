@@ -118,12 +118,12 @@ void Paffs::resetLastErr(){
 	}
 }
 
-Result Paffs::format(){
+Result Paffs::format(bool complete){
 	//TODO: Handle errors
 	Result r = Result::ok;
 	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
 		if(validDevices[i]){
-			Result r_ = devices[i]->format();
+			Result r_ = devices[i]->format(complete);
 			if(r == Result::ok)
 				r = r_;
 				r = r_;

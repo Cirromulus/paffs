@@ -46,7 +46,7 @@ public:
 	Device(Driver* driver);
 	~Device();
 
-	Result format();
+	Result format(bool complete=false);
 	Result mnt();
 	Result unmnt();
 

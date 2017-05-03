@@ -29,7 +29,7 @@ public:
 			PAFFS_TRACE_ERROR |
 			PAFFS_TRACE_BUG
 		);
-		paffs::Result r = fs.format();
+		paffs::Result r = fs.format(true);
 		if(r != paffs::Result::ok)
 			std::cerr << "Could not format device!" << std::endl;
 		r = fs.mount();

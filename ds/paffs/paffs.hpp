@@ -23,7 +23,7 @@ public:
 	Paffs(std::vector<Driver*> &deviceDrivers);
 	~Paffs();
 
-	Result format();
+	Result format(bool complete=false);
 	Result mount();
 	Result unmount();
 	Result getLastErr();
