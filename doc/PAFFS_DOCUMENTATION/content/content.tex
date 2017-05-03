@@ -155,6 +155,7 @@ This section is under development since the filesystem is unfinished. Meanwhile 
 \section{TODOS}
 \begin{itemize}
     \item file_append breaks Fs. $\rarrow$ 1. write unittest provoking this behaviour, 2. repair this usecase.
+    \item Add check if dirty in commit Area Summaries to enable read-only
     \item Implement simple ECC for correcting two biterrors.
     \item Read validation and error handling. If error is found, either repair it automatically or delay it until scrubbing? Scrubbing would be not very frequent, so on-the-fly would be appreciated.
 	\item When ASCache runs full, some used pages cant be marked as dirty. Build sanity checker, scanning whole FS and marking unreachable pages as such.

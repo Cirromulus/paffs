@@ -277,6 +277,8 @@ Result SummaryCache::commitAreaSummaries(){
 			unpackStatusArray(translation[i], index.areaSummary[pos++]);
 		}
 	}
+
+	//TODO: Add check if dirty
 	return dev->superblock.commitSuperIndex(&index);
 }
 

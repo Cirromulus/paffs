@@ -19,7 +19,7 @@ namespace paffs{
 	static constexpr uint16_t totalBytesPerPage = dataBytesPerPage + oobBytesPerPage;
 	static constexpr uint16_t areasNo = blocks / blocksPerArea;
 	static constexpr uint16_t totalPagesPerArea = blocksPerArea * pagesPerBlock;
-	static constexpr uint16_t dataPagesPerArea = 1 - totalPagesPerArea;
+	static constexpr uint16_t dataPagesPerArea = totalPagesPerArea - 1;
 
 	//Cache sizes
 	static constexpr uint8_t  treeNodeCacheSize = 5;		//max. 1,5 * dataBytesPerPage(TreeNode) Bytes per Entry

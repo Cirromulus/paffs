@@ -91,7 +91,7 @@ Result Superblock::commitSuperIndex(SuperIndex *newIndex){
 				areasNo * sizeof(Area)
 				+ 2 * dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
 	unsigned int needed_pages = needed_bytes / dataBytesPerPage + 1;
-	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed to read former SuperIndex: %d (%d bytes, 2 AS'es)", needed_pages, needed_bytes);
+	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed to read former SuperIndex: %u (%u bytes, 2 AS'es)", needed_pages, needed_bytes);
 
 	uint32_t rel_page1 = 0;
 	Result r1 = findFirstFreeEntryInBlock(0, 0, &rel_page1, needed_pages);
@@ -110,20 +110,19 @@ Result Superblock::commitSuperIndex(SuperIndex *newIndex){
 	uint8_t chosen_block = 0;
 
 	if(r1 == Result::ok || r2 == Result::ok){
-		//some Blocks contain free space
+		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "some Blocks contain free space");
 		if(r1 == Result::ok && r2 == Result::ok){
-			//both are contain free blocks
+			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "both contain free blocks");
 			if(rel_page1 == 0 && rel_page2 == 0){
-				//Both completely free, just choose something
+				PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Both completely free, just choose something (0)");
 				chosen_block = 0;
 			}else if(rel_page1 == 0 && rel_page2 != 0){
-				//Block 0 wiped, Block 1 is current
+				PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Block 0 wiped, Block 1 is current");
 				chosen_block = 1;
 			}else if(rel_page1 != 0 && rel_page2 == 0){
-				//Block 0 is current, Block 1 wiped
+				PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Block 0 is current, Block 1 wiped");
 				chosen_block = 0;
 			}else {
-				//Both contain Data!?
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Both Superblocks contain Data!");
 				return Result::bug;
 			}
@@ -210,6 +209,31 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 		printSuperIndex(index);
 	}
 
+	for(unsigned int i = 0; i < areasNo; i++){
+		if(index->areaMap[i].position > areasNo){
+			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Position of area %u unplausible! (%" PRIu32 ")",
+					i, index->areaMap[i].position);
+			return Result::fail;
+		}
+		if(index->areaMap[i].type >= AreaType::no){
+			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Type of area %u unplausible! (%u)",
+					i, static_cast<unsigned int>(index->areaMap[i].type));
+			return Result::fail;
+		}
+		if(index->areaMap[i].status > AreaStatus::empty){
+			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Status of area %u unplausible! (%u)",
+					i, static_cast<unsigned int>(index->areaMap[i].status));
+			return Result::fail;
+		}
+	}
+
+	if(index->areaMap[extractLogicalArea(index->rootNode)].type != AreaType::index){
+		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Rootnode address does not point to index area"
+				" (%u, %u)",
+				extractLogicalArea(index->rootNode), extractPage(index->rootNode));
+		return Result::fail;
+	}
+
 	rootnode_addr = index->rootNode;
 	rootnode_dirty = false;
 	return Result::ok;
@@ -217,6 +241,7 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 
 // Superblock related
 
+//out_pos shall point to the first free page
 Result Superblock::findFirstFreeEntryInBlock(uint32_t area, uint8_t block, uint32_t* out_pos, unsigned int required_pages){
 	unsigned int in_a_row = 0;
 	uint64_t page_offs = pagesPerBlock * block;
@@ -235,7 +260,9 @@ Result Superblock::findFirstFreeEntryInBlock(uint32_t area, uint8_t block, uint3
 		}
 
 		// Unprogrammed, therefore empty
-		*out_pos = i;
+		if(in_a_row == 0)
+			*out_pos = i;	//We shall point to the first free page in this row
+
 		if(++in_a_row == required_pages)
 			return Result::ok;
 	}

@@ -46,13 +46,19 @@ Result Device::format(bool complete){
 	if(r != Result::ok)
 		return r;
 
+	if(complete)
+		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Deleting all areas.\n");
+
 	unsigned char had_areaType = 0;
 	for(unsigned int area = 0; area < areasNo; area++){
 		areaMap[area].status = AreaStatus::empty;
 		areaMap[area].erasecount = 0;
 		areaMap[area].position = area;
 
-		if(complete){
+		if(had_areaType &
+				(1 << AreaType::superblock |
+				1 << AreaType::garbageBuffer) ||
+				complete){
 			for(int p = 0; p < blocksPerArea; p++){
 				r = driver->eraseBlock(p + area);
 				if(r != Result::ok){
@@ -147,10 +153,15 @@ Result Device::mnt(){
 
 	r = sumCache.loadAreaSummaries();
 	if(r == Result::nf){
-		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Tried mounting a device with an empty superblock!");
+		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Tried mounting a device with an empty superblock!\nMaybe not formatted?");
 		destroyDevice();
 		return r;
 	}
+	if(r != Result::ok){
+		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not load Area Summaries");
+		return r;
+	}
+
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Area Summaries loaded");
 
 	for(AreaPos i = 0; i < areasNo; i++){
@@ -816,7 +827,6 @@ Obj* Device::open(const char* path, Fileopenmask mask){
 	}
 
 	obj->rdnly = ! (mask & FW);
-
 	return obj;
 }
 

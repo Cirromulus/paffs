@@ -123,6 +123,21 @@ void Paffs::resetLastErr(){
 
 Result Paffs::format(bool complete){
 	//TODO: Handle errors
+	PAFFS_DBG_S(PAFFS_TRACE_INFO, "Formatting infos:\n"
+			"dataBytesPerPage: %04u\n"
+			"oobBytesPerPage : %04u\n"
+			"pagesPerBlock   : %04u\n"
+			"blocks          : %04u\n"
+			"blocksPerArea   : %04u\n\n"
+
+			"totalBytesPerPage : %04u\n"
+			"areasNo           : %04u\n"
+			"totalPagesPerArea : %04u\n"
+			"dataPagesPerArea  : %04u\n\n"
+			, dataBytesPerPage, oobBytesPerPage, pagesPerBlock
+			, blocks, blocksPerArea
+			, totalBytesPerPage, areasNo, totalPagesPerArea, dataPagesPerArea
+			);
 	Result r = Result::ok;
 	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
 		if(validDevices[i]){
