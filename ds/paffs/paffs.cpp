@@ -153,8 +153,7 @@ Result Paffs::format(bool complete){
 	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
 		if(validDevices[i]){
 			Result r_ = devices[i]->format(complete);
-			if(r == Result::ok)
-				r = r_;
+			if(r != Result::ok)
 				r = r_;
 		}
 	}

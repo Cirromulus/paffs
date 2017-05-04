@@ -16,6 +16,8 @@ namespace paffs{
 //Values Zero and 0xFF... are reserved.
 //Zero to indicate overflow, 0xFF.. to indicate empty page
 typedef uint32_t SerialNo;
+const SerialNo emptySerial = 0xFFFFFFFF;
+
 
 struct AnchorEntry{
 	SerialNo no;

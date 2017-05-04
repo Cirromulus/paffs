@@ -43,9 +43,14 @@ envGlobal = Environment(toolpath=[os.path.join(extpath, 'scons-build-tools/site_
                         BASEPATH=os.path.abspath('.'),
                         ENV=os.environ)
 
-buildfolder = os.path.join(rootpath, 'release')
-envGlobal['CCFLAGS_optimize'] = ['-O3']
-envGlobal.ParseFlags('-DDEBUG')
+if GetOption('release_build'):
+    buildfolder = os.path.join(rootpath, 'release')
+    envGlobal['CCFLAGS_optimize'] = ['-O3']
+else:
+    buildfolder = buildfolder = os.path.join(rootpath, 'debug')
+    envGlobal['CCFLAGS_optimize'] = ['-O0']
+    envGlobal.ParseFlags('-DDEBUG')
+    
 if GetOption('with_clang'):
 	envGlobal.Tool('compiler_hosted_llvm')
 else:

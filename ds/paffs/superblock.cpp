@@ -352,20 +352,20 @@ Result Superblock::writeSuperPageIndex(Addr addr, SuperIndex* entry){
 			neededASes++;
 	}
 
-	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
+	//note: Serial number is inserted on the first bytes for every page later on.
+	unsigned int needed_bytes = sizeof(Addr) +
 		areasNo * sizeof(Area)
 		+ neededASes * dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
 	if(dataPagesPerArea % 8 != 0)
 		needed_bytes++;
 
-	unsigned int needed_pages = needed_bytes / dataBytesPerPage + 1;
+	//Every page needs its serial Number
+	unsigned int needed_pages = needed_bytes / (dataBytesPerPage - sizeof(SerialNo)) + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed to write SuperIndex: %d (%d bytes, %d AS'es)", needed_pages, needed_bytes, neededASes);
 
 	unsigned int pointer = 0;
 	char buf[needed_bytes];
 	memset(buf, 0, needed_bytes);
-	memcpy(buf, &entry->no, sizeof(SerialNo));
-	pointer += sizeof(SerialNo);
 	memcpy(&buf[pointer], &entry->rootNode, sizeof(Addr));
 	pointer += sizeof(Addr);
 	unsigned char pospos = 0;	//Stupid name
@@ -395,13 +395,17 @@ Result Superblock::writeSuperPageIndex(Addr addr, SuperIndex* entry){
 	pointer = 0;
 	uint64_t page_offs = getPageNumber(addr, dev);
 	Result r;
+	char pagebuf[dataBytesPerPage];
 	for(unsigned page = 0; page < needed_pages; page++){
-		unsigned int btw = pointer + dataBytesPerPage < needed_bytes ? dataBytesPerPage
-							: needed_bytes - pointer;
-		r = dev->driver->writePage(page_offs + page, &buf[pointer], btw);
+		unsigned int btw =
+				pointer + dataBytesPerPage - sizeof(SerialNo) < needed_bytes ?
+						dataBytesPerPage - sizeof(SerialNo) : needed_bytes - pointer;
+		//This inserts the serial number at the first Bytes in every page
+		memcpy(pagebuf, &entry->no, sizeof(SerialNo));
+		memcpy(&pagebuf[sizeof(SerialNo)], &buf[pointer], btw);
+		r = dev->driver->writePage(page_offs + page, pagebuf, btw + sizeof(SerialNo));
 		if(r != Result::ok)
 			return r;
-
 		pointer += btw;
 	}
 
@@ -415,11 +419,12 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 	if(entry->areaMap == NULL)
 		return Result::einval;
 
-	unsigned int needed_bytes = sizeof(SerialNo) + sizeof(Addr) +
+	//note: Serial number is inserted on the first bytes for every page later on.
+	unsigned int needed_bytes = sizeof(Addr) +
 		areasNo * sizeof(Area)
 		+ 2 * dataPagesPerArea / 8; /* One bit per entry, two entries for INDEX and DATA section. Others dont have summaries*/
 
-	unsigned int needed_pages = needed_bytes / dataBytesPerPage + 1;
+	unsigned int needed_pages = needed_bytes / (dataBytesPerPage - sizeof(SerialNo)) + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Maximum Pages needed to read SuperIndex: %d (%d bytes, 2 AS'es)", needed_pages, needed_bytes);
 
 	char buf[needed_bytes];
@@ -427,21 +432,39 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 	uint32_t pointer = 0;
 	uint64_t page_offs = getPageNumber(addr, dev);
 	Result r;
-	for(unsigned page = 0; page < needed_pages; page++){
-		unsigned int btr = pointer + dataBytesPerPage < needed_bytes ? dataBytesPerPage
-							: needed_bytes - pointer;
-		r = dev->driver->readPage(page_offs + page, &buf[pointer], btr);
+	entry->no = emptySerial;
+	unsigned char pagebuf[dataBytesPerPage];
+	SerialNo localSerialTmp;
+	for(unsigned int page = 0; page < needed_pages; page++){
+		unsigned int btr =
+				pointer + dataBytesPerPage - sizeof(SerialNo) < needed_bytes ?
+				dataBytesPerPage - sizeof(SerialNo) : needed_bytes - pointer;
+		r = dev->driver->readPage(page_offs + page, pagebuf, btr + sizeof(SerialNo));
+		memcpy(&localSerialTmp, pagebuf, sizeof(SerialNo));
+		if(localSerialTmp == emptySerial){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Got empty SerialNo during SuperPage read! "
+					"PageOffs: %" PRIu64 ", page: %u", page_offs, page);
+			return Result::bug;
+		}
+		if(entry->no != emptySerial && localSerialTmp != entry->no){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Got different Serials during SuperPage read! "
+					"Was: %" PRIu32 ", should %" PRIu32, localSerialTmp, entry->no);
+			return Result::bug;
+		}
+		if(entry->no == emptySerial){
+			entry->no = localSerialTmp;
+		}
+
+		memcpy(&buf[pointer], &pagebuf[sizeof(SerialNo)], btr);
+		pointer += btr;
+
 		if(r != Result::ok)
 			return r;
-
-		pointer += btr;
 	}
 	//buffer ready
 	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "SuperIndex Buffer was filled with %" PRIu32 " Bytes.", pointer);
 
 	pointer = 0;
-	memcpy(&entry->no, buf, sizeof(SerialNo));
-	pointer += sizeof(SerialNo);
 	memcpy(&entry->rootNode, &buf[pointer], sizeof(Addr));
 	pointer += sizeof(Addr);
 	entry->asPositions[0] = 0;
@@ -455,7 +478,6 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 			entry->asPositions[pospos++] = i;
 	}
 
-	unsigned char pagebuf[dataBytesPerPage];
 	for(unsigned int i = 0; i < 2; i++){
 		if(entry->asPositions[i] <= 0)
 			continue;
