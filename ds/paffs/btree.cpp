@@ -198,7 +198,7 @@ Result Btree::find_leaf(InodeNo key, TreeCacheNode** outtreeCacheNode) {
 }
 
 Result Btree::find_in_leaf (TreeCacheNode* leaf, InodeNo key, Inode* outInode){
-	int i;
+	unsigned int i;
     for (i = 0; i < leaf->raw.num_keys; i++)
             if (leaf->raw.as.leaf.keys[i] == key) break;
     if (i == leaf->raw.num_keys)
@@ -285,7 +285,7 @@ Result Btree::insert_into_leaf_after_splitting(TreeCacheNode * leaf, Inode * new
 	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert into leaf after splitting");
 	InodeNo temp_keys[leafOrder+1];
 	Inode temp_pInodes[leafOrder+1];
-	int insertion_index, split, new_key, i, j;
+	unsigned int insertion_index, split, new_key, i, j;
 	memset(temp_keys, 0, leafOrder+1 * sizeof(InodeNo));
 	memset(temp_pInodes, 0, leafOrder+1 * sizeof(Inode));
 
@@ -377,10 +377,10 @@ Result Btree::insert_into_node(TreeCacheNode* node,
  * into a TreeCacheNode, causing the TreeCacheNode's size to exceed
  * the order, and causing the TreeCacheNode to split into two.
  */
-Result Btree::insert_into_node_after_splitting(TreeCacheNode * old_node, int left_index,
+Result Btree::insert_into_node_after_splitting(TreeCacheNode * old_node, unsigned int left_index,
                 InodeNo key, TreeCacheNode * right) {
 	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert into node after splitting at key %u, index %d", key, left_index);
-	int i, j, split, k_prime;
+	unsigned int i, j, split, k_prime;
 	TreeCacheNode *new_node;
 	InodeNo temp_keys[branchOrder+1];
 	TreeCacheNode* temp_RAMaddresses[branchOrder+1];
@@ -403,7 +403,7 @@ Result Btree::insert_into_node_after_splitting(TreeCacheNode * old_node, int lef
 	 * keys and pointers to the old TreeCacheNode and
 	 * the other half to the new.
 	 */
-	for (i = 0, j = 0; i < old_node->raw.num_keys + 1; i++, j++) {
+	for (i = 0, j = 0; i < old_node->raw.num_keys + 1; i++, j++) { //FIXME: Why is i and num_keys different signed?
 		if (j == left_index + 1) j++;
 		temp_addresses[j] = old_node->raw.as.branch.pointers[i];
 		temp_RAMaddresses[j] = old_node->pointers[i];
@@ -628,10 +628,9 @@ int Btree::get_neighbor_index( TreeCacheNode * n ){
  */
 Result Btree::remove_entry_from_node(TreeCacheNode * n, InodeNo key) {
 
-	int i;
+	unsigned int i = 0;
 
 	// Remove the key and shift other keys accordingly.
-	i = 0;
 	while (n->raw.as.branch.keys[i] != key  && i < n->raw.num_keys)		//as.branch is OK, because it is same memory as as.leaf
 		i++;
 	if(key < n->raw.as.branch.keys[i-1]){
@@ -714,7 +713,7 @@ Result Btree::adjust_root(TreeCacheNode * root) {
  * can accept the additional entries
  * without exceeding the maximum.
  */
-Result Btree::coalesce_nodes(TreeCacheNode * n, TreeCacheNode * neighbor, int neighbor_index, int k_prime) {
+Result Btree::coalesce_nodes(TreeCacheNode * n, TreeCacheNode * neighbor, int neighbor_index, unsigned int k_prime) {
 
 	int i, j, neighbor_insertion_index, n_end;
 	TreeCacheNode *tmp;
@@ -810,7 +809,7 @@ Result Btree::coalesce_nodes(TreeCacheNode * n, TreeCacheNode * neighbor, int ne
  * maximum
  */
 Result Btree::redistribute_nodes(TreeCacheNode * n, TreeCacheNode * neighbor,
-			int neighbor_index, int k_prime_index, int k_prime) {
+			int neighbor_index, unsigned int k_prime_index, unsigned int k_prime) {
 	int i;
 
 	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Redistribute Nodes at k_prime %d", k_prime);

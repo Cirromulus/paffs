@@ -67,7 +67,7 @@ private:
 	Result insert_into_leaf_after_splitting(TreeCacheNode * leaf, Inode * newInode);
 	Result insert_into_node(TreeCacheNode * newNode,
 				int left_index, InodeNo key, TreeCacheNode * right);
-	Result insert_into_node_after_splitting(TreeCacheNode * old_node, int left_index,
+	Result insert_into_node_after_splitting(TreeCacheNode * old_node, unsigned int left_index,
 					InodeNo key, TreeCacheNode * right);
 	Result insert_into_parent(TreeCacheNode * left, InodeNo key, TreeCacheNode * right);
 	Result insert_into_new_root(TreeCacheNode * left, InodeNo key, TreeCacheNode * right);
@@ -77,9 +77,9 @@ private:
 
 	int get_neighbor_index(TreeCacheNode * n );
 	Result adjust_root(TreeCacheNode * root);
-	Result coalesce_nodes(TreeCacheNode * n, TreeCacheNode * neighbor, int neighbor_index, int k_prime);
+	Result coalesce_nodes(TreeCacheNode * n, TreeCacheNode * neighbor, int neighbor_index, unsigned int k_prime);
 	Result redistribute_nodes(TreeCacheNode * n, TreeCacheNode * neighbor, int neighbor_index,
-					int k_prime_index, int k_prime);
+					unsigned int k_prime_index, unsigned int k_prime);
 	Result delete_entry(TreeCacheNode * n, InodeNo key);
 	Result remove_entry_from_node(TreeCacheNode * n, InodeNo key);
 

@@ -31,6 +31,7 @@ unsigned int traceMask =
 	PAFFS_WRITE_VERIFY_AS |
 	PAFFS_TRACE_GC |
 	PAFFS_TRACE_GC_DETAIL |
+	PAFFS_TRACE_ALL |
 	0;
 
 const char* resultMsg[] = {
@@ -57,33 +58,36 @@ const char* err_msg(Result pr){
 }
 
 void Paffs::printCacheSizes(){
-	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
-		if(validDevices[i]){
-			PAFFS_DBG_S(PAFFS_TRACE_INFO, "------------DEVICE %d------------", i);
-			PAFFS_DBG_S(PAFFS_TRACE_INFO,
-					"TreeNode size: %zu Byte, TreeCacheNode size: %zu Byte. Cachable Nodes: %d.\n"
-					"Branch order: %zu, Leaf order: %zu\n"
-					"\tOverall TreeCache size: %zu Byte.",
-						sizeof(TreeNode), sizeof(TreeCacheNode), treeNodeCacheSize,
-						branchOrder, leafOrder,
-						treeNodeCacheSize*sizeof(TreeCacheNode)
-			);
+	PAFFS_DBG_S(PAFFS_TRACE_INFO, "-----------Devices: %u-----------", maxNumberOfDevices);
+	PAFFS_DBG_S(PAFFS_TRACE_INFO,
+			"TreeNode size: %zu Byte, TreeCacheNode size: %zu Byte. Cachable Nodes: %u.\n"
+			"\tBranch order: %u, Leaf order: %u\n"
+			"\tOverall TreeCache size: %zu Byte.",
+				sizeof(TreeNode), sizeof(TreeCacheNode), treeNodeCacheSize,
+				branchOrder, leafOrder,
+				treeNodeCacheSize*sizeof(TreeCacheNode)
+	);
 
-			PAFFS_DBG_S(PAFFS_TRACE_INFO,
-					"Packed AreaSummary size: %zu Byte. Cacheable Summaries: %d.\n"
-					"\tOverall AreaSummary cache size: %zu Byte.",
-					sizeof(dataPagesPerArea / 4 + 2), areaSummaryCacheSize,
-					sizeof(dataPagesPerArea / 4 + 2) * areaSummaryCacheSize
-			);
+	PAFFS_DBG_S(PAFFS_TRACE_INFO,
+			"Packed AreaSummary size: %zu Byte. Cacheable Summaries: %u.\n"
+			"\tOverall AreaSummary cache size: %zu Byte.",
+			sizeof(dataPagesPerArea / 4 + 2), areaSummaryCacheSize,
+			sizeof(dataPagesPerArea / 4 + 2) * areaSummaryCacheSize
+	);
 
-			/*PAFFS_DBG_S(PAFFS_TRACE_INFO,
-					"Total static size of PAFFS object: %zu",
-					sizeof(Paffs)
-			);*/
+	PAFFS_DBG_S(PAFFS_TRACE_INFO,
+			"Size of AreaMap Entry: %zu Byte. Areas: %u.\n"
+			"\tOverall AreaMap Size: %zu Byte.",
+				sizeof(Area), areasNo,
+				sizeof(Area) * areasNo
+	);
 
-			PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------------------");
-		}
-	}
+	/*PAFFS_DBG_S(PAFFS_TRACE_INFO,
+			"Total static size of PAFFS object: %zu",
+			sizeof(Paffs)
+	);*/
+
+	PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------------------\n");
 }
 
 Paffs::Paffs(std::vector<Driver*> &deviceDrivers){
@@ -123,21 +127,28 @@ void Paffs::resetLastErr(){
 
 Result Paffs::format(bool complete){
 	//TODO: Handle errors
-	PAFFS_DBG_S(PAFFS_TRACE_INFO, "Formatting infos:\n"
-			"dataBytesPerPage: %04u\n"
-			"oobBytesPerPage : %04u\n"
-			"pagesPerBlock   : %04u\n"
-			"blocks          : %04u\n"
-			"blocksPerArea   : %04u\n\n"
+	PAFFS_DBG_S(PAFFS_TRACE_INFO, "-----------------");
 
-			"totalBytesPerPage : %04u\n"
-			"areasNo           : %04u\n"
-			"totalPagesPerArea : %04u\n"
-			"dataPagesPerArea  : %04u\n\n"
+	PAFFS_DBG_S(PAFFS_TRACE_INFO, "Formatting infos:\n\t"
+			"dataBytesPerPage: %04u\n\t"
+			"oobBytesPerPage : %04u\n\t"
+			"pagesPerBlock   : %04u\n\t"
+			"blocks          : %04u\n\t"
+			"blocksPerArea   : %04u\n\n\t"
+
+			"totalBytesPerPage : %04u\n\t"
+			"areasNo           : %04u\n\t"
+			"totalPagesPerArea : %04u\n\t"
+			"dataPagesPerArea  : %04u\n\t"
+			"areaSummarySize   : %04u\n\t"
 			, dataBytesPerPage, oobBytesPerPage, pagesPerBlock
 			, blocks, blocksPerArea
 			, totalBytesPerPage, areasNo, totalPagesPerArea, dataPagesPerArea
+			, areaSummarySize
 			);
+
+	PAFFS_DBG_S(PAFFS_TRACE_INFO, "-----------------\n");
+
 	Result r = Result::ok;
 	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
 		if(validDevices[i]){

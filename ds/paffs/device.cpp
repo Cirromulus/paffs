@@ -59,11 +59,11 @@ Result Device::format(bool complete){
 				(1 << AreaType::superblock |
 				1 << AreaType::garbageBuffer) ||
 				complete){
-			for(int p = 0; p < blocksPerArea; p++){
+			for(unsigned int p = 0; p < blocksPerArea; p++){
 				r = driver->eraseBlock(p + area);
 				if(r != Result::ok){
 					PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
-							"Found bad block %lu during formatting", p + area);
+							"Found bad block %u during formatting", p + area);
 					areaMap[area].type = AreaType::retired;
 					break;
 				}
@@ -137,9 +137,10 @@ Result Device::mnt(){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
-	}else{
-		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "mount with valid driver");
 	}
+
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "mount with valid driver");
+
 	if(mounted)
 		return Result::alrMounted;
 
@@ -149,11 +150,12 @@ Result Device::mnt(){
 	Result r = initializeDevice();
 	if(r != Result::ok)
 		return r;
-	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Could init Device");
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Inited Device");
 
 	r = sumCache.loadAreaSummaries();
 	if(r == Result::nf){
-		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Tried mounting a device with an empty superblock!\nMaybe not formatted?");
+		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Tried mounting a device with an empty superblock!\n"
+				"Maybe not formatted?");
 		destroyDevice();
 		return r;
 	}

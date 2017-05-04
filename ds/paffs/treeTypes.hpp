@@ -11,11 +11,12 @@
 namespace paffs {
 
 //Calculates how many pointers a node can hold in one page
-static constexpr int branchOrder = (dataBytesPerPage - sizeof(Addr)
-		- sizeof(unsigned char))
+//Note that this struct is not packed.
+static constexpr uint32_t branchOrder = (dataBytesPerPage - sizeof(Addr)
+		- sizeof(bool) - sizeof(unsigned char))
 		/ (sizeof(Addr) + sizeof(InodeNo));
-static constexpr int leafOrder = (dataBytesPerPage - sizeof(Addr)
-		- sizeof(unsigned char))
+static constexpr uint32_t leafOrder = (dataBytesPerPage - sizeof(Addr)
+		- sizeof(bool) - sizeof(unsigned char))
 		/ (sizeof(Inode) + sizeof(InodeNo));
 
 typedef struct TreeNode{

@@ -29,6 +29,7 @@ const char* areaStatusNames[] = {
 		"EMPTY "
 };
 
+//Returns the absolute page number
 uint64_t getPageNumber(Addr addr, Device* dev){
 	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
 								totalPagesPerArea;
@@ -40,7 +41,7 @@ uint64_t getPageNumber(Addr addr, Device* dev){
 	return page;
 }
 
-
+//Combines the area number with the relative page starting from first page in area
 Addr combineAddress(uint32_t logical_area, uint32_t page){
 	Addr addr = 0;
 	memcpy(&addr, &page, sizeof(uint32_t));
@@ -48,18 +49,6 @@ Addr combineAddress(uint32_t logical_area, uint32_t page){
 
 	return addr;
 }
-
-/*
-unsigned int extractLogicalArea(Addr addr){
-	unsigned int area = 0;
-	memcpy(&area, &addr, sizeof(uint32_t));
-	return area;
-}
-unsigned int extractPage(Addr addr){
-	unsigned int page = 0;
-	memcpy(&page, &((char*)&addr)[sizeof(uint32_t)], sizeof(uint32_t));
-	return page;
-}*/
 
 unsigned int extractLogicalArea(Addr addr){
 	unsigned int area = 0;
