@@ -52,8 +52,14 @@ public:
 	//For Garbage collection that has deleted the AS too
 	void resetASWritten(AreaPos area);
 
-	//Loads all unclosed AreaSummaries in RAM upon Mount
+	/**
+	 * Loads all unclosed AreaSummaries in RAM upon Mount
+	 *
+	 * \warning High Stack usage scaling with dataPagesPerArea
+	 */
+
 	Result loadAreaSummaries();
+
 
 	Result commitAreaSummaries();
 
