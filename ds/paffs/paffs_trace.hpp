@@ -67,6 +67,7 @@ namespace paffs{
 #define PAFFS_TRACE_BUG			0x80000000
 #define PAFFS_TRACE_ALWAYS		0xf0000000
 #define PAFFS_TRACE_ALL			0xfff7ffff
+#define PAFFS_TRACE_SOME		0xC0050071
 
 
 

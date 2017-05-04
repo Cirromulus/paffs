@@ -52,7 +52,7 @@ task_system_init(rtems_task_argument)
 	std::vector<paffs::Driver*> drv;
 	drv.push_back(paffs::getDriver(0));
 	Paffs *fs = new Paffs(drv);
-	fs->setTraceMask(PAFFS_TRACE_ALL);
+	fs->setTraceMask(PAFFS_TRACE_SOME);
 
 	printf("Trying to mount FS...\n");
 	Result r = fs->mount();
@@ -96,7 +96,7 @@ task_system_init(rtems_task_argument)
 				printf("Touch error: %s\n", err_msg(r));
 				goto idle;
 			}
-			printf("Trying to reopen file.../n");
+			printf("Trying to reopen file...\n");
 			file = fs->open("/test.txt", FR | FE);
 			if(file == nullptr || fs->getLastErr() != Result::ok){
 				printf("Error opening file: %s\n", err_msg(fs->getLastErr()));
@@ -114,8 +114,9 @@ task_system_init(rtems_task_argument)
 
 	if(inf.size != 0){
 		printf("Reading contents of file:\n");
-		char rbuf[inf.size];
+		char rbuf[inf.size+1];
 		r = fs->read(file, rbuf, inf.size, &br);
+		rbuf[inf.size] = 0;
 		if(r != Result::ok){
 			printf("Error reading file: %s\n", err_msg(r));
 			goto idle;

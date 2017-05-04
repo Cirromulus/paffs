@@ -31,7 +31,6 @@ unsigned int traceMask =
 	PAFFS_WRITE_VERIFY_AS |
 	PAFFS_TRACE_GC |
 	PAFFS_TRACE_GC_DETAIL |
-	PAFFS_TRACE_ALL |
 	0;
 
 const char* resultMsg[] = {

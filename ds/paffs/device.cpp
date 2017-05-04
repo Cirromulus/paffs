@@ -191,6 +191,10 @@ Result Device::unmnt(){
 					, i, areaMap[i].position, area_names[areaMap[i].type]
 					, areaMap[i].position*blocksPerArea*pagesPerBlock
 					, areaStatusNames[areaMap[i].status]);
+			if(i > 128){
+				printf("\n -- truncated 128-%u Areas.\n", areasNo);
+				break;
+			}
 		}
 	}
 
