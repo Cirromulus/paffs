@@ -20,6 +20,8 @@ TEST_F(FileTest, seekReadWrite){
 	unsigned int bw;
 
 	fil = fs.open("/file", paffs::FW | paffs::FC);
+	if(fs.getLastErr() != paffs::Result::ok)
+		printf("%s!\n", paffs::err_msg(fs.getLastErr()));
 	ASSERT_NE(fil, nullptr);
 
 	r = fs.seek(fil, paffs::dataBytesPerPage + 20, paffs::Seekmode::set);

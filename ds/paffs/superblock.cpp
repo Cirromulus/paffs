@@ -156,7 +156,7 @@ Result Superblock::commitSuperIndex(SuperIndex *newIndex){
 			return r;
 	}else{
 		//Index starts at 1 to handle overflow
-		lastIndex.no = 1;
+		lastIndex.no = 0;
 	}
 
 	newIndex->no = lastIndex.no+1;
@@ -177,11 +177,11 @@ Result Superblock::commitSuperIndex(SuperIndex *newIndex){
 
 	//Handle deletion.
 	if(r1 == Result::nf){
-		return deleteAnchorBlock(0, 0);
+		return deleteSuperBlock(0, 0);
 	}
 
 	if(r2 == Result::nf){
-		return deleteAnchorBlock(0, 1);
+		return deleteSuperBlock(0, 1);
 	}
 
 	rootnode_dirty = false;
@@ -239,8 +239,6 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 	return Result::ok;
 }
 
-// Superblock related
-
 //out_pos shall point to the first free page
 Result Superblock::findFirstFreeEntryInBlock(uint32_t area, uint8_t block, uint32_t* out_pos, unsigned int required_pages){
 	unsigned int in_a_row = 0;
@@ -269,6 +267,12 @@ Result Superblock::findFirstFreeEntryInBlock(uint32_t area, uint8_t block, uint3
 	return Result::nf;
 }
 
+/**
+ * @param area : Area in wich to look
+ * @param block: Which block to check
+ * @param out_pos : offset in pages starting from area front where Entry was found
+ * @param out_index : The index of the elem found
+ */
 Result Superblock::findMostRecentEntryInBlock(uint32_t area, uint8_t block, uint32_t* out_pos, uint32_t* out_index){
 	uint32_t* maximum = out_index;
 	*maximum = 0;
@@ -281,7 +285,7 @@ Result Superblock::findMostRecentEntryInBlock(uint32_t area, uint8_t block, uint
 		Result r = dev->driver->readPage(getPageNumber(addr, dev), &no, sizeof(uint32_t));
 		if(r != Result::ok)
 			return r;
-		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Read Page %" PRIu64 " successful", getPageNumber(addr, dev));
+		//PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Read Page %" PRIu64 " successful", getPageNumber(addr, dev));
 		if(no == 0xFFFFFFFF){
 			// Unprogrammed, therefore empty
 			if(*maximum != 0 || overflow)
@@ -300,46 +304,59 @@ Result Superblock::findMostRecentEntryInBlock(uint32_t area, uint8_t block, uint
 	return Result::ok;
 }
 
-
 Result Superblock::writeAnchorEntry(Addr addr, AnchorEntry* entry){
-	//Currently not implemented to simplify Find-Strategy
-	(void) addr;
-	(void) entry;
-	return Result::nimpl;
-}
-Result Superblock::readAnchorEntry(Addr addr, AnchorEntry* entry){
-	//Currently not implemented to simplify Find-Strategy
-	(void) addr;
-	(void) entry;
-	return Result::nimpl;
-}
-
-Result Superblock::deleteAnchorBlock(uint32_t area, uint8_t block) {
-	if(dev->areaMap[area].type != AreaType::superblock){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete Block outside of SUPARBLCOKAREA");
+	if(sizeof(AnchorEntry) > dataBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "JumpPadEntry bigger than dataBytes per Page! (%zu, %u)",
+				sizeof(AnchorEntry), dataBytesPerPage);
+		return Result::nimpl;
+	}
+	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::superblock){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to read JumpPad outside of SUPERBLOCKAREA");
 		return Result::bug;
 	}
-	dev->areaMap[area].erasecount++;
-	uint32_t block_offs = dev->areaMap[area].position * blocksPerArea;
-	return dev->driver->eraseBlock(block_offs + block);
+	return dev->driver->writePage(getPageNumber(addr, dev), entry, sizeof(AnchorEntry));
+}
+
+Result Superblock::readAnchorEntry(Addr addr, AnchorEntry* entry){
+	if(sizeof(AnchorEntry) > dataBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "JumpPadEntry bigger than dataBytes per Page! (%zu, %u)",
+				sizeof(AnchorEntry), dataBytesPerPage);
+		return Result::nimpl;
+	}
+	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::superblock){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to read JumpPad outside of SUPERBLOCKAREA");
+		return Result::bug;
+	}
+	return dev->driver->readPage(getPageNumber(addr, dev), entry, sizeof(AnchorEntry));
 }
 
 Result Superblock::writeJumpPadEntry(Addr addr, JumpPadEntry* entry){
-	//Currently not implemented to simplify Find-Strategy
-	(void) addr;
-	(void) entry;
-	return Result::nimpl;
+	if(sizeof(JumpPadEntry) > dataBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "JumpPadEntry bigger than dataBytes per Page! (%zu, %u)",
+				sizeof(JumpPadEntry), dataBytesPerPage);
+		return Result::nimpl;
+	}
+	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::superblock){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to read JumpPad outside of SUPERBLOCKAREA");
+		return Result::bug;
+	}
+	return dev->driver->writePage(getPageNumber(addr, dev), entry, sizeof(JumpPadEntry));
 }
 
 Result Superblock::readJumpPadEntry(Addr addr, JumpPadEntry* entry){
-	//Currently not implemented to simplify Find-Strategy
-	(void) addr;
-	(void) entry;
-	return Result::nimpl;
+	if(sizeof(JumpPadEntry) > dataBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "JumpPadEntry bigger than dataBytes per Page! (%zu, %u)",
+				sizeof(JumpPadEntry), dataBytesPerPage);
+		return Result::nimpl;
+	}
+	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::superblock){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to read JumpPad outside of SUPERBLOCKAREA");
+		return Result::bug;
+	}
+	return dev->driver->readPage(getPageNumber(addr, dev), entry, sizeof(JumpPadEntry));
 }
 
-
-//todo: Make sure that free space is sufficient!
+//warn: Make sure that free space is sufficient!
 Result Superblock::writeSuperPageIndex(Addr addr, SuperIndex* entry){
 	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
@@ -508,6 +525,16 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 	}
 
 	return Result::ok;
+}
+
+Result Superblock::deleteSuperBlock(uint32_t area, uint8_t block) {
+	if(dev->areaMap[area].type != AreaType::superblock){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete Block outside of SUPARBLCOKAREA");
+		return Result::bug;
+	}
+	dev->areaMap[area].erasecount++;
+	uint32_t block_offs = dev->areaMap[area].position * blocksPerArea;
+	return dev->driver->eraseBlock(block_offs + block);
 }
 
 }

@@ -44,9 +44,11 @@ envGlobal = Environment(toolpath=[os.path.join(extpath, 'scons-build-tools/site_
                         ENV=os.environ)
 
 if GetOption('release_build'):
+    print("release_build")
     buildfolder = os.path.join(rootpath, 'release')
     envGlobal['CCFLAGS_optimize'] = ['-O3']
 else:
+    print("debug_build")
     buildfolder = buildfolder = os.path.join(rootpath, 'debug')
     envGlobal['CCFLAGS_optimize'] = ['-O0']
     envGlobal.ParseFlags('-DDEBUG')

@@ -17,6 +17,9 @@ class GarbageCollection{
 public:
 	GarbageCollection(Device *mdev) : dev(mdev) {};
 
+	/* Special case: Target=unset.
+	 * This frees any Type (with a favour to areas with committed AS'es)
+	 */
 	Result collectGarbage(AreaType target);
 
 private:

@@ -65,7 +65,6 @@ private:
 
 	Result writeAnchorEntry(Addr _addr, AnchorEntry* entry);
 	Result readAnchorEntry(Addr addr, AnchorEntry* entry);
-	Result deleteAnchorBlock(uint32_t area, uint8_t block);
 
 	Result writeJumpPadEntry(Addr addr, JumpPadEntry* entry);
 	Result readJumpPadEntry(Addr addr, JumpPadEntry* entry);
@@ -73,6 +72,7 @@ private:
 	Result writeSuperPageIndex(Addr addr, SuperIndex* entry);
 	Result readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap);
 
+	Result deleteSuperBlock(uint32_t area, uint8_t block);
 };
 
 }

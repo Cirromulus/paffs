@@ -42,6 +42,7 @@ Result Device::format(bool complete){
 	}
 	if(mounted)
 		return Result::alrMounted;
+
 	Result r = initializeDevice();
 	if(r != Result::ok)
 		return r;
@@ -1078,8 +1079,14 @@ Result Device::initializeDevice(){
 	activeArea[AreaType::journal] = 0;
 	activeArea[AreaType::data] = 0;
 
+	if(areasNo < AreaType::no - 2){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device too small, at least %u Areas are needed!",
+				static_cast<unsigned>(AreaType::no));
+		return Result::einval;
+	}
+
 	if(blocksPerArea < 2){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device too small, at least 12 Blocks are needed!");
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device too small, at least 2 Blocks per Area are needed!");
 		return Result::einval;
 	}
 
