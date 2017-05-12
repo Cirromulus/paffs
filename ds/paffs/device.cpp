@@ -76,7 +76,6 @@ Result Device::format(bool complete){
 			}
 		}
 
-
 		if(!(had_areaType & 1 << AreaType::superblock)){
 			activeArea[AreaType::superblock] = area;
 			areaMap[area].type = AreaType::superblock;
@@ -189,7 +188,7 @@ Result Device::unmnt(){
 		printf("Info: \n");
 		for(unsigned int i = 0; i < areasNo; i++){
 			printf("\tArea %d on %u as %10s from page %4d %s\n"
-					, i, areaMap[i].position, area_names[areaMap[i].type]
+					, i, areaMap[i].position, areaNames[areaMap[i].type]
 					, areaMap[i].position*blocksPerArea*pagesPerBlock
 					, areaStatusNames[areaMap[i].status]);
 			if(i > 128){
@@ -433,20 +432,26 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 		return Result::bug;
 	}
 
-	unsigned int dirnamel = strlen(name);
-	if(name[dirnamel-1] == '/'){
-		dirnamel--;
+	unsigned int elemNameL = strlen(name);
+	if(name[elemNameL-1] == '/'){
+		elemNameL--;
+	}
+
+	if(elemNameL > maxDirEntryLength){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Elem name too long,"
+				" this should have been checked before calling insertInode");
+		return Result::objNameTooLong;
 	}
 
 	//TODO: Check if name already exists
 
-	DirEntryLength direntryl = sizeof(DirEntryLength) + sizeof(InodeNo) + dirnamel;	//Size of the new directory entry
+	DirEntryLength direntryl = sizeof(DirEntryLength) + sizeof(InodeNo) + elemNameL;	//Size of the new directory entry
 
 	unsigned char *buf = new unsigned char [direntryl];
 	buf[0] = direntryl;
 	memcpy(&buf[sizeof(DirEntryLength)], &newElem->no, sizeof(InodeNo));
 
-	memcpy(&buf[sizeof(DirEntryLength) + sizeof(InodeNo)], name, dirnamel);
+	memcpy(&buf[sizeof(DirEntryLength) + sizeof(InodeNo)], name, elemNameL);
 
 	char* dirData = new char[contDir->size + direntryl];
 	unsigned int bytes = 0;
@@ -555,6 +560,10 @@ Result Device::mkDir(const char* fullPath, Permission mask){
 	Result res = getParentDir(fullPath, &parDir, &lastSlash);
 	if(res != Result::ok)
 		return res;
+
+	if(strlen(&fullPath[lastSlash]) > maxDirEntryLength){
+		return Result::objNameTooLong;
+	}
 
 	Inode newDir;
 	Result r = createDirInode(&newDir, mask);
@@ -758,6 +767,10 @@ Result Device::createFile(Inode* outFile, const char* fullPath, Permission mask)
 	Result res = getParentDir(fullPath, &parDir, &lastSlash);
 	if(res != Result::ok)
 		return res;
+
+	if(strlen(&fullPath[lastSlash]) > maxDirEntryLength){
+		return Result::objNameTooLong;
+	}
 
 	if(createFilInode(outFile, mask) != Result::ok){
 		return Result::bug;

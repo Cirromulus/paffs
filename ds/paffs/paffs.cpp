@@ -49,6 +49,7 @@ const char* resultMsg[] = {
 		"Flash needs retirement",
 		"Device is not mounted",
 		"Device is already mounted",
+		"Objet name is too big",
 		"You should not be seeing this..."
 };
 

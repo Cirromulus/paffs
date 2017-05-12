@@ -158,7 +158,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 	while(1){
 		deletion_target = findNextBestArea(targetType, summary, &srcAreaContainsData);
 		if(deletion_target == 0){
-			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not find any GC'able pages for type %s!", area_names[targetType]);
+			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not find any GC'able pages for type %s!", areaNames[targetType]);
 
 			//TODO: Only use this Mode for the "higher needs", i.e. unmounting.
 			//might as well be for INDEX also, as tree is cached and needs to be
@@ -271,7 +271,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 			if(traceMask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
 				printf("Info: \n");
 				for(unsigned int i = 0; i < areasNo; i++){
-					printf("\tArea %d on %u as %10s with %3u erases\n", i, dev->areaMap[i].position, area_names[dev->areaMap[i].type], dev->areaMap[i].erasecount);
+					printf("\tArea %d on %u as %10s with %3u erases\n", i, dev->areaMap[i].position, areaNames[dev->areaMap[i].type], dev->areaMap[i].erasecount);
 				}
 			}
 		}else if(r != Result::ok){
@@ -301,7 +301,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 		if(traceMask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
 			printf("Info: \n");
 			for(unsigned int i = 0; i < areasNo; i++){
-				printf("\tArea %d on %u as %10s with %u erases\n", i, dev->areaMap[i].position, area_names[dev->areaMap[i].type], dev->areaMap[i].erasecount);
+				printf("\tArea %d on %u as %10s with %u erases\n", i, dev->areaMap[i].position, areaNames[dev->areaMap[i].type], dev->areaMap[i].erasecount);
 			}
 		}
 	}

@@ -15,6 +15,7 @@ namespace paffs{
 	static constexpr uint16_t pagesPerBlock = BLOCK_SIZE;
 	static constexpr uint16_t blocks = PLANE_SIZE*CELL_SIZE;
 	static constexpr uint8_t  blocksPerArea = 2;
+	static constexpr uint8_t  jumpPadNo = 1;
 
 	//Cache sizes
 	static constexpr uint8_t  treeNodeCacheSize = 5;		//max. 1,5 * dataBytesPerPage(TreeNode) Bytes per Entry

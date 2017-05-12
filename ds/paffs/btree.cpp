@@ -403,7 +403,7 @@ Result Btree::insert_into_node_after_splitting(TreeCacheNode * old_node, unsigne
 	 * keys and pointers to the old TreeCacheNode and
 	 * the other half to the new.
 	 */
-	for (i = 0, j = 0; i < old_node->raw.num_keys + 1; i++, j++) { //FIXME: Why is i and num_keys different signed?
+	for (i = 0, j = 0; i < old_node->raw.num_keys + 1U; i++, j++) {
 		if (j == left_index + 1) j++;
 		temp_addresses[j] = old_node->raw.as.branch.pointers[i];
 		temp_RAMaddresses[j] = old_node->pointers[i];

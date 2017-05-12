@@ -14,8 +14,12 @@ extern const char* area_names[];
 extern const char* areaStatusNames[];
 
 //Helper functions
-uint64_t getPageNumber(Addr addr, Device *dev);	//Translates Addr to physical page number in respect to the Area mapping
-Addr combineAddress(uint32_t logical_area, uint32_t page);
+//Translates indirect Addr to physical page number in respect to the Area mapping
+PageAbs getPageNumber(Addr addr, Device *dev);
+//Translates direct Addr to physical page number ignoring AreaMap
+PageAbs getPageNumberFromDirect(Addr addr);
+//combines two values to one type
+Addr combineAddress(AreaPos logical_area, PageOffs page);
 unsigned int extractLogicalArea(Addr addr);
 unsigned int extractPage(Addr addr);
 

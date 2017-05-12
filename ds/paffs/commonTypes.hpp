@@ -10,7 +10,13 @@
 
 #pragma once
 
+#ifdef __CDT_PARSER__
+#	define PRIu32 "u"
+#	define PRIu64 "lu"
+#endif
+
 namespace paffs {
+static const uint8_t version = 1;
 
 //TODO: Elaborate certain order of badness
 enum class Result : uint8_t{
@@ -29,11 +35,13 @@ enum class Result : uint8_t{
 	badflash,
 	notMounted,
 	alrMounted,
+	objNameTooLong,
 	num_result
 };
 
-extern char* areaNames[];		//Initialized in dataIO.cpp
-extern const char* resultMsg[];	//Initialized in paffs.cpp
+extern const char* areaNames[];		  //Initialized in area.cpp
+extern const char* areaStatusNames[]; //Initialized in area.cpp
+extern const char* resultMsg[];		  //Initialized in paffs.cpp
 
 typedef uint8_t Permission;
 
@@ -69,15 +77,24 @@ struct Param{
 	unsigned int dataPagesPerArea;
 };
 
-typedef uint64_t Addr;
-typedef uint32_t AreaPos;
+static const Param stdParam{
+	totalBytesPerPage, oobBytesPerPage, pagesPerBlock, blocks, dataBytesPerPage,
+	areasNo, blocksPerArea, totalPagesPerArea, dataPagesPerArea
+};
+
+typedef uint64_t Addr;		//Contains logical area and relative page
+typedef uint32_t AreaPos;	//Has to address total areas
+typedef uint32_t PageOffs;	//Has to address pages per area
+typedef uint64_t PageAbs;	//has to address all pages in a device
+typedef uint32_t BlockAbs;	//has to address all blocks in a device
 typedef uint32_t FileSize; 	  //~ 4 GB per file
 typedef uint32_t InodeNo;		  //~ 4 Million files
 typedef uint16_t DirEntryCount; //65,535 Entries per Directory
 typedef uint8_t  DirEntryLength; //255 characters per Directory entry
+static const DirEntryLength maxDirEntryLength = 255;
 
 //Together with area = 0, it is used to mark an unused page in Inode
-const uint32_t unusedMarker = 0xFFFFFFFF;
+static const PageOffs unusedMarker = 0xFFFFFFFF;
 
 enum class InodeType : uint8_t{
 	file,

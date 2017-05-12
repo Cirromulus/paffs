@@ -416,7 +416,7 @@ Result DataIO::readTreeNode(Addr addr, TreeNode* node){
 	}
 
 	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::index){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ TREEENODE operation on %s!", area_names[dev->areaMap[extractLogicalArea(addr)].type]);
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ TREEENODE operation on %s!", areaNames[dev->areaMap[extractLogicalArea(addr)].type]);
 		return Result::bug;
 	}
 

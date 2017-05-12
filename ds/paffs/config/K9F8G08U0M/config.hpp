@@ -13,7 +13,8 @@ namespace paffs{
 	static constexpr uint8_t  oobBytesPerPage = 128;
 	static constexpr uint16_t pagesPerBlock = 64;
 	static constexpr uint16_t blocks = 4096;
-	static constexpr uint8_t  blocksPerArea = 2;
+	static constexpr uint8_t  blocksPerArea = 4;
+	static constexpr uint8_t  jumpPadNo = 2;
 
 	//Cache sizes
 	static constexpr uint8_t  treeNodeCacheSize = 5;		//max. 1,5 * dataBytesPerPage(TreeNode) Bytes per Entry

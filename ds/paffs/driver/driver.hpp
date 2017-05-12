@@ -16,13 +16,13 @@ namespace paffs{
 		Driver(){};
 		virtual ~Driver(){};
 
-		virtual Result writePage (uint64_t page_no,
+		virtual Result writePage (PageAbs page_no,
 				void* data, unsigned int data_len) = 0;
-		virtual Result readPage (uint64_t page_no,
+		virtual Result readPage (PageAbs page_no,
 				void* data, unsigned int data_len) = 0;
-		virtual Result eraseBlock (uint32_t block_no) = 0;
-		virtual Result markBad (uint32_t block_no) = 0;
-		virtual Result checkBad (uint32_t block_no) = 0;
+		virtual Result eraseBlock (BlockAbs block_no) = 0;
+		virtual Result markBad (BlockAbs block_no) = 0;
+		virtual Result checkBad (BlockAbs block_no) = 0;
 	};
 
 	Driver* getDriver(const uint8_t deviceId);
