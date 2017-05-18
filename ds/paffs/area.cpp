@@ -52,6 +52,11 @@ PageAbs getPageNumberFromDirect(Addr addr){
 	return page;
 }
 
+//Returns the absolute page number from *logical* address
+BlockAbs getBlockNumber(Addr addr, Device* dev){
+	return dev->areaMap[extractLogicalArea(addr)].position * blocksPerArea;
+}
+
 //Returns the absolute page number from *direct* address
 BlockAbs getBlockNumberFromDirect(Addr addr){
 	return extractLogicalArea(addr) * blocksPerArea;

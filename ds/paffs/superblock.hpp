@@ -109,7 +109,7 @@ private:
 	 * @param area may be changed if target was written to a new area
 	 */
 	Result insertNewSuperIndex(Addr prev, AreaPos *area, SuperIndex* entry);
-	Result writeSuperPageIndex(AreaPos logarea, Addr addr, SuperIndex* entry);
+	Result writeSuperPageIndex(AreaPos logarea, PageAbs pageStart, SuperIndex* entry);
 	Result readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap);
 
 	Result deleteSuperBlock(AreaPos area, uint8_t block);

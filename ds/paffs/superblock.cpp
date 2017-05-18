@@ -390,13 +390,13 @@ Result Superblock::findMostRecentEntryInBlock(AreaPos area, uint8_t block, PageO
 /**
  * This assumes that the area of the Anchor entry does not change.
  */
-Result Superblock::insertNewAnchorEntry(Addr prev, AreaPos *directArea, AnchorEntry* entry){
-	if(dev->areaMap[extractLogicalArea(prev)].position != *directArea){
+Result Superblock::insertNewAnchorEntry(Addr logPrev, AreaPos *directArea, AnchorEntry* entry){
+	if(dev->areaMap[extractLogicalArea(logPrev)].position != *directArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Logical and direct Address differ!");
 		return Result::bug;
 	}
 
-	if(dev->areaMap[extractLogicalArea(prev)].type != AreaType::superblock){
+	if(dev->areaMap[extractLogicalArea(logPrev)].type != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
 		return Result::bug;
 	}
@@ -422,9 +422,13 @@ Result Superblock::insertNewAnchorEntry(Addr prev, AreaPos *directArea, AnchorEn
 	}
 
 	BlockAbs newblock = *directArea * blocksPerArea + page / blocksPerArea;
-	if(newblock != getBlockNumberFromDirect(prev)){
+	if(newblock != getBlockNumber(logPrev, dev)){
 		//reset serial no if we start a new block
 		entry->no = 0;
+		r = deleteSuperBlock(extractLogicalArea(logPrev), extractPage(logPrev) / blocksTotal);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete block of AnchorArea! BlockAbs: %" PRIu32, getBlockNumber(logPrev, dev));
+		}
 	}
 
 	return dev->driver->writePage(*directArea * pagesPerBlock + page, entry, sizeof(AnchorEntry));
@@ -440,13 +444,13 @@ Result Superblock::readAnchorEntry(Addr addr, AnchorEntry* entry){
 	return dev->driver->readPage(getPageNumberFromDirect(addr), entry, sizeof(AnchorEntry));
 }
 
-Result Superblock::insertNewJumpPadEntry(Addr prev, AreaPos *directArea, JumpPadEntry* entry){
-	if(dev->areaMap[extractLogicalArea(prev)].position != *directArea){
+Result Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos *directArea, JumpPadEntry* entry){
+	if(dev->areaMap[extractLogicalArea(logPrev)].position != *directArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Logical and direct Address differ!");
 		return Result::bug;
 	}
 
-	if(dev->areaMap[extractLogicalArea(prev)].type != AreaType::superblock){
+	if(dev->areaMap[extractLogicalArea(logPrev)].type != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
 		return Result::bug;
 	}
@@ -454,9 +458,32 @@ Result Superblock::insertNewJumpPadEntry(Addr prev, AreaPos *directArea, JumpPad
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Anchor entry (%zu) is bigger than page (%d)!", sizeof(AnchorEntry), dataBytesPerPage);
 		return Result::fail;
 	}
-	//dev->driver->writePage(getPageNumberFromDirect(addr), entry, sizeof(JumpPadEntry));
-	(void) entry;
-	return Result::nimpl;
+	PageOffs page;
+	Result r = findFirstFreeEntryInArea(*directArea, &page, 1);
+	if(r == Result::nf){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free entry in directArea %" PRIu32", "
+				"and deletion+GC is not implemented yet", *directArea);
+		/*
+		 * TODO: change directArea after deletion
+		 */
+		return Result::nimpl;
+	}
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new JumpPad!");
+		return r;
+	}
+
+	BlockAbs newblock = *directArea * blocksPerArea + page / blocksPerArea;
+	if(newblock != getBlockNumber(logPrev, dev)){
+		//reset serial no if we start a new block
+		entry->no = 0;
+		r = deleteSuperBlock(extractLogicalArea(logPrev), extractPage(logPrev) / blocksTotal);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete block of JumpPad! BlockAbs: %" PRIu32, getBlockNumber(logPrev, dev));
+		}
+	}
+
+	return dev->driver->writePage(*directArea * pagesPerBlock + page, entry, sizeof(JumpPadEntry));
 }
 
 Result Superblock::readJumpPadEntry(Addr addr, JumpPadEntry* entry){
@@ -469,13 +496,13 @@ Result Superblock::readJumpPadEntry(Addr addr, JumpPadEntry* entry){
 	return dev->driver->readPage(getPageNumberFromDirect(addr), entry, sizeof(JumpPadEntry));
 }
 
-Result Superblock::insertNewSuperIndex(Addr prev, AreaPos *directArea, SuperIndex* entry){
-	if(dev->areaMap[extractLogicalArea(prev)].position != *directArea){
+Result Superblock::insertNewSuperIndex(Addr logPrev, AreaPos *directArea, SuperIndex* entry){
+	if(dev->areaMap[extractLogicalArea(logPrev)].position != *directArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Logical and direct Address differ!");
 		return Result::bug;
 	}
 
-	if(dev->areaMap[extractLogicalArea(prev)].type != AreaType::superblock){
+	if(dev->areaMap[extractLogicalArea(logPrev)].type != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
 		return Result::bug;
 	}
@@ -483,12 +510,51 @@ Result Superblock::insertNewSuperIndex(Addr prev, AreaPos *directArea, SuperInde
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Anchor entry (%zu) is bigger than page (%d)!", sizeof(AnchorEntry), dataBytesPerPage);
 		return Result::fail;
 	}
-	(void) entry;
-	return Result::nimpl;
+	PageOffs page;
+	unsigned int neededASes = 0;
+	for(unsigned int i = 0; i < 2; i++){
+		if(entry->asPositions[i] > 0)
+			neededASes++;
+	}
+	unsigned int needed_bytes = sizeof(Addr) +
+		areasNo * sizeof(Area)
+		+ neededASes * dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
+	if(dataPagesPerArea % 8 != 0)
+		needed_bytes++;
+
+	//Every page needs its serial Number
+	unsigned int needed_pages = needed_bytes / (dataBytesPerPage - sizeof(SerialNo)) + 1;
+
+	Result r = findFirstFreeEntryInArea(*directArea, &page, needed_pages);
+	if(r == Result::nf){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free entry in directArea %" PRIu32", "
+				"and deletion+GC is not implemented yet", *directArea);
+		/*
+		 * TODO: change directArea after deletion
+		 */
+		return Result::nimpl;
+	}
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new superIndex!");
+		return r;
+	}
+
+	BlockAbs newblock = *directArea * blocksPerArea + page / blocksPerArea;
+	if(newblock != getBlockNumber(logPrev, dev)){
+		//reset serial no if we start a new block
+		entry->no = 0;
+		r = deleteSuperBlock(extractLogicalArea(logPrev), extractPage(logPrev) / blocksTotal);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete block of superIndex! BlockAbs: %" PRIu32, getBlockNumber(logPrev, dev));
+		}
+	}
+
+	return writeSuperPageIndex(extractLogicalArea(logPrev), *directArea * pagesPerBlock + page, entry);
 }
+
 //warn: Make sure that free space is sufficient!
-Result Superblock::writeSuperPageIndex(AreaPos logarea, Addr addr, SuperIndex* entry){
-	if(dev->areaMap[logarea].position != extractLogicalArea(addr)){
+Result Superblock::writeSuperPageIndex(AreaPos logarea, PageAbs pageStart, SuperIndex* entry){
+	if(dev->areaMap[logarea].position != pageStart / totalPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Logical and direct Address differ!");
 		return Result::bug;
 	}
@@ -545,7 +611,6 @@ Result Superblock::writeSuperPageIndex(AreaPos logarea, Addr addr, SuperIndex* e
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "%u bytes have been written to Buffer", pointer);
 
 	pointer = 0;
-	uint64_t page_offs = getPageNumberFromDirect(addr);
 	Result r;
 	char pagebuf[dataBytesPerPage];
 	for(unsigned page = 0; page < needed_pages; page++){
@@ -555,7 +620,7 @@ Result Superblock::writeSuperPageIndex(AreaPos logarea, Addr addr, SuperIndex* e
 		//This inserts the serial number at the first Bytes in every page
 		memcpy(pagebuf, &entry->no, sizeof(SerialNo));
 		memcpy(&pagebuf[sizeof(SerialNo)], &buf[pointer], btw);
-		r = dev->driver->writePage(page_offs + page, pagebuf, btw + sizeof(SerialNo));
+		r = dev->driver->writePage(pageStart + page, pagebuf, btw + sizeof(SerialNo));
 		if(r != Result::ok)
 			return r;
 		pointer += btw;
