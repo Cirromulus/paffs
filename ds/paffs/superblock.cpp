@@ -64,15 +64,15 @@ void Superblock::printSuperIndex(SuperIndex* ind){
 /**
  * @brief Ugh, O(n) with areaCount
  */
-Result Superblock::resolveDirectToLogicalPath(AreaPos directPath[jumpPadNo+2],
-		AreaPos outPath[jumpPadNo+2]){
+Result Superblock::resolveDirectToLogicalPath(Addr directPath[superChainElems],
+		Addr outPath[superChainElems]){
 	AreaPos p = 0;
 	int d = 0;
 	for(AreaPos i = 0; i < areasNo; i++){
 		p = dev->areaMap[i].position;
-		for(d = 0; d < jumpPadNo+2; d++){
-			if(p == directPath[d])
-				outPath[d] = i;
+		for(d = 0; d < superChainElems; d++){
+			if(p == extractLogicalArea(directPath[d]))
+				outPath[d] = combineAddress(i, extractPage(directPath[i]));
 		}
 	}
 	return Result::ok;
@@ -85,8 +85,8 @@ Result Superblock::commitSuperIndex(SuperIndex *newIndex){
 	unsigned int needed_pages = needed_bytes / dataBytesPerPage + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed to read former SuperIndex: %u (%u bytes, 2 AS'es)", needed_pages, needed_bytes);
 
-	Addr path[jumpPadNo+2];
-	SerialNo indexes[jumpPadNo+2];
+	Addr path[superChainElems];
+	SerialNo indexes[superChainElems];
 	Result r = getAddrOfMostRecentSuperIndex(path, indexes);
 
 	if(r == Result::nf){
@@ -119,49 +119,67 @@ Result Superblock::commitSuperIndex(SuperIndex *newIndex){
 		printSuperIndex(newIndex);
 	}
 
-	AreaPos directAreas[jumpPadNo+2];
-	AreaPos logicalAreas[jumpPadNo+2];
-	for(int i = 0; i < jumpPadNo+2; i++){
-		directAreas[i] = extractLogicalArea(path[i]);
-	}
-
-
-	r = resolveDirectToLogicalPath(directAreas, logicalAreas);
+	Addr logicalPath[superChainElems];
+	r = resolveDirectToLogicalPath(path, logicalPath);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not resolve direct to logical path!");
 		return r;
 	}
 
-	r = insertNewSuperPage(&logicalAreas[jumpPadNo+1], &directAreas[jumpPadNo+1], newIndex);
+	AreaPos directAreas[superChainElems];
+	for(int i = 0; i < superChainElems; i++){
+		directAreas[i] = extractLogicalArea(path[i]);
+	}
+	AreaPos lastArea = directAreas[jumpPadNo+1];
+
+	r = insertNewSuperIndex(logicalPath[jumpPadNo+1], &directAreas[jumpPadNo+1], newIndex);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new super Page!");
 		return r;
 	}
 
+	if(lastArea == directAreas[jumpPadNo+1]){
+		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Committing superindex "
+				"at phys. area %" PRIu32 "was enough!", lastArea);
+		rootnode_dirty = false;
+		return Result::ok;
+	}
+
 	for(int i = jumpPadNo; i > 0; i--){
 		JumpPadEntry e = {indexes[i], directAreas[i+1]};
-		r = insertNewJumpPadEntry(&logicalAreas[i], &directAreas[i], &e);
+		lastArea = directAreas[i+1];
+		r = insertNewJumpPadEntry(logicalPath[i], &directAreas[i], &e);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new JumpPadEntry (Chain %d)!", i);
 			return r;
 		}
+		if(lastArea == directAreas[i+1]){
+			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Committing jumpPad no. %d"
+					"at phys. area %" PRIu32 "was enough!", i, lastArea);
+			rootnode_dirty = false;
+			return Result::ok;
+		}
 	}
-
 	AnchorEntry a = {indexes[0], version, stdParam, directAreas[1]};
-	r = insertNewAnchorEntry(&logicalAreas[0], &directAreas[0], &a);
+	lastArea = directAreas[1];
+	r = insertNewAnchorEntry(logicalPath[0], &directAreas[0], &a);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new AnchorEntry!");
 		return r;
 	}
+	if(lastArea != directAreas[1]){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Anchor entry (%" PRIu32 ") may never "
+				"change its previous area (%" PRIu32 ")!", directAreas[1], lastArea);
+		return Result::bug;
+	}
 
 	rootnode_dirty = false;
-
 	return Result::ok;
 }
 
 Result Superblock::readSuperIndex(SuperIndex* index){
-	Addr path[jumpPadNo+2];
-	SerialNo indexes[jumpPadNo+2];
+	Addr path[superChainElems];
+	SerialNo indexes[superChainElems];
 	Result r = getAddrOfMostRecentSuperIndex(path, indexes);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "could not get addr of most recent Superindex");
@@ -228,7 +246,28 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 
 Result Superblock::findFirstFreeEntryInArea(AreaPos area, PageOffs* out_pos,
 		unsigned int required_pages){
-	return Result::nimpl;
+	PageOffs pageOffs[blocksPerArea];
+	int ffBlock = -1;
+	Result r;
+	for(int block = 0; block < blocksPerArea; block++){
+		r = findFirstFreeEntryInBlock(area, block, &pageOffs[block], required_pages);
+		if(r == Result::nf){
+			if (block+1 == blocksPerArea){
+				//We are last entry
+				return Result::nf;
+			}
+		}else if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free Entry in phys. Area %" PRIu32, area);
+			return r;
+		}
+		if(ffBlock < 0)
+			ffBlock = block;
+	}
+	if (ffBlock < 0)
+		return Result::nf;//this should never be reached
+
+	*out_pos = pageOffs[ffBlock];
+	return Result::ok;
 }
 
 //out_pos shall point to the first free page
@@ -262,10 +301,10 @@ Result Superblock::findFirstFreeEntryInBlock(AreaPos area, uint8_t block,
 /**
  * @param path returns the *direct* addresses to each found Entry up to SuperEntry
  */
-Result Superblock::getAddrOfMostRecentSuperIndex(Addr path[jumpPadNo+2], SerialNo indexes[jumpPadNo+2]){
+Result Superblock::getAddrOfMostRecentSuperIndex(Addr path[superChainElems], SerialNo indexes[superChainElems]){
 	path[0] = 0;
 	Result r;
-	for(int i = 1; i <= jumpPadNo; i++){
+	for(int i = 1; i < superChainElems; i++){
 		r = findMostRecentEntryInArea(
 				extractLogicalArea(path[i-1]), &path[i], &indexes[i]
 		    );
@@ -274,6 +313,8 @@ Result Superblock::getAddrOfMostRecentSuperIndex(Addr path[jumpPadNo+2], SerialN
 					extractLogicalArea(path[i-1]));
 			return r;
 		}
+		PAFFS_DBG(PAFFS_TRACE_SUPERBLOCK, "Found Chain Elem %d at phys. area "
+				"%" PRIu32 " with index %" PRIu32, i - 1, extractLogicalArea(path[i-1]), indexes[i]);
 	}
 
 	return Result::ok;
@@ -349,35 +390,44 @@ Result Superblock::findMostRecentEntryInBlock(AreaPos area, uint8_t block, PageO
 /**
  * This assumes that the area of the Anchor entry does not change.
  */
-Result Superblock::insertNewAnchorEntry(AreaPos *logarea, AreaPos *directArea, AnchorEntry* entry){
-	if(dev->areaMap[*logarea].position != *directArea){
+Result Superblock::insertNewAnchorEntry(Addr prev, AreaPos *directArea, AnchorEntry* entry){
+	if(dev->areaMap[extractLogicalArea(prev)].position != *directArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Logical and direct Address differ!");
 		return Result::bug;
 	}
 
-	if(dev->areaMap[*logarea].type != AreaType::superblock){
+	if(dev->areaMap[extractLogicalArea(prev)].type != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
 		return Result::bug;
 	}
-	(void) entry;
-	return Result::nimpl;
-}
-
-Result Superblock::writeAnchorEntry(AreaPos logarea, Addr addr, AnchorEntry* entry){
 	if(sizeof(AnchorEntry) > dataBytesPerPage){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "AnchorEntry bigger than dataBytes per Page! (%zu, %u)",
-				sizeof(JumpPadEntry), dataBytesPerPage);
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Anchor entry (%zu) is bigger than page (%d)!", sizeof(AnchorEntry), dataBytesPerPage);
+		return Result::fail;
+	}
+	PageOffs page;
+	Result r = findFirstFreeEntryInArea(*directArea, &page, 1);
+	if(r == Result::nf){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free entry in directArea %" PRIu32", "
+				"and deletion+GC is not implemented yet", *directArea);
 		return Result::nimpl;
+		/*
+		 * TODO: this is anchor, just write to first block (set p to zero)
+		 * and delete last block later on
+		 * If this were another, directArea would change after deletion
+		 */
 	}
-	if(dev->areaMap[logarea].position != extractLogicalArea(addr)){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Logical and direct Address differ!");
-		return Result::bug;
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new Anchor Entry!");
+		return r;
 	}
-	if(dev->areaMap[logarea].type != AreaType::superblock){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
-		return Result::bug;
+
+	BlockAbs newblock = *directArea * blocksPerArea + page / blocksPerArea;
+	if(newblock != getBlockNumberFromDirect(prev)){
+		//reset serial no if we start a new block
+		entry->no = 0;
 	}
-	return dev->driver->writePage(getPageNumberFromDirect(addr), entry, sizeof(AnchorEntry));
+
+	return dev->driver->writePage(*directArea * pagesPerBlock + page, entry, sizeof(AnchorEntry));
 }
 
 Result Superblock::readAnchorEntry(Addr addr, AnchorEntry* entry){
@@ -390,35 +440,23 @@ Result Superblock::readAnchorEntry(Addr addr, AnchorEntry* entry){
 	return dev->driver->readPage(getPageNumberFromDirect(addr), entry, sizeof(AnchorEntry));
 }
 
-Result Superblock::insertNewJumpPadEntry(AreaPos *logarea, AreaPos *directArea, JumpPadEntry* entry){
-	if(dev->areaMap[*logarea].position != *directArea){
+Result Superblock::insertNewJumpPadEntry(Addr prev, AreaPos *directArea, JumpPadEntry* entry){
+	if(dev->areaMap[extractLogicalArea(prev)].position != *directArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Logical and direct Address differ!");
 		return Result::bug;
 	}
 
-	if(dev->areaMap[*logarea].type != AreaType::superblock){
+	if(dev->areaMap[extractLogicalArea(prev)].type != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
 		return Result::bug;
 	}
+	if(sizeof(AnchorEntry) > dataBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Anchor entry (%zu) is bigger than page (%d)!", sizeof(AnchorEntry), dataBytesPerPage);
+		return Result::fail;
+	}
+	//dev->driver->writePage(getPageNumberFromDirect(addr), entry, sizeof(JumpPadEntry));
 	(void) entry;
 	return Result::nimpl;
-}
-
-Result Superblock::writeJumpPadEntry(AreaPos logarea, Addr addr, JumpPadEntry* entry){
-	if(sizeof(JumpPadEntry) > dataBytesPerPage){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "JumpPadEntry bigger than dataBytes per Page! (%zu, %u)",
-				sizeof(JumpPadEntry), dataBytesPerPage);
-		return Result::nimpl;
-	}
-	if(dev->areaMap[logarea].position != extractLogicalArea(addr)){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Logical and direct Address differ!");
-		return Result::bug;
-	}
-	if(dev->areaMap[logarea].type != AreaType::superblock){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
-		return Result::bug;
-	}
-	return dev->driver->writePage(getPageNumberFromDirect(addr), entry, sizeof(JumpPadEntry));
 }
 
 Result Superblock::readJumpPadEntry(Addr addr, JumpPadEntry* entry){
@@ -431,17 +469,21 @@ Result Superblock::readJumpPadEntry(Addr addr, JumpPadEntry* entry){
 	return dev->driver->readPage(getPageNumberFromDirect(addr), entry, sizeof(JumpPadEntry));
 }
 
-Result Superblock::insertNewSuperPage(AreaPos *logarea, AreaPos *directArea, SuperIndex* entry){
-	if(dev->areaMap[*logarea].position != *directArea){
+Result Superblock::insertNewSuperIndex(Addr prev, AreaPos *directArea, SuperIndex* entry){
+	if(dev->areaMap[extractLogicalArea(prev)].position != *directArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Logical and direct Address differ!");
 		return Result::bug;
 	}
 
-	if(dev->areaMap[*logarea].type != AreaType::superblock){
+	if(dev->areaMap[extractLogicalArea(prev)].type != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
 		return Result::bug;
 	}
-
+	if(sizeof(AnchorEntry) > dataBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Anchor entry (%zu) is bigger than page (%d)!", sizeof(AnchorEntry), dataBytesPerPage);
+		return Result::fail;
+	}
+	(void) entry;
 	return Result::nimpl;
 }
 //warn: Make sure that free space is sufficient!

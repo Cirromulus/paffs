@@ -1,4 +1,3 @@
-
 \chapter{Introduction}
 \label{cha:introduction}
 
@@ -8,7 +7,6 @@ Another big challenge is to reduce wear. Every change to data has to be written 
 
 \section{Fundamental structures}
 \label{sec:funst}
-
 
 \subsection{Areas}
 \label{areas}
@@ -23,18 +21,18 @@ An Area is a logical group of erase blocks. The number of contained blocks is a 
 
 \subsection{Area types}
 \begin{table}[htbp]
-\caption{Area types}
-\label{tab:areatypes}
-\begin{tabularx}{\textwidth}{lp{11cm}p{2.5cm}}
-\toprule
-Type & Description\\
-\midrule
-Superblock & One superblock area is on the first area of flash, the rest is dynamically allocated. It contains the anchor blocks as well as jump pads and a superpage. See chapter \ref{sub:chainedSB} \\
-Index & The index areas will only contain tree nodes (some of them storing inodes). See chapter \ref{b+tree}.\\
-Data & Data areas contain data chunks of files, directory entries and softlinks referenced by the index.\\
-Journal & The single journal area (some when) will contain uncommitted changes of the \texttt{area Summary}.\\
-\bottomrule
-\end{tabularx}
+	\caption{Area types}
+	\label{tab:areatypes}
+	\begin{tabularx}{\textwidth}{lp{11cm}p{2.5cm}}
+		\toprule
+		Type & Description\\
+		\midrule
+		Superblock & One superblock area is on the first area of flash, the rest is dynamically allocated. It contains the anchor blocks as well as jump pads and a superpage. See chapter \ref{sub:chainedSB} \\
+		Index & The index areas will only contain tree nodes (some of them storing inodes). See chapter \ref{b+tree}.\\
+		Data & Data areas contain data chunks of files, directory entries and softlinks referenced by the index.\\
+		Journal & The single journal area (some when) will contain uncommitted changes of the \texttt{area Summary}.\\
+		\bottomrule
+	\end{tabularx}
 \end{table} 
 
 \subsection{Area map / Addresses}
@@ -53,9 +51,9 @@ For saving space, the information of \texttt{free}, \texttt{used} and \texttt{di
 \paragraph{Overview}
 The garbage collection needs at least one free area to copy valid data to. At first, one or more of the \texttt{closed} areas are inspected (as the \texttt{active} areas are still in use), sorted by textt{dirty} pages and eventually chosen for garbage collection. All valid pages are copied from the old area to the new area in their same relative positions. After that, the old area is erased, and the \texttt{AreaMap} is updated so that the logical areas swap their physical positions. The new area is marked \textit{active}, and the \texttt{AreaSummary} is deleted from Flash, thus giving way for a new commit of an area summary. If the previous way is not sufficient, the \texttt{garbage buffer} is given up for storing the more information. This procedure can not be reverted, and is reserved for \texttt{index} type only to enable a safe unmount without information loss.
 \begin{figure}[ht]
-  \centering\includegraphics[width=\textwidth]{Areas_address.png}
-  \caption{Basic process of garbage collection with areas}
-  \label{fig:area_address}
+	\centering\includegraphics[width=\textwidth]{Areas_address.png}
+	\caption{Basic process of garbage collection with areas}
+	\label{fig:area_address}
 \end{figure}
 
 \paragraph{Functionality}
@@ -112,23 +110,23 @@ B+Tree is a variation of the standard binary search tree with more than two keys
 \paragraph{Overview}
 Can be file, directory and softlink. Points to data chunks in a way like \texttt{EXT3} does. See Table \ref{tab:pinode}. It is possible to use pointer space for very small files or directories (14 * 4 Byte).
 \begin{table}[htbp]
-\caption{Inode contents}
-\label{tab:pinode}
-\begin{tabularx}{\textwidth}{lp{11cm}p{2.5cm}}
-\toprule
-Value & Description\\
-\midrule
-\texttt{pInode\_no} & Unique number of inode. \\
-\texttt{pInode\_type} & One of \texttt{file}, \texttt{directory} or \texttt{link}.\\
-\texttt{permission} & Global read, write and execute permissions. Changeable via \texttt{chmod}.\\
-\texttt{created} & Unix time stamp of file creation.\\
-\texttt{modified} & Unix time stamp of last file write access.\\
-\texttt{size} & Size of user data in bytes. \\
-\texttt{reserved size} & Space user data is actually occupying in bytes (multiple of chunk size).\\
-\texttt{direct pointer} & 11 direct pointers to user data chunks.\\
-\texttt{indirect pointers} & One of each first, second and third layer indirection pointers pointing to data chunks with more pointers.\\
-\bottomrule
-\end{tabularx}
+	\caption{Inode contents}
+	\label{tab:pinode}
+	\begin{tabularx}{\textwidth}{lp{11cm}p{2.5cm}}
+		\toprule
+		Value & Description\\
+		\midrule
+		\texttt{pInode\_no} & Unique number of inode. \\
+		\texttt{pInode\_type} & One of \texttt{file}, \texttt{directory} or \texttt{link}.\\
+		\texttt{permission} & Global read, write and execute permissions. Changeable via \texttt{chmod}.\\
+		\texttt{created} & Unix time stamp of file creation.\\
+		\texttt{modified} & Unix time stamp of last file write access.\\
+		\texttt{size} & Size of user data in bytes. \\
+		\texttt{reserved size} & Space user data is actually occupying in bytes (multiple of chunk size).\\
+		\texttt{direct pointer} & 11 direct pointers to user data chunks.\\
+		\texttt{indirect pointers} & One of each first, second and third layer indirection pointers pointing to data chunks with more pointers.\\
+		\bottomrule
+	\end{tabularx}
 \end{table} 
 
 \section{Tests}
@@ -143,7 +141,7 @@ This section is under development since the filesystem is unfinished. Meanwhile 
 \end{figure}
 \begin{figure}[htp]
 	\centering\includegraphics[width=\textwidth]{paffs__fileIO_GC_annotations.png}
-	\caption{\label{fig:fileIO} Status of simulated flash after 1562658 read/write cycles on a single file. This result is affected by block erasure count.}
+	\caption{\label{fig:GC} Status of simulated flash after 1562658 read/write cycles on a single file. This result is affected by block erasure count.}
 \end{figure}
 \begin{figure}[htp]
 	\centering\includegraphics[width=\textwidth]{yaffs_paffs_comparison_WL.png}

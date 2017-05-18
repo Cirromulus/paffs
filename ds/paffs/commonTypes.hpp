@@ -78,7 +78,7 @@ struct Param{
 };
 
 static const Param stdParam{
-	totalBytesPerPage, oobBytesPerPage, pagesPerBlock, blocks, dataBytesPerPage,
+	totalBytesPerPage, oobBytesPerPage, pagesPerBlock, blocksTotal, dataBytesPerPage,
 	areasNo, blocksPerArea, totalPagesPerArea, dataPagesPerArea
 };
 

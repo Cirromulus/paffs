@@ -49,7 +49,7 @@ const char* resultMsg[] = {
 		"Flash needs retirement",
 		"Device is not mounted",
 		"Device is already mounted",
-		"Objet name is too big",
+		"Object name is too big",
 		"You should not be seeing this..."
 };
 
@@ -142,7 +142,7 @@ Result Paffs::format(bool complete){
 			"dataPagesPerArea  : %04u\n\t"
 			"areaSummarySize   : %04u\n\t"
 			, dataBytesPerPage, oobBytesPerPage, pagesPerBlock
-			, blocks, blocksPerArea
+			, blocksTotal, blocksPerArea
 			, totalBytesPerPage, areasNo, totalPagesPerArea, dataPagesPerArea
 			, areaSummarySize
 			);

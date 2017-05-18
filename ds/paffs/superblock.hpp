@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include "commonTypes.hpp"
+#include <config.hpp>
 
 namespace paffs{
 
@@ -61,17 +62,22 @@ public:
 
 private:
 
-	Result resolveDirectToLogicalPath(AreaPos directPath[jumpPadNo+2],
-			AreaPos outPath[jumpPadNo+2]);
+	Result resolveDirectToLogicalPath(Addr directPath[superChainElems],
+			Addr outPath[superChainElems]);
 
+	/**
+	 * This assumes that blocks are immediately deleted after starting
+	 * a new block inside area
+	 * -> returns NF if last block is full, even if other blocks are free
+	 */
 	Result findFirstFreeEntryInArea(AreaPos area, PageOffs* out_pos,
 			unsigned int required_pages);
 
 	Result findFirstFreeEntryInBlock(AreaPos area, uint8_t block,
 			PageOffs* out_pos, unsigned int required_pages);
 
-	Result getAddrOfMostRecentSuperIndex(Addr path[jumpPadNo+2],
-			SerialNo indexes[jumpPadNo+2]);
+	Result getAddrOfMostRecentSuperIndex(Addr path[superChainElems],
+			SerialNo indexes[superChainElems]);
 	Result findMostRecentEntryInArea(AreaPos area, Addr* out_pos,
 			SerialNo* out_index);
 	Result findMostRecentEntryInBlock(AreaPos area, uint8_t block,
@@ -79,31 +85,30 @@ private:
 
 	/**
 	 * This assumes that the area of the Anchor entry does not change.
+	 * Entry->serialNo needs to be set to appropriate increased number.
 	 * Changes the serial to zero if a new block is used.
-	 * @param logarea may be changed if target was written to a new area
+	 * @param prev is a *logical* addr to the last valid entry
 	 * @param area may be changed if target was written to a new area
 	 */
-	Result insertNewAnchorEntry(AreaPos *logarea, AreaPos *area, AnchorEntry* entry);
-	Result writeAnchorEntry(AreaPos logarea, Addr addr, AnchorEntry* entry);
+	Result insertNewAnchorEntry(Addr prev, AreaPos *area, AnchorEntry* entry);
 	Result readAnchorEntry(Addr addr, AnchorEntry* entry);
 
 	/**
 	 * May call garbage collection for a new SB area.
 	 * Changes the serial to zero if a new block is used.
- 	 * @param logarea may be changed if target was written to a new area
+ 	 * @param prev is a *logical* addr to the last valid entry
 	 * @param area may be changed if target was written to a new area
 	 */
-	Result insertNewJumpPadEntry(AreaPos *logarea, AreaPos *area, JumpPadEntry* entry);
-	Result writeJumpPadEntry(AreaPos logarea, Addr addr, JumpPadEntry* entry);
+	Result insertNewJumpPadEntry(Addr prev, AreaPos *area, JumpPadEntry* entry);
 	Result readJumpPadEntry(Addr addr, JumpPadEntry* entry);
 
 	/**
 	 * May call garbage collection for a new SB area.
 	 * Changes the serial to zero if a new block is used.
-	 * @param logarea may be changed if target was written to a new area
+	 * @param prev is a *logical* addr to the last valid entry
 	 * @param area may be changed if target was written to a new area
 	 */
-	Result insertNewSuperPage(AreaPos *logarea, AreaPos *area, SuperIndex* entry);
+	Result insertNewSuperIndex(Addr prev, AreaPos *area, SuperIndex* entry);
 	Result writeSuperPageIndex(AreaPos logarea, Addr addr, SuperIndex* entry);
 	Result readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap);
 

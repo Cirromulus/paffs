@@ -12,14 +12,15 @@ envGlobal.SConscript([
 	os.path.join('$OUTPOST_CORE_PATH', 'modules/SConscript.library'),
 	], exports='envGlobal')
 
+if not envGlobal['PAFFSCONFIG']:
+	print('No configuration set!')
+	envGlobal['PAFFSCONFIG'] = 'default'
+else:
+	print('Paffs configuration: ' + str(envGlobal['PAFFSCONFIG']))
+
 envGlobal.Append(CPPPATH=[
 	os.path.join(os.path.abspath("./config/"), '$PAFFSCONFIG')
 ])
-
-if not envGlobal['PAFFSCONFIG']:
-	print('No configuration set!')
-else:
-	print('Paffs configuration: ' + str(envGlobal['PAFFSCONFIG']))
 
 env = envGlobal.Clone()
 

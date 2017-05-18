@@ -31,7 +31,7 @@ const char* areaStatusNames[] = {
 
 //Returns the absolute page number from *indirect* address
 PageAbs getPageNumber(Addr addr, Device* dev){
-	uint64_t page = dev->areaMap[extractLogicalArea(addr)].position *
+	PageAbs page = dev->areaMap[extractLogicalArea(addr)].position *
 								totalPagesPerArea;
 	page += extractPage(addr);
 	if(page > areasNo * totalPagesPerArea){
@@ -43,13 +43,18 @@ PageAbs getPageNumber(Addr addr, Device* dev){
 
 //Returns the absolute page number from *direct* address
 PageAbs getPageNumberFromDirect(Addr addr){
-	uint64_t page = extractLogicalArea(addr) * totalPagesPerArea;
+	PageAbs page = extractLogicalArea(addr) * totalPagesPerArea;
 	page += extractPage(addr);
 	if(page > areasNo * totalPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "calculated Page number out of range!");
 		return 0;
 	}
 	return page;
+}
+
+//Returns the absolute page number from *direct* address
+BlockAbs getBlockNumberFromDirect(Addr addr){
+	return extractLogicalArea(addr) * blocksPerArea;
 }
 
 //Combines the area number with the relative page starting from first page in area

@@ -18,6 +18,8 @@ extern const char* areaStatusNames[];
 PageAbs getPageNumber(Addr addr, Device *dev);
 //Translates direct Addr to physical page number ignoring AreaMap
 PageAbs getPageNumberFromDirect(Addr addr);
+//Translates direct Addr to physical Block number ignoring AreaMap
+BlockAbs getBlockNumberFromDirect(Addr addr);
 //combines two values to one type
 Addr combineAddress(AreaPos logical_area, PageOffs page);
 unsigned int extractLogicalArea(Addr addr);

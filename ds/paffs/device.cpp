@@ -1103,10 +1103,10 @@ Result Device::initializeDevice(){
 		return Result::einval;
 	}
 
-	if(blocks % blocksPerArea != 0){
+	if(blocksTotal % blocksPerArea != 0){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "'blocksPerArea' does not divide "
 				"%u blocks evenly! (define %u, rest: %u)",
-				blocks, blocksPerArea, blocks % blocksPerArea);
+				blocksTotal, blocksPerArea, blocksTotal % blocksPerArea);
 		return Result::einval;
 	}
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Init success");
