@@ -50,13 +50,15 @@ Result Device::format(bool complete){
 	if(complete)
 		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Deleting all areas.\n");
 
-	unsigned char had_areaType = 0;
+	unsigned char hadAreaType = 0;
+	unsigned char hadSuperblocks = 0;
+
 	for(unsigned int area = 0; area < areasNo; area++){
 		areaMap[area].status = AreaStatus::empty;
 		areaMap[area].erasecount = 0;
 		areaMap[area].position = area;
 
-		if(had_areaType &
+		if(hadAreaType &
 				(1 << AreaType::superblock |
 				1 << AreaType::garbageBuffer) ||
 				complete){
@@ -76,26 +78,27 @@ Result Device::format(bool complete){
 			}
 		}
 
-		if(!(had_areaType & 1 << AreaType::superblock)){
+		if(!(hadAreaType & 1 << AreaType::superblock)){
 			activeArea[AreaType::superblock] = area;
 			areaMap[area].type = AreaType::superblock;
 			areaMgmt.initArea(area);
-			had_areaType |= 1 << AreaType::superblock;
+			if(++hadSuperblocks == superChainElems)
+				hadAreaType |= 1 << AreaType::superblock;
 			continue;
 		}
-		if(!(had_areaType & 1 << AreaType::journal)){
+		if(!(hadAreaType & 1 << AreaType::journal)){
 			activeArea[AreaType::journal] = area;
 			areaMap[area].type = AreaType::journal;
 			areaMgmt.initArea(area);
-			had_areaType |= 1 << AreaType::journal;
+			hadAreaType |= 1 << AreaType::journal;
 			continue;
 		}
 
-		if(!(had_areaType & 1 << AreaType::garbageBuffer)){
+		if(!(hadAreaType & 1 << AreaType::garbageBuffer)){
 			activeArea[AreaType::garbageBuffer] = area;
 			areaMap[area].type = AreaType::garbageBuffer;
 			areaMgmt.initArea(area);
-			had_areaType |= 1 << AreaType::garbageBuffer;
+			hadAreaType |= 1 << AreaType::garbageBuffer;
 			continue;
 		}
 
@@ -124,7 +127,7 @@ Result Device::format(bool complete){
 		destroyDevice();
 		return r;
 	}
-	r = sumCache.commitAreaSummaries();
+	r = sumCache.commitAreaSummaries(true);
 	if(r != Result::ok){
 		destroyDevice();
 		return r;

@@ -26,15 +26,15 @@ const SerialNo emptySerial = 0xFFFFFFFF;
 
 struct AnchorEntry{
 	SerialNo no;
-	uint8_t fsVersion;
+	AreaPos jumpPadArea;	//this needs to be on second place after Serial no
 	Param param;
-	AreaPos jumpPadArea;
+	uint8_t fsVersion;
 	//Todo: Still space free
 };
 
 struct JumpPadEntry{
 	SerialNo no;
-	AreaPos nextArea;
+	AreaPos nextArea;		//this needs to be on second place after Serial no
 };
 
 struct SuperIndex{
@@ -57,13 +57,19 @@ public:
 
 	//returns PAFFS_NF if no superindex is in flash
 	Result readSuperIndex(SuperIndex* index);
-	Result commitSuperIndex(SuperIndex* index);
+	Result commitSuperIndex(SuperIndex* index, bool createNew = false);
 	void printSuperIndex(SuperIndex* ind);
 
 private:
-
+	/**
+	 * Worst case O(n) with area count
+	 */
 	Result resolveDirectToLogicalPath(Addr directPath[superChainElems],
 			Addr outPath[superChainElems]);
+	/**
+	 * Should be constant because at formatting time all superblocks are located at start
+	 */
+	Result fillPathWithFirstSuperblockAreas(Addr directPath[superChainElems]);
 
 	/**
 	 * This assumes that blocks are immediately deleted after starting
@@ -76,12 +82,15 @@ private:
 	Result findFirstFreeEntryInBlock(AreaPos area, uint8_t block,
 			PageOffs* out_pos, unsigned int required_pages);
 
+	/**
+	 * First elem is anchor
+	 */
 	Result getAddrOfMostRecentSuperIndex(Addr path[superChainElems],
 			SerialNo indexes[superChainElems]);
-	Result findMostRecentEntryInArea(AreaPos area, Addr* out_pos,
-			SerialNo* out_index);
-	Result findMostRecentEntryInBlock(AreaPos area, uint8_t block,
-			PageOffs* out_pos, SerialNo* out_index);
+	Result readMostRecentEntryInArea(AreaPos area, Addr* out_pos,
+			SerialNo* out_index, AreaPos* next);
+	Result readMostRecentEntryInBlock(AreaPos area, uint8_t block,
+			PageOffs* out_pos, SerialNo* out_index, AreaPos* next);
 
 	/**
 	 * This assumes that the area of the Anchor entry does not change.
@@ -109,7 +118,7 @@ private:
 	 * @param area may be changed if target was written to a new area
 	 */
 	Result insertNewSuperIndex(Addr prev, AreaPos *area, SuperIndex* entry);
-	Result writeSuperPageIndex(AreaPos logarea, PageAbs pageStart, SuperIndex* entry);
+	Result writeSuperPageIndex(PageAbs pageStart, SuperIndex* entry);
 	Result readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap);
 
 	Result deleteSuperBlock(AreaPos area, uint8_t block);

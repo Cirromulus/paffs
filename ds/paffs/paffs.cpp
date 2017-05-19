@@ -16,12 +16,12 @@ unsigned int traceMask =
 	//PAFFS_TRACE_VERBOSE |
 	//PAFFS_TRACE_READ |
 	PAFFS_TRACE_INFO |
-	//PAFFS_TRACE_AREA |
+	PAFFS_TRACE_AREA |
 	PAFFS_TRACE_ERROR |
 	PAFFS_TRACE_BUG |
 	//PAFFS_TRACE_TREE |
 	//PAFFS_TRACE_TREECACHE |
-	PAFFS_TRACE_ASCACHE |
+	//PAFFS_TRACE_ASCACHE |
 	//PAFFS_TRACE_SCAN |
 	//PAFFS_TRACE_WRITE |
 	PAFFS_TRACE_SUPERBLOCK |
@@ -29,8 +29,8 @@ unsigned int traceMask =
 	//PAFFS_TRACE_VERIFY_AS |
 	PAFFS_TRACE_VERIFY_TC |
 	PAFFS_WRITE_VERIFY_AS |
-	PAFFS_TRACE_GC |
-	PAFFS_TRACE_GC_DETAIL |
+	//PAFFS_TRACE_GC |
+	//PAFFS_TRACE_GC_DETAIL |
 	0;
 
 const char* resultMsg[] = {
@@ -130,21 +130,23 @@ Result Paffs::format(bool complete){
 	PAFFS_DBG_S(PAFFS_TRACE_INFO, "-----------------");
 
 	PAFFS_DBG_S(PAFFS_TRACE_INFO, "Formatting infos:\n\t"
-			"dataBytesPerPage: %04u\n\t"
-			"oobBytesPerPage : %04u\n\t"
-			"pagesPerBlock   : %04u\n\t"
-			"blocks          : %04u\n\t"
-			"blocksPerArea   : %04u\n\n\t"
+			"dataBytesPerPage  : %04u\n\t"
+			"oobBytesPerPage   : %04u\n\t"
+			"pagesPerBlock     : %04u\n\t"
+			"blocks            : %04u\n\t"
+			"blocksPerArea     : %04u\n\t"
+			"jumpPadNo         : %04u\n\n\t"
 
 			"totalBytesPerPage : %04u\n\t"
 			"areasNo           : %04u\n\t"
 			"totalPagesPerArea : %04u\n\t"
 			"dataPagesPerArea  : %04u\n\t"
 			"areaSummarySize   : %04u\n\t"
+			"superChainElems   : %04u\n\t"
 			, dataBytesPerPage, oobBytesPerPage, pagesPerBlock
-			, blocksTotal, blocksPerArea
+			, blocksTotal, blocksPerArea, jumpPadNo
 			, totalBytesPerPage, areasNo, totalPagesPerArea, dataPagesPerArea
-			, areaSummarySize
+			, areaSummarySize, superChainElems
 			);
 
 	PAFFS_DBG_S(PAFFS_TRACE_INFO, "-----------------\n");

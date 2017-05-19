@@ -61,7 +61,7 @@ public:
 	Result loadAreaSummaries();
 
 
-	Result commitAreaSummaries();
+	Result commitAreaSummaries(bool createNew = false);
 
 private:
 	SummaryEntry getPackedStatus(uint16_t position, uint16_t page);

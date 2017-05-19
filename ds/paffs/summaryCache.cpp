@@ -245,7 +245,7 @@ Result SummaryCache::loadAreaSummaries(){
 	return Result::ok;
 }
 
-Result SummaryCache::commitAreaSummaries(){
+Result SummaryCache::commitAreaSummaries(bool createNew){
 	//commit all Areas except the active ones (and maybe some others)
 	Result r;
 	while(translation.size() > 2){
@@ -279,7 +279,7 @@ Result SummaryCache::commitAreaSummaries(){
 	}
 
 	//TODO: Add check if dirty
-	return dev->superblock.commitSuperIndex(&index);
+	return dev->superblock.commitSuperIndex(&index, createNew);
 }
 
 Result SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent){
