@@ -19,7 +19,7 @@ TEST_F (TreeTest, Sizes) {
 	EXPECT_LE(paffs::branchOrder * sizeof(paffs::Addr), sizeof(paffs::TreeNode));
 }
 
-TEST_F(TreeTest, handleMoreThanCacheLimit){
+TEST_F(TreeTest, DISABLED_handleMoreThanCacheLimit){
 	//Double cache size
 	paffs::Device *d = fs.getDevice();
 	paffs::Result r;
@@ -47,7 +47,7 @@ TEST_F(TreeTest, handleMoreThanCacheLimit){
 
 }
 
-TEST_F(TreeTest, coalesceAndRedistributeTree){
+TEST_F(TreeTest, DISABLED_coalesceAndRedistributeTree){
 	paffs::Device *d = fs.getDevice();
 	paffs::Result r;
 

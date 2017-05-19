@@ -13,7 +13,7 @@
 
 class SummaryCache : public InitFs{};
 
-TEST_F(SummaryCache, fillFlashAndVerify){
+TEST_F(SummaryCache, DISABLED_fillFlashAndVerify){
 	paffs::Obj *fil;
 	paffs::Result r;
 	char txt[] = "Hallo";
