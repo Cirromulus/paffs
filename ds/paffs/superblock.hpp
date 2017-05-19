@@ -109,7 +109,7 @@ private:
 	 * @param area may be changed if target was written to a new area
 	 */
 	Result insertNewJumpPadEntry(Addr prev, AreaPos *area, JumpPadEntry* entry);
-	Result readJumpPadEntry(Addr addr, JumpPadEntry* entry);
+	//Result readJumpPadEntry(Addr addr, JumpPadEntry* entry);
 
 	/**
 	 * May call garbage collection for a new SB area.
