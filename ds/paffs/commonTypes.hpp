@@ -68,18 +68,21 @@ struct Param{
 	unsigned int totalBytesPerPage;
 	unsigned int oobBytesPerPage;
 	unsigned int pagesPerBlock;
-	unsigned int blocks;
+	unsigned int blocksTotal;
+	unsigned int jumpPadNo;
 	//Automatically filled//
 	unsigned int dataBytesPerPage;
 	unsigned long areasNo;
 	unsigned int blocksPerArea;
 	unsigned int totalPagesPerArea;
 	unsigned int dataPagesPerArea;
+	unsigned int superChainElems;
 };
 
 static const Param stdParam{
-	totalBytesPerPage, oobBytesPerPage, pagesPerBlock, blocksTotal, dataBytesPerPage,
-	areasNo, blocksPerArea, totalPagesPerArea, dataPagesPerArea
+	totalBytesPerPage, oobBytesPerPage, pagesPerBlock, blocksTotal, jumpPadNo,
+	dataBytesPerPage, areasNo, blocksPerArea,
+	totalPagesPerArea, dataPagesPerArea, superChainElems
 };
 
 typedef uint64_t Addr;		//Contains logical area and relative page

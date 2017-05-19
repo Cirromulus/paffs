@@ -222,10 +222,12 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 	if(memcmp(&stdParam, &e.param, sizeof(Param)) != 0){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device parameter differ with own settings!");
 		return Result::fail;
+	}else{
+		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Formatting infos are matching with our own");
 	}
 
 
-	Addr addr = path[jumpPadNo+1];
+	Addr addr = path[superChainElems-1];
 
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found Super Index at %u:%u\n", extractLogicalArea(addr), extractPage(addr));
 
@@ -303,7 +305,7 @@ Result Superblock::findFirstFreeEntryInBlock(AreaPos area, uint8_t block,
 	unsigned int inARow = 0;
 	PageOffs pageOffs = pagesPerBlock * (area * blocksPerArea + block);
 	for(unsigned int i = 0; i < pagesPerBlock; i++) {
-		PageAbs page = area*totalPagesPerArea + i + pageOffs;
+		PageAbs page = i + pageOffs;
 		SerialNo no;
 		Result r = dev->driver->readPage(page, &no, sizeof(SerialNo));
 		if(r != Result::ok)
@@ -367,8 +369,8 @@ Result Superblock::readMostRecentEntryInArea(AreaPos area, Addr* out_pos,
 		r = readMostRecentEntryInBlock(area, i, &pos, &serial, &target);
 		if(r == Result::ok){
 			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found most recent entry in "
-					"phys. area %" PRIu32 " page %" PRIu32, area, pos);
-			*out_pos = combineAddress(area, pos);
+					"phys. area %" PRIu32 " (abs page %" PRIu32 ")", area, pos);
+			*out_pos = combineAddress(pos / totalPagesPerArea, pos % totalPagesPerArea);
 			*out_index = serial;
 			*next = target;
 			return Result::ok;
@@ -677,6 +679,12 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 
 	if(entry->areaMap == NULL)
 		return Result::einval;
+
+	if(extractPage(addr) > totalPagesPerArea){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Read SuperPage at page %" PRIu32 " of area %" PRIu32 ", "
+				"but an area is only %" PRIu32 " pages wide!",
+				extractPage(addr), extractLogicalArea(addr), totalPagesPerArea);
+	}
 
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Reading SuperIndex at phys. area %" PRIu32 " page %" PRIu32,
 			extractLogicalArea(addr), extractPage(addr));
