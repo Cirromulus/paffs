@@ -39,7 +39,7 @@ TEST_F(SuperBlock, DISABLED_multipleRemounts){
 	r = fs.touch("/a");
 	ASSERT_EQ(r, paffs::Result::notMounted);
 
-	for(unsigned int i = 0; i < 3 * paffs::totalPagesPerArea; i++){
+	for(unsigned int i = 0; i < pow(2, paffs::superChainElems) * paffs::totalPagesPerArea; i++){
 		r = fs.mount();
 		ASSERT_EQ(r, paffs::Result::ok);
 
