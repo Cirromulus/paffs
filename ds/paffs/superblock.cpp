@@ -444,14 +444,9 @@ Result Superblock::insertNewAnchorEntry(Addr logPrev, AreaPos *directArea, Ancho
 	PageOffs page;
 	Result r = findFirstFreeEntryInArea(*directArea, &page, 1);
 	if(r == Result::nf){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free entry in directArea %" PRIu32", "
-				"and deletion+GC is not implemented yet", *directArea);
-		return Result::nimpl;
-		/*
-		 * TODO: this is anchor, just write to first block (set p to zero)
-		 * and delete last block later on
-		 * If this were another, directArea would change after deletion
-		 */
+		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Cycled Anchor Area");
+		//just start at first page again, we do not look for other areas as Anchor is always at 0
+		page = 0;
 	}
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new Anchor Entry!");
@@ -504,12 +499,11 @@ Result Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos *directArea, Jump
 	PageOffs page;
 	Result r = findFirstFreeEntryInArea(*directArea, &page, 1);
 	if(r == Result::nf){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free entry in directArea %" PRIu32", "
-				"and deletion+GC is not implemented yet", *directArea);
-		/*
-		 * TODO: change directArea after deletion
-		 */
-		return Result::nimpl;
+		r = findBestNextFreeArea(directArea);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find new Area for new JumpPad!");
+			return r;
+		}
 	}
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new JumpPad!");
@@ -571,12 +565,11 @@ Result Superblock::insertNewSuperIndex(Addr logPrev, AreaPos *directArea, SuperI
 
 	Result r = findFirstFreeEntryInArea(*directArea, &page, needed_pages);
 	if(r == Result::nf){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free entry in directArea %" PRIu32", "
-				"and deletion+GC is not implemented yet", *directArea);
-		/*
-		 * TODO: change directArea after deletion
-		 */
-		return Result::nimpl;
+		r = findBestNextFreeArea(directArea);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find new Area for new SuperIndex!");
+			return r;
+		}
 	}
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new superIndex!");
@@ -676,7 +669,7 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Reading SuperIndex at phys. area %" PRIu32 " page %" PRIu32,
 			extractLogicalArea(addr), extractPage(addr));
 	//TODO: Just read the appropiate number of area Summaries
-	//when dynamic asses are allowed.
+	//when dynamic ASses are allowed.
 
 	//note: Serial number is inserted on the first bytes for every page later on.
 	unsigned int needed_bytes = sizeof(Addr) +
@@ -772,7 +765,6 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 Result Superblock::handleBlockOverflow(PageAbs newPage, Addr logPrev, SerialNo *serial){
 	BlockAbs newblock = newPage / pagesPerBlock;
 	if(newblock != getBlockNumber(logPrev, dev)){
-		//FIXME: Unnecessary deletionas happen here!
 		//reset serial no if we start a new block
 		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Deleting phys. Area %d, block %d"
 				" (abs: %d, previous version on %d) for chain Entry",
@@ -801,4 +793,16 @@ Result Superblock::deleteSuperBlock(AreaPos area, uint8_t block) {
 	return dev->driver->eraseBlock(block_offs + block);
 }
 
+Result Superblock::findBestNextFreeArea(AreaPos *newArea){
+	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Area %" PRIu32 " is full, finding new one...", *newArea);
+	PAFFS_DBG(PAFFS_TRACE_ERROR, "findBestNextFreeArea is not implemented.");
+	/**
+	 * TODO: Doesnt use Garbage collection, but may use garbage buffer.
+	 * In Mounting process, a special check has to be implemented; finding a new Garbage Buffer.
+	 * This may be the newly deleted Superblock area.
+	 * Nice way: modify Superblock entry. (But what if we just wrote SuperIndex?)
+	 * Ugly: Check for data in Garbage Buffer upon mount and act accordingly
+	 */
+	return Result::nimpl;
+}
 }

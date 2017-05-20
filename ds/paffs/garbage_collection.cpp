@@ -14,9 +14,9 @@
 
 namespace paffs{
 
-uint32_t GarbageCollection::countDirtyPages(SummaryEntry* summary){
-	uint32_t dirty = 0;
-	for(uint32_t i = 0; i < dataPagesPerArea; i++){
+PageOffs GarbageCollection::countDirtyPages(SummaryEntry* summary){
+	PageOffs dirty = 0;
+	for(PageOffs i = 0; i < dataPagesPerArea; i++){
 		if(summary[i] != SummaryEntry::used)
 			dirty++;
 	}
@@ -26,7 +26,7 @@ uint32_t GarbageCollection::countDirtyPages(SummaryEntry* summary){
 //Special Case 'unset': Find any Type and also extremely favour Areas with committed AS
 AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_summary, bool* srcAreaContainsData){
 	AreaPos favourite_area = 0;
-	uint32_t fav_dirty_pages = 0;
+	PageOffs fav_dirty_pages = 0;
 	*srcAreaContainsData = true;
 	SummaryEntry curr[dataPagesPerArea];
 
@@ -36,7 +36,7 @@ AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_s
 				(dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)){
 
 			Result r = dev->sumCache.getSummaryStatus(i, curr);
-			uint32_t dirty_pages = countDirtyPages(curr);
+			PageOffs dirty_pages = countDirtyPages(curr);
 			if(r != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Could not load Summary of Area %d for Garbage collection!", i);
 				return 0;
@@ -290,7 +290,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 	dev->areaMap[deletion_target].position = dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].position;
 	dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].position = tmp;
 	//swap erasecounts to let them point to the physical position
-	uint32_t tmp2 = dev->areaMap[deletion_target].erasecount;
+	PageOffs tmp2 = dev->areaMap[deletion_target].erasecount;
 	dev->areaMap[deletion_target].erasecount = dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].erasecount;
 	dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].erasecount = tmp2;
 

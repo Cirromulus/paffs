@@ -202,12 +202,16 @@ Result Device::unmnt(){
 	}
 
 	Result r = tree.commitCache();
-	if(r != Result::ok)
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Tree cache!");
 		return r;
+	}
 
 	r = sumCache.commitAreaSummaries();
-	if(r != Result::ok)
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Area Summaries!");
 		return r;
+	}
 
 	destroyDevice();
 

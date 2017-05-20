@@ -123,6 +123,12 @@ private:
 
 	Result handleBlockOverflow(PageAbs newPage, Addr logPrev, SerialNo *serial);
 	Result deleteSuperBlock(AreaPos area, uint8_t block);
+
+	/**
+	 * This does not trigger GC, because this would change Area Map
+	 * @param newArea as input: old area, output: new area
+	 */
+	Result findBestNextFreeArea(AreaPos *newArea);
 };
 
 }

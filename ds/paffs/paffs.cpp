@@ -180,8 +180,10 @@ Result Paffs::unmount(){
 	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
 		if(validDevices[i]){
 			Result r_ = devices[i]->unmnt();
-			if(r == Result::ok)
+			if(r == Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not unmount device %d!", i);
 				r = r_;
+			}
 		}
 	}
 	return r;

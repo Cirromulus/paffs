@@ -23,7 +23,7 @@ public:
 	Result collectGarbage(AreaType target);
 
 private:
-	uint32_t countDirtyPages(SummaryEntry* summary);
+	PageOffs countDirtyPages(SummaryEntry* summary);
 	AreaPos findNextBestArea(AreaType target,
 			SummaryEntry* out_summary, bool* srcAreaContainsData);
 	Result moveValidDataToNewArea(AreaPos srcArea,
