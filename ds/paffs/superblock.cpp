@@ -282,20 +282,21 @@ Result Superblock::findFirstFreeEntryInArea(AreaPos area, PageOffs* out_pos,
 		r = findFirstFreeEntryInBlock(area, block, &pageOffs[block], required_pages);
 		if(r == Result::nf){
 			if (block+1 == blocksPerArea){
-				//We are last entry
+				//We are last entry, no matter what previous blocks contain or not, this is full
 				return Result::nf;
 			}
 		}else if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free Entry in phys. Area %" PRIu32, area);
 			return r;
+		}else{
+			if(ffBlock < 0 || pageOffs[block] != 0)
+				ffBlock = block;
 		}
-		if(ffBlock < 0)
-			ffBlock = block;
 	}
 	if (ffBlock < 0)
 		return Result::nf;//this should never be reached
 
-	*out_pos = pageOffs[ffBlock];
+	*out_pos = ffBlock * pagesPerBlock + pageOffs[ffBlock];
 	return Result::ok;
 }
 
@@ -369,7 +370,7 @@ Result Superblock::readMostRecentEntryInArea(AreaPos area, Addr* out_pos,
 		r = readMostRecentEntryInBlock(area, i, &pos, &serial, &target);
 		if(r == Result::ok){
 			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found most recent entry in "
-					"phys. area %" PRIu32 " (abs page %" PRIu32 ")", area, pos);
+					"phys. area %" PRIu32 " block %d (abs page %" PRIu32 ")", area, i, pos);
 			*out_pos = combineAddress(pos / totalPagesPerArea, pos % totalPagesPerArea);
 			*out_index = serial;
 			*next = target;
@@ -457,15 +458,10 @@ Result Superblock::insertNewAnchorEntry(Addr logPrev, AreaPos *directArea, Ancho
 		return r;
 	}
 
-	BlockAbs newblock = *directArea * blocksPerArea + page / blocksPerArea;
-	if(newblock != getBlockNumber(logPrev, dev)){
-		//reset serial no if we start a new block
-		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Deleting phys. Area %d, block %d for anchor", extractLogicalArea(logPrev), extractPage(logPrev) / blocksTotal);
-		entry->no = 0;
-		r = deleteSuperBlock(extractLogicalArea(logPrev), extractPage(logPrev) / blocksTotal);
-		if(r != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete block of AnchorArea! BlockAbs: %" PRIu32, getBlockNumber(logPrev, dev));
-		}
+	r = handleBlockOverflow(*directArea * totalPagesPerArea + page, logPrev, &entry->no);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not handle Block overflow!");
+		return r;
 	}
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Writing Anchor to phys. Area %" PRIu32 ", "
 			"page %" PRIu32 " pointing to area %" PRIu32, *directArea, page, entry->jumpPadArea);
@@ -520,15 +516,10 @@ Result Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos *directArea, Jump
 		return r;
 	}
 
-	BlockAbs newblock = *directArea * blocksPerArea + page / blocksPerArea;
-	if(newblock != getBlockNumber(logPrev, dev)){
-		//reset serial no if we start a new block
-		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Deleting phys. Area %d, block %d for jumpPad", extractLogicalArea(logPrev), extractPage(logPrev) / blocksTotal);
-		entry->no = 0;
-		r = deleteSuperBlock(extractLogicalArea(logPrev), extractPage(logPrev) / blocksTotal);
-		if(r != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete block of JumpPad! BlockAbs: %" PRIu32, getBlockNumber(logPrev, dev));
-		}
+	r = handleBlockOverflow(*directArea * totalPagesPerArea + page, logPrev, &entry->no);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not handle Block overflow!");
+		return r;
 	}
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Writing jumpPad to phys. Area %" PRIu32 ", "
 			"page %" PRIu32 " pointing to area %" PRIu32, *directArea, page, entry->nextArea);
@@ -592,16 +583,12 @@ Result Superblock::insertNewSuperIndex(Addr logPrev, AreaPos *directArea, SuperI
 		return r;
 	}
 
-	BlockAbs newblock = *directArea * blocksPerArea + page / blocksPerArea;
-	if(newblock != getBlockNumber(logPrev, dev)){
-		//reset serial no if we start a new block
-		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Deleting phys. Area %d, block %d for SuperIndex", extractLogicalArea(logPrev), extractPage(logPrev) / blocksTotal);
-		entry->no = 0;
-		r = deleteSuperBlock(extractLogicalArea(logPrev), extractPage(logPrev) / blocksTotal);
-		if(r != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete block of superIndex! BlockAbs: %" PRIu32, getBlockNumber(logPrev, dev));
-		}
+	r = handleBlockOverflow(*directArea * totalPagesPerArea + page, logPrev, &entry->no);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not handle Block overflow!");
+		return r;
 	}
+
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Writing superIndex to phys. Area %" PRIu32 ", page %" PRIu32, *directArea, page);
 	return writeSuperPageIndex(*directArea * totalPagesPerArea + page, entry);
 }
@@ -782,6 +769,25 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 	return Result::ok;
 }
 
+Result Superblock::handleBlockOverflow(PageAbs newPage, Addr logPrev, SerialNo *serial){
+	BlockAbs newblock = newPage / pagesPerBlock;
+	if(newblock != getBlockNumber(logPrev, dev)){
+		//FIXME: Unnecessary deletionas happen here!
+		//reset serial no if we start a new block
+		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Deleting phys. Area %d, block %d"
+				" (abs: %d, previous version on %d) for chain Entry",
+				extractLogicalArea(logPrev), extractPage(logPrev) / blocksTotal,
+				newblock, getBlockNumber(logPrev, dev));
+		*serial = 0;
+		Result r = deleteSuperBlock(extractLogicalArea(logPrev), extractPage(logPrev) / pagesPerBlock);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete block of chain Entry! BlockAbs: %" PRIu32, getBlockNumber(logPrev, dev));
+			return r;
+		}
+	}
+	return Result::ok;
+}
+
 Result Superblock::deleteSuperBlock(AreaPos area, uint8_t block) {
 	if(dev->areaMap[area].type != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete Block outside of SUPARBLCOKAREA");
@@ -791,7 +797,7 @@ Result Superblock::deleteSuperBlock(AreaPos area, uint8_t block) {
 	if(block == blocksPerArea)
 		dev->areaMap[area].erasecount++;
 
-	uint32_t block_offs = dev->areaMap[area].position * blocksPerArea;
+	BlockAbs block_offs = dev->areaMap[area].position * blocksPerArea;
 	return dev->driver->eraseBlock(block_offs + block);
 }
 

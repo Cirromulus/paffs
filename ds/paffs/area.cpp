@@ -54,12 +54,12 @@ PageAbs getPageNumberFromDirect(Addr addr){
 
 //Returns the absolute page number from *logical* address
 BlockAbs getBlockNumber(Addr addr, Device* dev){
-	return dev->areaMap[extractLogicalArea(addr)].position * blocksPerArea;
+	return dev->areaMap[extractLogicalArea(addr)].position * blocksPerArea + extractPage(addr) / pagesPerBlock;
 }
 
 //Returns the absolute page number from *direct* address
 BlockAbs getBlockNumberFromDirect(Addr addr){
-	return extractLogicalArea(addr) * blocksPerArea;
+	return extractLogicalArea(addr) * blocksPerArea + extractPage(addr) / pagesPerBlock;
 }
 
 //Combines the area number with the relative page starting from first page in area

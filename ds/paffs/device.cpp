@@ -190,7 +190,7 @@ Result Device::unmnt(){
 	if(traceMask & PAFFS_TRACE_AREA){
 		printf("Info: \n");
 		for(unsigned int i = 0; i < areasNo; i++){
-			printf("\tArea %d on %u as %10s from page %4d %s\n"
+			printf("\tArea %03d on %03u as %10s from page %4d %s\n"
 					, i, areaMap[i].position, areaNames[areaMap[i].type]
 					, areaMap[i].position*blocksPerArea*pagesPerBlock
 					, areaStatusNames[areaMap[i].status]);

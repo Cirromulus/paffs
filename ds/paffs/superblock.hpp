@@ -121,6 +121,7 @@ private:
 	Result writeSuperPageIndex(PageAbs pageStart, SuperIndex* entry);
 	Result readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap);
 
+	Result handleBlockOverflow(PageAbs newPage, Addr logPrev, SerialNo *serial);
 	Result deleteSuperBlock(AreaPos area, uint8_t block);
 };
 
