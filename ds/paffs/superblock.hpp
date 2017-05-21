@@ -26,7 +26,8 @@ const SerialNo emptySerial = 0xFFFFFFFF;
 
 struct AnchorEntry{
 	SerialNo no;
-	AreaPos jumpPadArea;	//this needs to be on second place after Serial no
+	AreaPos logPrev;		//This is unused in anchor entry
+	AreaPos jumpPadArea;	//direct. this needs to be on second place after Serial no
 	Param param;
 	uint8_t fsVersion;
 	//Todo: Still space free
@@ -34,11 +35,13 @@ struct AnchorEntry{
 
 struct JumpPadEntry{
 	SerialNo no;
-	AreaPos nextArea;		//this needs to be on second place after Serial no
+	AreaPos logPrev;		//if != 0, the logical area prev is now free, while this current is not (obviously)
+	AreaPos nextArea;		//direct.
 };
 
 struct SuperIndex{
 	SerialNo no;
+	AreaPos logPrev;		//if != 0, the logical area prev is now free, while this current is not (obviously)
 	Addr rootNode;
 	Area* areaMap;
 	AreaPos asPositions[2];
@@ -49,7 +52,8 @@ class Superblock{
 	Device* dev;
 	Addr rootnode_addr = 0;
 	bool rootnode_dirty = 0;
-
+	Addr pathToSuperIndexDirect[superChainElems];			//Direct Addresses
+	SerialNo superChainIndexes[superChainElems];
 public:
 	Superblock(Device *mdev) : dev(mdev){};
 	Result registerRootnode(Addr addr);
@@ -85,12 +89,12 @@ private:
 	/**
 	 * First elem is anchor
 	 */
-	Result getAddrOfMostRecentSuperIndex(Addr path[superChainElems],
-			SerialNo indexes[superChainElems]);
+	Result getPathToMostRecentSuperIndex(Addr path[superChainElems],
+			SerialNo indexes[superChainElems], AreaPos logPrev[superChainElems]);
 	Result readMostRecentEntryInArea(AreaPos area, Addr* out_pos,
-			SerialNo* out_index, AreaPos* next);
+			SerialNo* out_index, AreaPos* next, AreaPos* logPrev);
 	Result readMostRecentEntryInBlock(AreaPos area, uint8_t block,
-			PageOffs* out_pos, SerialNo* out_index, AreaPos* next);
+			PageOffs* out_pos, SerialNo* out_index, AreaPos* next, AreaPos* logPrev);
 
 	/**
 	 * This assumes that the area of the Anchor entry does not change.
@@ -126,9 +130,10 @@ private:
 
 	/**
 	 * This does not trigger GC, because this would change Area Map
-	 * @param newArea as input: old area, output: new area
+	 * @param logPrev: old log. area
+	 * @return newArea: new log. area
 	 */
-	Result findBestNextFreeArea(AreaPos *newArea);
+	AreaPos findBestNextFreeArea(AreaPos logPrev);
 };
 
 }
