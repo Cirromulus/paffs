@@ -11,7 +11,7 @@
 
 class SuperBlock : public InitFs{};
 
-TEST_F(SuperBlock, DISABLED_multipleRemounts){
+TEST_F(SuperBlock, multipleRemounts){
 	paffs::Obj *fil;
 	paffs::Dir *dir;
 	paffs::Result r;

@@ -633,7 +633,7 @@ Result Btree::remove_entry_from_node(TreeCacheNode * n, InodeNo key) {
 	// Remove the key and shift other keys accordingly.
 	while (n->raw.as.branch.keys[i] != key  && i < n->raw.num_keys)		//as.branch is OK, because it is same memory as as.leaf
 		i++;
-	if(key < n->raw.as.branch.keys[i-1]){
+	if(i > 0 && key < n->raw.as.branch.keys[i-1]){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Key to delete (%lu) not found!", static_cast<long unsigned> (key));
 		return Result::bug;
 	}
