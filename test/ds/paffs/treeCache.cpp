@@ -57,19 +57,16 @@ TEST_F(TreeTest, coalesceAndRedistributeTree){
 		memset(&test, 0, sizeof(paffs::Inode));
 		test.no = i;
 		r = d->tree.insertInode(&test);
-		ASSERT_EQ(paffs::Result::ok, r);
 		if(r != paffs::Result::ok)
 			std::cerr << paffs::err_msg(r) << std::endl;
+		ASSERT_EQ(paffs::Result::ok, r);
 	}
 
 	//delete
-	for(unsigned int i = paffs::leafOrder * 3; i < paffs::leafOrder * 3; i++){
-		paffs::Inode test;
-		memset(&test, 0, sizeof(paffs::Inode));
-		test.no = i;
-		r = d->tree.insertInode(&test);
-		ASSERT_EQ(paffs::Result::ok, r);
+	for(unsigned int i = paffs::leafOrder * 3; i > 0; i--){
+		r = d->tree.deleteInode(i);
 		if(r != paffs::Result::ok)
 			std::cerr << paffs::err_msg(r) << std::endl;
+		ASSERT_EQ(paffs::Result::ok, r);
 	}
 }
