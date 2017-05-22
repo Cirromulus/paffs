@@ -19,6 +19,8 @@ TEST_F(SuperBlock, DISABLED_multipleRemounts){
 	char buf[6];
 	unsigned int bw;
 
+	fs.getDevice()->superblock.setTestmode(true);
+
 	fil = fs.open("/file", paffs::FC);
 	ASSERT_NE(fil, nullptr);
 	fs.resetLastErr();
@@ -39,7 +41,7 @@ TEST_F(SuperBlock, DISABLED_multipleRemounts){
 	r = fs.touch("/a");
 	ASSERT_EQ(r, paffs::Result::notMounted);
 
-	for(unsigned int i = 0; i < pow(paffs::pagesPerBlock, paffs::superChainElems) * paffs::totalPagesPerArea; i++){
+	for(unsigned int i = 0; i < pow(paffs::totalPagesPerArea, paffs::superChainElems); i++){
 		r = fs.mount();
 		if(r != paffs::Result::ok){
 			printf("Error during round %d!\n", i);
