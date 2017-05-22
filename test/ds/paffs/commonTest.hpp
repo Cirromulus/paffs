@@ -23,12 +23,12 @@ public:
 	//automatically loads default driver "0" with default flash
 	paffs::Paffs fs;
 	InitFs() : fs(collectDrivers()){
-		/*fs.setTraceMask(
+		fs.setTraceMask(
 			PAFFS_TRACE_VERIFY_TC |
 			PAFFS_TRACE_VERIFY_AS |
 			PAFFS_TRACE_ERROR |
 			PAFFS_TRACE_BUG
-		);*/
+		);
 		paffs::Result r = fs.format(true);
 		if(r != paffs::Result::ok)
 			std::cerr << "Could not format device!" << std::endl;
