@@ -149,14 +149,14 @@ Result Superblock::commitSuperIndex(SuperIndex *newIndex, bool createNew){
 
 	for(int i = jumpPadNo; i > 0; i--){
 		JumpPadEntry e = {superChainIndexes[i]+1, 0, directAreas[i+1]};
-		lastArea = directAreas[i+1];
+		lastArea = directAreas[i];
 		r = insertNewJumpPadEntry(logicalPath[i], &directAreas[i], &e);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new JumpPadEntry (Chain %d)!", i);
 			return r;
 		}
-		if(!createNew && lastArea == directAreas[i+1]){
-			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Committing jumpPad no. %d"
+		if(!createNew && lastArea == directAreas[i]){
+			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Committing jumpPad no. %d "
 					"at phys. area %" PRIu32 "was enough!", i, lastArea);
 			rootnode_dirty = false;
 			return Result::ok;
@@ -269,14 +269,25 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 	if(logPrev[0] != 0){
 		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Anchor Area stated it would have been "
 				"moved to log. %" PRIu32 ", which is not allowed.", logPrev[0]);
+		return Result::fail;
 	}
 	for(int i = 1; i < superChainElems; i++){
 		if(logPrev[i] != 0){
-			//TODO: now handle Area moves
-			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Chain Area %d (phys. %" PRIu32 ") changed its location to log. %" PRIu32
-					", This is not yet implemented.", i,
+			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Chain Area %d (phys. %" PRIu32 ") changed its location to log. %" PRIu32, i,
 					extractLogicalArea(pathToSuperIndexDirect[i]), logPrev[i]);
-			return Result::nimpl;
+			AreaPos directNew = extractLogicalArea(pathToSuperIndexDirect[i]);
+			AreaPos logNew = 0;
+			//This is O(n) with AreasNo
+			for(AreaPos a = 0; a < areasNo; a++){
+				if(directNew == index->areaMap[a].position){
+					logNew = a;
+					break;
+				}
+			}
+			index->areaMap[logPrev[i]].status = AreaStatus::empty;
+			index->areaMap[logPrev[i]].type = AreaType::unset;
+			index->areaMap[logNew].status = AreaStatus::active;
+			index->areaMap[logNew].type = AreaType::superblock;
 		}
 	}
 

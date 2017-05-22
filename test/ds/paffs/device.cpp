@@ -12,7 +12,7 @@ class FileTest : public InitFs{
 
 };
 
-TEST_F(FileTest, DISABLED_seekReadWrite){
+TEST_F(FileTest, seekReadWrite){
 	paffs::Obj *fil;
 	paffs::Result r;
 	char txt[] = "Hallo";
@@ -59,7 +59,7 @@ TEST_F(FileTest, DISABLED_seekReadWrite){
 	ASSERT_EQ(r, paffs::Result::ok);
 }
 
-TEST_F(FileTest, DISABLED_createReadWriteFile){
+TEST_F(FileTest, createReadWriteFile){
 	unsigned const int filesize = 3*paffs::dataBytesPerPage + 50;
 	char t[] = ".                         Text";	//30 chars
 	char tl[filesize];
@@ -117,7 +117,7 @@ TEST_F(FileTest, DISABLED_createReadWriteFile){
 	ASSERT_EQ(r, paffs::Result::ok);
 }
 
-TEST_F(FileTest, DISABLED_directoryReadWrite){
+TEST_F(FileTest, directoryReadWrite){
 	paffs::Permission p = paffs::R | paffs::W;
 	paffs::Result r;
 	r = fs.mkDir("/a", p);
@@ -186,7 +186,7 @@ TEST_F(FileTest, DISABLED_directoryReadWrite){
 }
 
 
-TEST_F(FileTest, DISABLED_permissions){
+TEST_F(FileTest, permissions){
 	paffs::Obj *fil;
 	paffs::Result r;
 	char txt[] = "Hallo";

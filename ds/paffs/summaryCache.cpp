@@ -238,7 +238,7 @@ Result SummaryCache::loadAreaSummaries(){
 			translation[index.asPositions[i]] = i;
 			packStatusArray(i, index.areaSummary[i]);
 			dev->activeArea[dev->areaMap[index.asPositions[i]].type] = dev->areaMap[index.asPositions[i]].position;
-			PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Loaded area summary %d pn %d", index.asPositions[i], dev->areaMap[index.asPositions[i]].position);
+			PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Loaded area summary %d on %d", index.asPositions[i], dev->areaMap[index.asPositions[i]].position);
 		}
 	}
 

@@ -169,11 +169,12 @@ Result Device::mnt(){
 
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Area Summaries loaded");
 
+	//FIXME: This is O(n), save aactive Area in SuperIndex
 	for(AreaPos i = 0; i < areasNo; i++){
 		if(areaMap[i].type == AreaType::garbageBuffer){
 			activeArea[AreaType::garbageBuffer] = i;
 		}
-		//Superblock do not need an active Area,
+		//Superblock does not need an active Area,
 		//data and index active areas are extracted by areaSummaryCache
 	}
 	mounted = true;
