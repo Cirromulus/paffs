@@ -72,7 +72,7 @@ Result Superblock::resolveDirectToLogicalPath(Addr directPath[superChainElems],
 		p = dev->areaMap[i].position;
 		for(d = 0; d < superChainElems; d++){
 			if(p == extractLogicalArea(directPath[d]))
-				outPath[d] = combineAddress(i, extractPage(directPath[i]));
+				outPath[d] = combineAddress(i, extractPage(directPath[d]));
 		}
 	}
 	return Result::ok;
@@ -810,9 +810,9 @@ Result Superblock::handleBlockOverflow(PageAbs newPage, Addr logPrev, SerialNo *
 	if(newblock != getBlockNumber(logPrev, dev)){
 		//reset serial no if we start a new block
 		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Deleting phys. Area %d, block %d"
-				" (abs: %d, previous version on %d) for chain Entry",
-				extractLogicalArea(logPrev), extractPage(logPrev) / blocksTotal,
-				newblock, getBlockNumber(logPrev, dev));
+				" (abs: %d, new abs on %d) for chain Entry",
+				extractLogicalArea(logPrev), extractPage(logPrev) / pagesPerBlock,
+				getBlockNumber(logPrev, dev), newblock);
 		*serial = 0;
 		Result r = deleteSuperBlock(extractLogicalArea(logPrev), extractPage(logPrev) / pagesPerBlock);
 		if(r != Result::ok){
