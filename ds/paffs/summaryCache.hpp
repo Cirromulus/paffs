@@ -9,32 +9,22 @@
 #include "commonTypes.hpp"
 #include <unordered_map>
 
-#ifndef TEST_FRIENDS
-#define TEST_FRIENDS
-#endif
-
-//#define STR_HELPER(x) #x
-//#define STR(x) STR_HELPER(x)
-//#pragma message "TEST_FRIENDS: " STR(TEST_FRIENDS)
-
 namespace paffs {
 
 class SummaryCache{
 	static constexpr unsigned int areaSummaryEntrySize = dataPagesPerArea / 4 + 2;
-	TEST_FRIENDS;
 	//excess byte is for dirty- and wasASWritten marker
 	unsigned char summaryCache[areaSummaryCacheSize][areaSummaryEntrySize];
 
 	std::unordered_map<AreaPos, uint16_t> translation;	//from area number to array offset
 	Device* dev;
-
 public:
 
 	SummaryCache(Device* mdev);
 
-	Result setPageStatus(AreaPos area, uint16_t page, SummaryEntry state);
+	Result setPageStatus(AreaPos area, PageOffs page, SummaryEntry state);
 
-	SummaryEntry getPageStatus(AreaPos area, uint16_t page, Result *result);
+	SummaryEntry getPageStatus(AreaPos area, PageOffs page, Result *result);
 
 	Result setSummaryStatus(AreaPos area, SummaryEntry* summary);
 
@@ -60,13 +50,11 @@ public:
 
 	Result loadAreaSummaries();
 
-
 	Result commitAreaSummaries(bool createNew = false);
-
 private:
-	SummaryEntry getPackedStatus(uint16_t position, uint16_t page);
+	SummaryEntry getPackedStatus(uint16_t position, PageOffs page);
 
-	void setPackedStatus(uint16_t position, uint16_t page, SummaryEntry value);
+	void setPackedStatus(uint16_t position, PageOffs page, SummaryEntry value);
 
 	void unpackStatusArray(uint16_t position, SummaryEntry* arr);
 
@@ -86,7 +74,7 @@ private:
 
 	Result freeNextBestSummaryCacheEntry(bool urgent);
 
-	uint32_t countDirtyPages(uint16_t position);
+	PageOffs countDirtyPages(uint16_t position);
 
 	Result readAreasummary(AreaPos area, SummaryEntry* out_summary, bool complete);
 

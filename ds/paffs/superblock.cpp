@@ -61,6 +61,9 @@ void Superblock::printSuperIndex(SuperIndex* ind){
 	}
 }
 
+void Superblock::setTestmode(bool t){
+	testmode = t;
+}
 /**
  * @brief Ugh, O(n) with areaCount
  */
@@ -140,11 +143,15 @@ Result Superblock::commitSuperIndex(SuperIndex *newIndex, bool createNew){
 		return r;
 	}
 
-	if(!createNew && lastArea == directAreas[jumpPadNo+1]){
-		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Committing superindex "
-				"at phys. area %" PRIu32 " was enough!", lastArea);
-		rootnode_dirty = false;
-		return Result::ok;
+	if(!testmode){
+		if(!createNew && lastArea == directAreas[jumpPadNo+1]){
+			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Committing superindex "
+					"at phys. area %" PRIu32 " was enough!", lastArea);
+			rootnode_dirty = false;
+			return Result::ok;
+		}
+	}else{
+		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "comitting jumpPad anyway because of test setting!");
 	}
 
 	for(int i = jumpPadNo; i > 0; i--){

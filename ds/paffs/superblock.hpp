@@ -54,6 +54,7 @@ class Superblock{
 	bool rootnode_dirty = 0;
 	Addr pathToSuperIndexDirect[superChainElems];			//Direct Addresses
 	SerialNo superChainIndexes[superChainElems];
+	bool testmode = false;
 public:
 	Superblock(Device *mdev) : dev(mdev){};
 	Result registerRootnode(Addr addr);
@@ -63,7 +64,7 @@ public:
 	Result readSuperIndex(SuperIndex* index);
 	Result commitSuperIndex(SuperIndex* index, bool createNew = false);
 	void printSuperIndex(SuperIndex* ind);
-
+	void setTestmode(bool t);
 private:
 	/**
 	 * Worst case O(n) with area count

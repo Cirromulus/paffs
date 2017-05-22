@@ -22,11 +22,11 @@ SummaryCache::SummaryCache(Device* mdev) : dev(mdev){
 	memset(summaryCache, 0, areaSummaryCacheSize * areaSummaryEntrySize);
 }
 
-SummaryEntry SummaryCache::getPackedStatus(uint16_t position, uint16_t page){
+SummaryEntry SummaryCache::getPackedStatus(uint16_t position, PageOffs page){
 	return static_cast<SummaryEntry>((summaryCache[position][page/4] & (0b11 << (page % 4)*2)) >> (page % 4)*2);
 }
 
-void SummaryCache::setPackedStatus(uint16_t position, uint16_t page, SummaryEntry value){
+void SummaryCache::setPackedStatus(uint16_t position, PageOffs page, SummaryEntry value){
 	summaryCache[position][page/4] =
 			(summaryCache[position][page/4] & ~(0b11 << (page % 4)*2)) |
 			(static_cast<int>(value) << (page % 4) * 2);
@@ -84,7 +84,7 @@ int SummaryCache::findNextFreeCacheEntry(){
 	return -1;
 }
 
-Result SummaryCache::setPageStatus(AreaPos area, uint16_t page, SummaryEntry state){
+Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state){
 	if(page > dataPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dataPagesPerArea);
 		return Result::einval;
@@ -109,7 +109,7 @@ Result SummaryCache::setPageStatus(AreaPos area, uint16_t page, SummaryEntry sta
 	return Result::ok;
 }
 
-SummaryEntry SummaryCache::getPageStatus(AreaPos area, uint16_t page, Result *result){
+SummaryEntry SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result *result){
 	if(page > dataPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dataPagesPerArea);
 		*result = Result::einval;
