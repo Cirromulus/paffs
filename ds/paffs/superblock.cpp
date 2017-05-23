@@ -119,7 +119,7 @@ Result Superblock::commitSuperIndex(SuperIndex *newIndex, bool createNew){
 	newIndex->rootNode = rootnode_addr;
 	newIndex->areaMap = dev->areaMap;	//This should already be done in cachefunction
 
-	if(traceMask & PAFFS_TRACE_SUPERBLOCK){
+	if(traceMask & PAFFS_TRACE_VERBOSE){
 		printf("write Super Index:\n");
 		printSuperIndex(newIndex);
 	}
@@ -278,7 +278,9 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 				"moved to log. %" PRIu32 ", which is not allowed.", logPrev[0]);
 		return Result::fail;
 	}
-	for(int i = 1; i < superChainElems; i++){
+	//Reverse order, because the changes were committed from
+	//SuperIndex (last) to Anchor (first entry)
+	for(int i = superChainElems-1; i >= 0; i--){
 		if(logPrev[i] != 0){
 			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Chain Area %d (phys. %" PRIu32 ") changed its location to log. %" PRIu32, i,
 					extractLogicalArea(pathToSuperIndexDirect[i]), logPrev[i]);
@@ -483,8 +485,7 @@ Result Superblock::insertNewAnchorEntry(Addr logPrev, AreaPos *directArea, Ancho
 		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Cycled Anchor Area");
 		//just start at first page again, we do not look for other areas as Anchor is always at 0
 		page = 0;
-	}
-	if(r != Result::ok){
+	}else if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new Anchor Entry!");
 		return r;
 	}

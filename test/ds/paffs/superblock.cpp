@@ -11,7 +11,7 @@
 
 class SuperBlock : public InitFs{};
 
-TEST_F(SuperBlock, DISABLED_multipleRemounts){
+TEST_F(SuperBlock, multipleRemounts){
 	paffs::Obj *fil;
 	paffs::Dir *dir;
 	paffs::Result r;
@@ -41,7 +41,7 @@ TEST_F(SuperBlock, DISABLED_multipleRemounts){
 	r = fs.touch("/a");
 	ASSERT_EQ(r, paffs::Result::notMounted);
 
-	for(unsigned int i = 0; i < pow(paffs::totalPagesPerArea, paffs::superChainElems); i++){
+	for(unsigned int i = 0; i < paffs::totalPagesPerArea + pow(paffs::totalPagesPerArea, paffs::superChainElems-1); i++){
 		r = fs.mount();
 		if(r != paffs::Result::ok){
 			printf("Error during round %d!\n", i);

@@ -30,8 +30,8 @@ Result DataIO::writeInodeData(Inode* inode,
 
 	if(pageTo > 11){
 		//Would use first indirection Layer
-		PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Write would use first indirection layer, too big!");
-		return dev->lasterr = Result::nimpl;
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Write would use first indirection layer, too big!");
+		return dev->lasterr = Result::toobig;
 	}
 
 	for(unsigned int i = 0; i < pageFrom; i++){
@@ -201,7 +201,7 @@ Result DataIO::readInodeData(Inode* inode,
 
 	if(pageTo > 11){
 		//todo Read indirection Layers
-		return Result::nimpl;
+		return Result::toobig;
 	}
 
 	char* wrap = data;
@@ -290,7 +290,7 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 
 	if(pageTo > 11){
 		//todo Read indirection Layers
-		return Result::nimpl;
+		return Result::toobig;
 	}
 
 

@@ -38,6 +38,7 @@ const char* resultMsg[] = {
 		"Unknown error",
 		"Object not found",
 		"Object already exists",
+		"Object too big",
 		"Input values malformed",
 		"Operation not yet supported",
 		"Gratulations, you found a Bug",

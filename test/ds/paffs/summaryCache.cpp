@@ -5,15 +5,14 @@
  *      Author: rooot
  */
 
-#define TEST_FRIENDS friend class SummaryCache_packedStatusIntegrity_Test;
-
 #include "commonTest.hpp"
 #include <paffs.hpp>
 #include <stdio.h>
 
 class SummaryCache : public InitFs{};
+using namespace testing;
 
-TEST_F(SummaryCache, DISABLED_fillFlashAndVerify){
+TEST_F(SummaryCache, fillFlashAndVerify){
 	paffs::Obj *fil;
 	paffs::Result r;
 	char txt[] = "Hallo";
@@ -28,7 +27,7 @@ TEST_F(SummaryCache, DISABLED_fillFlashAndVerify){
 		fil = fs.open(filename, paffs::FC);
 		if(fil == nullptr){
 			std::cout << paffs::err_msg(fs.getLastErr()) << std::endl;
-			ASSERT_EQ(fs.getLastErr(), paffs::Result::nosp);
+			ASSERT_THAT(fs.getLastErr(), AnyOf(Eq(paffs::Result::nosp), Eq(paffs::Result::toobig)));
 			break;
 		}
 		ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
@@ -45,12 +44,7 @@ TEST_F(SummaryCache, DISABLED_fillFlashAndVerify){
 	//check if valid
 	for(i--;i >= 0; i--){
 		sprintf(filename, "/%09d", i);
-		fil = fs.open(filename, paffs::FC);
-		if(fil == nullptr){
-			std::cout << paffs::err_msg(fs.getLastErr()) << std::endl;
-			ASSERT_EQ(fs.getLastErr(), paffs::Result::nosp);
-			break;
-		}
+ 		fil = fs.open(filename, paffs::FC);
 		ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
 
 		r = fs.read(fil, buf, strlen(txt), &bw);

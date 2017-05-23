@@ -24,6 +24,7 @@ enum class Result : uint8_t{
 	fail,
 	nf,
 	exists,
+	toobig,
 	einval,
 	nimpl,
 	bug,

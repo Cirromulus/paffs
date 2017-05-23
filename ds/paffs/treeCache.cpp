@@ -689,7 +689,7 @@ Result TreeCache::getTreeNodeAtIndexFrom(uint16_t index,
 	}
 
 	//--------------
-
+	dev->lasterr = Result::ok;
 	if(getIndexFromPointer(parent) == 0 && dev->lasterr != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get child from Treenode not located in cache!");
 		dev->lasterr = Result::ok;
