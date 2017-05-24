@@ -32,6 +32,21 @@ Result deleteInodeData(Inode* inode, unsigned int offs);
 Result writeTreeNode(TreeNode* node);
 Result readTreeNode(Addr addr, TreeNode* node);
 Result deleteTreeNode(TreeNode* node);
+
+private:
+/**
+ * @param buf input buffer read from page
+ * @param addresses Array big enough to hold 'count' Addresses
+ * @param count number of addresses contained in buffer
+ */
+Result extractIndirection(char* buf, Addr* addresses, unsigned count);
+
+/**
+ * @param buf output buffer read from page big enough to hold 'count' addresses
+ * @param addresses Array of 'count' Addresses
+ * @param count number of addresses contained in Array
+ */
+Result composeIndirection(char* buf, Addr* addresses, unsigned count);
 };
 }
 

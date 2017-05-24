@@ -25,19 +25,54 @@ Result DataIO::writeInodeData(Inode* inode,
 		return Result::einval;
 	}
 
+	//todo: use pageFrom as offset to reduce memory usage and IO
 	unsigned int pageFrom = offs/dataBytesPerPage;
 	unsigned int pageTo = (offs + bytes - 1) / dataBytesPerPage;
 
+	Result res;
+	bool extendedMode = false;
+	Addr *pageList = inode->direct;
+
 	if(pageTo > 11){
-		//Would use first indirection Layer
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Write would use first indirection layer, too big!");
+		if(pageTo > 11 + dataBytesPerPage / sizeof(Addr)){
+			//Would use second indirection layer, not yet implemented.
+			return dev->lasterr = Result::nimpl;
+		}
+		//FIXME: This return is just for green screen appearance
 		return dev->lasterr = Result::toobig;
+		//Would use first indirection Layer
+		PAFFS_DBG_S(PAFFS_TRACE_WRITE, "Write uses first indirection layer");
+		extendedMode = true;
+		pageList = new Addr[pageTo];
+		memcpy(pageList, inode->direct, 11 * sizeof(Addr));
+		//Check if data from first indirection is available
+		if(inode->indir != 0){
+			int atr = (inode->reservedSize / dataBytesPerPage - 11);
+			if(atr < 0){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "inode->indir != 0, but reservedSize"
+					" is too small for indirection layer (%u Byte, "
+					"so %d pages)", inode->reservedSize,
+					inode->reservedSize / dataBytesPerPage);
+				return Result::bug;
+			}
+			//TODO: read all addresses in page for write-back
+			PageAbs addr = getPageNumber(inode->indir, dev);
+			res = dev->driver->readPage(addr, &pageList[11], atr * sizeof(Addr));
+			if(res != Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load existing addresses"
+						" of first indirection layer");
+				return res;
+			}
+			memset(&pageList[11+atr], 0, pageTo - 11+atr);
+		}else{
+			memset(&pageList[1], 0, pageTo - 11);
+		}
 	}
 
 	for(unsigned int i = 0; i < pageFrom; i++){
-		if(inode->direct[i] == 0){
+		if(pageList[i] == 0){
 			//we jumped over pages, so mark them as not (yet) used
-			inode->direct[i] = combineAddress(0, unusedMarker);
+			pageList[i] = combineAddress(0, unusedMarker);
 		}
 	}
 
@@ -45,8 +80,7 @@ Result DataIO::writeInodeData(Inode* inode,
 	unsigned int pageOffs = offs % dataBytesPerPage;
 	*bytes_written = 0;
 
-	Result res;
-
+	//todo: extract this big for loop into another function
 	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
 		bool misaligned = false;
 		dev->activeArea[AreaType::data] = dev->areaMgmt.findWritableArea(AreaType::data);
@@ -76,8 +110,6 @@ Result DataIO::writeInodeData(Inode* inode,
 		}
 
 		//Prepare buffer and calculate bytes to write
-		//FIXME: If write has offset, misaligned is still false
-		//so no leading zeros are inserted
 		char* buf = &const_cast<char*>(data)[page*dataBytesPerPage];
 		unsigned int btw = bytes - *bytes_written;
 		if((bytes+pageOffs) > dataBytesPerPage){
@@ -88,13 +120,13 @@ Result DataIO::writeInodeData(Inode* inode,
 
 
 
-		if((inode->direct[page+pageFrom] != 0
-				&& inode->direct[page+pageFrom] != combineAddress(0, unusedMarker))
+		if((pageList[page+pageFrom] != 0
+				&& pageList[page+pageFrom] != combineAddress(0, unusedMarker))
 				|| pageOffs != 0){
 			//We are overriding existing data
 			//mark old Page in Areamap
-			unsigned long oldArea = extractLogicalArea(inode->direct[page+pageFrom]);
-			unsigned long oldPage = extractPage(inode->direct[page+pageFrom]);
+			unsigned long oldArea = extractLogicalArea(pageList[page+pageFrom]);
+			unsigned long oldPage = extractPage(pageList[page+pageFrom]);
 
 
 			if((btw + pageOffs < dataBytesPerPage &&
@@ -113,8 +145,8 @@ Result DataIO::writeInodeData(Inode* inode,
 					btr = inode->size - (pageFrom+page) * dataBytesPerPage;
 				}
 
-				if(inode->direct[page+pageFrom] != 0
-						&& inode->direct[page+pageFrom] != combineAddress(0, unusedMarker)){
+				if(pageList[page+pageFrom] != 0
+						&& pageList[page+pageFrom] != combineAddress(0, unusedMarker)){
 					//We are overriding real data, not just empty space
 					unsigned int bytes_read = 0;
 					Result r = readInodeData(inode, (pageFrom+page)*dataBytesPerPage, btr, &bytes_read, buf);
@@ -141,8 +173,8 @@ Result DataIO::writeInodeData(Inode* inode,
 			}
 
 			//if we overwrote an existing page
-			if(inode->direct[page+pageFrom] != 0
-					&& inode->direct[page+pageFrom] != combineAddress(0, unusedMarker)){
+			if(pageList[page+pageFrom] != 0
+					&& pageList[page+pageFrom] != combineAddress(0, unusedMarker)){
 				//Mark old pages dirty
 				res = dev->sumCache.setPageStatus(oldArea, oldPage, SummaryEntry::dirty);
 				if(res != Result::ok){
@@ -154,7 +186,7 @@ Result DataIO::writeInodeData(Inode* inode,
 			*bytes_written += btw;
 			inode->reservedSize += dataBytesPerPage;
 		}
-		inode->direct[page+pageFrom] = pageAddress;
+		pageList[page+pageFrom] = pageAddress;
 
 		res = dev->driver->writePage(getPageNumber(pageAddress, dev), buf, btw);
 
@@ -175,6 +207,11 @@ Result DataIO::writeInodeData(Inode* inode,
 
 	if(inode->size < *bytes_written + offs)
 		inode->size = *bytes_written + offs;
+
+	if(extendedMode){
+		//write out indirection pages
+		//todo: extract finding pages and writing to them into another function
+	}
 
 	return dev->tree.updateExistingInode(inode);
 }
@@ -256,7 +293,7 @@ Result DataIO::readInodeData(Inode* inode,
 			}
 		}
 
-		Addr addr = getPageNumber(inode->direct[page + pageFrom], dev);
+		PageAbs addr = getPageNumber(inode->direct[page + pageFrom], dev);
 		r = dev->driver->readPage(addr, buf, btr);
 		if(r != Result::ok){
 			if(misaligned)
@@ -452,7 +489,6 @@ Result DataIO::readTreeNode(Addr addr, TreeNode* node){
 Result DataIO::deleteTreeNode(TreeNode* node){
 	return dev->sumCache.setPageStatus(extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);
 }
-
 
 
 
