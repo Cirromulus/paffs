@@ -75,134 +75,11 @@ Result DataIO::writeInodeData(Inode* inode,
 			pageList[i] = combineAddress(0, unusedMarker);
 		}
 	}
-
-	//Will be set to zero after offset is applied
-	unsigned int pageOffs = offs % dataBytesPerPage;
-	*bytes_written = 0;
-
-	//todo: extract this big for loop into another function
-	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
-		bool misaligned = false;
-		dev->activeArea[AreaType::data] = dev->areaMgmt.findWritableArea(AreaType::data);
-		if(dev->lasterr != Result::ok){
-			//TODO: Return to a safe state by trying to resurrect dirty marked pages
-			//		Mark fresh written pages as dirty. If old pages have been deleted,
-			//		use the Journal to resurrect (not currently used)
-			return dev->lasterr;
-		}
-
-		//Handle Areas
-		if(dev->areaMap[dev->activeArea[AreaType::data]].status == AreaStatus::empty){
-			//We'll have to use a fresh area,
-			//so generate the areaSummary in Memory
-			dev->areaMgmt.initArea(dev->activeArea[AreaType::data]);
-		}
-		unsigned int firstFreePage = 0;
-		if(dev->areaMgmt.findFirstFreePage(&firstFreePage, dev->activeArea[AreaType::data]) == Result::nosp){
-			PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::data]);
-			return Result::bug;
-		}
-
-		Addr pageAddress = combineAddress(dev->activeArea[AreaType::data], firstFreePage);
-		res = dev->sumCache.setPageStatus(dev->activeArea[AreaType::data], firstFreePage, SummaryEntry::used);
-		if(res != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[static_cast<int>(res)]);
-		}
-
-		//Prepare buffer and calculate bytes to write
-		char* buf = &const_cast<char*>(data)[page*dataBytesPerPage];
-		unsigned int btw = bytes - *bytes_written;
-		if((bytes+pageOffs) > dataBytesPerPage){
-			btw = (bytes+pageOffs) > (page+1)*dataBytesPerPage ?
-						dataBytesPerPage - pageOffs :
-						bytes - page*dataBytesPerPage;
-		}
-
-
-
-		if((pageList[page+pageFrom] != 0
-				&& pageList[page+pageFrom] != combineAddress(0, unusedMarker))
-				|| pageOffs != 0){
-			//We are overriding existing data
-			//mark old Page in Areamap
-			unsigned long oldArea = extractLogicalArea(pageList[page+pageFrom]);
-			unsigned long oldPage = extractPage(pageList[page+pageFrom]);
-
-
-			if((btw + pageOffs < dataBytesPerPage &&
-				page*dataBytesPerPage + btw < inode->size) ||  //End Misaligned
-				(pageOffs > 0 && page == 0)){									//Start Misaligned
-
-				//fill write buffer with valid Data
-				misaligned = true;
-				buf = new char[dataBytesPerPage];
-				memset(buf, 0x0, dataBytesPerPage);
-
-				unsigned int btr = dataBytesPerPage;
-
-				//limit maximum bytes to read if file is smaller than actual page
-				if((pageFrom+1+page)*dataBytesPerPage > inode->size){
-					btr = inode->size - (pageFrom+page) * dataBytesPerPage;
-				}
-
-				if(pageList[page+pageFrom] != 0
-						&& pageList[page+pageFrom] != combineAddress(0, unusedMarker)){
-					//We are overriding real data, not just empty space
-					unsigned int bytes_read = 0;
-					Result r = readInodeData(inode, (pageFrom+page)*dataBytesPerPage, btr, &bytes_read, buf);
-					if(r != Result::ok || bytes_read != btr){
-						delete[] buf;
-						return Result::bug;
-					}
-				}
-
-				//Handle pageOffset
-				memcpy(&buf[pageOffs], &data[*bytes_written], btw);
-
-				//this is here, because btw will be modified
-				*bytes_written += btw;
-
-				//increase btw to whole page to write existing data back
-				btw = btr > (pageOffs + btw) ? btr : pageOffs + btw;
-
-				//pageoffset is only at applied to first page
-				pageOffs = 0;
-			}else{
-				//not misaligned
-				*bytes_written += btw;
-			}
-
-			//if we overwrote an existing page
-			if(pageList[page+pageFrom] != 0
-					&& pageList[page+pageFrom] != combineAddress(0, unusedMarker)){
-				//Mark old pages dirty
-				res = dev->sumCache.setPageStatus(oldArea, oldPage, SummaryEntry::dirty);
-				if(res != Result::ok){
-					PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[static_cast<int>(res)]);
-				}
-			}
-		}else{
-			//we are writing to a new page
-			*bytes_written += btw;
-			inode->reservedSize += dataBytesPerPage;
-		}
-		pageList[page+pageFrom] = pageAddress;
-
-		res = dev->driver->writePage(getPageNumber(pageAddress, dev), buf, btw);
-
-		if(misaligned)
-			delete[] buf;
-
-		PAFFS_DBG_S(PAFFS_TRACE_WRITE, "write r.P: %d/%d, phy.P: %llu", page+1, pageTo+1, static_cast<long long unsigned int> (getPageNumber(pageAddress, dev)));
-		if(res != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "ERR: write returned FAIL at phy.P: %llu", static_cast<long long unsigned int> (getPageNumber(pageAddress, dev)));
-			return Result::fail;
-		}
-
-		res = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::data], AreaType::data);
-		if(res != Result::ok)
-			return res;
-
+	unsigned pageoffs = offs % dataBytesPerPage;
+	res = writePageData(pageFrom, pageTo, pageoffs, bytes, data, pageList, bytes_written, inode);
+	if(res != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "could not write pageData");
+		return res;
 	}
 
 	if(inode->size < *bytes_written + offs)
@@ -210,11 +87,11 @@ Result DataIO::writeInodeData(Inode* inode,
 
 	if(extendedMode){
 		//write out indirection pages
-		//todo: extract finding pages and writing to them into another function
 	}
 
 	return dev->tree.updateExistingInode(inode);
 }
+
 Result DataIO::readInodeData(Inode* inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_read,
 					char* data){
@@ -227,8 +104,6 @@ Result DataIO::readInodeData(Inode* inode,
 	*bytes_read = 0;
 	unsigned int pageFrom = offs/dataBytesPerPage;
 	unsigned int pageTo = (offs + bytes - 1) / dataBytesPerPage;
-	unsigned int pageOffs = offs % dataBytesPerPage;
-
 
 	if(offs + bytes > inode->size){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read bigger than size of object! (was: %d, max: %lu)", offs+bytes, static_cast<long unsigned>(inode->size));
@@ -241,78 +116,8 @@ Result DataIO::readInodeData(Inode* inode,
 		return Result::toobig;
 	}
 
-	char* wrap = data;
-	bool misaligned = false;
-	if(pageOffs > 0){
-		misaligned = true;
-		wrap = new char[bytes + pageOffs];
-	}
-
-	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
-		char* buf = &wrap[page*dataBytesPerPage];
-
-		unsigned int btr = bytes + pageOffs - *bytes_read;
-		if(btr > dataBytesPerPage){
-			btr = (bytes + pageOffs) > (page+1)*dataBytesPerPage ?
-						dataBytesPerPage :
-						(bytes + pageOffs) - page*dataBytesPerPage;
-		}
-
-		AreaPos area = extractLogicalArea(inode->direct[pageFrom + page]);
-		if(dev->areaMap[area].type != AreaType::data){
-			if(inode->direct[pageFrom + page] == combineAddress(0, unusedMarker)){
-				//This Page is currently not written to flash
-				//because it contains just empty space
-				memset(buf, 0, btr);
-				*bytes_read += btr;
-				continue;
-			}
-			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid area at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
-			return Result::bug;
-		}
-		Result r;
-		if(traceMask & PAFFS_TRACE_VERIFY_AS){
-			SummaryEntry e = dev->sumCache.getPageStatus(extractLogicalArea(inode->direct[page + pageFrom])
-					,extractPage(inode->direct[page + pageFrom]), &r);
-			if(r != Result::ok){
-				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load AreaSummary of area %d for verification!", extractLogicalArea(inode->direct[page + pageFrom]));
-			}else{
-				if(e == SummaryEntry::dirty){
-					PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of outdated (dirty) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
-					return Result::bug;
-				}
-
-				if(e == SummaryEntry::free){
-					PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid (free) data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),extractPage(inode->direct[page + pageFrom]));
-					return Result::bug;
-				}
-
-				if(e >= SummaryEntry::error){
-					PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of data with invalid AreaSummary at area %d!", extractLogicalArea(inode->direct[page + pageFrom]));
-				}
-			}
-		}
-
-		PageAbs addr = getPageNumber(inode->direct[page + pageFrom], dev);
-		r = dev->driver->readPage(addr, buf, btr);
-		if(r != Result::ok){
-			if(misaligned)
-				delete[] wrap;
-			return dev->lasterr = r;
-		}
-		*bytes_read += btr;
-
-	}
-
-	if(misaligned) {
-		memcpy(data, &wrap[pageOffs], bytes);
-		*bytes_read -= pageOffs;
-		delete[] wrap;
-	}
-
-	return Result::ok;
+	return readPageData(pageFrom, pageTo, offs % dataBytesPerPage, bytes, data, inode->direct, bytes_read);
 }
-
 
 //inode->size and inode->reservedSize is altered.
 Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
@@ -490,6 +295,214 @@ Result DataIO::deleteTreeNode(TreeNode* node){
 	return dev->sumCache.setPageStatus(extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);
 }
 
+
+Result DataIO::writePageData(PageOffs pageFrom, PageOffs pageTo, unsigned offs,
+		unsigned bytes, const char* data, Addr *pageList,
+		unsigned* bytes_written, Inode* inode){
+	//Will be set to zero after offset is applied
+	if(offs > dataBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried applying an offset %d > %d", offs, dataBytesPerPage);
+		return Result::bug;
+	}
+	*bytes_written = 0;
+	Result res;
+	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
+		bool misaligned = false;
+		Result rBuf = dev->lasterr;
+		dev->lasterr = Result::ok;
+		dev->activeArea[AreaType::data] = dev->areaMgmt.findWritableArea(AreaType::data);
+		if(dev->lasterr != Result::ok){
+			//TODO: Return to a safe state by trying to resurrect dirty marked pages
+			//		Mark fresh written pages as dirty. If old pages have been deleted,
+			//		use the Journal to resurrect (not currently implemented)
+			return dev->lasterr;
+		}
+		dev->lasterr = rBuf;
+
+		//Handle Areas
+		if(dev->areaMap[dev->activeArea[AreaType::data]].status == AreaStatus::empty){
+			//We'll have to use a fresh area,
+			//so generate the areaSummary in Memory
+			dev->areaMgmt.initArea(dev->activeArea[AreaType::data]);
+		}
+
+		//Prepare buffer and calculate bytes to write
+		char* buf = &const_cast<char*>(data)[page*dataBytesPerPage];
+		unsigned int btw = bytes - *bytes_written;
+		if((bytes+offs) > dataBytesPerPage){
+			btw = (bytes+offs) > (page+1)*dataBytesPerPage ?
+						dataBytesPerPage - offs :
+						bytes - page*dataBytesPerPage;
+		}
+
+		if((btw + offs < dataBytesPerPage &&
+			page*dataBytesPerPage + btw < inode->size) ||	//End Misaligned
+			(offs > 0 && page == 0)){						//Start Misaligned
+			//we are misaligned, so fill write buffer with valid Data
+			misaligned = true;
+			buf = new char[dataBytesPerPage];
+			memset(buf, 0x0, dataBytesPerPage);
+
+			unsigned int btr = dataBytesPerPage;
+
+			//limit maximum bytes to read if file is smaller than actual page
+			if((pageFrom+1+page)*dataBytesPerPage > inode->size){
+				if(inode->size > (pageFrom+page) * dataBytesPerPage)
+					btr = inode->size - (pageFrom+page) * dataBytesPerPage;
+				else
+					btr = 0;
+			}
+
+			if(pageList[page+pageFrom] != 0	 //not an empty page
+					&& pageList[page+pageFrom] != combineAddress(0, unusedMarker)){  //not a skipped page (thus containing no information)
+				//We are overriding real data, not just empty space
+				unsigned int bytes_read = 0;
+				Result r = readPageData(pageFrom+page, pageFrom+page, 0, btr, buf, pageList, &bytes_read);
+				if(r != Result::ok || bytes_read != btr){
+					delete[] buf;
+					return Result::bug;
+				}
+			}
+
+			//Handle offset
+			memcpy(&buf[offs], &data[*bytes_written], btw);
+
+			//this is here, because btw will be modified
+			*bytes_written += btw;
+
+			//increase btw to whole page to write existing data back
+			btw = btr > (offs + btw) ? btr : offs + btw;
+
+			//offset is only applied to first page
+			offs = 0;
+		}else{
+			//not misaligned, we are writing a whole page
+			*bytes_written += btw;
+		}
+
+		//if we are overwriting existing data...
+		if(pageList[page+pageFrom] != 0	 //not an empty page
+			&& pageList[page+pageFrom] != combineAddress(0, unusedMarker)){  //not a skipped page (thus containing no information)
+			//Mark old pages dirty
+			//mark old Page in Areamap
+			unsigned long oldArea = extractLogicalArea(pageList[page+pageFrom]);
+			unsigned long oldPage = extractPage(pageList[page+pageFrom]);
+
+			res = dev->sumCache.setPageStatus(oldArea, oldPage, SummaryEntry::dirty);
+			if(res != Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[static_cast<int>(res)]);
+			}
+		}else{
+			//or we will add a new page to this file
+			inode->reservedSize += dataBytesPerPage;
+		}
+
+		//find new page to write to
+		unsigned int firstFreePage = 0;
+		if(dev->areaMgmt.findFirstFreePage(&firstFreePage, dev->activeArea[AreaType::data]) == Result::nosp){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::data]);
+			return Result::bug;
+		}
+		Addr pageAddress = combineAddress(dev->activeArea[AreaType::data], firstFreePage);
+		res = dev->sumCache.setPageStatus(dev->activeArea[AreaType::data], firstFreePage, SummaryEntry::used);
+		if(res != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[static_cast<int>(res)]);
+		}
+		pageList[page+pageFrom] = pageAddress;
+
+		res = dev->driver->writePage(getPageNumber(pageAddress, dev), buf, btw);
+
+		if(misaligned)
+			delete[] buf;
+
+		PAFFS_DBG_S(PAFFS_TRACE_WRITE, "write r.P: %d/%d, phy.P: %llu", page+1, pageTo+1, static_cast<long long unsigned int> (getPageNumber(pageAddress, dev)));
+		if(res != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "ERR: write returned FAIL at phy.P: %llu", static_cast<long long unsigned int> (getPageNumber(pageAddress, dev)));
+			return Result::fail;
+		}
+
+		res = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::data], AreaType::data);
+		if(res != Result::ok)
+			return res;
+
+	}
+	return Result::ok;
+}
+
+Result DataIO::readPageData(PageOffs pageFrom, PageOffs pageTo, unsigned offs,
+			unsigned bytes, char* data, Addr *pageList,
+			unsigned* bytes_read){
+	char* wrap = data;
+	bool misaligned = false;
+	if(offs > 0){
+		misaligned = true;
+		wrap = new char[bytes + offs];
+	}
+
+	for(unsigned int page = 0; page <= pageTo - pageFrom; page++){
+		char* buf = &wrap[page*dataBytesPerPage];
+
+		unsigned int btr = bytes + offs - *bytes_read;
+		if(btr > dataBytesPerPage){
+			btr = (bytes + offs) > (page+1)*dataBytesPerPage ?
+						dataBytesPerPage :
+						(bytes + offs) - page*dataBytesPerPage;
+		}
+
+		AreaPos area = extractLogicalArea(pageList[pageFrom + page]);
+		if(dev->areaMap[area].type != AreaType::data){
+			if(pageList[pageFrom + page] == combineAddress(0, unusedMarker)){
+				//This Page is currently not written to flash
+				//because it contains just empty space
+				memset(buf, 0, btr);
+				*bytes_read += btr;
+				continue;
+			}
+			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid area at %d:%d", extractLogicalArea(pageList[page + pageFrom]),extractPage(pageList[page + pageFrom]));
+			return Result::bug;
+		}
+		Result r;
+		if(traceMask & PAFFS_TRACE_VERIFY_AS){
+			SummaryEntry e = dev->sumCache.getPageStatus(extractLogicalArea(pageList[page + pageFrom])
+					,extractPage(pageList[page + pageFrom]), &r);
+			if(r != Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load AreaSummary of area %d for verification!", extractLogicalArea(pageList[page + pageFrom]));
+			}else{
+				if(e == SummaryEntry::dirty){
+					PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of outdated (dirty) data at %d:%d", extractLogicalArea(pageList[page + pageFrom]),extractPage(pageList[page + pageFrom]));
+					return Result::bug;
+				}
+
+				if(e == SummaryEntry::free){
+					PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid (free) data at %d:%d", extractLogicalArea(pageList[page + pageFrom]),extractPage(pageList[page + pageFrom]));
+					return Result::bug;
+				}
+
+				if(e >= SummaryEntry::error){
+					PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of data with invalid AreaSummary at area %d!", extractLogicalArea(pageList[page + pageFrom]));
+				}
+			}
+		}
+
+		PageAbs addr = getPageNumber(pageList[page + pageFrom], dev);
+		r = dev->driver->readPage(addr, buf, btr);
+		if(r != Result::ok){
+			if(misaligned)
+				delete[] wrap;
+			return dev->lasterr = r;
+		}
+		*bytes_read += btr;
+
+	}
+
+	if(misaligned) {
+		memcpy(data, &wrap[offs], bytes);
+		*bytes_read -= offs;
+		delete[] wrap;
+	}
+
+	return Result::ok;
+}
 
 
 }

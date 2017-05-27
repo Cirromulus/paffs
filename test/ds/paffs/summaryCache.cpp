@@ -18,42 +18,57 @@ TEST_F(SummaryCache, fillFlashAndVerify){
 	char txt[] = "Hallo";
 	char buf[6];
 	unsigned int bw;
-	int i;
-	char filename[11];
-
+	int i = 0, j = 0;
+	char filename[50];
+	bool full = false;
 	//fill areas
-	for(i = 0; ; i++){
-		sprintf(filename, "/%09d", i);
-		fil = fs.open(filename, paffs::FC);
-		if(fil == nullptr){
-			std::cout << paffs::err_msg(fs.getLastErr()) << std::endl;
-			ASSERT_THAT(fs.getLastErr(), AnyOf(Eq(paffs::Result::nosp), Eq(paffs::Result::toobig)));
+	for(i = 0; !full; i++){
+		sprintf(filename, "/%05d", i);
+		r = fs.mkDir(filename, paffs::FC);
+		if(r != paffs::Result::ok){
+			ASSERT_THAT(r, AnyOf(Eq(paffs::Result::nosp), Eq(paffs::Result::toobig)));
 			break;
 		}
-		ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
+		for(j = 0; j < 100; j++){
+			sprintf(filename, "/%05d/%02d", i, j);
+			if(i == 4 && j == 97){
+				printf("HERE\n");
+			}
+			fil = fs.open(filename, paffs::FC);
+			if(fil == nullptr){
+				std::cout << filename << ": " << paffs::err_msg(fs.getLastErr()) << std::endl;
+				ASSERT_THAT(fs.getLastErr(), AnyOf(Eq(paffs::Result::nosp), Eq(paffs::Result::toobig)));
+				full = true;
+				break;
+			}
+			ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
 
-		r = fs.write(fil, txt, strlen(txt), &bw);
-		EXPECT_EQ(bw, strlen(txt));
-		ASSERT_EQ(r, paffs::Result::ok);
+			r = fs.write(fil, txt, strlen(txt), &bw);
+			EXPECT_EQ(bw, strlen(txt));
+			ASSERT_EQ(r, paffs::Result::ok);
 
-		r = fs.close(fil);
-		ASSERT_EQ(r, paffs::Result::ok);
-		ASSERT_EQ(fs.getDevice()->tree.cache.isTreeCacheValid(), true);
+			r = fs.close(fil);
+			ASSERT_EQ(r, paffs::Result::ok);
+			ASSERT_EQ(fs.getDevice()->tree.cache.isTreeCacheValid(), true);
+		}
 	}
 
 	//check if valid
 	for(i--;i >= 0; i--){
-		sprintf(filename, "/%09d", i);
- 		fil = fs.open(filename, paffs::FC);
-		ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
+		for(j--; j >= 0; j--){
+			sprintf(filename, "/%05d/%02d", i, j);
+			fil = fs.open(filename, paffs::FC);
+			ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
 
-		r = fs.read(fil, buf, strlen(txt), &bw);
-		EXPECT_EQ(bw, strlen(txt));
-		ASSERT_EQ(r, paffs::Result::ok);
-		ASSERT_TRUE(ArraysMatch(txt, buf, strlen(txt)));
+			r = fs.read(fil, buf, strlen(txt), &bw);
+			EXPECT_EQ(bw, strlen(txt));
+			ASSERT_EQ(r, paffs::Result::ok);
+			ASSERT_TRUE(ArraysMatch(txt, buf, strlen(txt)));
 
-		r = fs.close(fil);
-		ASSERT_EQ(r, paffs::Result::ok);
+			r = fs.close(fil);
+			ASSERT_EQ(r, paffs::Result::ok);
+		}
+		j = 100;
 	}
 }
 

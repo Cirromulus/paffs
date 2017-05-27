@@ -341,7 +341,7 @@ Result Device::getInodeInDir( Inode* outInode, Inode* folder, const char* name){
 	while(p < folder->size){
 			DirEntryLength direntryl = buf[p];
 			if(direntryl < sizeof(DirEntryLength) + sizeof(InodeNo)){
-				PAFFS_DBG(PAFFS_TRACE_BUG, "Directory size of Folder %u is unplausible! (was: %d, should: >%lu)", folder->no, direntryl, sizeof(DirEntryLength) + sizeof(InodeNo));
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Directory entry size of Folder %u is unplausible! (was: %d, should: >%lu)", folder->no, direntryl, sizeof(DirEntryLength) + sizeof(InodeNo));
 				delete[] buf;
 				return Result::bug;
 			}
@@ -436,7 +436,7 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 		return Result::fail;
 	}
 	if(contDir == nullptr){
-		lasterr = Result::bug;
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Container Directory was null!");
 		return Result::bug;
 	}
 
@@ -503,7 +503,6 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 		return Result::fail;
 	}
 	if(contDir == nullptr){
-		lasterr = Result::bug;
 		return Result::bug;
 	}
 
@@ -773,19 +772,23 @@ Result Device::createFile(Inode* outFile, const char* fullPath, Permission mask)
 
 	Inode parDir;
 	Result res = getParentDir(fullPath, &parDir, &lastSlash);
-	if(res != Result::ok)
+	if(res != Result::ok){
 		return res;
+	}
 
 	if(strlen(&fullPath[lastSlash]) > maxDirEntryLength){
 		return Result::objNameTooLong;
 	}
 
-	if(createFilInode(outFile, mask) != Result::ok){
-		return Result::bug;
+	if((res = createFilInode(outFile, mask)) != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not create fileInode: %s", err_msg(res));
+		return res;
 	}
 	res = tree.insertInode(outFile);
-	if(res != Result::ok)
+	if(res != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert Inode into tree: %s", err_msg(res));
 		return res;
+	}
 
 	return insertInodeInDir(&fullPath[lastSlash], &parDir, outFile);
 }
@@ -993,8 +996,8 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 	if(obj->fp > obj->dirent->node->size){
 		//size was increased
 		if(obj->dirent->node->reservedSize < obj->fp){
-			PAFFS_DBG(PAFFS_TRACE_BUG, "Reserved size is smaller than actual size?!");
-			return Result::bug;
+			PAFFS_DBG(PAFFS_TRACE_WRITE, "Reserved size is smaller than actual size "
+					"which is OK if we skipped pages");
 		}
 	}
 	return tree.updateExistingInode(obj->dirent->node);
@@ -1014,15 +1017,16 @@ Result Device::seek(Obj* obj, int m, Seekmode mode){
 		obj->fp = m;
 		break;
 	case Seekmode::end :
+		if(-m > static_cast<int>(obj->dirent->node->size))
+			return Result::einval;
 		obj->fp = obj->dirent->node->size + m;
 		break;
 	case Seekmode::cur :
+		if(static_cast<int>(obj->fp) + m < 0)
+			return Result::einval;
 		obj->fp += m;
 		break;
 	}
-
-	if(obj->fp > obj->dirent->node->size)
-		obj->dirent->node->size = obj->fp;
 
 	return Result::ok;
 }
