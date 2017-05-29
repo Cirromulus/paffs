@@ -43,6 +43,9 @@ private:
 	Result readPageData(PageOffs pageFrom, PageOffs pageTo, unsigned offs,
 			unsigned bytes, char* data, Addr *pageList,
 			unsigned* bytes_read);
+
+	Result writePageList(Addr* pageList, BitList<dataBytesPerPage> &modified,
+			unsigned fromPage, unsigned toPage);
 };
 
 };

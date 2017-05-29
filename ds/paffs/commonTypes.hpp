@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <config.hpp>
 #include <outpost/time/time_epoch.h>
+#include "paffs_trace.hpp"
 
 #pragma once
 
@@ -185,6 +186,34 @@ struct Area{	//TODO: Maybe packed? Slow, but less RAM
 };	//4 + 2 + 17 + 32 = 55 Bit = 7 Byte (8 on RAM)
 
 const char* err_msg(Result pr);	//implemented in paffs.cpp
+
+template <size_t size> class BitList{
+	char list[size/8 + 1];
+public:
+	BitList(){
+		memset(list, 0, sizeof(list));
+	}
+	void setBit(unsigned n){
+		if(n < size)
+			list[n / 8] |= 1 << n % 8;
+		else
+			PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Bit at %u, but size is %zu", n, size);
+	}
+
+	void resetBit(unsigned n){
+		if(n < size)
+			list[n / 8] &= ~(1 << n % 8);
+		else
+			PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to reset Bit at %u, but size is %zu", n, size);
+	}
+
+	bool getBit(unsigned n){
+		if(n < size)
+			return list[n / 8] & 1 << n % 8;
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Bit at %u, but size is %zu", n, size);
+		return false;
+	}
+};
 
 class Device;
 class Driver;
