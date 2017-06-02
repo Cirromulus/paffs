@@ -10,4 +10,9 @@ namespace paffs{
 	//minimum one byte with one bit per page, and another byte for meta
 	static constexpr uint16_t areaSummarySize = 1 + dataPagesPerArea / 8 + 1;
 	static constexpr uint16_t superChainElems = jumpPadNo + 2;
+	//Address buffer for dataIO, currently only first indirection is implemented
+	static constexpr uint16_t addrsPerPage = dataBytesPerPage / sizeof(Addr);
+	static constexpr uint32_t maxAddrs = 11 + addrsPerPage;
+
+
 }

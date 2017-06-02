@@ -11,11 +11,13 @@
 #include "btree.hpp"
 #include "superblock.hpp"
 #include "commonTypes.hpp"
+#include "bitlist.hpp"
 
 namespace paffs{
 
 class DataIO{
 	Device *dev;
+	Addr pageListBuffer[1];	//todo: determine buffer size
 public:
 	DataIO(Device *mdev) : dev(mdev){};
 	//Updates changes to treeCache as well
@@ -39,15 +41,16 @@ private:
 	 */
 	Result writePageData(PageOffs pageFrom, PageOffs pageTo, unsigned offs,
 			unsigned bytes, const char* data, Addr *pageList,
-			unsigned* bytes_written, Inode* inode);
+			unsigned* bytes_written, Inode* inode, BitList<maxAddrs> &modified);
 	Result readPageData(PageOffs pageFrom, PageOffs pageTo, unsigned offs,
 			unsigned bytes, char* data, Addr *pageList,
 			unsigned* bytes_read);
 
-	Result writePageList(Addr* pageList, BitList<dataBytesPerPage> &modified,
-			unsigned fromPage, unsigned toPage);
+	Result writePageList(Inode *inode, Addr* &pageList, BitList<maxAddrs> &modified,
+			unsigned int fromPage, unsigned int toPage);
 
-	Result readPageList(Addr* pageList, unsigned fromPage, unsigned toPage);
+	Result readPageList(Inode *inode, Addr* &pageList, unsigned int fromPage,
+			unsigned int toPage);
 };
 
 };

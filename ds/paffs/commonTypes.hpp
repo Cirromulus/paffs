@@ -5,7 +5,6 @@
  *      Author: Pascal Pieper
  */
 #include <stdint.h>
-#include <config.hpp>
 #include <outpost/time/time_epoch.h>
 #include "paffs_trace.hpp"
 
@@ -81,19 +80,15 @@ struct Param{
 	unsigned int superChainElems;
 };
 
-static const Param stdParam{
-	totalBytesPerPage, oobBytesPerPage, pagesPerBlock, blocksTotal, jumpPadNo,
-	dataBytesPerPage, areasNo, blocksPerArea,
-	totalPagesPerArea, dataPagesPerArea, superChainElems
-};
+extern const Param stdParam;
 
-typedef uint64_t Addr;		//Contains logical area and relative page
-typedef uint32_t AreaPos;	//Has to address total areas
-typedef uint32_t PageOffs;	//Has to address pages per area
-typedef uint64_t PageAbs;	//has to address all pages in a device
-typedef uint32_t BlockAbs;	//has to address all blocks in a device
-typedef uint32_t FileSize; 	  //~ 4 GB per file
-typedef uint32_t InodeNo;		  //~ 4 Million files
+typedef uint64_t Addr;			//Contains logical area and relative page
+typedef uint32_t AreaPos;		//Has to address total areas
+typedef uint32_t PageOffs;		//Has to address pages per area
+typedef uint64_t PageAbs;		//has to address all pages in a device
+typedef uint32_t BlockAbs;		//has to address all blocks in a device
+typedef uint32_t FileSize; 	  	//~ 4 GB per file
+typedef uint32_t InodeNo;		//~ 4 Million files
 typedef uint16_t DirEntryCount; //65,535 Entries per Directory
 typedef uint8_t  DirEntryLength; //255 characters per Directory entry
 static const DirEntryLength maxDirEntryLength = 255;
@@ -187,35 +182,9 @@ struct Area{	//TODO: Maybe packed? Slow, but less RAM
 
 const char* err_msg(Result pr);	//implemented in paffs.cpp
 
-template <size_t size> class BitList{
-	char list[size/8 + 1];
-public:
-	BitList(){
-		memset(list, 0, sizeof(list));
-	}
-	void setBit(unsigned n){
-		if(n < size)
-			list[n / 8] |= 1 << n % 8;
-		else
-			PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Bit at %u, but size is %zu", n, size);
-	}
-
-	void resetBit(unsigned n){
-		if(n < size)
-			list[n / 8] &= ~(1 << n % 8);
-		else
-			PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to reset Bit at %u, but size is %zu", n, size);
-	}
-
-	bool getBit(unsigned n){
-		if(n < size)
-			return list[n / 8] & 1 << n % 8;
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Bit at %u, but size is %zu", n, size);
-		return false;
-	}
-};
-
 class Device;
 class Driver;
 
 }  // namespace paffs
+
+#include <config.hpp>

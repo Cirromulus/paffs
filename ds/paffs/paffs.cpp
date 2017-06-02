@@ -5,12 +5,18 @@
 
 #include "paffs.hpp"
 #include "device.hpp"
-
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 
 namespace paffs{
+
+const Param stdParam{
+	totalBytesPerPage, oobBytesPerPage, pagesPerBlock, blocksTotal, jumpPadNo,
+	dataBytesPerPage, areasNo, blocksPerArea,
+	totalPagesPerArea, dataPagesPerArea, superChainElems
+};
 
 unsigned int traceMask =
 	//PAFFS_TRACE_VERBOSE |
@@ -83,10 +89,13 @@ void Paffs::printCacheSizes(){
 				sizeof(Area) * areasNo
 	);
 
-	/*PAFFS_DBG_S(PAFFS_TRACE_INFO,
-			"Total static size of PAFFS object: %zu",
-			sizeof(Paffs)
-	);*/
+	PAFFS_DBG_S(PAFFS_TRACE_INFO,
+			"Size of Address: %zu. Addresses per Page: %u\n"
+			"\tBufferable Addresses in DataIO: %" PRIu32 ".\n"
+			"\tOverall AddrBuffer Size: %zu Byte.",
+			sizeof(Addr), addrsPerPage, maxAddrs,
+			sizeof(Addr) * maxAddrs
+	);
 
 	PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------------------\n");
 }
