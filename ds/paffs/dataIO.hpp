@@ -11,13 +11,12 @@
 #include "btree.hpp"
 #include "superblock.hpp"
 #include "commonTypes.hpp"
-#include "bitlist.hpp"
 
 namespace paffs{
 
 class DataIO{
 	Device *dev;
-	Addr pageListBuffer[1];	//todo: determine buffer size
+	Addr pageListBuffer[maxAddrs];
 public:
 	DataIO(Device *mdev) : dev(mdev){};
 	//Updates changes to treeCache as well
@@ -35,22 +34,24 @@ public:
 	Result readTreeNode(Addr addr, TreeNode* node);
 	Result deleteTreeNode(TreeNode* node);
 
-private:
-	/**
-	 * @param inode: Needed to increase reserved size and for bounds check.
+	private:
+		/**
+	 * @param reservrdPages Is increased if new page was used
 	 */
 	Result writePageData(PageOffs pageFrom, PageOffs pageTo, unsigned offs,
 			unsigned bytes, const char* data, Addr *pageList,
-			unsigned* bytes_written, Inode* inode, BitList<maxAddrs> &modified);
+			unsigned* bytes_written, FileSize filesize, uint32_t &reservedPages);
 	Result readPageData(PageOffs pageFrom, PageOffs pageTo, unsigned offs,
 			unsigned bytes, char* data, Addr *pageList,
 			unsigned* bytes_read);
 
-	Result writePageList(Inode *inode, Addr* &pageList, BitList<maxAddrs> &modified,
+	Result writePageList(Inode *inode, Addr* &pageList,
 			unsigned int fromPage, unsigned int toPage);
 
 	Result readPageList(Inode *inode, Addr* &pageList, unsigned int fromPage,
 			unsigned int toPage);
+
+	bool checkIfPageListIsPlausible(Addr* pageList, size_t elems);
 };
 
 };

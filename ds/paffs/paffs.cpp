@@ -91,9 +91,11 @@ void Paffs::printCacheSizes(){
 
 	PAFFS_DBG_S(PAFFS_TRACE_INFO,
 			"Size of Address: %zu. Addresses per Page: %u\n"
-			"\tBufferable Addresses in DataIO: %" PRIu32 ".\n"
-			"\tOverall AddrBuffer Size: %zu Byte.",
-			sizeof(Addr), addrsPerPage, maxAddrs,
+			"\tBufferable Addresses in DataIO: %" PRIu32 ",\n"
+			"\treducing the maximal filesize to %" PRIu32 " byte.\n"
+			"\tOverall AddrBuffer Size: %zu Byte",
+			sizeof(Addr), addrsPerPage,
+			maxAddrs, dataBytesPerPage * maxAddrs,
 			sizeof(Addr) * maxAddrs
 	);
 

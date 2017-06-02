@@ -18,6 +18,10 @@ TEST (Bitlist, SetAndGetBits) {
 	for(unsigned i = 0; i < length; i++){
 		ASSERT_EQ(bitlist.getBit(i), false);
 	}
+	ASSERT_EQ(bitlist.isSetSomewhere(), false);
+	bitlist.setBit(length-1);
+	ASSERT_EQ(bitlist.isSetSomewhere(), true);
+
 	for(unsigned i = 0; i < length; i++){
 		bitlist.setBit(i);
 	}

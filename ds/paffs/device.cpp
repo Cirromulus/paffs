@@ -238,7 +238,7 @@ Result Device::createInode(Inode* outInode, Permission mask){
 	if(mask & W)
 		outInode->perm |= R;
 	outInode->size = 0;
-	outInode->reservedSize = 0;
+	outInode->reservedPages = 0;
 	outInode->crea = systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
 	outInode->mod = outInode->crea;
 	return Result::ok;
@@ -256,7 +256,7 @@ Result Device::createDirInode(Inode* outInode, Permission mask){
 		return Result::bug;
 	outInode->type = InodeType::dir;
 	outInode->size = sizeof(DirEntryCount);		//to hold directory-entry-count. even if it is not commited to flash
-	outInode->reservedSize = 0;
+	outInode->reservedPages = 0;
 	return Result::ok;
 }
 
@@ -464,7 +464,7 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 	char* dirData = new char[contDir->size + direntryl];
 	unsigned int bytes = 0;
 	Result r;
-	if(contDir->reservedSize > 0){		//if Directory is not empty
+	if(contDir->reservedPages > 0){		//if Directory is not empty
 		r = dataIO.readInodeData(contDir, 0, contDir->size, &bytes, dirData);
 		if(r != Result::ok || bytes != contDir->size){
 			lasterr = r;
@@ -509,7 +509,7 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 	char* dirData = new char[contDir->size];
 	unsigned int bytes = 0;
 	Result r;
-	if(contDir->reservedSize > 0){		//if Directory is not empty
+	if(contDir->reservedPages > 0){		//if Directory is not empty
 		r = dataIO.readInodeData(contDir, 0, contDir->size, &bytes, dirData);
 		if(r != Result::ok || bytes != contDir->size){
 			lasterr = r;
@@ -610,7 +610,7 @@ Dir* Device::openDir(const char* path){
 
 	char* dirData = new char[dirPinode.size];
 	unsigned int br = 0;
-	if(dirPinode.reservedSize > 0){
+	if(dirPinode.reservedPages > 0){
 		r = dataIO.readInodeData(&dirPinode, 0, dirPinode.size, &br, dirData);
 		if(r != Result::ok || br != dirPinode.size){
 			lasterr = r;
@@ -995,7 +995,7 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 	obj->fp += *bytes_written;
 	if(obj->fp > obj->dirent->node->size){
 		//size was increased
-		if(obj->dirent->node->reservedSize < obj->fp){
+		if(obj->dirent->node->reservedPages * dataBytesPerPage < obj->fp){
 			PAFFS_DBG(PAFFS_TRACE_WRITE, "Reserved size is smaller than actual size "
 					"which is OK if we skipped pages");
 		}

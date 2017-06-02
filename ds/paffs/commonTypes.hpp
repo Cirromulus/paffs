@@ -106,10 +106,10 @@ struct Inode{
 	InodeNo no;
 	InodeType type;//:2;
 	Permission perm:3;
+	uint32_t reservedPages;	//Space on filesystem used in Pages
+	FileSize size;			//Space on filesystem needed in bytes
 	uint64_t crea;
 	uint64_t mod;
-	FileSize reservedSize;	//Space on filesystem used in bytes
-	FileSize size;			//Space on filesystem needed in bytes
 	Addr direct[11];
 	Addr indir;
 	Addr d_indir;

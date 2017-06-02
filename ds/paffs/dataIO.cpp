@@ -12,6 +12,7 @@
 #include "paffs_trace.hpp"
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
 namespace paffs{
 
@@ -31,29 +32,41 @@ Result DataIO::writeInodeData(Inode* inode,
 
 	Result res;
 	Addr *pageList = 0;
-	BitList<maxAddrs> modified;
 
 	res = readPageList(inode, pageList, pageFrom, toPage);
 	if(res != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "could not read page Address list");
 		return res;
 	}
+
+	if(!checkIfPageListIsPlausible(pageList, toPage)){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "PageList is unplausible!");
+		return Result::fail;
+	}
+
+	for(unsigned int i = 0; i < pageFrom; i++){
+		if(pageList[i] == 0){
+			//we jumped over unwritten pages, so mark them as not (yet) used
+			pageList[i] = combineAddress(0, unusedMarker);
+		}
+	}
+
 	unsigned pageoffs = offs % dataBytesPerPage;
 	res = writePageData(pageFrom, toPage, pageoffs, bytes, data,
-			pageList, bytes_written, inode, modified);
+			pageList, bytes_written, inode->size, inode->reservedPages);
 	if(res != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "could not write pageData");
 		return res;
 	}
 
-	res = writePageList(inode, pageList, modified, pageFrom, toPage);
+	if(inode->size < *bytes_written + offs)
+		inode->size = *bytes_written + offs;
+
+	res = writePageList(inode, pageList, pageFrom, toPage);
 	if(res != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "could not write back page Address list");
 		return res;
 	}
-
-	if(inode->size < *bytes_written + offs)
-		inode->size = *bytes_written + offs;
 
 	return dev->tree.updateExistingInode(inode);
 }
@@ -77,12 +90,19 @@ Result DataIO::readInodeData(Inode* inode,
 		return Result::nimpl;
 	}
 
-	if(toPage > 11){
-		//todo Read indirection Layers
-		return Result::toobig;
+	Addr *pageList = 0;
+	Result r = readPageList(inode, pageList, pageFrom, toPage);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read page List");
+		return r;
 	}
 
-	return readPageData(pageFrom, toPage, offs % dataBytesPerPage, bytes, data, inode->direct, bytes_read);
+	if(!checkIfPageListIsPlausible(pageList, toPage)){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "PageList is unplausible!");
+		return Result::fail;
+	}
+
+	return readPageData(pageFrom, toPage, offs % dataBytesPerPage, bytes, data, pageList, bytes_read);
 }
 
 //inode->size and inode->reservedSize is altered.
@@ -98,16 +118,15 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 
 	if(toPage > 11){
 		//todo Read indirection Layers
-		return Result::toobig;
+		return Result::nimpl;
 	}
-
 
 	inode->size = offs;
 
-	if(inode->reservedSize == 0)
+	if(inode->reservedPages == 0)
 		return Result::ok;
 
-	if(inode->size >= inode->reservedSize - dataBytesPerPage)
+	if(inode->size >= (inode->reservedPages - 1) * dataBytesPerPage)
 		//doesn't leave a whole page blank
 		return Result::ok;
 
@@ -145,9 +164,8 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 			return r;
 		}
 
-		inode->reservedSize -= dataBytesPerPage;
+		inode->reservedPages--;
 		inode->direct[page+pageFrom] = 0;
-
 	}
 
 	return Result::ok;
@@ -261,10 +279,9 @@ Result DataIO::deleteTreeNode(TreeNode* node){
 	return dev->sumCache.setPageStatus(extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);
 }
 
-
 Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 		unsigned bytes, const char* data, Addr *pageList,
-		unsigned* bytes_written, Inode* inode, BitList<maxAddrs> &modified){
+		unsigned* bytes_written, FileSize filesize, uint32_t &reservedPages){
 	//Will be set to zero after offset is applied
 	if(offs > dataBytesPerPage){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried applying an offset %d > %d", offs, dataBytesPerPage);
@@ -302,7 +319,7 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 		}
 
 		if((btw + offs < dataBytesPerPage &&
-			page*dataBytesPerPage + btw < inode->size) ||	//End Misaligned
+			page*dataBytesPerPage + btw < filesize) ||		//End Misaligned
 			(offs > 0 && page == 0)){						//Start Misaligned
 			//we are misaligned, so fill write buffer with valid Data
 			misaligned = true;
@@ -312,9 +329,9 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 			unsigned int btr = dataBytesPerPage;
 
 			//limit maximum bytes to read if file is smaller than actual page
-			if((pageFrom+1+page)*dataBytesPerPage > inode->size){
-				if(inode->size > (pageFrom+page) * dataBytesPerPage)
-					btr = inode->size - (pageFrom+page) * dataBytesPerPage;
+			if((pageFrom+1+page)*dataBytesPerPage > filesize){
+				if(filesize > (pageFrom+page) * dataBytesPerPage)
+					btr = filesize - (pageFrom+page) * dataBytesPerPage;
 				else
 					btr = 0;
 			}
@@ -357,10 +374,11 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 			res = dev->sumCache.setPageStatus(oldArea, oldPage, SummaryEntry::dirty);
 			if(res != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[static_cast<int>(res)]);
+				PAFFS_DBG_S(PAFFS_TRACE_WRITE, "At pagelistindex %" PRIu32 ", oldArea: %lu, oldPage: %lu", page+pageFrom, oldArea, oldPage);
 			}
 		}else{
 			//or we will add a new page to this file
-			inode->reservedSize += dataBytesPerPage;
+			reservedPages ++;
 		}
 
 		//find new page to write to
@@ -375,8 +393,6 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[static_cast<int>(res)]);
 		}
 		pageList[page+pageFrom] = pageAddress;
-		modified.setBit(page+pageFrom);
-
 		res = dev->driver->writePage(getPageNumber(pageAddress, dev), buf, btw);
 
 		if(misaligned)
@@ -473,60 +489,85 @@ Result DataIO::readPageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 
 Result DataIO::readPageList(Inode *inode, Addr* &pageList, unsigned int fromPage,
 		unsigned int toPage){
+	//TODO: Read only fromPage-ToPage and not 0-ToPage
+	(void) fromPage;
 	pageList = inode->direct;
 	if(toPage > 11){
-		if(toPage > 11 + dataBytesPerPage / sizeof(Addr)){
+		if(toPage > maxAddrs){
 			//Would use second indirection layer, not yet implemented.
 			return dev->lasterr = Result::nimpl;
 		}
-		//FIXME: This return is just for green screen appearance
-		return dev->lasterr = Result::toobig;
+		unsigned filePages = inode->size ? inode->size / dataBytesPerPage + 1 : 0;
 		//Would use first indirection Layer
-		PAFFS_DBG_S(PAFFS_TRACE_WRITE, "Write uses first indirection layer");
-		pageList = new Addr[toPage];
+		PAFFS_DBG_S(PAFFS_TRACE_WRITE, "read uses first indirection layer");
+		pageList = pageListBuffer;
 		memcpy(pageList, inode->direct, 11 * sizeof(Addr));
+		memset(&pageList[11], 0, (maxAddrs - 11) * sizeof(Addr));
 		//Check if data from first indirection is available
 		if(inode->indir != 0){
-			int atr = (inode->reservedSize / dataBytesPerPage - 11);
-			if(atr < 0){
-				PAFFS_DBG(PAFFS_TRACE_ERROR, "inode->indir != 0, but reservedSize"
-					" is too small for indirection layer (%u Byte, "
-					"so %d pages)", inode->reservedSize,
-					inode->reservedSize / dataBytesPerPage);
+			if(filePages > maxAddrs){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "filesize is bigger than it could have been written");
 				return Result::bug;
 			}
-			//TODO: read all addresses in page for write-back
+			if(static_cast<int>(filePages) - 11 < 0){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "inode->indir != 0, but size"
+					" is too small for indirection layer (%u Byte, "
+					"so %d pages)", inode->size,
+					filePages);
+				return Result::bug;
+			}
+			PAFFS_DBG_S(PAFFS_TRACE_WRITE, "Reading additional %u addresses "
+					"for indirection",filePages - 11);
 			PageAbs addr = getPageNumber(inode->indir, dev);
-			Result res = dev->driver->readPage(addr, &pageList[11], atr * sizeof(Addr));
+			Result res = dev->driver->readPage(addr, &pageList[11], (filePages - 11) * sizeof(Addr));
 			if(res != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load existing addresses"
 						" of first indirection layer");
 				return res;
 			}
-			memset(&pageList[11+atr], 0, toPage - 11+atr);
-		}else{
-			memset(&pageList[1], 0, toPage - 11);
-		}
-	}
-
-	for(unsigned int i = 0; i < fromPage; i++){
-		if(pageList[i] == 0){
-			//we jumped over pages, so mark them as not (yet) used
-			pageList[i] = combineAddress(0, unusedMarker);
 		}
 	}
 	return Result::ok;
 }
 
-Result DataIO::writePageList(Inode *inode, Addr* &pageList, BitList<maxAddrs> &modified,
-		unsigned int fromPage, unsigned int toPage){
-	(void) modified;
+Result DataIO::writePageList(Inode *inode, Addr* &pageList, unsigned int fromPage, unsigned int toPage){
 	(void) fromPage;
 	(void) toPage;
 	if(pageList != inode->direct){
-		return Result::nimpl;
+		memcpy(inode->direct, pageList, 11 * sizeof(Addr));
+		unsigned filePages = inode->size ? inode->size / dataBytesPerPage + 1 : 0;
+		if(filePages <= 11){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "filePages is %u, but should be > 11 (indirection)", filePages);
+			return Result::bug;
+		}
+		unsigned int bw;
+		uint32_t reservedPages = 0;
+		Result r = writePageData(0, 0, 0, filePages - 11 * sizeof(Addr),
+				reinterpret_cast<char*>(&pageList[11]),
+				&inode->indir, &bw, filePages - 11 * sizeof(Addr), reservedPages);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write indirection addresses");
+			return r;
+		}
 	}
 	return Result::ok;
+}
+
+bool DataIO::checkIfPageListIsPlausible(Addr* pageList, size_t elems){
+	for(unsigned i = 0; i < elems; i++){
+		if(extractPage(pageList[i]) == unusedMarker)
+			continue;
+
+		if(extractPage(pageList[i]) > dataPagesPerArea){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "PageList elem %d Page is unplausible (%" PRIu32 ")", i, extractPage(pageList[i]));
+			return false;
+		}
+		if(extractLogicalArea(pageList[i]) == 0 && extractPage(pageList[i]) != 0){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "PageList elem %d Area is 0, but Page is not (%" PRIu32 ")", i, extractPage(pageList[i]));
+			return false;
+		}
+	}
+	return true;
 }
 
 }

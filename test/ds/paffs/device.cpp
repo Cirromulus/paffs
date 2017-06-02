@@ -60,7 +60,8 @@ TEST_F(FileTest, seekReadWrite){
 }
 
 TEST_F(FileTest, createReadWriteFile){
-	unsigned const int filesize = 3*paffs::dataBytesPerPage + 50;
+	//operate on indirection layer
+	unsigned const int filesize = (paffs::maxAddrs - 1)*paffs::dataBytesPerPage + 50;
 	char t[] = ".                         Text";	//30 chars
 	char tl[filesize];
 	char buf[filesize];
