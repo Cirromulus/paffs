@@ -7,7 +7,7 @@ print("SIMUDRIVER")
 
 env = envGlobal.Clone()
 
-files  = env.Glob('simu.cpp')
+files  = ['simu.cpp', 'yaffs_ecc.cpp']
 
 envGlobal.SConscript([
 		os.path.join('$ROOTPATH', 'simu/SConscript'),

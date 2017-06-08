@@ -34,7 +34,7 @@ unsigned int traceMask =
 	//PAFFS_TRACE_ALLOCATE |
 	//PAFFS_TRACE_VERIFY_AS |
 	PAFFS_TRACE_VERIFY_TC |
-	PAFFS_WRITE_VERIFY_AS |
+	//PAFFS_WRITE_VERIFY_AS | //This may collide with ECC
 	//PAFFS_TRACE_GC |
 	//PAFFS_TRACE_GC_DETAIL |
 	0;
@@ -57,6 +57,8 @@ const char* resultMsg[] = {
 		"Device is not mounted",
 		"Device is already mounted",
 		"Object name is too big",
+		"Biterror could be corrected by ECC",
+		"Biterror could not be corrected by ECC",
 		"You should not be seeing this..."
 };
 

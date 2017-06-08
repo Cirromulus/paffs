@@ -35,8 +35,8 @@ public:
 	Result deleteTreeNode(TreeNode* node);
 
 	private:
-		/**
-	 * @param reservrdPages Is increased if new page was used
+	/**
+	 * @param reservedPages Is increased if new page was used
 	 */
 	Result writePageData(PageOffs pageFrom, PageOffs pageTo, unsigned offs,
 			unsigned bytes, const char* data, Addr *pageList,

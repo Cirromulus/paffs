@@ -26,6 +26,9 @@ env = envGlobal.Clone()
 
 files  = env.Glob('*.cpp')
 
+#for file in files:
+#    print (file)
+
 library = env.StaticLibrary('paffs', files)
 
 envGlobal.Append(LIBS=[

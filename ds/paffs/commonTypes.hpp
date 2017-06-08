@@ -37,6 +37,8 @@ enum class Result : uint8_t{
 	notMounted,
 	alrMounted,
 	objNameTooLong,
+	biterrorCorrected,
+	biterrorNotCorrected,
 	num_result
 };
 
