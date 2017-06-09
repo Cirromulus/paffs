@@ -264,8 +264,18 @@ Result DataIO::readTreeNode(Addr addr, TreeNode* node){
 	}
 
 	r = dev->driver->readPage(getPageNumber(addr, dev), node, sizeof(TreeNode));
-	if(r != Result::ok)
-		return r;
+	if(r != Result::ok){
+		if(r == Result::biterrorCorrected){
+			r = writeTreeNode(node);
+			if(r == Result::ok)
+				PAFFS_DBG(PAFFS_TRACE_INFO, "Corrected biterror");
+			else
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not rewrite corrected treenode bc. %s", err_msg(r));
+		}else{
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Error reading Treenode");
+			return r;
+		}
+	}
 
 	if(node->self != addr){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Read Treenode at %X:%X, but its content stated that it was on %X:%X", extractLogicalArea(addr), extractPage(addr), extractLogicalArea(node->self), extractPage(node->self));
@@ -470,9 +480,15 @@ Result DataIO::readPageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 		PageAbs addr = getPageNumber(pageList[page + pageFrom], dev);
 		r = dev->driver->readPage(addr, buf, btr);
 		if(r != Result::ok){
-			if(misaligned)
-				delete[] wrap;
-			return dev->lasterr = r;
+			if(r == Result::biterrorCorrected){
+				//TODO rewrite page
+				PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Corrected biterror, but we do not yet write corrected version back to flash.");
+			}else{
+				if(misaligned)
+					delete[] wrap;
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read page, aborting pageData Read");
+				return dev->lasterr = r;
+			}
 		}
 		*bytes_read += btr;
 
@@ -521,9 +537,15 @@ Result DataIO::readPageList(Inode *inode, Addr* &pageList, unsigned int fromPage
 			PageAbs addr = getPageNumber(inode->indir, dev);
 			Result res = dev->driver->readPage(addr, &pageList[11], (filePages - 11) * sizeof(Addr));
 			if(res != Result::ok){
-				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load existing addresses"
+				if(res == Result::biterrorCorrected){
+					//TODO rewrite PageList or mark it as dirty
+					PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Corrected biterror, but we do not yet "
+						"write corrected version back to flash.");
+				}else{
+					PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load existing addresses"
 						" of first indirection layer");
-				return res;
+					return res;
+				}
 			}
 		}
 	}

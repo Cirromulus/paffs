@@ -8,6 +8,7 @@
 
 #include "../commonTypes.hpp"
 #include "../paffs_trace.hpp"
+#include "yaffs_ecc.hpp"
 #include <string.h>
 #include <inttypes.h>
 
@@ -40,10 +41,15 @@ Result OfficeModelNexys3Driver::writePage(uint64_t page_no,
 
 	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "Write %u bytes at page %" PRIu64, data_len, page_no);
 
-	if(data_len != totalBytesPerPage){
-		memset(buf, 0xFF, totalBytesPerPage);
+	if(totalBytesPerPage != data_len){
+		memset(buf+data_len, 0xFF, totalBytesPerPage - data_len);
 	}
 	memcpy(buf, data, data_len);
+
+	unsigned char* p = &buf[dataBytesPerPage+2];
+	for(int i = 0; i < dataBytesPerPage; i+=256, p+=3)
+		YaffsEcc::calc(static_cast<unsigned char*>(buf) + i, p);
+
 	nand->writePage(bank, device, page_no, static_cast<uint8_t*>(data));
 	return Result::ok;
 }
@@ -56,7 +62,18 @@ Result OfficeModelNexys3Driver::readPage(uint64_t page_no,
 	}
 
 	nand->readPage(bank, device, page_no, buf);
+	unsigned char read_ecc[3];
+	unsigned char *p = &buf[dataBytesPerPage + 2];
+	Result ret = Result::ok;
+	for(int i = 0; i < dataBytesPerPage; i+=256, p+=3) {
+		YaffsEcc::calc(static_cast<unsigned char*>(buf) + i, read_ecc);
+		Result r = YaffsEcc::correct(static_cast<unsigned char*>(buf), p, read_ecc);
+		//ok < corrected < notcorrected
+		if (r > ret)
+			ret = r;
+	}
 	memcpy(data, buf, data_len);
+	(void) ret; //TODO: Return actual ECC result
 	return Result::ok;
 }
 Result OfficeModelNexys3Driver::eraseBlock(uint32_t block_no){

@@ -19,6 +19,7 @@ env = envGlobal.Clone()
 
 files  = [
     'office_model_nexys3.cpp',
+    'yaffs_ecc.cpp'
 ]
 files.extend(env.Glob(amappath+'/*.cpp'))
 files.extend(env.Glob(nandpath+'/*.cpp'))

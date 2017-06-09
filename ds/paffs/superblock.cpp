@@ -341,7 +341,8 @@ Result Superblock::findFirstFreeEntryInBlock(AreaPos area, uint8_t block,
 		PageAbs page = i + pageOffs;
 		SerialNo no;
 		Result r = dev->driver->readPage(page, &no, sizeof(SerialNo));
-		if(r != Result::ok)
+		//Ignore corrected bits b.c. This function is used to write new Entry
+		if(r != Result::ok && r != Result::biterrorCorrected)
 			return r;
 		if(no != emptySerial){
 			if(inARow != 0){
@@ -436,9 +437,15 @@ Result Superblock::readMostRecentEntryInBlock(AreaPos area, uint8_t block,
 		char buf[sizeof(SerialNo) + sizeof(AreaPos) + sizeof(AreaPos)];
 		Result r = dev->driver->readPage(page, buf,
 				sizeof(SerialNo) + sizeof(AreaPos) + sizeof(AreaPos));
+		if(r != Result::ok){
+			if(r == Result::biterrorCorrected){
+				//TODO trigger SB rewrite. AS may be invalid at this point.
+				PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Corrected biterror, but we do not yet write corrected version back to flash.");
+			}else{
+				return r;
+			}
+		}
 		SerialNo *no = reinterpret_cast<SerialNo*>(buf);
-		if(r != Result::ok)
-			return r;
 		//PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Read Page %" PRIu64 " successful", getPageNumber(addr, dev));
 		if(*no == emptySerial){
 			// Unprogrammed, therefore empty
@@ -514,7 +521,15 @@ Result Superblock::readAnchorEntry(Addr addr, AnchorEntry* entry){
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Reading Anchor entry at phys. area %" PRIu32 " page %" PRIu32,
 			extractLogicalArea(addr), extractPage(addr));
 	//No check of areaType because we may not have an AreaMap
-	return dev->driver->readPage(getPageNumberFromDirect(addr), entry, sizeof(AnchorEntry));
+	Result r = dev->driver->readPage(
+			getPageNumberFromDirect(addr), entry, sizeof(AnchorEntry));
+
+	if(r == Result::biterrorCorrected){
+		//TODO trigger SB rewrite. AS may be invalid at this point.
+		PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Corrected biterror, but we do not yet write corrected version back to flash.");
+		return Result::ok;
+	}
+	return r;
 }
 
 Result Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos *directArea, JumpPadEntry* entry){
@@ -703,9 +718,17 @@ Result Superblock::writeSuperPageIndex(PageAbs pageStart, SuperIndex* entry){
 }
 
 Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap){
-	if(!withAreaMap)
-		 return dev->driver->readPage(getPageNumberFromDirect(addr), entry, sizeof(SerialNo) + sizeof(Addr));
-
+	Result r;
+	if(!withAreaMap){
+		r = dev->driver->readPage(
+				 getPageNumberFromDirect(addr), entry, sizeof(SerialNo) + sizeof(Addr));
+		if(r == Result::biterrorCorrected){
+			//TODO trigger SB rewrite. AS may be invalid at this point.
+			PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Corrected biterror, but we do not yet write corrected version back to flash.");
+			return Result::ok;
+		}
+		return r;
+	}
 	if(entry->areaMap == NULL)
 		return Result::einval;
 
@@ -732,7 +755,6 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 	memset(buf, 0, needed_bytes);
 	uint32_t pointer = 0;
 	PageAbs pageBase = getPageNumberFromDirect(addr);
-	Result r;
 	entry->no = emptySerial;
 	unsigned char pagebuf[dataBytesPerPage];
 	SerialNo localSerialTmp;
@@ -741,6 +763,15 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 				pointer + dataBytesPerPage - sizeof(SerialNo) < needed_bytes ?
 				dataBytesPerPage - sizeof(SerialNo) : needed_bytes - pointer;
 		r = dev->driver->readPage(pageBase + page, pagebuf, btr + sizeof(SerialNo));
+		if(r != Result::ok){
+			if(r == Result::biterrorCorrected){
+				//TODO trigger SB rewrite. AS may be invalid at this point.
+				PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Corrected biterror, but we do not yet write corrected version back to flash.");
+				return Result::ok;
+			}
+			return r;
+		}
+
 		memcpy(&localSerialTmp, pagebuf, sizeof(SerialNo));
 		if(localSerialTmp == emptySerial){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Got empty SerialNo during SuperPage read! "
@@ -758,9 +789,6 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 
 		memcpy(&buf[pointer], &pagebuf[sizeof(SerialNo)], btr);
 		pointer += btr;
-
-		if(r != Result::ok)
-			return r;
 	}
 	//buffer ready
 	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "SuperIndex Buffer was filled with %" PRIu32 " Bytes.", pointer);
@@ -790,8 +818,14 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 				//TODO: Normally, we would check in the OOB for a Checksum or so, which is present all the time
 				Addr tmp = combineAddress(entry->asPositions[i], j);
 				r = dev->driver->readPage(getPageNumberFromDirect(tmp), pagebuf, dataBytesPerPage);
-				if(r != Result::ok)
+				if(r != Result::ok){
+					if(r == Result::biterrorCorrected){
+						//TODO trigger SB rewrite. AS may be invalid at this point.
+						PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Corrected biterror, but we do not yet write corrected version back to flash.");
+						return Result::ok;
+					}
 					return r;
+				}
 				bool contains_data = false;
 				for(unsigned int byte = 0; byte < dataBytesPerPage; byte++){
 					if(pagebuf[byte] != 0xFF){

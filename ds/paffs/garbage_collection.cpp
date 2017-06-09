@@ -92,7 +92,8 @@ Result GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstAre
 
 			char buf[totalBytesPerPage];
 			Result r = dev->driver->readPage(src, buf, totalBytesPerPage);
-			if(r != Result::ok){
+			//Any Biterror gets corrected here by being moved
+			if(r != Result::ok && r != Result::biterrorCorrected){
 				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not read page n° %lu!", static_cast<long unsigned> (src));
 				return r;
 			}

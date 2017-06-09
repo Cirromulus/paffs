@@ -80,8 +80,7 @@ Result SimuDriver::readPage(uint64_t page_no,
 	}
 
 	memcpy(data, buf, data_len);
-	(void) ret;
-	return Result::ok;
+	return ret;
 }
 Result SimuDriver::eraseBlock(uint32_t block_no){
 	if(!cell)

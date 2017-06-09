@@ -473,8 +473,14 @@ Result SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bo
 		unsigned int btr = pointer + dataBytesPerPage < areaSummarySize ? dataBytesPerPage
 							: areaSummarySize - pointer;
 		r = dev->driver->readPage(page_offs + page, &buf[pointer], btr);
-		if(r != Result::ok)
-			return r;
+		if(r != Result::ok){
+			if(r == Result::biterrorCorrected){
+				setDirty(translation[area]);
+				PAFFS_DBG(PAFFS_TRACE_INFO, "Corrected biterror, triggering dirty areaSummary for rewrite.");
+			}else{
+				return r;
+			}
+		}
 
 		pointer += btr;
 	}
@@ -490,13 +496,20 @@ Result SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bo
 	for(unsigned int j = 0; j < dataPagesPerArea; j++){
 		if(buf[j/8+1] & 1 << j%8){
 			if(complete){
-				unsigned char pagebuf[dataBytesPerPage];
+				unsigned char pagebuf[totalBytesPerPage];
 				Addr tmp = combineAddress(area, j);
-				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, dataBytesPerPage);
-				if(r != Result::ok)
-					return r;
+				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, totalBytesPerPage);
+				if(r != Result::ok){
+					if(r == Result::biterrorCorrected){
+						setDirty(translation[area]);
+						PAFFS_DBG(PAFFS_TRACE_INFO, "Corrected biterror, triggering dirty areaSummary for "
+								"rewrite by Garbage collection.\n\t(Hopefully it runs before an additional bitflip happens)");
+					}else{
+						return r;
+					}
+				}
 				bool contains_data = false;
-				for(unsigned int byte = 0; byte < dataBytesPerPage; byte++){
+				for(unsigned int byte = 0; byte < totalBytesPerPage; byte++){
 					if(pagebuf[byte] != 0xFF){
 						contains_data = true;
 						break;

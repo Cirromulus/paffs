@@ -77,6 +77,9 @@ private:
 
 	PageOffs countDirtyPages(uint16_t position);
 
+	/**
+	 * @warn Area needs to be in translation array
+	 */
 	Result readAreasummary(AreaPos area, SummaryEntry* out_summary, bool complete);
 
 	Result writeAreasummary(AreaPos area, SummaryEntry* summary);
