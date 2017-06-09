@@ -62,7 +62,7 @@ Result DataIO::writeInodeData(Inode* inode,
 	if(inode->size < *bytes_written + offs)
 		inode->size = *bytes_written + offs;
 
-	res = writePageList(inode, pageList, pageFrom, toPage);
+	res = writePageList(inode, inode->indir, pageList, pageFrom, toPage);
 	if(res != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "could not write back page Address list");
 		return res;
@@ -116,9 +116,16 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 		return Result::einval;
 	}
 
-	if(toPage > 11){
-		//todo Read indirection Layers
-		return Result::nimpl;
+	Addr *pageList = 0;
+	Result r = readPageList(inode, pageList, pageFrom, toPage);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read page List");
+		return r;
+	}
+
+	if(!checkIfPageListIsPlausible(pageList, toPage)){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "PageList is unplausible!");
+		return Result::fail;
 	}
 
 	inode->size = offs;
@@ -133,21 +140,20 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 
 	for(unsigned int page = 0; page <= toPage - pageFrom; page++){
 
-		unsigned int area = extractLogicalArea(inode->direct[page + pageFrom]);
-		unsigned int relPage = extractPage(inode->direct[page + pageFrom]);
+		unsigned int area = extractLogicalArea(pageList[page + pageFrom]);
+		unsigned int relPage = extractPage(pageList[page + pageFrom]);
 
 		if(dev->areaMap[area].type != AreaType::data){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of invalid area at %d:%d",
-					extractLogicalArea(inode->direct[page + pageFrom]),
-					extractPage(inode->direct[page + pageFrom]));
+					extractLogicalArea(pageList[page + pageFrom]),
+					extractPage(pageList[page + pageFrom]));
 			return Result::bug;
 		}
 
-		Result r;
 		if(dev->sumCache.getPageStatus(area, relPage, &r) == SummaryEntry::dirty){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of outdated (dirty)"
-					" data at %d:%d", extractLogicalArea(inode->direct[page + pageFrom]),
-					extractPage(inode->direct[page + pageFrom]));
+					" data at %d:%d", extractLogicalArea(pageList[page + pageFrom]),
+					extractPage(pageList[page + pageFrom]));
 			return Result::bug;
 		}
 		if(r != Result::ok){
@@ -165,10 +171,14 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 		}
 
 		inode->reservedPages--;
-		inode->direct[page+pageFrom] = 0;
+		pageList[page+pageFrom] = 0;
 	}
 
-	return Result::ok;
+	r = writePageList(inode, inode->indir, pageList, pageFrom, toPage);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "could not write back page Address list");
+	}
+	return r;
 }
 
 //Does not change addresses in parent Nodes
@@ -552,21 +562,28 @@ Result DataIO::readPageList(Inode *inode, Addr* &pageList, unsigned int fromPage
 	return Result::ok;
 }
 
-Result DataIO::writePageList(Inode *inode, Addr* &pageList, unsigned int fromPage, unsigned int toPage){
+//todo: Change this function to not need inode, and not distinguish between direct and indirect. Implement in new cache.
+Result DataIO::writePageList(Inode *inode, Addr& page, Addr* &pageList,
+		unsigned int fromPage, unsigned int toPage){
 	(void) fromPage;
 	(void) toPage;
 	if(pageList != inode->direct){
 		memcpy(inode->direct, pageList, 11 * sizeof(Addr));
 		unsigned filePages = inode->size ? inode->size / dataBytesPerPage + 1 : 0;
 		if(filePages <= 11){
-			PAFFS_DBG(PAFFS_TRACE_BUG, "filePages is %u, but should be > 11 (indirection)", filePages);
-			return Result::bug;
+			//Pages have been deleted
+			Result r = dev->sumCache.setPageStatus(extractLogicalArea(page), extractPage(page), SummaryEntry::dirty);
+			if(r != Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write AreaSummary for area %d,"
+						" so no invalidation of data!", extractLogicalArea(page));
+			}
+			page = 0;
 		}
 		unsigned int bw;
 		uint32_t reservedPages = 0;
 		Result r = writePageData(0, 0, 0, filePages - 11 * sizeof(Addr),
 				reinterpret_cast<char*>(&pageList[11]),
-				&inode->indir, &bw, filePages - 11 * sizeof(Addr), reservedPages);
+				&page, &bw, filePages - 11 * sizeof(Addr), reservedPages);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write indirection addresses");
 			return r;

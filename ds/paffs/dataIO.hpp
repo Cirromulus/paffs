@@ -45,7 +45,10 @@ public:
 			unsigned bytes, char* data, Addr *pageList,
 			unsigned* bytes_read);
 
-	Result writePageList(Inode *inode, Addr* &pageList,
+	/**
+	 * @param page address where pageList was previously and outputs where it has been written to
+	 */
+	Result writePageList(Inode *inode, Addr& page, Addr* &pageList,
 			unsigned int fromPage, unsigned int toPage);
 
 	Result readPageList(Inode *inode, Addr* &pageList, unsigned int fromPage,

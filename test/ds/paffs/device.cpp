@@ -59,7 +59,7 @@ TEST_F(FileTest, seekReadWrite){
 	ASSERT_EQ(r, paffs::Result::ok);
 }
 
-TEST_F(FileTest, createReadWriteFile){
+TEST_F(FileTest, createReadWriteDeleteFile){
 	//operate on indirection layer
 	unsigned const int filesize = (paffs::maxAddrs - 1)*paffs::dataBytesPerPage + 50;
 	char t[] = ".                         Text";	//30 chars
@@ -115,6 +115,9 @@ TEST_F(FileTest, createReadWriteFile){
 	EXPECT_TRUE(ArraysMatch(buf, tl));
 
 	r = fs.close(fil);
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	r = fs.remove("/file");
 	ASSERT_EQ(r, paffs::Result::ok);
 }
 
