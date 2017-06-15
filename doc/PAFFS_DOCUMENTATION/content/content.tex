@@ -141,7 +141,7 @@ This section is under development since the filesystem is unfinished. Meanwhile 
 \end{figure}
 \begin{figure}[htp]
 	\centering\includegraphics[width=\textwidth]{paffs__fileIO_GC_annotations.png}
-	\caption{\label{fig:GC} Status of simulated flash after 1562658 read/write cycles on a single file. This result is affected by block erasure count.}
+	\caption{\label{fig:GC} Status of simulated flash after 1562658 read/write cycles on a single file. This result is dependend on block erasure count.}
 \end{figure}
 \begin{figure}[htp]
 	\centering\includegraphics[width=\textwidth]{yaffs_paffs_comparison_WL.png}
@@ -152,13 +152,13 @@ This section is under development since the filesystem is unfinished. Meanwhile 
 \appendix
 \section{TODOS}
 \begin{itemize}
-    \item file_append breaks Fs. $\rarrow$ 1. write unittest provoking this behaviour, 2. repair this usecase.
+    \item file\_append breaks Fs. $\rightarrow$ 1. write unittest provoking this behaviour, 2. repair this usecase.
     \item Add check if dirty in commit Area Summaries to enable read-only
     \item Implement simple ECC for correcting two biterrors.
     \item Read validation and error handling. If error is found, either repair it automatically or delay it until scrubbing? Scrubbing would be not very frequent, so on-the-fly would be appreciated.
 	\item When ASCache runs full, some used pages cant be marked as dirty. Build sanity checker, scanning whole FS and marking unreachable pages as such.
 	\item Implement dynamic number of uncommitted areas to superpage. (Maybe call it Checkpoint?)
-	\item CRC and ECC. How will a broken FS be transferred into a safe state?
+	%\item CRC and ECC. How will a broken FS be transferred into a safe state?
 	\item Merge DATA and INDEX areas to a single DATA type. Benefits: Less complexity, more efficient space usage, GC desperate mode for unmounting only. But maybe too overdone.
 	\item TreeCache - full commit from time to time. (Maybe 'used' marker?)
 	\item GC: Static Wear levelling, keep deletioncount in mind.
