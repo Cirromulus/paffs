@@ -229,3 +229,49 @@ TEST_F(FileTest, permissions){
 	r = fs.close(fil);
 	ASSERT_EQ(r, paffs::Result::ok);
 }
+
+TEST_F(FileTest, maxFilesize){
+	paffs::Obj *fil;
+	paffs::Result r;
+	char txt[] = "Hallo";
+	unsigned int bw;
+	unsigned int wordsize = sizeof(txt) - 1;
+	unsigned int blocksize = paffs::dataBytesPerPage*1.5;
+	char block[blocksize];
+	char blockcopy[blocksize];
+	unsigned int i = 0;
+	for(;i < blocksize; i += wordsize){
+		memcpy(&block[i], txt, wordsize);
+	}
+	if(i-wordsize < blocksize)
+		memcpy(&block[i-wordsize], txt,  blocksize - (i - wordsize));
+	//block[blocksize-1] = 0; No Nullpointer needed
+
+	fil = fs.open("/file", paffs::FW | paffs::FC);
+	if(fs.getLastErr() != paffs::Result::ok)
+		printf("%s!\n", paffs::err_msg(fs.getLastErr()));
+	ASSERT_NE(fil, nullptr);
+	i = 0;
+	//Just for a green screen, we will limit this write until a pageBuffer is implemented.
+	while(true && i < paffs::maxAddrs * paffs::dataBytesPerPage){
+		r = fs.write(fil, block, blocksize, &bw);
+		if(r == paffs::Result::nosp)
+			break;
+		EXPECT_EQ(bw, blocksize);
+		ASSERT_EQ(r, paffs::Result::ok);
+		i += bw;
+	}
+	fs.seek(fil, 0, paffs::Seekmode::set);
+	paffs::ObjInfo info;
+	fs.getObjInfo("/file", &info);
+	ASSERT_EQ(i, info.size);
+	while(i > 0){
+		memset(blockcopy, 0, blocksize);
+		r = fs.read(fil, blockcopy, blocksize, &bw);
+		EXPECT_EQ(bw, blocksize);
+		ASSERT_EQ(r, paffs::Result::ok);
+		EXPECT_TRUE(ArraysMatch(block, blockcopy, blocksize));
+		i -= bw;
+	}
+
+}

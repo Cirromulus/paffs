@@ -86,8 +86,7 @@ Result DataIO::readInodeData(Inode* inode,
 
 	if(offs + bytes > inode->size){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read bigger than size of object! (was: %d, max: %lu)", offs+bytes, static_cast<long unsigned>(inode->size));
-		//TODO: return less bytes_read
-		return Result::nimpl;
+		bytes = inode->size - offs;
 	}
 
 	Addr *pageList = 0;
@@ -330,17 +329,17 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 		}
 
 		//Prepare buffer and calculate bytes to write
-		char* buf = &const_cast<char*>(data)[page*dataBytesPerPage];
+		char* buf = &const_cast<char*>(data)[*bytes_written];
 		unsigned int btw = bytes - *bytes_written;
-		if((bytes+offs) > dataBytesPerPage){
-			btw = (bytes+offs) > (page+1)*dataBytesPerPage ?
+		if((btw + offs) > dataBytesPerPage){
+			btw = (btw+offs) > dataBytesPerPage ?
 						dataBytesPerPage - offs :
-						bytes - page*dataBytesPerPage;
+						dataBytesPerPage;
 		}
 
 		if((btw + offs < dataBytesPerPage &&
 			page*dataBytesPerPage + btw < filesize) ||		//End Misaligned
-			(offs > 0 && page == 0)){						//Start Misaligned
+			offs > 0){										//Start Misaligned
 			//we are misaligned, so fill write buffer with valid Data
 			misaligned = true;
 			buf = new char[dataBytesPerPage];
@@ -379,7 +378,7 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 			//offset is only applied to first page
 			offs = 0;
 		}else{
-			//not misaligned, we are writing a whole page
+			//not misaligned, we are writing a whole page or a new page
 			*bytes_written += btw;
 		}
 
@@ -518,12 +517,16 @@ Result DataIO::readPageList(Inode *inode, Addr* &pageList, unsigned int fromPage
 	//TODO: Read only fromPage-ToPage and not 0-ToPage
 	(void) fromPage;
 	pageList = inode->direct;
-	if(toPage > 11){
-		if(toPage > maxAddrs){
+	if(toPage >= 11){
+		if(toPage >= maxAddrs){
 			//Would use second indirection layer, not yet implemented.
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "File would use %u pages, we currently support only %u", toPage, maxAddrs);
 			return dev->lasterr = Result::nimpl;
 		}
-		unsigned filePages = inode->size ? inode->size / dataBytesPerPage + 1 : 0;
+		unsigned filePages = inode->size ? inode->size / dataBytesPerPage : 0;
+		if(inode->size % dataBytesPerPage != 0)
+			filePages++;
+
 		//Would use first indirection Layer
 		PAFFS_DBG_S(PAFFS_TRACE_WRITE, "read uses first indirection layer");
 		pageList = pageListBuffer;

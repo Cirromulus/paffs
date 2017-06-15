@@ -953,8 +953,8 @@ Result Device::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned in
 	if(r != Result::ok){
 		return r;
 	}
-	//TODO: Check if actually read that much!
-	*bytes_read = bytes_to_read;
+
+	//*bytes_read = bytes_to_read;
 	obj->fp += *bytes_read;
 	return Result::ok;
 }
