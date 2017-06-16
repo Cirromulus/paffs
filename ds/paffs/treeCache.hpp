@@ -71,8 +71,6 @@ public:
 	bool isSubTreeValid(TreeCacheNode* node, uint8_t* cache_node_reachable, InodeNo keyMin, InodeNo keyMax);
 	bool isTreeCacheValid();
 
-
-
 	//debug
 	uint16_t getCacheUsage();
 	uint16_t getCacheSize();

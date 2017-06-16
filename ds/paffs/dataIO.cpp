@@ -275,11 +275,7 @@ Result DataIO::readTreeNode(Addr addr, TreeNode* node){
 	r = dev->driver->readPage(getPageNumber(addr, dev), node, sizeof(TreeNode));
 	if(r != Result::ok){
 		if(r == Result::biterrorCorrected){
-			r = writeTreeNode(node);
-			if(r == Result::ok)
-				PAFFS_DBG(PAFFS_TRACE_INFO, "Corrected biterror");
-			else
-				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not rewrite corrected treenode bc. %s", err_msg(r));
+			PAFFS_DBG(PAFFS_TRACE_INFO, "Corrected biterror");
 		}else{
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Error reading Treenode");
 			return r;
@@ -291,7 +287,7 @@ Result DataIO::readTreeNode(Addr addr, TreeNode* node){
 		return Result::bug;
 	}
 
-	return Result::ok;
+	return r;
 }
 
 Result DataIO::deleteTreeNode(TreeNode* node){

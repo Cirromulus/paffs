@@ -661,7 +661,13 @@ Result TreeCache::getRootNodeFromCache(TreeCacheNode** tcn){
 
 	*tcn = new_root;
 
-	return dev->dataIO.readTreeNode(addr, &cache[cache_root].raw);
+	r = dev->dataIO.readTreeNode(addr, &cache[cache_root].raw);
+	if(r == Result::biterrorCorrected){
+		//Make shure it is going to be rewritten to flash
+		cache[cache_root].dirty = true;
+		return Result::ok;
+	}
+	return r;
 }
 
 /**
@@ -717,9 +723,11 @@ Result TreeCache::getTreeNodeAtIndexFrom(uint16_t index,
 	parent->pointers[index] = target;
 	*child = target;
 
-	Result r2 = dev->dataIO.readTreeNode(parent->raw.as.branch.pointers[index], &(*child)->raw);
-	if(r2 != Result::ok)
-		return r2;
+	r = dev->dataIO.readTreeNode(parent->raw.as.branch.pointers[index], &((*child)->raw));
+	if(r == Result::biterrorCorrected){
+		(*child)->dirty = true;
+		return Result::ok;
+	}
 	return r;
 }
 
