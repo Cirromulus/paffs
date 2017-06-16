@@ -8,6 +8,7 @@
 #pragma once
 #include "commonTypes.hpp"
 #include "treeTypes.hpp"
+#include "bitlist.hpp"
 
 namespace paffs{
 
@@ -19,7 +20,8 @@ class TreeCache{
 
 	TreeCacheNode cache[treeNodeCacheSize];
 
-	uint8_t cache_usage[(treeNodeCacheSize/8)+1];
+	BitList<treeNodeCacheSize> cacheUsage;
+	//uint8_t cache_usage[(treeNodeCacheSize/8)+1];
 
 	//Just for debug/tuning purposes
 	uint16_t cache_hits = 0;
@@ -68,7 +70,7 @@ public:
 	/**
 	 * Consistency checkers for Treecache
 	 */
-	bool isSubTreeValid(TreeCacheNode* node, uint8_t* cache_node_reachable, InodeNo keyMin, InodeNo keyMax);
+	bool isSubTreeValid(TreeCacheNode* node, BitList<treeNodeCacheSize> &reachable, InodeNo keyMin, InodeNo keyMax);
 	bool isTreeCacheValid();
 
 	//debug

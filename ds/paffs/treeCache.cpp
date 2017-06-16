@@ -15,38 +15,20 @@
 namespace paffs{
 
 void TreeCache::setIndexUsed(uint16_t index){
-	if(index > treeNodeCacheSize){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Index used at %u!", index);
-		dev->lasterr = Result::bug;
-	}
-	cache_usage[index / 8] |= 1 << index % 8;
+	cacheUsage.setBit(index);
 }
 
 void TreeCache::setIndexFree(uint16_t index){
-	if(index > treeNodeCacheSize){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Index free at %u!", index);
-		dev->lasterr = Result::bug;
-	}
-	cache_usage[index / 8] &= ~(1 << index % 8);
+	cacheUsage.resetBit(index);
 }
 
 bool TreeCache::isIndexUsed(uint16_t index){
-	if(index > treeNodeCacheSize){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to query Index Used at %u!", index);
-		dev->lasterr = Result::bug;
-		return true;
-	}
-	return cache_usage[index / 8] & (1 << index % 8);
+	return cacheUsage.getBit(index);
 }
 
 int16_t TreeCache::findFirstFreeIndex(){
-	for(int i = 0; i <= treeNodeCacheSize/8; i++){
-		if(cache_usage[i] != 0xFF)
-			for(int j = 0; j < 8; j++)
-				if(i*8 + j < treeNodeCacheSize && !isIndexUsed(i*8 + j))
-					return i*8 + j;
-	}
-	return -1;
+	size_t r = cacheUsage.findFirstFree();
+	return r == treeNodeCacheSize ? -1 : r;
 }
 
 int16_t TreeCache::getIndexFromPointer(TreeCacheNode* tcn){
@@ -63,7 +45,7 @@ int16_t TreeCache::getIndexFromPointer(TreeCacheNode* tcn){
  */
 void TreeCache::clear(){
 	memset(cache, 0, treeNodeCacheSize * sizeof(TreeCacheNode));
-	memset(cache_usage, 0, treeNodeCacheSize / 8 + 1);
+	cacheUsage.clear();
 }
 
 Result TreeCache::tryAddNewCacheNode(TreeCacheNode** newTcn){
@@ -179,9 +161,9 @@ bool TreeCache::areSiblingsClean(TreeCacheNode* tcn){
 	return true;
 }
 
-bool TreeCache::isSubTreeValid(TreeCacheNode* node, uint8_t* cache_node_reachable, InodeNo keyMin, InodeNo keyMax){
+bool TreeCache::isSubTreeValid(TreeCacheNode* node, BitList<treeNodeCacheSize> &reachable, InodeNo keyMin, InodeNo keyMax){
 
-	cache_node_reachable[getIndexFromPointer(node) / 8] |= 1 << getIndexFromPointer(node) % 8;
+	reachable.setBit(getIndexFromPointer(node));
 
 	if(node->parent == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Node n° %d has invalid parent!", getIndexFromPointer(node));
@@ -263,7 +245,7 @@ bool TreeCache::isSubTreeValid(TreeCacheNode* node, uint8_t* cache_node_reachabl
 				}
 				long keyMin_n = i == 0 ? 0 : node->raw.as.branch.keys[i-1];
 				long keyMax_n = i >= node->raw.num_keys ? 0 : node->raw.as.branch.keys[i];
-				if(!isSubTreeValid(node->pointers[i], cache_node_reachable, keyMin_n, keyMax_n))
+				if(!isSubTreeValid(node->pointers[i], reachable, keyMin_n, keyMax_n))
 					return false;
 			}
 		}
@@ -275,41 +257,38 @@ bool TreeCache::isSubTreeValid(TreeCacheNode* node, uint8_t* cache_node_reachabl
 
 bool TreeCache::isTreeCacheValid(){
 	//Just for debugging purposes
-	uint8_t cache_node_reachable[(treeNodeCacheSize/8)+1];
-	memset(cache_node_reachable, 0, (treeNodeCacheSize/8)+1);	//See c. 162
+	BitList<treeNodeCacheSize> reachable;
 
 
 	if(!isIndexUsed(cache_root))
 		return true;
 
 
-	if(!isSubTreeValid(&cache[cache_root], cache_node_reachable, 0, 0))
+	if(!isSubTreeValid(&cache[cache_root], reachable, 0, 0))
 		return false;
 
 	bool valid = true;
-	if(memcmp(cache_node_reachable,cache_usage, (treeNodeCacheSize/8)+1)){
-		for(int i = 0; i <= treeNodeCacheSize/8; i++){
-			for(int j = 0; j < 8; j++){
-				if((cache_usage[i*8] & 1 << j % 8) < (cache_node_reachable[i*8] & 1 << j % 8)){
-					PAFFS_DBG(PAFFS_TRACE_BUG, "Deleted Node n° %d still reachable!", i*8 + j);
-					return false;
-				}
-				if((cache_usage[i*8] & 1 << j % 8) > (cache_node_reachable[i*8] & 1 << j % 8)){
-					if(!cache[i*8+j].locked && !cache[i*8+j].inheritedLock){
-						//it is allowed if we are moving a parent around
-						bool parentLocked = false;
-						TreeCacheNode* par = cache[i*8+j].parent;
-						while(par != par->parent){
-							if(par->locked){
-								parentLocked = true;
-								break;
-							}
-							par = par->parent;
+	if(reachable != cacheUsage){
+		for(int i = 0; i < treeNodeCacheSize; i++){
+		if(cacheUsage.getBit(i) < reachable.getBit(i)){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Deleted Node n° %d still reachable!", i);
+				return false;
+			}
+			if(cacheUsage.getBit(i) > reachable.getBit(i)){
+				if(!cache[i].locked && !cache[i].inheritedLock){
+					//it is allowed if we are moving a parent around
+					bool parentLocked = false;
+					TreeCacheNode* par = cache[i].parent;
+					while(par != par->parent){
+						if(par->locked){
+							parentLocked = true;
+							break;
 						}
-						if(!parentLocked){
-							PAFFS_DBG(PAFFS_TRACE_BUG, "Cache contains unreachable node %d!", i*8 + j);
-							valid = false;
-						}
+						par = par->parent;
+					}
+					if(!parentLocked){
+						PAFFS_DBG(PAFFS_TRACE_BUG, "Cache contains unreachable node %d!", i);
+						valid = false;
 					}
 				}
 			}

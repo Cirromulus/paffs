@@ -15,8 +15,13 @@ template <size_t size> class BitList{
 	char list[size/8 + 1];
 public:
 	BitList(){
+		clear();
+	}
+
+	void clear(){
 		memset(list, 0, sizeof(list));
 	}
+
 	void setBit(unsigned n){
 		if(n < size)
 			list[n / 8] |= 1 << n % 8;
@@ -38,6 +43,18 @@ public:
 		return false;
 	}
 
+	size_t findFirstFree(){
+		for(unsigned i = 0; i <= size/8; i++){
+			if(list[i] != 0xFF){
+				for(unsigned int j = i * 8; j < (i+1)*8 && j < size; j++){
+					if(!getBit(j))
+						return j;
+				}
+			}
+		}
+		return size;
+	}
+
 	bool isSetSomewhere(){
 		for(unsigned i = 0; i <= size/8; i++){
 			if(list[i])
@@ -51,6 +68,18 @@ public:
 			printf("%s", getBit(i) ? "1" : "0");
 		}
 		printf("\n");
+	}
+
+	bool operator==(BitList<size>& rhs)const{
+		for(unsigned i = 0; i <= size/8; i++){
+			if(list[i] != rhs.list[i])
+				return false;
+		}
+		return true;
+	}
+
+	bool operator!=(BitList<size>& rhs)const{
+		return !(*this == rhs);
 	}
 };
 
