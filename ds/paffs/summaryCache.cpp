@@ -7,6 +7,7 @@
 
 #include "area.hpp"
 #include "device.hpp"
+#include "bitlist.hpp"
 #include "superblock.hpp"
 #include "summaryCache.hpp"
 #include "driver/driver.hpp"
@@ -68,17 +69,17 @@ void SummaryCache::packStatusArray(uint16_t position, SummaryEntry* arr){
 
 int SummaryCache::findNextFreeCacheEntry(){
 	//from summaryCache to AreaPosition
-	bool used[areaSummaryCacheSize] = {0};
+	BitList<areaSummaryCacheSize> used;
 	for(auto it = translation.cbegin(), end = translation.cend();
 			it != end; ++it){
-		if(used[it->second] != false){
+		if(used.getBit(it->second)){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "Multiple Areas point to same location in Cache!");
 			return -1;
 		}
-		used[it->second] = true;
+		used.setBit(it->second);
 	}
 	for(int i = 0; i < areaSummaryCacheSize; i++){
-		if(!used[i])
+		if(!used.getBit(i))
 			return i;
 	}
 	return -1;

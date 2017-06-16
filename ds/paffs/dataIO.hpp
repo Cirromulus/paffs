@@ -11,14 +11,15 @@
 #include "btree.hpp"
 #include "superblock.hpp"
 #include "commonTypes.hpp"
+#include "pageAddressCache.hpp"
 
 namespace paffs{
 
 class DataIO{
 	Device *dev;
-	Addr pageListBuffer[maxAddrs];
+	PageAddressCache pac;
 public:
-	DataIO(Device *mdev) : dev(mdev){};
+	DataIO(Device *mdev) : dev(mdev), pac(mdev){};
 	//Updates changes to treeCache as well
 	Result writeInodeData(Inode* inode,
 						unsigned int offs, unsigned int bytes,unsigned int *bytes_written,
@@ -39,22 +40,12 @@ public:
 	 * @param reservedPages Is increased if new page was used
 	 */
 	Result writePageData(PageOffs pageFrom, PageOffs pageTo, unsigned offs,
-			unsigned bytes, const char* data, Addr *pageList,
+			unsigned bytes, const char* data, PageAddressCache &ac,
 			unsigned* bytes_written, FileSize filesize, uint32_t &reservedPages);
 	Result readPageData(PageOffs pageFrom, PageOffs pageTo, unsigned offs,
-			unsigned bytes, char* data, Addr *pageList,
+			unsigned bytes, char* data, PageAddressCache &ac,
 			unsigned* bytes_read);
 
-	/**
-	 * @param page address where pageList was previously and outputs where it has been written to
-	 */
-	Result writePageList(Inode *inode, Addr& page, Addr* &pageList,
-			unsigned int fromPage, unsigned int toPage);
-
-	Result readPageList(Inode *inode, Addr* &pageList, unsigned int fromPage,
-			unsigned int toPage);
-
-	bool checkIfPageListIsPlausible(Addr* pageList, size_t elems);
 };
 
 };

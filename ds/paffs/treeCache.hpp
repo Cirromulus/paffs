@@ -21,7 +21,6 @@ class TreeCache{
 	TreeCacheNode cache[treeNodeCacheSize];
 
 	BitList<treeNodeCacheSize> cacheUsage;
-	//uint8_t cache_usage[(treeNodeCacheSize/8)+1];
 
 	//Just for debug/tuning purposes
 	uint16_t cache_hits = 0;
