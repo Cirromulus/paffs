@@ -50,6 +50,9 @@ Result PageAddressCache::getPage(PageNo page, Addr *addr){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
 		return Result::bug;
 	}
+
+	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "GetPage at %" PRIu32, page);
+
 	if(page < directAddrCount){
 		*addr = inode->direct[page];
 		return Result::ok;
@@ -58,7 +61,7 @@ Result PageAddressCache::getPage(PageNo page, Addr *addr){
 	Result r;
 
 	if(page < addrsPerPage){
-		//First Indirection
+		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Accessing first indirection at %" PRIu32, page);
 		if(!singl.active){
 			r = loadCacheElem(inode->indir, singl);
 			if(r != Result::ok){
@@ -73,6 +76,7 @@ Result PageAddressCache::getPage(PageNo page, Addr *addr){
 	PageNo addrPos;
 
 	if(page < std::pow(addrsPerPage, 2)){
+		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Accessing second indirection at %" PRIu32, page);
 		r = loadPath(inode->d_indir, page, doubl, 1, addrPos);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load second indirection!");
@@ -84,6 +88,7 @@ Result PageAddressCache::getPage(PageNo page, Addr *addr){
 	page -= std::pow(addrsPerPage, 2);
 
 	if(page < std::pow(addrsPerPage, 3)){
+		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Accessing third indirection at %" PRIu32, page);
 		r = loadPath(inode->t_indir, page, tripl, 2, addrPos);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load third indirection!");
@@ -103,6 +108,9 @@ Result PageAddressCache::setPage(PageNo page, Addr  addr){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
 		return Result::bug;
 	}
+
+	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "SetPage at %" PRIu32, page);
+
 	if(page < directAddrCount){
 		inode->direct[page] = addr;
 		return Result::ok;
@@ -176,92 +184,8 @@ Result PageAddressCache::commit(){
 		return r;
 	}
 
-	return Result::ok;
+	return dev->tree.updateExistingInode(inode);
 }
-
-/*
-Result PageAddressCache::getPage(Inode *inode, Addr* &pageList, unsigned int fromPage,
-		unsigned int toPage){
-	//TODO: Read only fromPage-ToPage and not 0-ToPage
-	(void) fromPage;
-	pageList = inode->direct;
-	if(toPage >= 11){
-		if(toPage >= maxAddrs){
-			//Would use second indirection layer, not yet implemented.
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "File would use %u pages, we currently support only %u", toPage, maxAddrs);
-			return dev->lasterr = Result::nimpl;
-		}
-		unsigned filePages = inode->size ? inode->size / dataBytesPerPage : 0;
-		if(inode->size % dataBytesPerPage != 0)
-			filePages++;
-
-		//Would use first indirection Layer
-		PAFFS_DBG_S(PAFFS_TRACE_WRITE, "read uses first indirection layer");
-		pageList = pageListBuffer;
-		memcpy(pageList, inode->direct, 11 * sizeof(Addr));
-		memset(&pageList[11], 0, (maxAddrs - 11) * sizeof(Addr));
-		//Check if data from first indirection is available
-		if(inode->indir != 0){
-			if(filePages > maxAddrs){
-				PAFFS_DBG(PAFFS_TRACE_BUG, "filesize is bigger than it could have been written");
-				return Result::bug;
-			}
-			if(static_cast<int>(filePages) - 11 < 0){
-				PAFFS_DBG(PAFFS_TRACE_ERROR, "inode->indir != 0, but size"
-					" is too small for indirection layer (%u Byte, "
-					"so %d pages)", inode->size,
-					filePages);
-				return Result::bug;
-			}
-			PAFFS_DBG_S(PAFFS_TRACE_WRITE, "Reading additional %u addresses "
-					"for indirection",filePages - 11);
-			PageAbs addr = getPageNumber(inode->indir, dev);
-			Result res = dev->driver->readPage(addr, &pageList[11], (filePages - 11) * sizeof(Addr));
-			if(res != Result::ok){
-				if(res == Result::biterrorCorrected){
-					//TODO rewrite PageList or mark it as dirty
-					PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Corrected biterror, but we do not yet "
-						"write corrected version back to flash.");
-				}else{
-					PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load existing addresses"
-						" of first indirection layer");
-					return res;
-				}
-			}
-		}
-	}
-	return Result::ok;
-}
-
-//todo: Change this function to not need inode, and not distinguish between direct and indirect. Implement in new cache.
-Result PageAddressCache::writePageList(Inode *inode, Addr& page, Addr* &pageList,
-		unsigned int fromPage, unsigned int toPage){
-	(void) fromPage;
-	(void) toPage;
-	if(pageList != inode->direct){
-		memcpy(inode->direct, pageList, 11 * sizeof(Addr));
-		unsigned filePages = inode->size ? inode->size / dataBytesPerPage + 1 : 0;
-		if(filePages <= 11){
-			//Pages have been deleted
-			Result r = dev->sumCache.setPageStatus(extractLogicalArea(page), extractPage(page), SummaryEntry::dirty);
-			if(r != Result::ok){
-				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write AreaSummary for area %d,"
-						" so no invalidation of data!", extractLogicalArea(page));
-			}
-			page = 0;
-		}
-		unsigned int bw;
-		uint32_t reservedPages = 0;
-		Result r = writePageData(0, 0, 0, filePages - 11 * sizeof(Addr),
-				reinterpret_cast<char*>(&pageList[11]),
-				&page, &bw, filePages - 11 * sizeof(Addr), reservedPages);
-		if(r != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write indirection addresses");
-			return r;
-		}
-	}
-	return Result::ok;
-} */
 
 Result PageAddressCache::loadPath(Addr& anchor, PageNo pageOffs, AddrListCacheElem* start,
 		unsigned char depth, PageNo &addrPos){
@@ -385,11 +309,14 @@ Result PageAddressCache::writeCacheElem(Addr &to, AddrListCacheElem &elem){
 
 Result PageAddressCache::readAddrList (Addr from, Addr list[addrsPerPage]){
 	if(from == 0){
-		//Not yet used
+		//This data was not used yet
+		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "load empty CacheElem (new)");
 		memset(list, 0, addrsPerPage * sizeof(Addr));
 		return Result::ok;
 	}
-	Result res = dev->driver->readPage(from,list, addrsPerPage * sizeof(Addr));
+	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "loadCacheElem from %"
+			PRIu32 ":%" PRIu32, extractLogicalArea(from), extractPage(from));
+	Result res = dev->driver->readPage(getPageNumber(from, dev),list, addrsPerPage * sizeof(Addr));
 	if(res != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load existing addresses"
 			" of first indirection layer");
@@ -431,10 +358,10 @@ Result PageAddressCache::writeAddrList(Addr &to , Addr list[addrsPerPage]){
 	unsigned int firstFreePage = 0;
 	if(dev->areaMgmt.findFirstFreePage(&firstFreePage,
 			dev->activeArea[AreaType::data]) == Result::nosp){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::index]);
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::data]);
 		return dev->lasterr = Result::bug;
 	}
-	to = combineAddress(dev->activeArea[AreaType::index], firstFreePage);
+	to = combineAddress(dev->activeArea[AreaType::data], firstFreePage);
 
 	//Mark Page as used
 	r = dev->sumCache.setPageStatus(dev->activeArea[AreaType::data],
