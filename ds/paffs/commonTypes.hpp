@@ -104,6 +104,8 @@ enum class InodeType : uint8_t{
 	lnk
 };
 
+static constexpr uint16_t directAddrCount = 11;
+
 struct Inode{
 	InodeNo no;
 	InodeType type;//:2;
@@ -112,7 +114,7 @@ struct Inode{
 	FileSize size;			//Space on filesystem needed in bytes
 	uint64_t crea;
 	uint64_t mod;
-	Addr direct[11];
+	Addr direct[directAddrCount];
 	Addr indir;
 	Addr d_indir;
 	Addr t_indir;

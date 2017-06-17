@@ -642,7 +642,8 @@ Result TreeCache::getRootNodeFromCache(TreeCacheNode** tcn){
 
 	r = dev->dataIO.readTreeNode(addr, &cache[cache_root].raw);
 	if(r == Result::biterrorCorrected){
-		//Make shure it is going to be rewritten to flash
+		//Make sure it is going to be rewritten to flash
+		PAFFS_DBG(PAFFS_TRACE_INFO, "Corrected biterror in TreeNode");
 		cache[cache_root].dirty = true;
 		return Result::ok;
 	}

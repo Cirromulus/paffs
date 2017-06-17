@@ -153,6 +153,16 @@ Result DataIO::writeTreeNode(TreeNode* node){
 		return Result::bug;
 	}
 
+	dev->lasterr = Result::ok;
+	dev->activeArea[AreaType::index] = dev->areaMgmt.findWritableArea(AreaType::index);
+	if(dev->lasterr != Result::ok){
+		return dev->lasterr;
+	}
+	if(dev->activeArea[AreaType::index] == 0){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "WRITE TREE NODE findWritableArea returned 0");
+		return Result::bug;
+	}
+
 	if(node->self != 0){
 		//We have to invalidate former position first
 		Result r = dev->sumCache.setPageStatus(extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);
@@ -160,18 +170,6 @@ Result DataIO::writeTreeNode(TreeNode* node){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate old Page! Ignoring Errors to continue...");
 			//return r;
 		}
-	}
-
-	dev->lasterr = Result::ok;
-	dev->activeArea[AreaType::index] = dev->areaMgmt.findWritableArea(AreaType::index);
-	if(dev->lasterr != Result::ok){
-		//TODO: Reset former pagestatus, so that FS will be in a safe state
-		return dev->lasterr;
-	}
-
-	if(dev->activeArea[AreaType::index] == 0){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "WRITE TREE NODE findWritableArea returned 0");
-		return Result::bug;
 	}
 
 	unsigned int firstFreePage = 0;
@@ -191,8 +189,10 @@ Result DataIO::writeTreeNode(TreeNode* node){
 
 
 	r = dev->driver->writePage(getPageNumber(node->self, dev), node, sizeof(TreeNode));
-	if(r != Result::ok)
+	if(r != Result::ok){
+		//TODO: Revert Changes to PageStatus
 		return r;
+	}
 
 	r = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::index], AreaType::index);
 	if(r != Result::ok)
