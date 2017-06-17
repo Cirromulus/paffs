@@ -93,12 +93,14 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 		if(dev->areaMap[area].type == AreaType::unset){
 			dev->areaMap[area].type = areaType;
 			initArea(area);
+			PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found unset Area %u for %s", area, areaNames[areaType]);
 			return area;
 		}
 	}
 
  	Result r = gc.collectGarbage(areaType);
 	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "GarbageCollection did not free an Area");
 		dev->lasterr = r;
 		return 0;
 	}
@@ -109,7 +111,10 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 		return 0;
 	}
 
-	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != AreaStatus::closed){
+	if(dev->activeArea[areaType] != 0 &&
+			dev->areaMap[dev->activeArea[areaType]].status != AreaStatus::closed){
+		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found GC'ed Area %u for %s",
+				dev->activeArea[areaType], areaNames[areaType]);
 		return dev->activeArea[areaType];
 	}
 
@@ -133,28 +138,13 @@ Result AreaManagement::findFirstFreePage(unsigned int* p_out, unsigned int area)
 }
 
 Result AreaManagement::manageActiveAreaFull(AreaPos *area, AreaType areaType){
-	Result r;
-	if(traceMask & PAFFS_TRACE_VERIFY_AS){
-		for(unsigned int i = 0; i < dataPagesPerArea; i++){
-			if(dev->sumCache.getPageStatus(*area, i,&r) > SummaryEntry::dirty)
-				PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %u contains invalid Entries (%s)!", *area, resultMsg[static_cast<int>(r)]);
-		}
-	}
-
-	bool isFull = true;
-	for(unsigned int i = 0; i < dataPagesPerArea; i++){
-		if(dev->sumCache.getPageStatus(*area, i,&r) == SummaryEntry::free) {
-			isFull = false;
-			break;
-		}
-		if(r != Result::ok)
-			return r;
-	}
-
-	if(isFull){
+	unsigned int ffp;
+	if(findFirstFreePage(&ffp, *area) != Result::ok){
 		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Area %u (Type %s) full.", *area, areaNames[areaType]);
 		//Current Area is full!
 		closeArea(*area);
+	}else{
+		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Area %u still page %u free.", *area, ffp);
 	}
 
 	return Result::ok;

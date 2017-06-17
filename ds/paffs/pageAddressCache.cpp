@@ -272,7 +272,8 @@ Result PageAddressCache::commitElem(AddrListCacheElem &parent, AddrListCacheElem
 	if(!elem.dirty){
 		return Result::ok;
 	}
-
+	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Committing CacheElem referenced by "
+			"parent:%" PRIu32, elem.positionInParent);
 	Result r = writeCacheElem(parent.cache[elem.positionInParent], elem);
 	if(r != Result::ok){
 		return r;
@@ -340,7 +341,7 @@ Result PageAddressCache::writeAddrList(Addr &to , Addr list[addrsPerPage]){
 		return dev->lasterr;
 	}
 	if(dev->activeArea[AreaType::data] == 0){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "WRITE TREE NODE findWritableArea returned 0");
+		PAFFS_DBG(PAFFS_TRACE_BUG, "findWritableArea returned 0");
 		return Result::bug;
 	}
 	dev->lasterr = r;
@@ -371,16 +372,16 @@ Result PageAddressCache::writeAddrList(Addr &to , Addr list[addrsPerPage]){
 		return r;
 	}
 
+	r = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::data], AreaType::data);
+	if(r != Result::ok)
+		return r;
+
 	r = dev->driver->writePage(getPageNumber(to, dev), reinterpret_cast<char*>(list),
 			addrsPerPage * sizeof(Addr));
 	if(r != Result::ok){
 		//TODO: Revert Changes to PageStatus
 		return r;
 	}
-
-	r = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::data], AreaType::data);
-	if(r != Result::ok)
-		return r;
 
 	return Result::ok;
 }

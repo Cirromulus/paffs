@@ -285,6 +285,23 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 			dev->areaMgmt.initArea(dev->activeArea[AreaType::data]);
 		}
 
+		//find new page to write to
+		unsigned int firstFreePage = 0;
+		if(dev->areaMgmt.findFirstFreePage(&firstFreePage, dev->activeArea[AreaType::data]) == Result::nosp){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::data]);
+			return Result::bug;
+		}
+		Addr pageAddress = combineAddress(dev->activeArea[AreaType::data], firstFreePage);
+		res = dev->sumCache.setPageStatus(dev->activeArea[AreaType::data], firstFreePage, SummaryEntry::used);
+		if(res != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[static_cast<int>(res)]);
+		}
+		//this may have filled the flash
+		res = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::data], AreaType::data);
+		if(res != Result::ok)
+			return res;
+
+
 		//Prepare buffer and calculate bytes to write
 		char* buf = &const_cast<char*>(data)[*bytes_written];
 		unsigned int btw = bytes - *bytes_written;
@@ -364,17 +381,6 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 			reservedPages ++;
 		}
 
-		//find new page to write to
-		unsigned int firstFreePage = 0;
-		if(dev->areaMgmt.findFirstFreePage(&firstFreePage, dev->activeArea[AreaType::data]) == Result::nosp){
-			PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::data]);
-			return Result::bug;
-		}
-		Addr pageAddress = combineAddress(dev->activeArea[AreaType::data], firstFreePage);
-		res = dev->sumCache.setPageStatus(dev->activeArea[AreaType::data], firstFreePage, SummaryEntry::used);
-		if(res != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[static_cast<int>(res)]);
-		}
 		ac.setPage(page+pageFrom, pageAddress);
 		res = dev->driver->writePage(getPageNumber(pageAddress, dev), buf, btw);
 
@@ -386,11 +392,6 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "ERR: write returned FAIL at phy.P: %llu", static_cast<long long unsigned int> (getPageNumber(pageAddress, dev)));
 			return Result::fail;
 		}
-
-		res = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::data], AreaType::data);
-		if(res != Result::ok)
-			return res;
-
 	}
 	return Result::ok;
 }
