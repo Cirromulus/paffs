@@ -53,7 +53,7 @@ public:
 	//ONLY FOR DEBUG
 	Device* getDevice();
 	void setTraceMask(unsigned int mask);
-
+	unsigned int getTraceMask();
 };
 }
 

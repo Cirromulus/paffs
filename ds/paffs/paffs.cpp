@@ -93,12 +93,9 @@ void Paffs::printCacheSizes(){
 
 	PAFFS_DBG_S(PAFFS_TRACE_INFO,
 			"Size of Address: %zu. Addresses per Page: %u\n"
-			"\tBufferable Addresses in DataIO: %" PRIu32 ",\n"
-			"\treducing the maximal filesize to %" PRIu32 " byte.\n"
 			"\tOverall AddrBuffer Size: %zu Byte",
 			sizeof(Addr), addrsPerPage,
-			maxAddrs, dataBytesPerPage * maxAddrs,
-			sizeof(Addr) * maxAddrs
+			sizeof(AddrListCacheElem)
 	);
 
 	PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------------------\n");
@@ -284,6 +281,10 @@ Device* Paffs::getDevice(){
 
 void Paffs::setTraceMask(unsigned int mask){
 	traceMask = mask;
+}
+
+unsigned int Paffs::getTraceMask(){
+	return traceMask;
 }
 
 }

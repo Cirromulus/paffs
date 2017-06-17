@@ -42,10 +42,14 @@ void PageAddressCache::setTargetInode(Inode* node){
 		}
 		singl.active = false;
 	}
-
+	inode = node;
 }
 
 Result PageAddressCache::getPage(PageNo page, Addr *addr){
+	if(inode == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
+		return Result::bug;
+	}
 	if(page < directAddrCount){
 		*addr = inode->direct[page];
 		return Result::ok;
@@ -95,6 +99,10 @@ Result PageAddressCache::getPage(PageNo page, Addr *addr){
 }
 
 Result PageAddressCache::setPage(PageNo page, Addr  addr){
+	if(inode == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
+		return Result::bug;
+	}
 	if(page < directAddrCount){
 		inode->direct[page] = addr;
 		return Result::ok;
@@ -144,8 +152,12 @@ Result PageAddressCache::setPage(PageNo page, Addr  addr){
 }
 
 Result PageAddressCache::commit(){
-	Result r;
+	if(inode == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
+		return Result::bug;
+	}
 
+	Result r;
 	r = commitPath(inode->indir, &singl, 0);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit first indirection!");
@@ -372,6 +384,11 @@ Result PageAddressCache::writeCacheElem(Addr &to, AddrListCacheElem &elem){
 }
 
 Result PageAddressCache::readAddrList (Addr from, Addr list[addrsPerPage]){
+	if(from == 0){
+		//Not yet used
+		memset(list, 0, addrsPerPage * sizeof(Addr));
+		return Result::ok;
+	}
 	Result res = dev->driver->readPage(from,list, addrsPerPage * sizeof(Addr));
 	if(res != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load existing addresses"

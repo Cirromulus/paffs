@@ -61,7 +61,7 @@ TEST_F(FileTest, seekReadWrite){
 
 TEST_F(FileTest, createReadWriteDeleteFile){
 	//operate on indirection layer
-	unsigned const int filesize = (paffs::maxAddrs - 1)*paffs::dataBytesPerPage + 50;
+	unsigned const int filesize = (paffs::addrsPerPage * 2)*paffs::dataBytesPerPage + 50;
 	char t[] = ".                         Text";	//30 chars
 	char tl[filesize];
 	char buf[filesize];
@@ -75,6 +75,8 @@ TEST_F(FileTest, createReadWriteDeleteFile){
 	//fill Rest
 	memset(&tl[i * strlen(t)], 0xAA, filesize - i * strlen(t));
 
+	fs.setTraceMask(fs.getTraceMask() | PAFFS_TRACE_PACACHE);
+
 	paffs::Obj *fil = fs.open("/file", paffs::FW | paffs::FC);
 	ASSERT_NE(fil, nullptr);
 
@@ -83,7 +85,6 @@ TEST_F(FileTest, createReadWriteDeleteFile){
 	r = fs.write(fil, tl, filesize, &bytes);
 	EXPECT_EQ(bytes, filesize);
 	ASSERT_EQ(r, paffs::Result::ok);
-
 
 	r = fs.getObjInfo("/file", &info);
 	ASSERT_EQ(r, paffs::Result::ok);
@@ -245,15 +246,13 @@ TEST_F(FileTest, maxFilesize){
 	}
 	if(i-wordsize < blocksize)
 		memcpy(&block[i-wordsize], txt,  blocksize - (i - wordsize));
-	//block[blocksize-1] = 0; No Nullpointer needed
 
 	fil = fs.open("/file", paffs::FW | paffs::FC);
 	if(fs.getLastErr() != paffs::Result::ok)
 		printf("%s!\n", paffs::err_msg(fs.getLastErr()));
 	ASSERT_NE(fil, nullptr);
 	i = 0;
-	//Just for a green screen, we will limit this write until a pageBuffer is implemented.
-	while(true && i < paffs::maxAddrs * paffs::dataBytesPerPage){
+	while(true){
 		r = fs.write(fil, block, blocksize, &bw);
 		if(r == paffs::Result::nosp)
 			break;

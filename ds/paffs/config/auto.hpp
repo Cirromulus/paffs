@@ -12,7 +12,6 @@ namespace paffs{
 	static constexpr uint16_t superChainElems = jumpPadNo + 2;
 	//Address buffer for dataIO, currently only first indirection is implemented
 	static constexpr uint16_t addrsPerPage = dataBytesPerPage / sizeof(Addr);
-	static constexpr uint32_t maxAddrs = 11 + addrsPerPage;
 
 
 }
