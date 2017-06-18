@@ -92,10 +92,10 @@ void Paffs::printCacheSizes(){
 	);
 
 	PAFFS_DBG_S(PAFFS_TRACE_INFO,
-			"Size of Address: %zu. Addresses per Page: %u\n"
+			"Size of Address: %zu. Addresses per Page: %u. AddrListCacheElem: %zu Bytes.\n"
 			"\tOverall AddrBuffer Size: %zu Byte",
-			sizeof(Addr), addrsPerPage,
-			sizeof(AddrListCacheElem)
+			sizeof(Addr), addrsPerPage, sizeof(AddrListCacheElem),
+			sizeof(PageAddressCache)
 	);
 
 	PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------------------\n");

@@ -75,8 +75,6 @@ TEST_F(FileTest, createReadWriteDeleteFile){
 	//fill Rest
 	memset(&tl[i * strlen(t)], 0xAA, filesize - i * strlen(t));
 
-	//fs.setTraceMask(fs.getTraceMask() | PAFFS_TRACE_PACACHE | PAFFS_TRACE_AREA);
-
 	paffs::Obj *fil = fs.open("/file", paffs::FW | paffs::FC);
 	ASSERT_NE(fil, nullptr);
 

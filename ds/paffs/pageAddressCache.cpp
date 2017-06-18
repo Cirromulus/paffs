@@ -32,17 +32,28 @@ Addr AddrListCacheElem::getAddr(PageNo pos){
 
 
 
-void PageAddressCache::setTargetInode(Inode* node){
-	if(node != inode){
-		for(AddrListCacheElem& elem : tripl){
-			elem.active = false;
-		}
-		for(AddrListCacheElem& elem : doubl){
-			elem.active = false;
-		}
-		singl.active = false;
+Result PageAddressCache::setTargetInode(Inode* node){
+	if(node == inode){
+		return Result::ok;
 	}
+	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Set new target inode");
+	if(isDirty()){
+		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Target Inode differs, committing old Inode");
+		Result r = commit();
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit old Inode, aborting");
+			return r;
+		}
+	}
+	for(AddrListCacheElem& elem : tripl){
+		elem.active = false;
+	}
+	for(AddrListCacheElem& elem : doubl){
+		elem.active = false;
+	}
+	singl.active = false;
 	inode = node;
+	return Result::ok;
 }
 
 Result PageAddressCache::getPage(PageNo page, Addr *addr){
@@ -103,13 +114,14 @@ Result PageAddressCache::getPage(PageNo page, Addr *addr){
 	return Result::toobig;
 }
 
-Result PageAddressCache::setPage(PageNo page, Addr  addr){
+Result PageAddressCache::setPage(PageNo page, Addr addr){
 	if(inode == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
 		return Result::bug;
 	}
 
-	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "SetPage at %" PRIu32, page);
+	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "SetPage to %" PRIu32 ":%" PRIu32 " at %" PRIu32,
+			extractLogicalArea(addr), extractPage(addr), page);
 
 	if(page < directAddrCount){
 		inode->direct[page] = addr;
@@ -159,6 +171,58 @@ Result PageAddressCache::setPage(PageNo page, Addr  addr){
 	return Result::toobig;
 }
 
+Result PageAddressCache::deletePage(PageNo pageFrom, PageNo pageTo){
+	if(inode == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete Page of null inode");
+		return Result::bug;
+	}
+	if(pageFrom > pageTo){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "pageFrom bigger than pageTo! (%u > %u)", pageFrom, pageTo);
+		return Result::bug;
+	}
+	if(pageTo > inode->size / dataBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "pageTo bigger than filesize! (%u > %u)", pageTo, inode->size / dataBytesPerPage);
+		return Result::bug;
+	}
+
+	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "delete Page %u-%u", pageFrom, pageTo);
+
+	if(pageFrom < directAddrCount){
+		//Limits the write to direct array
+		unsigned char count = pageTo >= directAddrCount ?
+				directAddrCount - pageFrom : pageTo - pageFrom + 1;
+		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "overwriting %u pages in direct", count);
+		memset(&inode->direct[pageFrom], 0, count * sizeof(Addr));
+	}
+
+	if(pageTo < directAddrCount)
+		return Result::ok;
+	pageFrom -= pageFrom < directAddrCount ? 0 : directAddrCount;
+	pageTo   -= directAddrCount;
+
+	Result r;
+	if(pageFrom < addrsPerPage){
+		//First Indirection
+		PageNo limitedPageTo = pageTo > addrsPerPage - 1 ? addrsPerPage - 1 : addrsPerPage;
+		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Limiting pageTo to %" PRIu32 " for first indir", limitedPageTo);
+		r = deletePath(inode->indir, pageFrom, limitedPageTo, &singl, 0);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete in first indirection!");
+			return r;
+		}
+	}
+
+	if(pageTo < std::pow(directAddrCount, 2))
+		return Result::ok;
+	pageFrom -= pageFrom < std::pow(directAddrCount, 2) ? 0 : std::pow(directAddrCount, 2);
+	pageTo   -= std::pow(directAddrCount, 2);
+
+	//Second layer
+	PAFFS_DBG(PAFFS_TRACE_ERROR, "Deleting second layer not implemented.");
+
+	return Result::nimpl;
+}
+
 Result PageAddressCache::commit(){
 	if(inode == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
@@ -185,6 +249,19 @@ Result PageAddressCache::commit(){
 	}
 
 	return dev->tree.updateExistingInode(inode);
+}
+
+bool PageAddressCache::isDirty(){
+	if(singl.dirty){
+		return true;
+	}
+	if(doubl[0].dirty || doubl[1].dirty){
+		return true;
+	}
+	if(tripl[0].dirty || tripl[1].dirty || tripl[2].dirty){
+		return true;
+	}
+	return false;
 }
 
 Result PageAddressCache::loadPath(Addr& anchor, PageNo pageOffs, AddrListCacheElem* start,
@@ -237,6 +314,77 @@ Result PageAddressCache::loadPath(Addr& anchor, PageNo pageOffs, AddrListCacheEl
 	}
 	addrPos = path[depth];
 	return Result::ok;
+}
+
+Result PageAddressCache::deletePath(Addr& anchor, PageNo pageFrom, PageNo pageTo,
+		AddrListCacheElem* start, unsigned char depth){
+	Result r;
+	PageNo fromPath[3] = {0};
+	PageNo   toPath[3] = {0};
+	for(unsigned int i = 0; i <= depth; i++){
+		fromPath[depth - i] = static_cast<unsigned int>(
+				pageFrom / std::pow(addrsPerPage, i))
+				% addrsPerPage;
+		if(fromPath[depth - i] >= addrsPerPage){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "Miscalculated frompath for page %" PRIu32
+					" (was %u, should < %u)", pageFrom, fromPath[depth - i], addrsPerPage);
+			return Result::bug;
+		}
+		toPath[depth - i] = static_cast<unsigned int>(
+				pageTo / std::pow(addrsPerPage, i))
+				% addrsPerPage;
+		if(toPath[depth - i] >= addrsPerPage){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "Miscalculated topath for page %" PRIu32
+					" (was %u, should < %u)", pageTo, toPath[depth - i], addrsPerPage);
+			return Result::bug;
+		}
+	}
+
+	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Resulting from path: %" PRIu32 ":%" PRIu32 ":%" PRIu32,
+			fromPath[0], fromPath[1], fromPath[2]);
+	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Resulting to   path: %" PRIu32 ":%" PRIu32 ":%" PRIu32,
+			toPath[0], toPath[1], toPath[2]);
+
+
+	/**
+	if(fromPath[0] == 0 && toPath[0] >= addrsPerPage - 1){
+		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Delete spans over complete depth 0");
+		anchor = 0;
+		//just shut everythin below this
+		start[0].active = false;
+		return Result::ok;
+	}
+	if(!start[0].active){
+		r = loadCacheElem(anchor, start[0]);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read elem 0 in first depth!");
+			return r;
+		}
+	}
+
+	for(unsigned int i = 1; i <= depth; i++){
+		if(start[i].active && start[i].positionInParent != path[i-1]){
+			//We would override existing CacheElem
+			r = commitElem(start[i-1], start[i]);
+			if(r != Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit elem depth %d"
+						" at %" PRIu32 ":%" PRIu32 ":%" PRIu32, i, path[0], path[1], path[2]);
+				return r;
+			}
+		}
+
+		if(!start[i].active || start[i].positionInParent != path[i-1]){
+			//Load if it was inactive or has just been committed
+			r = loadCacheElem(start[i-1].getAddr(path[i-1]), start[i]);
+			if(r != Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read elem depth %d"
+						" at %" PRIu32 ":%" PRIu32 ":%" PRIu32, i, path[0], path[1], path[2]);
+				return r;
+			}
+			start[i].positionInParent = path[i-1];
+		}
+	}**/
+	return Result::nimpl;
 }
 
 Result PageAddressCache::commitPath(Addr& anchor, AddrListCacheElem* path,
@@ -309,11 +457,17 @@ Result PageAddressCache::writeCacheElem(Addr &to, AddrListCacheElem &elem){
 }
 
 Result PageAddressCache::readAddrList (Addr from, Addr list[addrsPerPage]){
-	if(from == 0){
+	if(from == 0 || from == combineAddress(0, unusedMarker)){
 		//This data was not used yet
 		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "load empty CacheElem (new)");
 		memset(list, 0, addrsPerPage * sizeof(Addr));
 		return Result::ok;
+	}
+	if(dev->areaMap[extractLogicalArea(from)].type != AreaType::data){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "READ ADDR LIST operation of invalid area at %d:%d",\
+				extractLogicalArea(from),
+				extractPage(from));
+		return Result::bug;
 	}
 	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "loadCacheElem from %"
 			PRIu32 ":%" PRIu32, extractLogicalArea(from), extractPage(from));

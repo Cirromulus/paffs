@@ -30,8 +30,22 @@ Result DataIO::writeInodeData(Inode* inode,
 	unsigned int pageFrom = offs/dataBytesPerPage;
 	unsigned int toPage = (offs + bytes - 1) / dataBytesPerPage;
 
-	Result res;
-	pac.setTargetInode(inode);
+	Result res = pac.setTargetInode(inode);
+	if(res != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "could not set new Inode!");
+		return res;
+	}
+
+	if(pageFrom > inode->size / dataBytesPerPage){
+		//We are skipping unused pages
+		PageOffs lastUsedPage = inode->size / dataBytesPerPage;
+		if(inode->size % dataBytesPerPage > 0)
+			lastUsedPage++;
+
+		for(unsigned i = lastUsedPage; i < pageFrom; i++){
+			pac.setPage(i, combineAddress(0, unusedMarker));
+		}
+	}
 
 	unsigned pageoffs = offs % dataBytesPerPage;
 	res = writePageData(pageFrom, toPage, pageoffs, bytes, data,
@@ -44,7 +58,7 @@ Result DataIO::writeInodeData(Inode* inode,
 	if(inode->size < *bytes_written + offs)
 		inode->size = *bytes_written + offs;
 
-	return pac.commit();
+	return Result::ok;
 }
 
 Result DataIO::readInodeData(Inode* inode,
@@ -65,7 +79,11 @@ Result DataIO::readInodeData(Inode* inode,
 		bytes = inode->size - offs;
 	}
 
-	pac.setTargetInode(inode);
+	Result res = pac.setTargetInode(inode);
+	if(res != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "could not set new Inode!");
+		return res;
+	}
 
 	return readPageData(pageFrom, toPage, offs % dataBytesPerPage, bytes, data, pac, bytes_read);
 }
@@ -81,21 +99,27 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 		return Result::einval;
 	}
 
-	pac.setTargetInode(inode);
+	Result r = pac.setTargetInode(inode);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "could not set new Inode!");
+		return r;
+	}
 
-	inode->size = offs;
-
-	if(inode->reservedPages == 0)
+	if(inode->reservedPages == 0){
+		inode->size = offs;
 		return Result::ok;
+	}
 
-	if(inode->size >= (inode->reservedPages - 1) * dataBytesPerPage)
+	if(inode->size >= (inode->reservedPages - 1) * dataBytesPerPage){
 		//doesn't leave a whole page blank
+		inode->size = offs;
 		return Result::ok;
+	}
 
 
 	for(unsigned int page = 0; page <= toPage - pageFrom; page++){
 		Addr pageAddr;
-		Result r = pac.getPage(page+pageFrom, &pageAddr);
+		r = pac.getPage(page+pageFrom, &pageAddr);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Coud not get Page %u for read" PRIu32, page+pageFrom);
 			return r;
@@ -131,14 +155,15 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 		}
 
 		inode->reservedPages--;
-		r = pac.setPage(page+pageFrom, 0);
-		if(r != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set page %u to zero", page+pageFrom);
-			return r;
-		}
 	}
 
-	return pac.commit();
+	r = pac.deletePage(pageFrom, toPage);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete page %u to %u", pageFrom, toPage);
+		return r;
+	}
+	inode->size = offs;
+	return Result::ok;
 }
 
 //Does not change addresses in parent Nodes

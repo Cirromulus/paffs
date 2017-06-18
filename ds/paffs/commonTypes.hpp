@@ -118,6 +118,7 @@ struct Inode{
 	Addr indir;
 	Addr d_indir;
 	Addr t_indir;
+	//TODO: Add pointer to a PAC if cached
 };
 
 //could be later used for caching file paths
