@@ -20,7 +20,10 @@ namespace paffs{
 Result DataIO::writeInodeData(Inode* inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_written,
 					const char* data){
-
+	if(dev->readOnly){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried writing InodeData in readOnly mode!");
+		return Result::bug;
+	}
 	if(offs+bytes == 0){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Write size 0! Bug?");
 		return Result::einval;
@@ -92,6 +95,10 @@ Result DataIO::readInodeData(Inode* inode,
 
 //inode->size and inode->reservedSize is altered.
 Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
+	if(dev->readOnly){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried deleting InodeData in readOnly mode!");
+		return Result::bug;
+	}
 	//TODO: This calculation contains errors in border cases
 	unsigned int pageFrom = offs/dataBytesPerPage;
 	unsigned int toPage = (inode->size - 1) / dataBytesPerPage;
@@ -170,6 +177,10 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 
 //Does not change addresses in parent Nodes
 Result DataIO::writeTreeNode(TreeNode* node){
+	if(dev->readOnly){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried writing TreeNode in readOnly mode!");
+		return Result::bug;
+	}
 	if(node == NULL){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: TreeNode NULL");
 				return Result::bug;
@@ -279,6 +290,10 @@ Result DataIO::readTreeNode(Addr addr, TreeNode* node){
 }
 
 Result DataIO::deleteTreeNode(TreeNode* node){
+	if(dev->readOnly){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried deleting something in readOnly mode!");
+		return Result::bug;
+	}
 	return dev->sumCache.setPageStatus(extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);
 }
 
@@ -286,6 +301,10 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 		unsigned bytes, const char* data, PageAddressCache &ac,
 		unsigned* bytes_written, FileSize filesize, uint32_t &reservedPages){
 	//Will be set to zero after offset is applied
+	if(dev->readOnly){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried writing something in readOnly mode!");
+		return Result::bug;
+	}
 	if(offs > dataBytesPerPage){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried applying an offset %d > %d", offs, dataBytesPerPage);
 		return Result::bug;

@@ -30,7 +30,6 @@ struct AnchorEntry{
 	AreaPos jumpPadArea;	//direct. this needs to be on second place after Serial no
 	Param param;
 	uint8_t fsVersion;
-	//Todo: Still space free
 };
 
 struct JumpPadEntry{
@@ -44,6 +43,7 @@ struct SuperIndex{
 	AreaPos logPrev;		//if != 0, the logical area prev is now free, while this current is not (obviously)
 	Addr rootNode;
 	Area* areaMap;
+	AreaPos usedAreas;
 	AreaPos asPositions[2];
 	SummaryEntry* areaSummary[2];
 };
@@ -62,7 +62,7 @@ public:
 
 	//returns PAFFS_NF if no superindex is in flash
 	Result readSuperIndex(SuperIndex* index);
-	Result commitSuperIndex(SuperIndex* index, bool createNew = false);
+	Result commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew = false);
 	void printSuperIndex(SuperIndex* ind);
 	void setTestmode(bool t);
 private:

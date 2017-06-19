@@ -37,6 +37,7 @@ void Superblock::printSuperIndex(SuperIndex* ind){
 	printf("Rootnode addr.: \t%u:%u\n",
 			extractLogicalArea(ind->rootNode),
 			extractPage(ind->rootNode));
+	printf("Used Areas: %" PRIu32 "\n", ind->usedAreas);
 	printf("areaMap:\n");
 	AreaPos asOffs = 0;
 	for(AreaPos i = 0; i < 8; i ++){
@@ -96,7 +97,7 @@ Result Superblock::fillPathWithFirstSuperblockAreas(Addr directPath[superChainEl
 	return Result::ok;
 }
 
-Result Superblock::commitSuperIndex(SuperIndex *newIndex, bool createNew){
+Result Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew){
 	unsigned int needed_bytes = sizeof(Addr) + sizeof(AreaPos) +
 				areasNo * sizeof(Area)
 				+ 2 * dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
@@ -112,6 +113,12 @@ Result Superblock::commitSuperIndex(SuperIndex *newIndex, bool createNew){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not init superchain");
 			return r;
 		}
+	}
+
+	if(!asDirty && !rootnode_dirty){
+		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Skipping write of superIndex "
+				"because nothing is dirty");
+		return Result::ok;
 	}
 
 	//Get index of last chain elem (SuperEntry) and increase
@@ -169,7 +176,11 @@ Result Superblock::commitSuperIndex(SuperIndex *newIndex, bool createNew){
 			return Result::ok;
 		}
 	}
-	AnchorEntry a = {superChainIndexes[0]+1, 0, directAreas[1], stdParam, version};
+	AnchorEntry a = {
+			.no = superChainIndexes[0]+1,
+			.logPrev = 0, .jumpPadArea = directAreas[1],
+			.param = stdParam, .fsVersion = version,
+	};
 	lastArea = directAreas[1];
 	r = insertNewAnchorEntry(logicalPath[0], &directAreas[0], &a);
 	if(r != Result::ok){
@@ -216,6 +227,10 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 		return Result::fail;
 	}else{
 		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Formatting infos are matching with our own");
+	}
+	if(e.fsVersion != version){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "FS Version differs with our own!");
+		return Result::fail;
 	}
 
 
@@ -375,6 +390,10 @@ Result Superblock::getPathToMostRecentSuperIndex(Addr path[superChainElems],
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find a Superpage in Area %" PRIu32,
 					extractLogicalArea(path[i]));
 			return r;
+		}
+		if(i > 0 && extractLogicalArea(path[i]) == 0){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "A non-anchor chain elem is located in Area 0!");
+			return Result::fail;
 		}
 		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found Chain Elem %d at phys. area "
 				"%" PRIu32 " with index %" PRIu32,
@@ -539,7 +558,10 @@ Result Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos *directArea, Jump
 				*directArea);
 		return Result::bug;
 	}
-
+	if(*directArea == 0){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write not-anchor chain Elem to area 0!");
+		return Result::bug;
+	}
 	if(dev->areaMap[extractLogicalArea(logPrev)].type != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
 		return Result::bug;

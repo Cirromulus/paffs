@@ -30,8 +30,10 @@ public:
 	Driver *driver;
 	AreaPos activeArea[AreaType::no];
 	Area areaMap[areasNo];
+	AreaPos usedAreas;
 	Result lasterr;
 	bool mounted;
+	bool readOnly;
 
 	Btree tree;
 	SummaryCache sumCache;
@@ -46,8 +48,8 @@ public:
 	Device(Driver* driver);
 	~Device();
 
-	Result format(bool complete=false);
-	Result mnt();
+	Result format(bool complete = false);
+	Result mnt(bool readOnlyMode = false);
 	Result unmnt();
 
 	//Directory

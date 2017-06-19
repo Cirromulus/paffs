@@ -118,6 +118,10 @@ Result PageAddressCache::setPage(PageNo page, Addr addr){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
 		return Result::bug;
 	}
+	if(dev->readOnly){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried setting PageAddress in readOnly mode!");
+		return Result::bug;
+	}
 
 	if(traceMask & PAFFS_TRACE_VERBOSE){
 		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "SetPage to %" PRIu32 ":%" PRIu32 " at %" PRIu32,

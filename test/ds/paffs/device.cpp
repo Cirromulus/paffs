@@ -272,5 +272,5 @@ TEST_F(FileTest, maxFilesize){
 		EXPECT_TRUE(ArraysMatch(block, blockcopy, blocksize));
 		i -= bw;
 	}
-
+	//TODO: Also delete everything
 }

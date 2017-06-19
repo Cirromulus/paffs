@@ -14,9 +14,9 @@ namespace paffs{
 outpost::rtos::SystemClock systemClock;
 
 Device::Device(Driver* mdriver) : driver(mdriver),
-		lasterr(Result::ok), mounted(false),
+		usedAreas(0), lasterr(Result::ok), mounted(false), readOnly(false),
 		tree(Btree(this)), sumCache(SummaryCache(this)),
-		 areaMgmt(this), dataIO(this), superblock(this){
+		areaMgmt(this), dataIO(this), superblock(this){
 };
 
 Device::~Device(){
@@ -136,7 +136,8 @@ Result Device::format(bool complete){
 	return Result::ok;
 }
 
-Result Device::mnt(){
+Result Device::mnt(bool readOnlyMode){
+	readOnly = readOnlyMode;
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
@@ -889,6 +890,10 @@ Result Device::touch(const char* path){
 	}
 	if(!mounted)
 		return Result::notMounted;
+	if(readOnly){
+		return Result::nosp;
+	}
+
 	Inode file;
 	Result r = getInodeOfElem(&file, path);
 	if(r == Result::nf){
@@ -972,6 +977,10 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 		return Result::notMounted;
 	if(obj == nullptr)
 		return Result::einval;
+
+	if(readOnly){
+		return Result::nosp;
+	}
 
 	if(obj->dirent->node->type == InodeType::dir){
 		return Result::einval;
@@ -1069,6 +1078,10 @@ Result Device::remove(const char* path){
 	}
 	if(!mounted)
 		return Result::notMounted;
+	if(readOnly){
+		return Result::nosp;
+	}
+
 	Inode object;
 	Result r;
 	if((r = getInodeOfElem(&object, path)) != Result::ok)

@@ -86,6 +86,10 @@ int SummaryCache::findNextFreeCacheEntry(){
 }
 
 Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state){
+	if(dev->readOnly){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried setting PageStatus in readOnly mode!");
+		return Result::bug;
+	}
 	if(page > dataPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dataPagesPerArea);
 		return Result::einval;
@@ -232,6 +236,7 @@ Result SummaryCache::loadAreaSummaries(){
 		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "failed to load Area Summaries!");
 		return r;
 	}
+	dev->usedAreas = index.usedAreas;
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "read superIndex successfully");
 
 	for(int i = 0; i < 2; i++){
@@ -248,6 +253,10 @@ Result SummaryCache::loadAreaSummaries(){
 
 Result SummaryCache::commitAreaSummaries(bool createNew){
 	//commit all Areas except the active ones (and maybe some others)
+	if(dev->readOnly){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried committing AreaSummaries in readOnly mode!");
+		return Result::bug;
+	}
 	Result r;
 	while(translation.size() > 2){
 		r = freeNextBestSummaryCacheEntry(true);
@@ -265,6 +274,8 @@ Result SummaryCache::commitAreaSummaries(bool createNew){
 	index.areaMap = dev->areaMap;
 	index.areaSummary[0] = tmp[0];
 	index.areaSummary[1] = tmp[1];
+	index.usedAreas = dev->usedAreas;
+	bool someDirty = false;
 
 	//write the two open AS'es to Superindex
 	for (unsigned int i = 0; i < areasNo; i++){
@@ -275,12 +286,12 @@ Result SummaryCache::commitAreaSummaries(bool createNew){
 				return Result::bug;
 			}
 			index.asPositions[pos] = i;
+			someDirty |= isDirty(translation[i]);
 			unpackStatusArray(translation[i], index.areaSummary[pos++]);
 		}
 	}
 
-	//TODO: Add check if dirty
-	return dev->superblock.commitSuperIndex(&index, createNew);
+	return dev->superblock.commitSuperIndex(&index, someDirty, createNew);
 }
 
 Result SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent){
