@@ -29,13 +29,12 @@ public:
 						char* data);
 	Result deleteInodeData(Inode* inode, unsigned int offs);
 
-
 	// TreeNode related
 	Result writeTreeNode(TreeNode* node);
 	Result readTreeNode(Addr addr, TreeNode* node);
 	Result deleteTreeNode(TreeNode* node);
 
-	private:
+private:
 	/**
 	 * @param reservedPages Is increased if new page was used
 	 */

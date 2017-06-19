@@ -262,6 +262,7 @@ TEST_F(FileTest, maxFilesize){
 	fs.seek(fil, 0, paffs::Seekmode::set);
 	paffs::ObjInfo info;
 	fs.getObjInfo("/file", &info);
+	ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
 	ASSERT_EQ(i, info.size);
 	while(i > 0){
 		memset(blockcopy, 0, blocksize);

@@ -30,8 +30,6 @@ Addr AddrListCacheElem::getAddr(PageNo pos){
 	return cache[pos];
 }
 
-
-
 Result PageAddressCache::setTargetInode(Inode* node){
 	if(node == inode){
 		return Result::ok;
@@ -61,8 +59,9 @@ Result PageAddressCache::getPage(PageNo page, Addr *addr){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
 		return Result::bug;
 	}
-
-	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "GetPage at %" PRIu32, page);
+	if(traceMask & PAFFS_TRACE_VERBOSE){
+		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "GetPage at %" PRIu32, page);
+	}
 
 	if(page < directAddrCount){
 		*addr = inode->direct[page];
@@ -120,8 +119,10 @@ Result PageAddressCache::setPage(PageNo page, Addr addr){
 		return Result::bug;
 	}
 
-	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "SetPage to %" PRIu32 ":%" PRIu32 " at %" PRIu32,
+	if(traceMask & PAFFS_TRACE_VERBOSE){
+		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "SetPage to %" PRIu32 ":%" PRIu32 " at %" PRIu32,
 			extractLogicalArea(addr), extractPage(addr), page);
+	}
 
 	if(page < directAddrCount){
 		inode->direct[page] = addr;

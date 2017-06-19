@@ -58,6 +58,8 @@ Result DataIO::writeInodeData(Inode* inode,
 	if(inode->size < *bytes_written + offs)
 		inode->size = *bytes_written + offs;
 
+	//the Tree UpdateExistingInode has to be done by high level functions,
+	//bc they may modify it by themselves
 	return Result::ok;
 }
 

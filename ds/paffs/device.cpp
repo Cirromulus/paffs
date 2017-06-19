@@ -489,9 +489,12 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 	r = dataIO.writeInodeData(contDir, 0, contDir->size + direntryl, &bytes, dirData);
 	delete[] dirData;
 	delete[] buf;
-	if(bytes != contDir->size)
-		r = r == Result::ok ? Result::bug : r;
-	return r;
+	if(bytes != contDir->size && r == Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "writeInodeData wrote different bytes than requested"
+				", but returned OK");
+	}
+
+	return tree.updateExistingInode(contDir);
 
 }
 
@@ -1037,7 +1040,12 @@ Result Device::flush(Obj* obj){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
+
 	(void) obj;
+	//TODO: When Inodes get Link to its PAC, it is committed here
+	//dataIO.pac.setTargetInode(obj->dirent->node);
+	//dataIO.pac.commit();
+
 	if(!mounted)
 		return Result::notMounted;
 	return Result::ok;
