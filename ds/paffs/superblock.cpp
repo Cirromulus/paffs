@@ -672,6 +672,10 @@ Result Superblock::insertNewSuperIndex(Addr logPrev, AreaPos *directArea, SuperI
 
 //warn: Make sure that free space is sufficient!
 Result Superblock::writeSuperPageIndex(PageAbs pageStart, SuperIndex* entry){
+	if(dev->readOnly){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried writing SuperPage in readOnly mode!");
+		return Result::bug;
+	}
 	unsigned int neededASes = 0;
 	for(unsigned int i = 0; i < 2; i++){
 		if(entry->asPositions[i] > 0)
@@ -679,7 +683,7 @@ Result Superblock::writeSuperPageIndex(PageAbs pageStart, SuperIndex* entry){
 	}
 
 	//note: Serial number is inserted on the first bytes for every page later on.
-	unsigned int needed_bytes = sizeof(Addr) + sizeof(AreaPos) +
+	unsigned int needed_bytes = sizeof(AreaPos) + sizeof(Addr) + sizeof(AreaPos) +
 		areasNo * sizeof(Area)
 		+ neededASes * dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
 	if(dataPagesPerArea % 8 != 0)
@@ -696,6 +700,8 @@ Result Superblock::writeSuperPageIndex(PageAbs pageStart, SuperIndex* entry){
 	pointer += sizeof(AreaPos);
 	memcpy(&buf[pointer], &entry->rootNode, sizeof(Addr));
 	pointer += sizeof(Addr);
+	memcpy(&buf[pointer], &entry->usedAreas, sizeof(AreaPos));
+	pointer += sizeof(AreaPos);
 	unsigned char pospos = 0;	//Stupid name
 
 	for(unsigned int i = 0; i < areasNo; i++){
@@ -766,7 +772,7 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 	//when dynamic ASses are allowed.
 
 	//note: Serial number is inserted on the first bytes for every page later on.
-	unsigned int needed_bytes = sizeof(Addr) + sizeof(AreaPos) +
+	unsigned int needed_bytes = sizeof(AreaPos) + sizeof(Addr) + sizeof(AreaPos) +
 		areasNo * sizeof(Area)
 		+ 2 * dataPagesPerArea / 8; /* One bit per entry, two entries for INDEX and DATA section. Others dont have summaries*/
 
@@ -820,6 +826,8 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 	pointer += sizeof(AreaPos);
 	memcpy(&entry->rootNode, &buf[pointer], sizeof(Addr));
 	pointer += sizeof(Addr);
+	memcpy(&entry->usedAreas, &buf[pointer], sizeof(AreaPos));
+	pointer += sizeof(AreaPos);
 	entry->asPositions[0] = 0;
 	entry->asPositions[1] = 0;
 	unsigned char pospos = 0;	//Stupid name

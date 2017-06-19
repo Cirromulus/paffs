@@ -42,8 +42,8 @@ struct SuperIndex{
 	SerialNo no;
 	AreaPos logPrev;		//if != 0, the logical area prev is now free, while this current is not (obviously)
 	Addr rootNode;
-	Area* areaMap;
 	AreaPos usedAreas;
+	Area* areaMap;
 	AreaPos asPositions[2];
 	SummaryEntry* areaSummary[2];
 };

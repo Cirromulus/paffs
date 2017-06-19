@@ -249,7 +249,7 @@ TEST_F(FileTest, maxFilesize){
 	if(fs.getLastErr() != paffs::Result::ok)
 		printf("%s!\n", paffs::err_msg(fs.getLastErr()));
 	ASSERT_NE(fil, nullptr);
-	fs.setTraceMask(fs.getTraceMask() | PAFFS_TRACE_PACACHE | PAFFS_TRACE_AREA);
+	//fs.setTraceMask(fs.getTraceMask() | PAFFS_TRACE_SUPERBLOCK );//PAFFS_TRACE_PACACHE | PAFFS_TRACE_AREA);
 	i = 0;
 	while(true){
 		r = fs.write(fil, block, blocksize, &bw);

@@ -8,6 +8,7 @@
 #include "device.hpp"
 #include "paffs_trace.hpp"
 #include "driver/driver.hpp"
+#include <inttypes.h>
 
 namespace paffs{
 
@@ -190,7 +191,7 @@ Result Device::unmnt(){
 	if(!mounted)
 		return Result::notMounted;
 	if(traceMask & PAFFS_TRACE_AREA){
-		printf("Info: \n");
+		printf("Info: \n\t%" PRIu32 " used Areas\n", usedAreas);
 		for(unsigned int i = 0; i < areasNo; i++){
 			printf("\tArea %03d on %03u as %10s from page %4d %s\n"
 					, i, areaMap[i].position, areaNames[areaMap[i].type]

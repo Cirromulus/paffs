@@ -154,6 +154,9 @@ Result AreaManagement::manageActiveAreaFull(AreaPos *area, AreaType areaType){
 //TODO: Add initAreaAs(...) to handle typical areaMap[abc].type = def; initArea(...);
 void AreaManagement::initArea(AreaPos area){
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %u (pos %u) as %s.", static_cast<unsigned int>(area), static_cast<unsigned int>(dev->areaMap[area].position), areaNames[dev->areaMap[area].type]);
+	if(dev->areaMap[area].status == AreaStatus::empty){
+		dev->usedAreas++;
+	}
 	dev->areaMap[area].status = AreaStatus::active;
 }
 
