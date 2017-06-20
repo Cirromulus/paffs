@@ -323,7 +323,7 @@ Result PageAddressCache::loadPath(Addr& anchor, PageNo pageOffs, AddrListCacheEl
 
 Result PageAddressCache::deletePath(Addr& anchor, PageNo pageFrom, PageNo pageTo,
 		AddrListCacheElem* start, unsigned char depth){
-	Result r;
+	//Result r;
 	PageNo fromPath[3] = {0};
 	PageNo   toPath[3] = {0};
 	for(unsigned int i = 0; i <= depth; i++){
@@ -351,7 +351,7 @@ Result PageAddressCache::deletePath(Addr& anchor, PageNo pageFrom, PageNo pageTo
 			toPath[0], toPath[1], toPath[2]);
 
 
-	/**
+
 	if(fromPath[0] == 0 && toPath[0] >= addrsPerPage - 1){
 		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Delete spans over complete depth 0");
 		anchor = 0;
@@ -359,6 +359,7 @@ Result PageAddressCache::deletePath(Addr& anchor, PageNo pageFrom, PageNo pageTo
 		start[0].active = false;
 		return Result::ok;
 	}
+	/**
 	if(!start[0].active){
 		r = loadCacheElem(anchor, start[0]);
 		if(r != Result::ok){
@@ -468,7 +469,7 @@ Result PageAddressCache::readAddrList (Addr from, Addr list[addrsPerPage]){
 		memset(list, 0, addrsPerPage * sizeof(Addr));
 		return Result::ok;
 	}
-	if(dev->areaMap[extractLogicalArea(from)].type != AreaType::data){
+	if(dev->areaMap[extractLogicalArea(from)].type != AreaType::index){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "READ ADDR LIST operation of invalid area at %d:%d",\
 				extractLogicalArea(from),
 				extractPage(from));
@@ -494,12 +495,12 @@ Result PageAddressCache::readAddrList (Addr from, Addr list[addrsPerPage]){
 Result PageAddressCache::writeAddrList(Addr &to , Addr list[addrsPerPage]){
 	Result r = dev->lasterr;
 	dev->lasterr = Result::ok;
-	dev->activeArea[AreaType::data] = dev->areaMgmt.findWritableArea(AreaType::data);
+	dev->activeArea[AreaType::index] = dev->areaMgmt.findWritableArea(AreaType::index);
 	if(dev->lasterr != Result::ok){
 		//TODO: Reset former pagestatus, so that FS will be in a safe state
 		return dev->lasterr;
 	}
-	if(dev->activeArea[AreaType::data] == 0){
+	if(dev->activeArea[AreaType::index] == 0){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "findWritableArea returned 0");
 		return Result::bug;
 	}
@@ -517,21 +518,21 @@ Result PageAddressCache::writeAddrList(Addr &to , Addr list[addrsPerPage]){
 
 	unsigned int firstFreePage = 0;
 	if(dev->areaMgmt.findFirstFreePage(&firstFreePage,
-			dev->activeArea[AreaType::data]) == Result::nosp){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::data]);
+			dev->activeArea[AreaType::index]) == Result::nosp){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::index]);
 		return dev->lasterr = Result::bug;
 	}
-	to = combineAddress(dev->activeArea[AreaType::data], firstFreePage);
+	to = combineAddress(dev->activeArea[AreaType::index], firstFreePage);
 
 	//Mark Page as used
-	r = dev->sumCache.setPageStatus(dev->activeArea[AreaType::data],
+	r = dev->sumCache.setPageStatus(dev->activeArea[AreaType::index],
 			firstFreePage, SummaryEntry::used);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
 		return r;
 	}
 
-	r = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::data], AreaType::data);
+	r = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::index], AreaType::index);
 	if(r != Result::ok)
 		return r;
 

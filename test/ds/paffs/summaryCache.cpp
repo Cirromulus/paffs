@@ -44,8 +44,12 @@ TEST_F(SummaryCache, fillFlashAndVerify){
 			ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
 
 			r = fs.write(fil, txt, strlen(txt), &bw);
-			EXPECT_EQ(bw, strlen(txt));
+			if(r == paffs::Result::nosp){
+				full = true;
+				break;
+			}
 			ASSERT_EQ(r, paffs::Result::ok);
+			EXPECT_EQ(bw, strlen(txt));
 
 			r = fs.close(fil);
 			ASSERT_EQ(r, paffs::Result::ok);

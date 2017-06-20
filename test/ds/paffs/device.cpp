@@ -261,6 +261,7 @@ TEST_F(FileTest, maxFilesize){
 	}
 	fs.seek(fil, 0, paffs::Seekmode::set);
 	paffs::ObjInfo info;
+	fs.resetLastErr();
 	fs.getObjInfo("/file", &info);
 	ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
 	ASSERT_EQ(i, info.size);
