@@ -1,0 +1,22 @@
+\section{TODOS}
+\begin{itemize}
+    \item Activate and Investigate superblock bug
+    \item Add "how to use" to this document
+    \item Add a "high space usage" mode limiting writes 
+    \item Give GC the possibility to officially reset Area to emtpy and unset
+    \item Add possibility to having multiple PageAddressCaches
+    \item Add possibility to concurrently have same Files open
+    \item Add check if dirty in commit Area Summaries to enable read-only (half functioning)
+    \item Add userdata write-back upon corrected Biterror
+    \item Read validation and error handling. If error is found, either repair it automatically or delay it until scrubbing? Scrubbing would be not very frequent, so on-the-fly would be appreciated.
+	\item When ASCache runs full, some used pages cant be marked as dirty. Build sanity checker, scanning whole FS and marking unreachable pages as such.
+	\item Implement dynamic number of uncommitted areas to superpage. (Maybe call it Checkpoint?)
+	%\item CRC and ECC. How will a broken FS be transferred into a safe state?
+	\item Merge DATA and INDEX areas to a single DATA type. Benefits: Less complexity, more efficient space usage, GC desperate mode for unmounting only. But maybe too overdone.
+	\item TreeCache - full commit from time to time. (Maybe 'used' marker?)
+	\item GC: Static Wear levelling, keep deletioncount in mind.
+	\item Implement additional driver function for copying pages for optimizing.
+	\item Replace mallocs to variable sized arrays. (Or standard container, b/c variable sized arrays are not legal in c++)
+	\item Use Inode pointer space for very small files to speed up access and save space.
+	\item Implement DATA Buffer to speed up everything. Note: Low priority and high effort.
+\end{itemize}

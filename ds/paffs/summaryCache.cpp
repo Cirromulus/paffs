@@ -440,12 +440,6 @@ Result SummaryCache::writeAreasummary(AreaPos area, SummaryEntry* summary){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
 		return Result::fail;
 	}
-	/*Is it really necessary to save 16 bit while slowing down garbage collection?
-	 *TODO: Check how cost reduction scales with bigger flashes.
-	 *		AreaSummary is without optimization 2 bit per page. 2 Kib per Page would
-	 *		allow roughly 1000 pages per Area. Usually big pages come with big Blocks,
-	 *		so a Block would be ~500 pages, so an area would be limited to two Blocks.
-	 */
 	//TODO: Check if areaOOB is clean, and maybe Verify written data
 	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Committing AreaSummary to Area %d", area);
 

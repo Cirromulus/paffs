@@ -56,6 +56,10 @@ TEST_F(SuperBlock, multipleRemounts){
 		ASSERT_EQ(bw, strlen(txt));
 		ASSERT_TRUE(ArraysMatch(buf, txt, strlen(txt)));
 
+		//TODO: Activate
+		//r = fs.touch("/a");
+		//ASSERT_EQ(r, paffs::Result::ok);
+
 		r = fs.close(fil);
 		ASSERT_EQ(r, paffs::Result::ok);
 
