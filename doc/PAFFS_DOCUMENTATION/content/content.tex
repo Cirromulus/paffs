@@ -108,7 +108,8 @@ B+Tree is a variation of the standard binary search tree with more than two keys
 \subsection{Inodes}
 \label{inode}
 \paragraph{Overview}
-Can be file, directory and softlink. Points to data chunks in a way like \texttt{EXT3} does. See Table \ref{tab:pinode}. It is possible to use pointer space for very small files or directories (14 * 4 Byte).
+Can be file, directory and softlink. Points to data chunks in a way like \texttt{EXT3} does. See Table \ref{tab:pinode. The maximum filesize depends on the data bytes per page; with 512 Byte per page it is calculated as 
+$512 * (11 + (512/8)^1 + (512/8)^2 + (512/8)^3) = 136353280 Byte \approx 138 MiB$. At a page width of 2084, the max filesize is $\approx 34 GiB$.
 \begin{table}[htbp]
 	\caption{Inode contents}
 	\label{tab:pinode}
