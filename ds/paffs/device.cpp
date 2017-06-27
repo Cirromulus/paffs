@@ -87,13 +87,6 @@ Result Device::format(bool complete){
 				hadAreaType |= 1 << AreaType::superblock;
 			continue;
 		}
-		if(!(hadAreaType & 1 << AreaType::journal)){
-			activeArea[AreaType::journal] = area;
-			areaMap[area].type = AreaType::journal;
-			areaMgmt.initArea(area);
-			hadAreaType |= 1 << AreaType::journal;
-			continue;
-		}
 
 		if(!(hadAreaType & 1 << AreaType::garbageBuffer)){
 			activeArea[AreaType::garbageBuffer] = area;
@@ -1123,7 +1116,6 @@ Result Device::initializeDevice(){
 
 	activeArea[AreaType::superblock] = 0;
 	activeArea[AreaType::index] = 0;
-	activeArea[AreaType::journal] = 0;
 	activeArea[AreaType::data] = 0;
 
 	if(areasNo < AreaType::no - 2){
@@ -1134,6 +1126,11 @@ Result Device::initializeDevice(){
 
 	if(blocksPerArea < 2){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device too small, at least 2 Blocks per Area are needed!");
+		return Result::einval;
+	}
+
+	if(dataPagesPerArea > dataBytesPerPage * 8){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device Areas too big, Area Summary would not fit a single page!");
 		return Result::einval;
 	}
 

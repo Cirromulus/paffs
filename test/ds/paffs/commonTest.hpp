@@ -29,7 +29,6 @@ public:
 			PAFFS_TRACE_VERIFY_AS |
 			PAFFS_TRACE_ERROR |
 			PAFFS_TRACE_BUG
-			//| PAFFS_TRACE_SUPERBLOCK | PAFFS_TRACE_VERBOSE
 		);
 		if(r != paffs::Result::ok)
 			std::cerr << "Could not format device!" << std::endl;

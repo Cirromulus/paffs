@@ -156,7 +156,6 @@ enum AreaType : uint8_t{
 	unset = 0,
 	superblock,
 	index,
-	journal,
 	data,
 	garbageBuffer,
 	retired,

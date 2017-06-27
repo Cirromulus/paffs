@@ -135,6 +135,7 @@ private:
 	 * @return newArea: new log. area
 	 */
 	AreaPos findBestNextFreeArea(AreaPos logPrev);
+	unsigned int calculateNeededBytesForSuperIndex(unsigned char numberOfAreaSummaries = 2);
 };
 
 }

@@ -50,6 +50,16 @@ Result SimuDriver::writePage(uint64_t page_no,
 	for(int i = 0; i < dataBytesPerPage; i+=256, p+=3)
 		YaffsEcc::calc(static_cast<unsigned char*>(buf) + i, p);
 
+	//This is just a debug verify
+	/**
+	bool something = false;
+	for(int i = 0; i < (dataBytesPerPage / 256) * 3; i++){
+		something |= buf[dataBytesPerPage + 2 + i] != 0xFF;
+	}
+	if(!something){
+		PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Writing a completely empty page! Why?");
+	}**/
+
 	Nandaddress d = translatePageToAddress(page_no, cell);
 
 	if(cell->writePage(d.plane, d.block, d.page, static_cast<unsigned char*>(buf)) < 0){

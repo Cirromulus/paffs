@@ -32,7 +32,7 @@ AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_s
 
 	//Look for the most dirty block
 	for(AreaPos i = 0; i < areasNo; i++){
-		if(dev->areaMap[i].status == AreaStatus::closed &&
+		if(dev->areaMap[i].status != AreaStatus::active &&
 				(dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)){
 
 			Result r = dev->sumCache.getSummaryStatus(i, curr);

@@ -49,6 +49,9 @@ TEST_F(SuperBlock, multipleRemounts){
 		ASSERT_EQ(r, paffs::Result::ok);
 
 		fil = fs.open("/file", paffs::FC);
+		if(fil == nullptr){
+			printf("Error in Run %u\n", i);
+		}
 		ASSERT_NE(fil, nullptr);
 
 		r = fs.read(fil, buf, strlen(txt), &bw);
@@ -56,9 +59,8 @@ TEST_F(SuperBlock, multipleRemounts){
 		ASSERT_EQ(bw, strlen(txt));
 		ASSERT_TRUE(ArraysMatch(buf, txt, strlen(txt)));
 
-		//TODO: Activate
-		//r = fs.touch("/a");
-		//ASSERT_EQ(r, paffs::Result::ok);
+		r = fs.touch("/a");
+		ASSERT_EQ(r, paffs::Result::ok);
 
 		r = fs.close(fil);
 		ASSERT_EQ(r, paffs::Result::ok);
@@ -68,8 +70,14 @@ TEST_F(SuperBlock, multipleRemounts){
 
 		r = fs.closeDir(dir);
 		ASSERT_EQ(r, paffs::Result::ok);
-
 		r = fs.unmount();
 		ASSERT_EQ(r, paffs::Result::ok);
 	}
+	/*	fs.setTraceMask(fs.getTraceMask() |
+		PAFFS_TRACE_SUPERBLOCK |
+		PAFFS_TRACE_ASCACHE |
+		PAFFS_TRACE_AREA |
+		PAFFS_TRACE_INFO |
+		PAFFS_TRACE_VERBOSE
+	);*/
 }

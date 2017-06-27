@@ -39,23 +39,27 @@ void Superblock::printSuperIndex(SuperIndex* ind){
 			extractPage(ind->rootNode));
 	printf("Used Areas: %" PRIu32 "\n", ind->usedAreas);
 	printf("areaMap:\n");
-	AreaPos asOffs = 0;
 	for(AreaPos i = 0; i < 8; i ++){
 		printf("\t%" PRIu32 "->%" PRIu32 "\n", i, ind->areaMap[i].position);
 		printf("\tType: %s\n", areaNames[ind->areaMap[i].type]);
-		if(asOffs < 2 && i == ind->asPositions[asOffs]){
-			unsigned int free = 0, used = 0, dirty = 0;
-			for(unsigned int j = 0; j < dataPagesPerArea; j++){
-				if(ind->areaSummary[asOffs][j] == SummaryEntry::free)
-					free++;
-				if(ind->areaSummary[asOffs][j] == SummaryEntry::used)
-					used++;
-				if(ind->areaSummary[asOffs][j] == SummaryEntry::dirty)
-					dirty++;
+		bool found = false;
+		for(unsigned int asOffs = 0; asOffs < 2; asOffs++){
+			if(ind->asPositions[asOffs] != 0 &&
+					i == ind->asPositions[asOffs]){
+				found = true;
+				unsigned int free = 0, used = 0, dirty = 0;
+				for(unsigned int j = 0; j < dataPagesPerArea; j++){
+					if(ind->areaSummary[asOffs][j] == SummaryEntry::free)
+						free++;
+					if(ind->areaSummary[asOffs][j] == SummaryEntry::used)
+						used++;
+					if(ind->areaSummary[asOffs][j] == SummaryEntry::dirty)
+						dirty++;
+				}
+				printf("\tFree/Used/Dirty Pages: %u/%u/%u\n", free, used, dirty);
+				asOffs++;
 			}
-			printf("\tFree/Used/Dirty Pages: %u/%u/%u\n", free, used, dirty);
-			asOffs++;
-		}else{
+		}if(!found){
 			printf("\tSummary not present.\n");
 		}
 		printf("\t----------------\n");
@@ -98,11 +102,6 @@ Result Superblock::fillPathWithFirstSuperblockAreas(Addr directPath[superChainEl
 }
 
 Result Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew){
-	unsigned int needed_bytes = sizeof(Addr) + sizeof(AreaPos) +
-				areasNo * sizeof(Area)
-				+ 2 * dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
-	unsigned int needed_pages = needed_bytes / dataBytesPerPage + 1;
-	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed to read former SuperIndex: %u (%u bytes, 2 AS'es)", needed_pages, needed_bytes);
 
 	Result r;
 	if(createNew){
@@ -262,6 +261,24 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 		return Result::fail;
 	}
 
+	if(index->asPositions[0] != 0 &&
+			index->areaMap[index->asPositions[0]].type != AreaType::data &&
+			index->areaMap[index->asPositions[0]].type != AreaType::index){
+		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "An superblock-cached Area may never be Type != data or index "
+				"(Area %d is %s)", index->asPositions[0],
+				areaNames[index->areaMap[index->asPositions[0]].type]);
+		return Result::fail;
+	}
+
+	if(index->asPositions[1] != 0 &&
+			index->areaMap[index->asPositions[1]].type != AreaType::data &&
+			index->areaMap[index->asPositions[1]].type != AreaType::index){
+		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "An superblock-cached Area may never be Type != data or index "
+				"(Area %d is %s)", index->asPositions[1],
+				areaNames[index->areaMap[index->asPositions[1]].type]);
+		return Result::fail;
+	}
+
 	for(unsigned int i = 0; i < areasNo; i++){
 		if(index->areaMap[i].position > areasNo){
 			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Position of area %u unplausible! (%" PRIu32 ")",
@@ -282,7 +299,7 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 
 	if(index->areaMap[extractLogicalArea(index->rootNode)].type != AreaType::index){
 		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Rootnode address does not point to index area"
-				" (%u, %u)",
+				" (Area %u, page %u)",
 				extractLogicalArea(index->rootNode), extractPage(index->rootNode));
 		return Result::fail;
 	}
@@ -309,7 +326,7 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 				}
 			}
 			index->areaMap[logPrev[i]].status = AreaStatus::empty;
-			index->areaMap[logPrev[i]].type = AreaType::unset;
+			//Type will be set to unset when deletion happens
 			index->areaMap[logNew].status = AreaStatus::active;
 			index->areaMap[logNew].type = AreaType::superblock;
 		}
@@ -633,13 +650,9 @@ Result Superblock::insertNewSuperIndex(Addr logPrev, AreaPos *directArea, SuperI
 		if(entry->asPositions[i] > 0)
 			neededASes++;
 	}
-	unsigned int needed_bytes = sizeof(Addr) + sizeof(AreaPos) +
-		areasNo * sizeof(Area)
-		+ neededASes * dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
-	if(dataPagesPerArea % 8 != 0)
-		needed_bytes++;
 
 	//Every page needs its serial Number
+	unsigned int needed_bytes = calculateNeededBytesForSuperIndex(neededASes);
 	unsigned int needed_pages = needed_bytes / (dataBytesPerPage - sizeof(SerialNo)) + 1;
 
 	Result r = findFirstFreeEntryInArea(*directArea, &page, needed_pages);
@@ -682,13 +695,8 @@ Result Superblock::writeSuperPageIndex(PageAbs pageStart, SuperIndex* entry){
 			neededASes++;
 	}
 
+	unsigned int needed_bytes = calculateNeededBytesForSuperIndex(neededASes);
 	//note: Serial number is inserted on the first bytes for every page later on.
-	unsigned int needed_bytes = sizeof(AreaPos) + sizeof(Addr) + sizeof(AreaPos) +
-		areasNo * sizeof(Area)
-		+ neededASes * dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
-	if(dataPagesPerArea % 8 != 0)
-		needed_bytes++;
-
 	//Every page needs its serial Number
 	unsigned int needed_pages = needed_bytes / (dataBytesPerPage - sizeof(SerialNo)) + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Minimum Pages needed to write SuperIndex: %d (%d bytes, %d AS'es)", needed_pages, needed_bytes, neededASes);
@@ -702,16 +710,10 @@ Result Superblock::writeSuperPageIndex(PageAbs pageStart, SuperIndex* entry){
 	pointer += sizeof(Addr);
 	memcpy(&buf[pointer], &entry->usedAreas, sizeof(AreaPos));
 	pointer += sizeof(AreaPos);
-	unsigned char pospos = 0;	//Stupid name
-
-	for(unsigned int i = 0; i < areasNo; i++){
-		if((entry->areaMap[i].type == AreaType::index || entry->areaMap[i].type == AreaType::data) && entry->areaMap[i].status == AreaStatus::active){
-			entry->asPositions[pospos++] = i;
-		}
-
-		memcpy(&buf[pointer], &entry->areaMap[i], sizeof(Area));
-		pointer += sizeof(Area);
-	}
+	memcpy(&buf[pointer], entry->areaMap, areasNo * sizeof(Area));
+	pointer += areasNo * sizeof(Area);
+	memcpy(&buf[pointer], entry->asPositions, 2 * sizeof(AreaPos));
+	pointer += 2 * sizeof(AreaPos);
 
 	//Collect area summaries and pack them
 	for(unsigned int i = 0; i < 2; i++){
@@ -721,10 +723,15 @@ Result Superblock::writeSuperPageIndex(PageAbs pageStart, SuperIndex* entry){
 			if(entry->areaSummary[i][j] != SummaryEntry::dirty)
 				buf[pointer + j/8] |= 1 << j%8;
 		}
-		pointer += dataPagesPerArea / 8;
+		pointer += dataPagesPerArea / 8 + 1;
 	}
 
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "%u bytes have been written to Buffer", pointer);
+	if(pointer != needed_bytes){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Written bytes (%u) differ from calculated (%u)!",
+				pointer, needed_bytes);
+		return Result::bug;
+	}
 
 	pointer = 0;
 	Result r;
@@ -772,10 +779,7 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 	//when dynamic ASses are allowed.
 
 	//note: Serial number is inserted on the first bytes for every page later on.
-	unsigned int needed_bytes = sizeof(AreaPos) + sizeof(Addr) + sizeof(AreaPos) +
-		areasNo * sizeof(Area)
-		+ 2 * dataPagesPerArea / 8; /* One bit per entry, two entries for INDEX and DATA section. Others dont have summaries*/
-
+	unsigned int needed_bytes = calculateNeededBytesForSuperIndex(2);
 	unsigned int needed_pages = needed_bytes / (dataBytesPerPage - sizeof(SerialNo)) + 1;
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Maximum Pages needed to read SuperIndex: %d (%d bytes, 2 AS'es)", needed_pages, needed_bytes);
 
@@ -828,21 +832,22 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 	pointer += sizeof(Addr);
 	memcpy(&entry->usedAreas, &buf[pointer], sizeof(AreaPos));
 	pointer += sizeof(AreaPos);
-	entry->asPositions[0] = 0;
-	entry->asPositions[1] = 0;
-	unsigned char pospos = 0;	//Stupid name
-	for(unsigned int i = 0; i < areasNo; i++){
-		memcpy(&entry->areaMap[i], &buf[pointer], sizeof(Area));
-		pointer += sizeof(Area);
-		if((dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)
-				&& entry->areaMap[i].status == AreaStatus::active)
-			entry->asPositions[pospos++] = i;
-	}
+	memcpy(entry->areaMap, &buf[pointer], areasNo * sizeof(Area));
+	pointer += areasNo * sizeof(Area);
+	memcpy(entry->asPositions, &buf[pointer], 2 * sizeof(AreaPos));
+	pointer += 2 * sizeof(AreaPos);
 
+	unsigned char asCount = 0;
 	for(unsigned int i = 0; i < 2; i++){
 		if(entry->asPositions[i] <= 0)
 			continue;
-
+		if(entry->asPositions[i] > areasNo){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Entry asPosition[%u] is unplausible! "
+					"(was %" PRIu32 ", should > %" PRIu32, i, entry->asPositions[i], areasNo);
+			return Result::fail;
+		}
+		asCount++;
+		//Unpack AreaSummary
 		for(unsigned int j = 0; j < dataPagesPerArea; j++){
 			if(buf[pointer + j/8] & 1 << j%8){
 				//TODO: Normally, we would check in the OOB for a Checksum or so, which is present all the time
@@ -871,9 +876,14 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 				entry->areaSummary[i][j] = SummaryEntry::dirty;
 			}
 		}
-		pointer += dataPagesPerArea / 8;
+		pointer += dataPagesPerArea / 8 + 1;
 	}
 
+	if(pointer != calculateNeededBytesForSuperIndex(asCount)){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Read bytes (%u) differs from calculated (%u)!",
+				pointer, calculateNeededBytesForSuperIndex(asCount));
+		return Result::bug;
+	}
 	return Result::ok;
 }
 
@@ -897,12 +907,17 @@ Result Superblock::handleBlockOverflow(PageAbs newPage, Addr logPrev, SerialNo *
 
 Result Superblock::deleteSuperBlock(AreaPos area, uint8_t block) {
 	if(dev->areaMap[area].type != AreaType::superblock){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete Block outside of SUPARBLCOKAREA");
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete Block outside of SUPERBLOCK area");
 		return Result::bug;
 	}
 	//blocks are deleted sequentially, erasecount is for whole area erases
-	if(block == blocksPerArea)
+	if(block == blocksPerArea){
 		dev->areaMap[area].erasecount++;
+		dev->areaMap[area].status = AreaStatus::empty;
+		dev->areaMap[area].type = AreaType::unset;
+		dev->usedAreas--;
+		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Area %u at pos. %u.", area, dev->areaMap[area].position);
+	}
 
 	BlockAbs block_offs = dev->areaMap[area].position * blocksPerArea;
 	return dev->driver->eraseBlock(block_offs + block);
@@ -914,6 +929,7 @@ AreaPos Superblock::findBestNextFreeArea(AreaPos logPrev){
 		if(dev->areaMap[i].status == AreaStatus::empty){
 			// Following changes to areaMap may not be persistent if SuperIndex was already written
 			dev->areaMap[i].status = AreaStatus::active;
+			dev->areaMap[i].type = AreaType::superblock;
 			/**
 			 * The area will be empty after the next handleBlockOverflow
 			 * This allows other SuperIndex areas to switch to this one if flushed in same commit.
@@ -922,12 +938,33 @@ AreaPos Superblock::findBestNextFreeArea(AreaPos logPrev){
 			 * thus less frequently written to.
 			 */
 			dev->areaMap[logPrev].status = AreaStatus::empty;
-			//Omitting ..type because it will be overwritten upon mount
+			//Unset is postponed till actual deletion
+
+
 			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found log. %" PRIu32, i);
 			return i;
 		}
 	}
 	PAFFS_DBG(PAFFS_TRACE_ERROR, "Warning: Using same area (log. %" PRIu32 ") for new cycle!", logPrev);
 	return logPrev;
+}
+
+unsigned int Superblock::calculateNeededBytesForSuperIndex(unsigned char numberOfAreaSummaries){
+	if(numberOfAreaSummaries > 2){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Not more than two area Summaries may be allowed in SuperIndex!"
+				" (queried %u)", numberOfAreaSummaries);
+		return 0;
+	}
+	//Serial Number Skipped because it is inserted later on
+	unsigned int neededBytes =
+			sizeof(AreaPos) +			//LogPrev
+			sizeof(Addr) +				//rootNode
+			sizeof(AreaPos) +			//usedAreas
+			areasNo * sizeof(Area) +	//AreaMap
+			2 * sizeof(AreaPos) +		//Area Summary Positions
+			numberOfAreaSummaries * dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
+	if(dataPagesPerArea % 8 != 0)
+		neededBytes++;
+	return neededBytes;
 }
 }

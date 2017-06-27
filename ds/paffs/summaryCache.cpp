@@ -7,6 +7,7 @@
 
 #include "area.hpp"
 #include "device.hpp"
+#include <inttypes.h>
 #include "bitlist.hpp"
 #include "superblock.hpp"
 #include "summaryCache.hpp"
@@ -21,6 +22,7 @@ SummaryCache::SummaryCache(Device* mdev) : dev(mdev){
 	}
 	translation.reserve(areaSummaryCacheSize);
 	memset(summaryCache, 0, areaSummaryCacheSize * areaSummaryEntrySize);
+	memset(dirtyPages, 0, areaSummaryCacheSize * sizeof(PageOffs));
 }
 
 SummaryEntry SummaryCache::getPackedStatus(uint16_t position, PageOffs page){
@@ -103,13 +105,33 @@ Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry sta
 	}
 	setDirty(translation[area]);
 	setPackedStatus(translation[area], page, state);
-	if(state == SummaryEntry::dirty && traceMask & PAFFS_WRITE_VERIFY_AS){
-		char* buf = new char[totalBytesPerPage];
-		memset(buf, 0xFF, dataBytesPerPage);
-		memset(&buf[dataBytesPerPage], 0x0A, oobBytesPerPage);
-		Addr addr = combineAddress(area, page);
-		dev->driver->writePage(getPageNumber(addr, dev), buf, totalBytesPerPage);
-		delete[] buf;
+	if(state == SummaryEntry::dirty){
+		if(traceMask & PAFFS_WRITE_VERIFY_AS){
+			char buf[totalBytesPerPage];
+			memset(buf, 0xFF, dataBytesPerPage);
+			memset(&buf[dataBytesPerPage], 0x0A, oobBytesPerPage);
+			Addr addr = combineAddress(area, page);
+			dev->driver->writePage(getPageNumber(addr, dev), buf, totalBytesPerPage);
+		}
+		++dirtyPages[translation[area]];
+
+		if(traceMask & PAFFS_TRACE_VERIFY_AS){
+			PageOffs dirtyPagesCheck = countDirtyPages(translation[area]);
+			if(dirtyPagesCheck != dirtyPages[translation[area]]){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "DirtyPages differ from actual count! "
+						"(Area %" PRIu32 " on %" PRIu32 " was: %" PRIu32 ", thought %" PRIu32 ")",
+						area, dev->areaMap[area].position, dirtyPagesCheck, dirtyPages[translation[area]]);
+				return Result::fail;
+			}
+		}
+
+		if(dirtyPages[translation[area]] == dataPagesPerArea){
+			PAFFS_DBG(PAFFS_TRACE_ASCACHE, "Area %" PRIu32 " has run full of dirty pages, deleting.", area);
+			dev->areaMgmt.deleteArea(area);
+			//This also resets ASWritten and dirty
+			memset(summaryCache[translation[area]], 0, areaSummaryEntrySize);
+			dirtyPages[translation[area]] = 0;
+		}
 	}
 	return Result::ok;
 }
@@ -183,6 +205,7 @@ Result SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary){
 			return r;
 	}
 	packStatusArray(translation[area], summary);
+	dirtyPages[translation[area]] = countDirtyPages(translation[area]);
 	return Result::ok;
 }
 
@@ -220,6 +243,7 @@ Result SummaryCache::loadAreaSummaries(){
 	//Assumes unused Summary Cache
 	for(AreaPos i = 0; i < 2; i++){
 		memset(summaryCache[i], 0, areaSummaryEntrySize);
+		dirtyPages[i] = 0;
 	}
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "cleared summary Cache");
 	SummaryEntry tmp[2][dataPagesPerArea];			//High Stack usage, FIXME?
@@ -243,7 +267,30 @@ Result SummaryCache::loadAreaSummaries(){
 		if(index.asPositions[i] > 0){
 			translation[index.asPositions[i]] = i;
 			packStatusArray(i, index.areaSummary[i]);
-			dev->activeArea[dev->areaMap[index.asPositions[i]].type] = dev->areaMap[index.asPositions[i]].position;
+			dirtyPages[i] = countDirtyPages(i);
+			setDirty(i);	//TODO: This forces a rewrite of superIndex even when we modified nothing
+			unsigned char as[totalBytesPerPage];
+			PAFFS_DBG(PAFFS_TRACE_ASCACHE, "Checking for an AS at area %" PRIu32 " (phys. %" PRIu32 ", "
+					"abs. page %" PRIu64 ")",
+					index.asPositions[i], dev->areaMap[index.asPositions[i]].position,
+					getPageNumber(combineAddress(index.asPositions[i], dataPagesPerArea), dev));
+			r = dev->driver->readPage(getPageNumber(
+					combineAddress(index.asPositions[i], dataPagesPerArea), dev),
+					as, totalBytesPerPage);
+			if(r != Result::ok && r != Result::biterrorCorrected){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not check if AS was already written on "
+						"area %" PRIu32, index.asPositions[i]);
+				return r;
+			}
+			for(unsigned int t = 0; t < totalBytesPerPage; t++){
+				if(as[t] != 0xFF){
+					setASWritten(i);
+					break;
+				}
+			}
+			if(dev->areaMap[index.asPositions[i]].status == AreaStatus::active){
+				dev->activeArea[dev->areaMap[index.asPositions[i]].type] = dev->areaMap[index.asPositions[i]].position;
+			}
 			PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Loaded area summary %d on %d", index.asPositions[i], dev->areaMap[index.asPositions[i]].position);
 		}
 	}
@@ -257,7 +304,8 @@ Result SummaryCache::commitAreaSummaries(bool createNew){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried committing AreaSummaries in readOnly mode!");
 		return Result::bug;
 	}
-	Result r;
+
+	Result r;	//TODO: Maybe commit closed Areas?
 	while(translation.size() > 2){
 		r = freeNextBestSummaryCacheEntry(true);
 		if(r != Result::ok){
@@ -266,6 +314,7 @@ Result SummaryCache::commitAreaSummaries(bool createNew){
 			break;
 		}
 	}
+
 
 	unsigned char pos = 0;
 	SummaryEntry tmp[2][dataPagesPerArea];
@@ -277,18 +326,22 @@ Result SummaryCache::commitAreaSummaries(bool createNew){
 	index.usedAreas = dev->usedAreas;
 	bool someDirty = false;
 
-	//write the two open AS'es to Superindex
-	for (unsigned int i = 0; i < areasNo; i++){
-		if((dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)
-				&& dev->areaMap[i].status == AreaStatus::active){
-			if(pos >= 2){
-				PAFFS_DBG(PAFFS_TRACE_BUG, "More than two active Areas! This is not handled.");
-				return Result::bug;
-			}
-			index.asPositions[pos] = i;
-			someDirty |= isDirty(translation[i]);
-			unpackStatusArray(translation[i], index.areaSummary[pos++]);
+	//write the open/uncommitted AS'es to Superindex
+	for(std::pair<AreaPos, uint16_t> cacheElem : translation){
+		//Clean Areas are not committed unless they are active
+		if(pos >= 2){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Too many uncommitted AreaSummaries.\n"
+								"\tskipping lossy, because we have to unmount.");
+			break;
 		}
+		if(!isDirty(cacheElem.second) &&
+				dev->activeArea[AreaType::data] != cacheElem.first &&
+				dev->activeArea[AreaType::index] != cacheElem.first)
+			continue;
+
+		someDirty |= isDirty(cacheElem.second);
+		index.asPositions[pos] = cacheElem.first;
+		unpackStatusArray(cacheElem.second, index.areaSummary[pos++]);
 	}
 
 	return dev->superblock.commitSuperIndex(&index, someDirty, createNew);
@@ -314,6 +367,7 @@ Result SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent){
 		}
 	}
 	translation[area] = nextEntry;
+	dirtyPages[translation[area]] = 0;
 	SummaryEntry buf[dataPagesPerArea];
 	r = readAreasummary(area, buf, true);
 	if(r == Result::ok){
@@ -321,6 +375,7 @@ Result SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent){
 		setASWritten(translation[area]);
 		setDirty(translation[area], false);
 		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of %d to cache", area);
+		dirtyPages[translation[area]] = countDirtyPages(translation[area]);
 	}
 	else if(r == Result::nf){
 		memset(summaryCache[translation[area]], 0, areaSummaryEntrySize);
@@ -369,10 +424,9 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 
 	//Look for the least probable Area to be used that has no committed AS
  	for(int i = 0; i < areaSummaryCacheSize; i++){
-		if(used[i]
-				&& !wasASWrittenByCachePosition(i) &&
+		if(used[i] && !wasASWrittenByCachePosition(i) &&
 				dev->areaMap[pos[i]].status != AreaStatus::active){
-			uint32_t tmp = countDirtyPages(i);
+			PageOffs tmp = countUnusedPages(i);
 			if(tmp > maxDirtyPages){
 				fav = i;
 				maxDirtyPages = tmp;
@@ -402,8 +456,9 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 
 	//Look for the least probable Area to be used that has no committed AS
 	for(int i = 0; i < areaSummaryCacheSize; i++){
-		if(used[i] && !wasASWrittenByCachePosition(i) && dev->areaMap[pos[i]].status != AreaStatus::active){
-			uint32_t tmp = countDirtyPages(i);
+		if(used[i] && !wasASWrittenByCachePosition(i) &&
+				dev->areaMap[pos[i]].status != AreaStatus::active){
+			PageOffs tmp = countUnusedPages(i);
 			if(tmp > maxDirtyPages){
 				fav = i;
 				maxDirtyPages = tmp;
@@ -426,10 +481,23 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 uint32_t SummaryCache::countDirtyPages(uint16_t position){
 	uint32_t dirty = 0;
 	for(uint32_t i = 0; i < dataPagesPerArea; i++){
-		if(getPackedStatus(position, i) != SummaryEntry::used)
+		if(getPackedStatus(position, i) == SummaryEntry::dirty)
 			dirty++;
 	}
 	return dirty;
+}
+
+uint32_t SummaryCache::countUsedPages(uint16_t position){
+	uint32_t used = 0;
+	for(uint32_t i = 0; i < dataPagesPerArea; i++){
+		if(getPackedStatus(position, i) == SummaryEntry::used)
+			used++;
+	}
+	return used;
+}
+
+PageOffs SummaryCache::countUnusedPages(uint16_t position){
+	return dataPagesPerArea - countUsedPages(position);
 }
 
 Result SummaryCache::writeAreasummary(AreaPos area, SummaryEntry* summary){
@@ -454,6 +522,18 @@ Result SummaryCache::writeAreasummary(AreaPos area, SummaryEntry* summary){
 	for(unsigned int page = 0; page < needed_pages; page++){
 		unsigned int btw = pointer + dataBytesPerPage < areaSummarySize ? dataBytesPerPage
 							: areaSummarySize - pointer;
+		if(traceMask & PAFFS_TRACE_VERIFY_AS){
+			unsigned char readbuf[totalBytesPerPage];
+			r = dev->driver->readPage(page_offs + page, readbuf, totalBytesPerPage);
+			for(unsigned int i = 0; i < totalBytesPerPage; i++){
+				if(readbuf[i] != 0xFF){
+					PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write AreaSummary over an existing one at "
+							"Area %" PRIu32, area);
+					return Result::bug;
+				}
+			}
+
+		}
 		r = dev->driver->writePage(page_offs + page, &buf[pointer], btw);
 		if(r != Result::ok)
 			return r;

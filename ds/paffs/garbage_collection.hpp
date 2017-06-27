@@ -22,13 +22,16 @@ public:
 	 */
 	Result collectGarbage(AreaType target);
 
+	/**
+	 * Deletes an area. This may be used by Summary Cache if the last page was set to dirty.
+	 */
+	Result deleteArea(AreaPos area);
 private:
 	PageOffs countDirtyPages(SummaryEntry* summary);
 	AreaPos findNextBestArea(AreaType target,
 			SummaryEntry* out_summary, bool* srcAreaContainsData);
 	Result moveValidDataToNewArea(AreaPos srcArea,
 			AreaPos dstArea, SummaryEntry* summary);
-	Result deleteArea(AreaPos area);
 };
 
 

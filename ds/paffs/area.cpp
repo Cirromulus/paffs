@@ -16,7 +16,6 @@ const char* areaNames[] = {
 		"UNSET",
 		"SUPERBLOCK",
 		"INDEX",
-		"JOURNAL",
 		"DATA",
 		"GC_BUFFER",
 		"RETIRED",
@@ -144,7 +143,7 @@ Result AreaManagement::manageActiveAreaFull(AreaPos *area, AreaType areaType){
 		//Current Area is full!
 		closeArea(*area);
 	}else{
-		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Area %u still page %u free.", *area, ffp);
+		//PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Area %u still page %u free.", *area, ffp);
 	}
 
 	return Result::ok;
@@ -173,6 +172,14 @@ void AreaManagement::retireArea(AreaPos area){
 	for(unsigned block = 0; block < blocksPerArea; block++)
 			dev->driver->markBad(dev->areaMap[area].position * blocksPerArea + block);
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %u at pos. %u.", area, dev->areaMap[area].position);
+}
+
+void AreaManagement::deleteArea(AreaPos area){
+	gc.deleteArea(area);
+	dev->areaMap[area].status = AreaStatus::empty;
+	dev->areaMap[area].type = AreaType::unset;
+	dev->usedAreas--;
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Area %u at pos. %u.", area, dev->areaMap[area].position);
 }
 
 }  // namespace paffs

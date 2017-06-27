@@ -80,8 +80,8 @@ void Paffs::printCacheSizes(){
 	PAFFS_DBG_S(PAFFS_TRACE_INFO,
 			"Packed AreaSummary size: %zu Byte. Cacheable Summaries: %u.\n"
 			"\tOverall AreaSummary cache size: %zu Byte.",
-			sizeof(dataPagesPerArea / 4 + 2), areaSummaryCacheSize,
-			sizeof(dataPagesPerArea / 4 + 2) * areaSummaryCacheSize
+			 dataPagesPerArea / 4 + 2 + sizeof(PageOffs), areaSummaryCacheSize,
+			(dataPagesPerArea / 4 + 2 + sizeof(PageOffs)) * areaSummaryCacheSize
 	);
 
 	PAFFS_DBG_S(PAFFS_TRACE_INFO,

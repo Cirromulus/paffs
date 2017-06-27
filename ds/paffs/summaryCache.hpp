@@ -15,6 +15,7 @@ class SummaryCache{
 	static constexpr unsigned int areaSummaryEntrySize = dataPagesPerArea / 4 + 2;
 	//excess byte is for dirty- and wasASWritten marker
 	unsigned char summaryCache[areaSummaryCacheSize][areaSummaryEntrySize];
+	PageOffs dirtyPages[areaSummaryCacheSize];
 
 	std::unordered_map<AreaPos, uint16_t> translation;	//from area number to array offset
 	Device* dev;
@@ -76,6 +77,10 @@ private:
 	Result freeNextBestSummaryCacheEntry(bool urgent);
 
 	PageOffs countDirtyPages(uint16_t position);
+
+	PageOffs countUsedPages(uint16_t position);
+
+	PageOffs countUnusedPages(uint16_t position);
 
 	/**
 	 * @warn Area needs to be in translation array

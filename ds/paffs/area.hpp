@@ -44,6 +44,7 @@ public:
 	void initArea(AreaPos area);
 	Result closeArea(AreaPos area);
 	void retireArea(AreaPos area);
+	void deleteArea(AreaPos area);
 };
 
 }  // namespace paffs
