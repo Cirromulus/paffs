@@ -13,6 +13,7 @@
 #include "summaryCache.hpp"
 #include <outpost/rtos/clock.h>
 #include <outpost/time/clock.h>
+#include <map>
 
 #pragma once
 
@@ -21,10 +22,10 @@ namespace paffs {
 extern outpost::rtos::SystemClock systemClock;
 
 class Device{
-	//Dirents zur schnelleren verfügung
-	/*Dirent* Dirent_buf[Dirent_BUFSIZE];
-	unsigned char Dirents_buf_used = 0;
-	*/
+	typedef std::pair<Inode*, uint8_t> InodeWithRefcount;
+	typedef std::map<InodeNo, InodeWithRefcount>  InodeMap;
+	typedef std::pair<InodeNo, InodeWithRefcount> InodeMapElem;
+	InodeMap openInodes;
 
 public:
 	Driver *driver;
@@ -83,11 +84,24 @@ private:
 	Result createInode(Inode* outInode, Permission mask);
 	Result createDirInode(Inode* outInode, Permission mask);
 	Result createFilInode(Inode* outInode, Permission mask);
-	void destroyInode(Inode* node);
+	void   destroyInode(Inode* node);
 	Result getParentDir(const char* fullPath, Inode* parDir,
 			unsigned int *lastSlash);
-	Result getInodeInDir( Inode* outInode, Inode* folder, const char* name);
-	Result getInodeOfElem( Inode* outInode, const char* fullPath);
+	Result getInodeInDir( InodeNo *inode, Inode* folder, const char* name);
+	/**
+	 * @param outInode has to point to an Inode, it is used as a buffer!
+	 */
+	Result getInodeOfElem(Inode* &outInode, const char* fullPath);
+	/**
+	 * @warn does not store the target into List, just checks whether it has to load it from tree
+	 * TODO: Future possibility is to store this target into cache (no buffer needed)
+	 *
+	 * @param target has to point to an Inode, it is used as a buffer!
+	 */
+	Result findOrLoadInode(InodeNo no, Inode* &target);
+	void   addOpenInode(InodeNo no, Inode* &target, Inode* source);
+	Result removeOpenInode(InodeNo no);
+
 	//newElem should be already inserted in Tree
 	Result insertInodeInDir(const char* name, Inode* contDir, Inode* newElem);
 	Result removeInodeFromDir(Inode* contDir, Inode* elem);

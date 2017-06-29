@@ -31,9 +31,6 @@ TEST_F(SummaryCache, fillFlashAndVerify){
 		}
 		for(j = 0; j < 100; j++){
 			sprintf(filename, "/%05d/%02d", i, j);
-			if(i == 4 && j == 97){
-				printf("HERE\n");
-			}
 			fil = fs.open(filename, paffs::FC);
 			if(fil == nullptr){
 				std::cout << filename << ": " << paffs::err_msg(fs.getLastErr()) << std::endl;

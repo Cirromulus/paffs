@@ -8,6 +8,9 @@
 
 #include "commonTest.hpp"
 
+#include <stdlib.h>     /* srand, rand */
+#include <time.h>       /* time */
+
 class FileTest : public InitFs{
 
 };
@@ -274,4 +277,71 @@ TEST_F(FileTest, maxFilesize){
 		i -= bw;
 	}
 	//TODO: Also delete everything
+
+	r = fs.close(fil);
+	ASSERT_EQ(r, paffs::Result::ok);
+}
+
+TEST_F(FileTest, multiplePointersToSameFile){
+	unsigned char elemsize = 4;
+	char elemIn[elemsize+1], elemOut[elemsize+1];
+	unsigned ringBufSize = 0, maxRingBufSize = 500;
+	unsigned runningNumberIn = 0, runningNumberOut = 0;
+	paffs::Obj *inFil, *outFil;
+	unsigned int b;
+	paffs::Result r;
+
+	/**
+	 * critical seeds:
+	 * none yet encountered
+	 */
+	int seed = time(NULL);
+	std::cout << "Random seed :" << seed << std::endl;
+	srand(seed);
+	//open file with different modes
+	outFil = fs.open("/file", paffs::FW | paffs::FC);
+	if(fs.getLastErr() != paffs::Result::ok)
+		printf("%s!\n", paffs::err_msg(fs.getLastErr()));
+	ASSERT_NE(outFil, nullptr);
+	inFil  = fs.open("/file", paffs::FR);
+	if(fs.getLastErr() != paffs::Result::ok)
+		printf("%s!\n", paffs::err_msg(fs.getLastErr()));
+	ASSERT_NE(inFil, nullptr);
+
+	while(runningNumberOut < 5000){
+		if(rand() % 2){
+			//insert
+			if(ringBufSize >= maxRingBufSize)
+				continue;
+			sprintf(elemIn, "%0*u", elemsize, runningNumberIn++);
+			r = fs.write(inFil, elemIn, elemsize, &b);
+			EXPECT_EQ(b, elemsize);
+			ASSERT_EQ(r, paffs::Result::ok);
+			//printf("Wrote elem %4s\n", elemIn);
+			if(inFil->fp >= maxRingBufSize * elemsize){
+				r = fs.seek(inFil, 0, paffs::Seekmode::set);
+				ASSERT_EQ(r, paffs::Result::ok);
+			}
+			ringBufSize++;
+		}else{
+			//retrieve
+			if(ringBufSize < 1)
+				continue;
+			r = fs.read(outFil, elemOut, elemsize, &b);
+			EXPECT_EQ(b, elemsize);
+			ASSERT_EQ(r, paffs::Result::ok);
+			//printf("Read elem %.*s\n",elemsize, elemOut);
+			sprintf(elemIn, "%0*u", elemsize, runningNumberOut++);
+			ASSERT_EQ(strncmp(elemIn, elemOut, elemsize), 0);
+			if(outFil->fp >= maxRingBufSize * elemsize){
+				r = fs.seek(outFil, 0, paffs::Seekmode::set);
+				ASSERT_EQ(r, paffs::Result::ok);
+			}
+			ringBufSize--;
+		}
+	}
+	r = fs.close(inFil);
+	ASSERT_EQ(r, paffs::Result::ok);
+	r = fs.close(outFil);
+	ASSERT_EQ(r, paffs::Result::ok);
 }
