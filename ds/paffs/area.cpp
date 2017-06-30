@@ -88,12 +88,18 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 		return dev->activeArea[areaType];
 	}
 
-	for(unsigned int area = 0; area < areasNo; area++){
-		if(dev->areaMap[area].type == AreaType::unset){
-			dev->areaMap[area].type = areaType;
-			initArea(area);
-			PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found unset Area %u for %s", area, areaNames[areaType]);
-			return area;
+	if(dev->usedAreas < areasNo - minFreeAreas || areaType == AreaType::index){
+		/**We only take new areas, if we dont hit the reserved pool.
+		 * The exeption is Index area, which is needed for committing caches.
+		 * If some day we support data cache, this would be allowed to use this pool as well.
+		**/
+		for(unsigned int area = 0; area < areasNo; area++){
+			if(dev->areaMap[area].status == AreaStatus::empty){
+				dev->areaMap[area].type = areaType;
+				initArea(area);
+				PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found empty Area %u for %s", area, areaNames[areaType]);
+				return area;
+			}
 		}
 	}
 

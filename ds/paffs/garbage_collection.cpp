@@ -30,7 +30,8 @@ AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_s
 	*srcAreaContainsData = true;
 	SummaryEntry curr[dataPagesPerArea];
 
-	//Look for the most dirty block
+	//Look for the most dirty area.
+	//This ignores unset (free) areas, if we look for data or index areas.
 	for(AreaPos i = 0; i < areasNo; i++){
 		if(dev->areaMap[i].status != AreaStatus::active &&
 				(dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)){
