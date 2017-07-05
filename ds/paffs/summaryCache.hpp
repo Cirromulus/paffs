@@ -46,14 +46,25 @@ public:
 	/**
 	 * Loads all unclosed AreaSummaries in RAM upon Mount
 	 *
-	 * \warning High Stack usage scaling with dataPagesPerArea
+	 * @warning High Stack usage scaling with dataPagesPerArea
 	 */
 
 	Result loadAreaSummaries();
 
+	/**
+	 * @param createNew if set, a new path will be set instead of
+	 * looking for an old one
+	 */
 	Result commitAreaSummaries(bool createNew = false);
 
 private:
+	/**
+	 * @Brief uses garbageCollection-buffer to swap a whole Area,
+	 * committing its new AS.
+	 * @warn Decreases wear-off efficiency if used regularly.
+	 */
+	Result commitASHard(int &clearedArea);
+
 	SummaryEntry getPackedStatus(uint16_t position, PageOffs page);
 
 	void setPackedStatus(uint16_t position, PageOffs page, SummaryEntry value);

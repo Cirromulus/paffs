@@ -26,12 +26,16 @@ public:
 	 * Deletes an area. This may be used by Summary Cache if the last page was set to dirty.
 	 */
 	Result deleteArea(AreaPos area);
+
+	/**
+	 *	Moves all valid Pages to new Area.
+	 */
+	Result moveValidDataToNewArea(AreaPos srcArea,
+			AreaPos dstArea, SummaryEntry* summary);
 private:
 	PageOffs countDirtyPages(SummaryEntry* summary);
 	AreaPos findNextBestArea(AreaType target,
 			SummaryEntry* out_summary, bool* srcAreaContainsData);
-	Result moveValidDataToNewArea(AreaPos srcArea,
-			AreaPos dstArea, SummaryEntry* summary);
 };
 
 

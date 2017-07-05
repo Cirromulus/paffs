@@ -25,6 +25,68 @@ SummaryCache::SummaryCache(Device* mdev) : dev(mdev){
 	memset(dirtyPages, 0, areaSummaryCacheSize * sizeof(PageOffs));
 }
 
+Result SummaryCache::commitASHard(int &clearedArea){
+	PageOffs favDirtyPages = 0;
+	AreaPos favouriteArea = 0;
+	for(std::pair<AreaPos, uint16_t> it : translation){
+			//found a cached element
+		uint16_t cachePos = it.second;
+		if(isDirty(cachePos) && wasASWrittenByCachePosition(cachePos) &&
+			dev->areaMap[it.first].status != AreaStatus::active &&
+			(dev->areaMap[it.first].type == AreaType::data || dev->areaMap[it.first].type == AreaType::index)){
+
+			PageOffs _dirtyPages = countDirtyPages(cachePos);
+
+			if(_dirtyPages >= favDirtyPages){
+				favouriteArea = it.first;
+				favDirtyPages = _dirtyPages;
+			}
+		}
+	}
+
+	if(favouriteArea == 0){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Could not find any swappable candidats, why?");
+		return Result::bug;
+	}
+	if(translation.find(favouriteArea) == translation.end()){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Could not find swapping area in cache?");
+		return Result::bug;
+	}
+	uint16_t cachePos = translation[favouriteArea];
+
+	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Commit Hard swaps GC Area %" PRIu32 " (on %" PRIu32 ")"
+			" with %" PRIu32 " (on %" PRIu32 ")",
+			dev->activeArea[AreaType::garbageBuffer], dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].position,
+			favouriteArea, dev->areaMap[favouriteArea].position);
+
+	SummaryEntry summary[dataPagesPerArea];
+	unpackStatusArray(cachePos, summary);
+
+	Result r = dev->areaMgmt.gc.moveValidDataToNewArea(
+			favouriteArea, dev->activeArea[AreaType::garbageBuffer], summary);
+
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not move Data for AS commit!");
+		return r;
+	}
+
+	//swap logical position of areas to keep addresses valid
+	AreaPos tmp = dev->areaMap[favouriteArea].position;
+	dev->areaMap[favouriteArea].position = dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].position;
+	dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].position = tmp;
+	//swap erasecounts to let them point to the correct physical position
+	PageOffs tmp2 = dev->areaMap[favouriteArea].erasecount;
+	dev->areaMap[favouriteArea].erasecount = dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].erasecount;
+	dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].erasecount = tmp2;
+
+	packStatusArray(cachePos, summary);
+	setDirty(cachePos, false);
+	setASWritten(cachePos, false);
+
+	clearedArea = favouriteArea;
+	return Result::ok;
+}
+
 SummaryEntry SummaryCache::getPackedStatus(uint16_t position, PageOffs page){
 	return static_cast<SummaryEntry>((summaryCache[position][page/4] & (0b11 << (page % 4)*2)) >> (page % 4)*2);
 }
@@ -126,7 +188,7 @@ Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry sta
 		}
 
 		if(dirtyPages[translation[area]] == dataPagesPerArea){
-			PAFFS_DBG(PAFFS_TRACE_ASCACHE, "Area %" PRIu32 " has run full of dirty pages, deleting.", area);
+			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Area %" PRIu32 " has run full of dirty pages, deleting.", area);
 			dev->areaMgmt.deleteArea(area);
 			//This also resets ASWritten and dirty
 			memset(summaryCache[translation[area]], 0, areaSummaryEntrySize);
@@ -395,7 +457,6 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 	memset(used, false, sizeof(bool) * areaSummaryCacheSize);
 	memset(pos, 0, sizeof(AreaPos) * areaSummaryCacheSize);
 	int fav = -1;
-	uint32_t maxDirtyPages = 0;
 
 	for(auto it = translation.cbegin(), end = translation.cend();
 			it != end; ++it){
@@ -423,11 +484,12 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 		return Result::ok;
 
 	//Look for the least probable Area to be used that has no committed AS
+	uint32_t maxDirtyPages = 0;
  	for(int i = 0; i < areaSummaryCacheSize; i++){
 		if(used[i] && !wasASWrittenByCachePosition(i) &&
 				dev->areaMap[pos[i]].status != AreaStatus::active){
 			PageOffs tmp = countUnusedPages(i);
-			if(tmp > maxDirtyPages){
+			if(tmp >= maxDirtyPages){
 				fav = i;
 				maxDirtyPages = tmp;
 			}
@@ -450,21 +512,16 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "freeNextBestCache found no uncommitted Area, activating Garbage collection");
 	Result r = dev->areaMgmt.gc.collectGarbage(AreaType::unset);
 	if(r != Result::ok){
-		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Garbage collection could not free any Areas! No possibility to commit AS");
+		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Garbage collection could not free any Areas");
+	}
+
+	//Ok, just swap Area-positions, clearing AS
+	r = commitASHard(fav);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not free any AS cache elem!");
 		return r;
 	}
 
-	//Look for the least probable Area to be used that has no committed AS
-	for(int i = 0; i < areaSummaryCacheSize; i++){
-		if(used[i] && !wasASWrittenByCachePosition(i) &&
-				dev->areaMap[pos[i]].status != AreaStatus::active){
-			PageOffs tmp = countUnusedPages(i);
-			if(tmp > maxDirtyPages){
-				fav = i;
-				maxDirtyPages = tmp;
-			}
-		}
-	}
 	if(fav > -1){
 		//Commit AS to Area OOB
 		SummaryEntry buf[dataPagesPerArea];

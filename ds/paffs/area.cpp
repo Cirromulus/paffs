@@ -101,6 +101,8 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 				return area;
 			}
 		}
+	}else if(dev->usedAreas < areasNo){
+		PAFFS_DBG_S(PAFFS_TRACE_AREA, "FindWritableArea ignored reserved area");
 	}
 
  	Result r = gc.collectGarbage(areaType);

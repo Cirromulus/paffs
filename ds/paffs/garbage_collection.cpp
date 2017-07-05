@@ -11,6 +11,7 @@
 #include "device.hpp"
 #include "dataIO.hpp"
 #include "area.hpp"
+#include <inttypes.h>
 
 namespace paffs{
 
@@ -125,13 +126,6 @@ Result GarbageCollection::deleteArea(AreaPos area){
 }
 
 /**
- * TODO: in Worst case scenario, all areas of other areatype contain only
- * one valid page per area and use all remaining space. This way,
- * the other areatype consumes all space without needing it. It would have to
- * be rewritten in terms of crawling through all addresses and changing their target...
- * Costly!
- * Possible solution: Unify INDEX and DATA to be written in a single AreaType
- *
  * Changes active Area to one of the new freed areas.
  * Necessary to not have any get/setPageStatus calls!
  * This could lead to a Cache Flush which could itself cause a call on collectGarbage again
@@ -140,21 +134,8 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 	SummaryEntry summary[dataPagesPerArea];
 	memset(summary, 0xFF, dataPagesPerArea);
 	bool srcAreaContainsData = false;
-	bool desperateMode = dev->activeArea[AreaType::garbageBuffer] == 0;	//If we have no AreaType::garbage_buffer left
 	AreaPos deletion_target = 0;
 	Result r;
-
-	if(desperateMode){
-		/*TODO: The last Straw.
-		 * If we find a completely dirty block
-		 * that can be successfully erased
-		 * AND we find another erasable arbitrary block,
-		 * we can escape desperate mode restoring a Garbage buffer.
-		 */
-
-		PAFFS_DBG(PAFFS_TRACE_GC, "GC is in desperate mode! Recovery is not implemented.");
-		return Result::nosp;
-	}
 
 	AreaPos lastDeletionTarget = 0;
 	while(1){
@@ -167,31 +148,41 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 			//committed even for read operations.
 
 			if(targetType != AreaType::index){
-				PAFFS_DBG_S(PAFFS_TRACE_GC, "And we reserve the DESPERATE MODE for INDEX only.");
+				PAFFS_DBG_S(PAFFS_TRACE_GC, "And we use reserved Areas for INDEX only.");
 				return Result::nosp;
 			}
 
-			if(desperateMode){
-				PAFFS_DBG_S(PAFFS_TRACE_GC, "... and additionally we already gave up GC_BUFFER!");
+			if(dev->usedAreas <= areasNo){
+				PAFFS_DBG_S(PAFFS_TRACE_GC, "and have no reserved Areas left.");
 				return Result::nosp;
 			}
 
 			//This happens if we couldn't erase former srcArea which was not empty
 			//The last resort is using our protected GC_BUFFER block...
-			PAFFS_DBG_S(PAFFS_TRACE_GC, "GC did not find next place for GC_BUFFER! Reutilizing BUFFER as last resort.");
-			desperateMode = true;
+			PAFFS_DBG_S(PAFFS_TRACE_GC, "GC did not find next place for GC_BUFFER! "
+					"Using reserved Areas.");
+
+			AreaPos nextPos;
+			for(nextPos = 0; nextPos < areasNo; nextPos++){
+				if(dev->areaMap[nextPos].status == AreaStatus::empty){
+					dev->areaMap[nextPos].type = targetType;
+					dev->areaMgmt.initArea(nextPos);
+					PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found empty Area %u", nextPos);
+				}
+			}
+			if(nextPos == areasNo){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Used Areas said we had space left (%" PRIu32 " areas), "
+						"but no empty area was found!", dev->usedAreas);
+				return Result::bug;
+			}
 
 			/* If lastArea contained data, it is already copied to gc_buffer. 'summary' is untouched and valid.
 			 * It it did not contain data (or this is the first round), 'summary' contains {SummaryEntry::free}.
 			 */
 			if(lastDeletionTarget == 0){
-				//this is first round, no possible chunks found.
-				//Just init and return garbageBuffer.
-				dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].type = AreaType::index;
-				dev->areaMgmt.initArea(dev->activeArea[AreaType::garbageBuffer]);
-				dev->activeArea[AreaType::index] = dev->activeArea[AreaType::garbageBuffer];
-
-				dev->activeArea[AreaType::garbageBuffer] = 0;	//No GC_BUFFER left
+				//this is first round, without having something deleted.
+				//Just init and return nextPos.
+				dev->activeArea[AreaType::index] = nextPos;
 				return Result::ok;
 			}
 
@@ -226,12 +217,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 			}
 		}
 
-		/*TODO: more Safety switches like comparison of lastDeletion targetType
-
-		if(desperateMode && srcAreaContainsData){
-			PAFFS_DBG(PAFFS_TRACE_GC, "GC cant copy valid data in desperate mode! Giving up.");
-			return Result::nosp;
-		}*/
+		//TODO: more Safety switches like comparison of lastDeletion targetType
 
 		lastDeletionTarget = deletion_target;
 
@@ -254,9 +240,10 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 				return r;
 			}
 			//Notify for used Pages
-			if(targetType != AreaType::unset)
+			if(targetType != AreaType::unset){
 				//Safe, because we can assume deletion targetType is same Type as we want (from getNextBestArea)
 				dev->areaMap[deletion_target].status = AreaStatus::active;
+			}
 		}else{
 			r = dev->sumCache.deleteSummary(deletion_target);
 			if(r != Result::ok){
@@ -296,18 +283,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 	dev->areaMap[deletion_target].erasecount = dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].erasecount;
 	dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].erasecount = tmp2;
 
-	if(desperateMode){
-		//now former retired section became garbage buffer, retire it officially.
-		dev->areaMgmt.retireArea(dev->activeArea[AreaType::garbageBuffer]);
-		dev->activeArea[AreaType::garbageBuffer] = 0;
-		if(traceMask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
-			printf("Info: \n");
-			for(unsigned int i = 0; i < areasNo; i++){
-				printf("\tArea %d on %u as %10s with %u erases\n", i, dev->areaMap[i].position, areaNames[dev->areaMap[i].type], dev->areaMap[i].erasecount);
-			}
-		}
-	}
-
+	//TODO: Check if unset mode is really doing the trick
 	if(targetType != AreaType::unset)
 		dev->activeArea[targetType] = deletion_target;
 
