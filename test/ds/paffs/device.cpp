@@ -262,12 +262,24 @@ TEST_F(FileTest, maxFilesize){
 		ASSERT_EQ(r, paffs::Result::ok);
 		i += bw;
 	}
-	fs.seek(fil, 0, paffs::Seekmode::set);
+
+	r = fs.close(fil);
+	ASSERT_EQ(r, paffs::Result::ok);
+	r = fs.unmount();
+	ASSERT_EQ(r, paffs::Result::ok);
+	r = fs.mount();
+	ASSERT_EQ(r, paffs::Result::ok);
+
 	paffs::ObjInfo info;
 	fs.resetLastErr();
 	fs.getObjInfo("/file", &info);
 	ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
 	ASSERT_EQ(i, info.size);
+	fil = fs.open("/file", paffs::FW);
+	if(fs.getLastErr() != paffs::Result::ok)
+		printf("%s!\n", paffs::err_msg(fs.getLastErr()));
+	ASSERT_NE(fil, nullptr);
+
 	while(i > 0){
 		memset(blockcopy, 0, blocksize);
 		r = fs.read(fil, blockcopy, blocksize, &bw);

@@ -53,8 +53,35 @@ TEST_F(SummaryCache, fillFlashAndVerify){
 			ASSERT_EQ(fs.getDevice()->tree.cache.isTreeCacheValid(), true);
 		}
 	}
-
+	int ic = i, jc = j;
 	//check if valid
+	for(i--;i >= 0; i--){
+		for(j--; j >= 0; j--){
+			sprintf(filename, "/%05d/%02d", i, j);
+			fil = fs.open(filename, paffs::FC);
+			ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
+
+			r = fs.read(fil, buf, strlen(txt), &bw);
+			EXPECT_EQ(bw, strlen(txt));
+			ASSERT_EQ(r, paffs::Result::ok);
+			ASSERT_TRUE(ArraysMatch(txt, buf, strlen(txt)));
+
+			r = fs.close(fil);
+			ASSERT_EQ(r, paffs::Result::ok);
+		}
+		j = 100;
+	}
+
+	ASSERT_EQ(r, paffs::Result::ok);
+	r = fs.unmount();
+	ASSERT_EQ(r, paffs::Result::ok);
+	r = fs.mount();
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	//second check, after remount
+	i = ic;
+	j = jc;
+
 	for(i--;i >= 0; i--){
 		for(j--; j >= 0; j--){
 			sprintf(filename, "/%05d/%02d", i, j);

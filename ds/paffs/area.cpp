@@ -10,6 +10,8 @@
 #include "paffs_trace.hpp"
 #include "summaryCache.hpp"
 #include <string.h>
+#include <inttypes.h>
+
 namespace paffs {
 
 const char* areaNames[] = {
@@ -30,6 +32,11 @@ const char* areaStatusNames[] = {
 
 //Returns the absolute page number from *indirect* address
 PageAbs getPageNumber(Addr addr, Device* dev){
+	if(extractLogicalArea(addr) >= areasNo){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried accessing area %" PRIu32 ", but we have only %" PRIu32,
+				extractLogicalArea(addr), areasNo);
+		return 0;
+	}
 	PageAbs page = dev->areaMap[extractLogicalArea(addr)].position *
 								totalPagesPerArea;
 	page += extractPage(addr);

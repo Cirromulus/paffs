@@ -201,12 +201,19 @@ Result Device::unmnt(){
 	if(it != openInodes.end()){
 		PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Unclosed files remain, closing for unmount");
 		while(it != openInodes.end()){
-			//TODO: instead, flush PAC on this Inode.
-			r = tree.updateExistingInode(it->second.first);
+
+			//TODO: Later, we would choose the actual pac instance (or the PAC will choose the actual Inode...
+			r = dataIO.pac.setTargetInode(it->second.first);
 			if(r != Result::ok){
 				//we ignore Result, because we unmount.
-				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit an open file");
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load pac of an open file");
 			}
+			r = dataIO.pac.commit();
+			if(r != Result::ok){
+				//we ignore Result, because we unmount.
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit pac of an open file");
+			}
+
 			it = openInodes.erase(it);
 		}
 	}
@@ -547,6 +554,19 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 	if(bytes != contDir->size && r == Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "writeInodeData wrote different bytes than requested"
 				", but returned OK");
+	}
+	if(r != Result::ok){
+		//Ouch, during directory write
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write %u of %u bytes directory data",
+				contDir->size + direntryl - bytes, contDir->size + direntryl);
+		if(bytes != 0){
+			Result r2 = tree.updateExistingInode(contDir);
+			if(r2 != Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update Inode after unfinished directory insert!"
+						" Ignoring error to continue.");
+			}
+		}
+		return r;
 	}
 
 	return tree.updateExistingInode(contDir);
@@ -954,7 +974,8 @@ Result Device::touch(const char* path){
 	}
 	if(!mounted)
 		return Result::notMounted;
-	if(readOnly){
+	if(readOnly || usedAreas > areasNo - minFreeAreas){
+		//If we use reserverd Areas, extensive touching may fill flash anyway
 		return Result::nosp;
 	}
 
@@ -1059,6 +1080,15 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 
 	Result r = dataIO.writeInodeData(obj->dirent->node, obj->fp, bytes_to_write, bytes_written, buf);
 	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write %u of %u bytes",
+				bytes_to_write - *bytes_written, bytes_to_write);
+		if(*bytes_written > 0){
+			Result r2 = tree.updateExistingInode(obj->dirent->node);
+			if(r2 != Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "could not update Inode of unsuccessful inode write "
+						"(%s)", err_msg(r2));
+			}
+		}
 		return r;
 	}
 	if(*bytes_written != bytes_to_write){
@@ -1115,14 +1145,20 @@ Result Device::flush(Obj* obj){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-
-	(void) obj;
-	//TODO: When Inodes get Link to its PAC, it is committed here
-	//dataIO.pac.setTargetInode(obj->dirent->node);
-	//dataIO.pac.commit();
-
 	if(!mounted)
 		return Result::notMounted;
+
+	//TODO: When Inodes get Link to its PAC, this would be more elegant
+	Result r = dataIO.pac.setTargetInode(obj->dirent->node);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Target Inode!");
+		return r;
+	}
+	dataIO.pac.commit();
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Inode!");
+		return r;
+	}
 	return Result::ok;
 }
 

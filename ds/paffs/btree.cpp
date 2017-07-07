@@ -37,7 +37,7 @@ Result Btree::updateExistingInode(Inode* inode){
 	}
 
 	if(pos == node->raw.num_keys){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Tried to update existing Inode %u, but could not find it!", inode->no);
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to update existing Inode %u, but could not find it!", inode->no);
 		return Result::bug;	//This Key did not exist
 	}
 

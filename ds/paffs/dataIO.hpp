@@ -17,8 +17,9 @@ namespace paffs{
 
 class DataIO{
 	Device *dev;
-	PageAddressCache pac;
 public:
+	PageAddressCache pac;
+
 	DataIO(Device *mdev) : dev(mdev), pac(mdev){};
 	//Updates changes to treeCache as well
 	Result writeInodeData(Inode* inode,

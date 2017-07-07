@@ -511,15 +511,42 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 
 	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "freeNextBestCache found no uncommitted Area, activating Garbage collection");
 	Result r = dev->areaMgmt.gc.collectGarbage(AreaType::unset);
-	if(r != Result::ok){
+	if(r == Result::ok){
+		//Look for the least probable Area to be used that has no committed AS
+		maxDirtyPages = 0;
+	 	for(int i = 0; i < areaSummaryCacheSize; i++){
+			if(used[i] && !wasASWrittenByCachePosition(i) &&
+					dev->areaMap[pos[i]].status != AreaStatus::active){
+				PageOffs tmp = countUnusedPages(i);
+				if(tmp >= maxDirtyPages){
+					fav = i;
+					maxDirtyPages = tmp;
+				}
+			}
+		}
+	}else{
 		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Garbage collection could not free any Areas");
+		//Ok, just swap Area-positions, clearing AS
+		r = commitASHard(fav);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not free any AS cache elem!");
+			return r;
+		}
 	}
 
-	//Ok, just swap Area-positions, clearing AS
-	r = commitASHard(fav);
-	if(r != Result::ok){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not free any AS cache elem!");
-		return r;
+	if(traceMask & PAFFS_TRACE_VERIFY_AS){
+		//check for bugs in usage of Garbage collection
+		unsigned activeAreas = 0;
+		for(AreaPos i = 0; i < areasNo; i++){
+			if(dev->areaMap[i].status == AreaStatus::active &&
+					(dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)){
+				activeAreas++;
+			}
+		}
+		if(activeAreas > 2){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "More than two active Areas after gc! (%u)", activeAreas);
+			return Result::bug;
+		}
 	}
 
 	if(fav > -1){
