@@ -359,6 +359,8 @@ Result PageAddressCache::deletePath(Addr& anchor, PageNo pageFrom, PageNo pageTo
 		start[0].active = false;
 		return Result::ok;
 	}
+
+	//TODO: Immediately invalidate all pages (data as well as index)
 	/**
 	if(!start[0].active){
 		r = loadCacheElem(anchor, start[0]);
