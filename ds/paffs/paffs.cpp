@@ -22,7 +22,7 @@ unsigned int traceMask =
 	//PAFFS_TRACE_VERBOSE |
 	//PAFFS_TRACE_READ |
 	PAFFS_TRACE_INFO |
-	PAFFS_TRACE_AREA |
+	//PAFFS_TRACE_AREA |
 	PAFFS_TRACE_ERROR |
 	PAFFS_TRACE_BUG |
 	//PAFFS_TRACE_TREE |
@@ -30,7 +30,7 @@ unsigned int traceMask =
 	//PAFFS_TRACE_ASCACHE |
 	//PAFFS_TRACE_SCAN |
 	//PAFFS_TRACE_WRITE |
-	PAFFS_TRACE_SUPERBLOCK |
+	//PAFFS_TRACE_SUPERBLOCK |
 	//PAFFS_TRACE_ALLOCATE |
 	//PAFFS_TRACE_VERIFY_AS |
 	PAFFS_TRACE_VERIFY_TC |
@@ -57,6 +57,7 @@ const char* resultMsg[] = {
 		"Device is not mounted",
 		"Device is already mounted",
 		"Object name is too big",
+		"Tried writing on readOnly Device",
 		"Biterror could be corrected by ECC",
 		"Biterror could not be corrected by ECC",
 		"You should not be seeing this..."
@@ -173,12 +174,12 @@ Result Paffs::format(bool complete){
 	return r;
 }
 
-Result Paffs::mount(){
+Result Paffs::mount(bool readOnly){
 	//TODO: Handle errors
 	Result r = Result::ok;
 	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
 		if(validDevices[i]){
-			Result r_ = devices[i]->mnt();
+			Result r_ = devices[i]->mnt(readOnly);
 			if(r == Result::ok)
 				r = r_;
 		}

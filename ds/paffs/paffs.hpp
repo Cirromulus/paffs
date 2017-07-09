@@ -24,13 +24,13 @@ public:
 	~Paffs();
 
 	Result format(bool complete=false);
-	Result mount();
+	Result mount(bool readoOnly=false);
 	Result unmount();
 	Result getLastErr();
 	void resetLastErr();
 
 	//Directory
-	Result mkDir(const char* fullPath, Permission mask);
+	Result mkDir(const char* fullPath, Permission mask = R | W | X);
 	Dir* openDir(const char* path);
 	Dirent* readDir(Dir* dir);
 	Result closeDir(Dir* dir);
@@ -45,7 +45,7 @@ public:
 	Result write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written);
 	Result seek(Obj* obj, int m, Seekmode mode);
 	Result flush(Obj* obj);
-	Result truncate(Dirent* obj);
+	Result truncate(Obj* obj);
 
 	Result chmod(const char* path, Permission perm);
 	Result remove(const char* path);

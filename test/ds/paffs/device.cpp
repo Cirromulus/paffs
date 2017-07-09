@@ -357,3 +357,122 @@ TEST_F(FileTest, multiplePointersToSameFile){
 	r = fs.close(outFil);
 	ASSERT_EQ(r, paffs::Result::ok);
 }
+
+TEST_F(FileTest, readOnlyChecks){
+	paffs::Permission p = paffs::R | paffs::W;
+	char word[] = "Hallo1";
+	unsigned int wordlen = 6;
+	char buf[wordlen];
+	paffs::Result r;
+	paffs::Obj* fil;
+	paffs::Dir* dir;
+	paffs::Dirent* entr;
+
+	unsigned int bw = 0;
+	r = fs.mkDir("/a", p);
+	ASSERT_EQ(r, paffs::Result::ok);
+	r = fs.mkDir("/a/b", p);
+	ASSERT_EQ(r, paffs::Result::ok);
+	r = fs.touch("/a/b/file1");
+	ASSERT_EQ(r, paffs::Result::ok);
+	r = fs.mkDir("/b", p);
+	ASSERT_EQ(r, paffs::Result::ok);
+	r = fs.mkDir("/b/c", p);
+	ASSERT_EQ(r, paffs::Result::ok);
+	r = fs.touch("/b/file2");
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	fil = fs.open("/a/b/file1", paffs::FW);
+	ASSERT_EQ(fs.getLastErr(),paffs::Result::ok);
+	ASSERT_NE(fil, nullptr);
+	r = fs.write(fil, word, wordlen, &bw);
+	ASSERT_EQ(r, paffs::Result::ok);
+	ASSERT_EQ(bw, wordlen);
+	r = fs.close(fil);
+
+	r = fs.unmount();
+	ASSERT_EQ(r, paffs::Result::ok);
+	r = fs.mount(true);
+	ASSERT_EQ(r, paffs::Result::ok);
+
+
+	//normal read
+	fil = fs.open("/a/b/file1", paffs::FR);
+	ASSERT_EQ(fs.getLastErr(),paffs::Result::ok);
+	ASSERT_NE(fil, nullptr);
+	r = fs.read(fil, buf, wordlen, &bw);
+	ASSERT_EQ(r, paffs::Result::ok);
+	ASSERT_EQ(bw, wordlen);
+	ASSERT_TRUE(ArraysMatch(buf, word, 6));
+	r = fs.close(fil);
+
+	//Write try
+	fil = fs.open("/a/b/file1", paffs::FW);
+	ASSERT_EQ(fs.getLastErr(), paffs::Result::readonly);
+	ASSERT_EQ(fil, nullptr);
+	fs.resetLastErr();
+
+	//existing File
+	r = fs.touch("/a/b/file1");
+	ASSERT_EQ(r, paffs::Result::readonly);
+
+	//new file
+	r = fs.touch("/a/b/fileNEW");
+	ASSERT_EQ(r, paffs::Result::readonly);
+
+	//existing Dirs
+	//root
+	dir = fs.openDir("/");
+	ASSERT_NE(dir, nullptr);
+	entr = fs.readDir(dir);
+	ASSERT_NE(entr, nullptr);
+	ASSERT_EQ(entr->node->type, paffs::InodeType::dir);
+	EXPECT_TRUE(StringsMatch(entr->name, "a/"));
+	entr = fs.readDir(dir);
+	ASSERT_NE(entr, nullptr);
+	ASSERT_EQ(entr->node->type, paffs::InodeType::dir);
+	EXPECT_TRUE(StringsMatch(entr->name, "b/"));
+	r = fs.closeDir(dir);
+	ASSERT_EQ(r, paffs::Result::ok);
+	//a
+	dir = fs.openDir("/a");
+	ASSERT_NE(dir, nullptr);
+	entr = fs.readDir(dir);
+	ASSERT_NE(entr, nullptr);
+	ASSERT_EQ(entr->node->type, paffs::InodeType::dir);
+	EXPECT_TRUE(StringsMatch(entr->name, "b/"));
+	r = fs.closeDir(dir);
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	// a/b
+	dir = fs.openDir("/a/b");
+	ASSERT_NE(dir, nullptr);
+	entr = fs.readDir(dir);
+	ASSERT_NE(entr, nullptr);
+	ASSERT_EQ(entr->node->type, paffs::InodeType::file);
+	EXPECT_TRUE(StringsMatch(entr->name, "file1"));
+	r = fs.closeDir(dir);
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	//b
+	dir = fs.openDir("/b");
+	ASSERT_NE(dir, nullptr);
+	entr = fs.readDir(dir);
+	ASSERT_NE(entr, nullptr);
+	ASSERT_EQ(entr->node->type, paffs::InodeType::dir);
+	EXPECT_TRUE(StringsMatch(entr->name, "c/"));
+	entr = fs.readDir(dir);
+	ASSERT_NE(entr, nullptr);
+	ASSERT_EQ(entr->node->type, paffs::InodeType::file);
+	EXPECT_TRUE(StringsMatch(entr->name, "file2"));
+	r = fs.closeDir(dir);
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	//new Dir
+	r = fs.mkDir("/c/");
+	ASSERT_EQ(r, paffs::Result::readonly);
+
+	//delete dir
+	r = fs.remove("/a/b");
+	ASSERT_EQ(r, paffs::Result::readonly);
+}

@@ -37,6 +37,7 @@ enum class Result : uint8_t{
 	notMounted,
 	alrMounted,
 	objNameTooLong,
+	readonly,
 	biterrorCorrected,
 	biterrorNotCorrected,
 	num_result
@@ -51,7 +52,7 @@ typedef uint8_t Permission;
 const Permission R = 0x1;
 const Permission W = 0x2;
 const Permission X = 0x4;
-const Permission permMask = 0b111;
+const Permission permMask = R | W | X;
 
 typedef uint8_t Fileopenmask;
 const Fileopenmask FR = 0x01;	//file read

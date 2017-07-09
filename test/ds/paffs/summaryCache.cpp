@@ -100,36 +100,55 @@ TEST_F(SummaryCache, fillFlashAndVerify){
 	}
 }
 
-/*
-TEST_F(SummaryCache, packedStatusIntegrity){
-	paffs::SummaryCache* c = &fs.getDevice()->sumCache;
-	constexpr unsigned int size = paffs::dataPagesPerArea / 4 + 1;
-	unsigned char buf[size] = {};
-	paffs::SummaryEntry buf2[paffs::dataPagesPerArea] = {};
 
-	for(paffs::AreaPos i = 0; i < paffs::areaSummaryCacheSize; i++){
-		memset(c->summaryCache[i], 0, size);
+TEST(SummaryCacheElem, packedStatusIntegrity){
+	paffs::AreaSummaryElem asElem;
+
+	for(unsigned i = 0; i < paffs::dataPagesPerArea; i++){
+		ASSERT_EQ(asElem.getStatus(i), paffs::SummaryEntry::free);
 	}
-	c->setDirty(0);
-	ASSERT_EQ(c->isDirty(0), true);
-	ASSERT_TRUE(ArraysMatch(c->summaryCache[1], buf, size));
+	ASSERT_EQ(asElem.isDirty(), false);
+	ASSERT_EQ(asElem.isAsWritten(), false);
+	ASSERT_EQ(asElem.isLoadedFromSuperPage(), false);
 
-	c->setDirty(0, false);
-	ASSERT_EQ(c->isDirty(0), false);
+	asElem.setDirty();
+	ASSERT_EQ(asElem.isDirty(), true);
+	ASSERT_EQ(asElem.isAsWritten(), false);
+	ASSERT_EQ(asElem.isLoadedFromSuperPage(), false);
+
+	asElem.setDirty(false);
+	ASSERT_EQ(asElem.isDirty(), false);
+
+	asElem.setAsWritten();
+	ASSERT_EQ(asElem.isDirty(), false);
+	ASSERT_EQ(asElem.isAsWritten(), true);
+	ASSERT_EQ(asElem.isLoadedFromSuperPage(), false);
+
+	asElem.setAsWritten(false);
+	ASSERT_EQ(asElem.isAsWritten(), false);
+
+	asElem.setLoadedFromSuperPage();
+	ASSERT_EQ(asElem.isDirty(), false);
+	ASSERT_EQ(asElem.isAsWritten(), false);
+	ASSERT_EQ(asElem.isLoadedFromSuperPage(), true);
 
 	for(unsigned int i = 0; i < paffs::dataPagesPerArea; i++){
-		c->setPackedStatus(0, i, paffs::SummaryEntry::error);
+		asElem.setStatus(i, paffs::SummaryEntry::error);
+		for(unsigned int j = 0; j < paffs::dataPagesPerArea; j++){
+			if(j == i){
+				ASSERT_EQ(asElem.getStatus(j), paffs::SummaryEntry::error);
+				continue;
+			}
+			ASSERT_EQ(asElem.getStatus(j), paffs::SummaryEntry::free);
+		}
+		asElem.setStatus(i, paffs::SummaryEntry::free);
 	}
-	for(unsigned int i = 0; i < paffs::dataPagesPerArea; i++){
-		ASSERT_EQ(c->getPackedStatus(0, i), paffs::SummaryEntry::error);
-	}
-	c->unpackStatusArray(0, buf2);
-	for(unsigned int i = 0; i < paffs::dataPagesPerArea; i++){
-		ASSERT_EQ(buf2[i], paffs::SummaryEntry::error);
-	}
-	ASSERT_EQ(c->isDirty(0), false);
 
-	c->setDirty(0);
-	ASSERT_EQ(c->isDirty(0), true);
-	ASSERT_TRUE(ArraysMatch(c->summaryCache[1], buf, size));
-}*/
+	//It should set itself Dirty when a setStatus occurs.
+	ASSERT_EQ(asElem.isDirty(), true);
+
+	//It should reset |loadedFromSuperPage| when a setStatus occurs.
+	ASSERT_EQ(asElem.isLoadedFromSuperPage(), false);
+
+
+}

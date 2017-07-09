@@ -639,6 +639,11 @@ Result Device::mkDir(const char* fullPath, Permission mask){
 	}
 	if(!mounted)
 		return Result::notMounted;
+	if(readOnly)
+		return Result::readonly;
+	if(usedAreas >= areasNo - minFreeAreas)
+		return Result::nosp;
+
 	unsigned int lastSlash = 0;
 
 	Inode parDir;
@@ -670,7 +675,7 @@ Dir* Device::openDir(const char* path){
 	if(!mounted){
 		lasterr = Result::notMounted;
 		return nullptr;
-		}
+	}
 	if(path[0] == 0){
 		lasterr = Result::einval;
 		return nullptr;
@@ -849,6 +854,11 @@ Result Device::createFile(Inode* outFile, const char* fullPath, Permission mask)
 	}
 	if(!mounted)
 		return Result::notMounted;
+	if(readOnly)
+		return Result::readonly;
+	if(usedAreas >= areasNo - minFreeAreas)
+		return Result::nosp;
+
 	unsigned int lastSlash = 0;
 
 	Inode parDir;
@@ -882,6 +892,10 @@ Obj* Device::open(const char* path, Fileopenmask mask){
 	}
 	if(!mounted){
 		lasterr = Result::notMounted;
+		return nullptr;
+	}
+	if(readOnly && mask & FW){
+		lasterr = Result::readonly;
 		return nullptr;
 	}
 	Inode buf;
@@ -974,10 +988,11 @@ Result Device::touch(const char* path){
 	}
 	if(!mounted)
 		return Result::notMounted;
-	if(readOnly || usedAreas > areasNo - minFreeAreas){
-		//If we use reserverd Areas, extensive touching may fill flash anyway
+	if(readOnly)
+		return Result::readonly;
+	if(usedAreas > areasNo - minFreeAreas)
+		//If we use reserved Areas, extensive touching may fill flash anyway
 		return Result::nosp;
-	}
 
 	Inode buf;
 	Inode *file = &buf;
@@ -1064,17 +1079,15 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 		return Result::notMounted;
 	if(obj == nullptr)
 		return Result::einval;
-
-	if(readOnly){
+	if(readOnly)
+		return Result::readonly;
+	if(usedAreas >= areasNo - minFreeAreas)
 		return Result::nosp;
-	}
 
-	if(obj->dirent->node->type == InodeType::dir){
+	if(obj->dirent->node->type == InodeType::dir)
 		return Result::einval;
-	}
-	if(obj->dirent->node->type == InodeType::lnk){
+	if(obj->dirent->node->type == InodeType::lnk)
 		return Result::nimpl;
-	}
 	if((obj->dirent->node->perm & W) == 0)
 		return Result::noperm;
 
@@ -1147,6 +1160,8 @@ Result Device::flush(Obj* obj){
 	}
 	if(!mounted)
 		return Result::notMounted;
+	if(readOnly)
+		return Result::ok;
 
 	//TODO: When Inodes get Link to its PAC, this would be more elegant
 	Result r = dataIO.pac.setTargetInode(obj->dirent->node);
@@ -1181,9 +1196,8 @@ Result Device::remove(const char* path){
 	}
 	if(!mounted)
 		return Result::notMounted;
-	if(readOnly){
-		return Result::nosp;
-	}
+	if(readOnly)
+		return Result::readonly;
 
 	Inode buf;
 	Inode *object = &buf;

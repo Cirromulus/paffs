@@ -11,11 +11,32 @@
 
 namespace paffs {
 
+struct AreaSummaryElem{
+	unsigned char entry[dataPagesPerArea / 4 + 1];	//assumes an Odd number of dataPagesPerArea
+	unsigned char statusBits; //dirty < asWritten < loadedFromSuperIndex
+	PageOffs dirtyPages;
+	AreaSummaryElem();
+	void clear();
+	SummaryEntry getStatus(PageOffs page);
+	void setStatus(PageOffs page, SummaryEntry value);
+	bool isDirty();
+	void setDirty(bool dirty = true);
+	bool isAsWritten();
+	void setAsWritten(bool written = true);
+	/**
+	 * @brief used to determine, if AS
+	 * did not change since loaded from SuperPage
+	 */
+	bool isLoadedFromSuperPage();
+	void setLoadedFromSuperPage(bool loaded = true);
+	PageOffs getDirtyPages();
+	void setDirtyPages(PageOffs pages);
+};
+
 class SummaryCache{
-	static constexpr unsigned int areaSummaryEntrySize = dataPagesPerArea / 4 + 2;
+
 	//excess byte is for dirty- and wasASWritten marker
-	unsigned char summaryCache[areaSummaryCacheSize][areaSummaryEntrySize];
-	PageOffs dirtyPages[areaSummaryCacheSize];
+	AreaSummaryElem summaryCache[areaSummaryCacheSize];
 
 	std::unordered_map<AreaPos, uint16_t> translation;	//from area number to array offset
 	Device* dev;
@@ -72,14 +93,6 @@ private:
 	void unpackStatusArray(uint16_t position, SummaryEntry* arr);
 
 	void packStatusArray(uint16_t position, SummaryEntry* arr);
-
-	bool isDirty(uint16_t position);
-
-	void setDirty(uint16_t position, bool value=true);
-
-	bool wasASWrittenByCachePosition(uint16_t position);
-
-	void setASWritten(uint16_t position, bool value=true);
 
 	int findNextFreeCacheEntry();
 

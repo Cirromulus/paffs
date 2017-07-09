@@ -23,6 +23,9 @@ public:
 	//automatically loads default driver "0" with default flash
 	paffs::Paffs fs;
 	InitFs() : fs(collectDrivers()){
+	};
+
+	virtual void SetUp(){
 		paffs::Result r = fs.format(true);
 		fs.setTraceMask(
 			PAFFS_TRACE_VERIFY_TC |
@@ -32,14 +35,19 @@ public:
 		);
 		if(r != paffs::Result::ok)
 			std::cerr << "Could not format device!" << std::endl;
+		ASSERT_EQ(r, paffs::Result::ok);
 		r = fs.mount();
 		if(r != paffs::Result::ok)
 			std::cerr << "Could not mount device!" << std::endl;
+		ASSERT_EQ(r, paffs::Result::ok);
 	}
 
-	virtual ~InitFs(){
-		fs.unmount();
+	virtual void TearDown(){
+		paffs::Result r = fs.unmount();
+		ASSERT_THAT(r, testing::AnyOf(testing::Eq(paffs::Result::ok), testing::Eq(paffs::Result::notMounted)));
 	}
+
+	virtual ~InitFs(){}
 };
 
 //Source: stack overflow, Fraser '12
