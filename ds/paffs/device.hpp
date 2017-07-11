@@ -71,10 +71,9 @@ public:
 			unsigned int *bytes_written);
 	Result seek(Obj* obj, int m, Seekmode mode);
 	Result flush(Obj* obj);
-	Result truncate(Dirent* obj);
-
-	Result chmod(const char* path, Permission perm);
+	Result truncate(const char* path, unsigned int newLength);
 	Result remove(const char* path);
+	Result chmod(const char* path, Permission perm);
 
 private:
 

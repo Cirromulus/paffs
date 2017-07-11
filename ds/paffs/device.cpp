@@ -608,6 +608,8 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 			//Found
 			unsigned int newSize = contDir->size - entryl;
 			unsigned int restByte = newSize - pointer;
+			if(newSize == sizeof(DirEntryCount))
+				newSize = 0;
 
 			if((r = dataIO.deleteInodeData(contDir, newSize)) != Result::ok)
 				return r;
@@ -615,8 +617,12 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 			if(restByte > 0 && restByte < 4)	//should either be 0 (no entries left) or bigger than 4 (minimum size for one entry)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Something is fishy! (%d)", restByte);
 
-			if(newSize == 0)
-				return Result::ok;
+			if(newSize == 0){
+				//TODO: This shurely can be more intuitive
+				contDir->size = sizeof(DirEntryCount); //Length
+				//This was the last entry
+				return dataIO.pac.commit();
+			}
 
 			(*entries)--;
 			memcpy(&dirData[pointer], &dirData[pointer + entryl], restByte);
@@ -624,7 +630,11 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 			unsigned int bw = 0;
 			r = dataIO.writeInodeData(contDir, 0, newSize, &bw, dirData);
 			delete[] dirData;
-			return r;
+			if(r != Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update Inode Data");
+				return r;
+			}
+			return dataIO.pac.commit();
 		}
 		pointer += entryl;
 	}
@@ -1177,19 +1187,7 @@ Result Device::flush(Obj* obj){
 	return Result::ok;
 }
 
-Result Device::chmod(const char* path, Permission perm){
-	if(!mounted)
-		return Result::notMounted;
-	Result r;
-	Inode buf;
-	Inode *object = &buf;
-	if((r = getInodeOfElem(object, path)) != Result::ok){
-		return r;
-	}
-	object->perm = perm;
-	return tree.updateExistingInode(object);
-}
-Result Device::remove(const char* path){
+Result Device::truncate(const char* path, unsigned int newLength){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
@@ -1202,8 +1200,10 @@ Result Device::remove(const char* path){
 	Inode buf;
 	Inode *object = &buf;
 	Result r;
-	if((r = getInodeOfElem(object, path)) != Result::ok)
+	if((r = getInodeOfElem(object, path)) != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get Inode of elem");
 		return r;
+	}
 
 	if(object != &buf){
 		//This elem is in openInode list
@@ -1218,8 +1218,29 @@ Result Device::remove(const char* path){
 		if(object->size > sizeof(DirEntryCount))
 			return Result::dirnotempty;
 
-	if((r = dataIO.deleteInodeData(object, 0)) != Result::ok)
+	r = dataIO.deleteInodeData(object, newLength);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete Inode Data");
 		return r;
+	}
+	return dataIO.pac.commit();
+}
+
+Result Device::remove(const char* path){
+	Result r = truncate(path, 0);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete the files contents");
+		return r;
+	}
+	Inode buf;
+	Inode *object = &buf;
+	if((r = getInodeOfElem(object, path)) != Result::ok)
+		return r;
+	if(object != &buf){
+		//This elem is in openInode list
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Object still opened, cant remove!");
+		return Result::einval;
+	}
 
 	Inode parentDir;
 	unsigned int lastSlash = 0;
@@ -1229,6 +1250,19 @@ Result Device::remove(const char* path){
 	if((r = removeInodeFromDir(&parentDir, object)) != Result::ok)
 		return r;
 	return tree.deleteInode(object->no);
+}
+
+Result Device::chmod(const char* path, Permission perm){
+	if(!mounted)
+		return Result::notMounted;
+	Result r;
+	Inode buf;
+	Inode *object = &buf;
+	if((r = getInodeOfElem(object, path)) != Result::ok){
+		return r;
+	}
+	object->perm = perm;
+	return tree.updateExistingInode(object);
 }
 
 Result Device::initializeDevice(){

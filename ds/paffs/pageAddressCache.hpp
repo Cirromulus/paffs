@@ -35,7 +35,6 @@ public:
 	Result setTargetInode(Inode* node);
 	Result getPage(PageNo page, Addr *addr);
 	Result setPage(PageNo page, Addr  addr);
-	Result deletePage(PageNo pageFrom, PageNo pageTo);
 	Result commit();
 	bool isDirty();
 private:
@@ -44,9 +43,6 @@ private:
 	 */
 	Result loadPath(Addr& anchor, PageNo pageOffs, AddrListCacheElem* start,
 			unsigned char depth, PageNo &addrPos);
-	Result deletePath(Addr& anchor, PageNo pageFrom, PageNo pageTo,
-			AddrListCacheElem* start, unsigned char depth);
-
 
 	Result commitPath(Addr& anchor, AddrListCacheElem* path, unsigned char depth);
 	Result commitElem(AddrListCacheElem &parent, AddrListCacheElem &elem);

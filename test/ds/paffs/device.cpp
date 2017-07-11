@@ -241,7 +241,7 @@ TEST_F(FileTest, maxFilesize){
 	unsigned int blocksize = paffs::dataBytesPerPage*1.5;
 	char block[blocksize];
 	char blockcopy[blocksize];
-	unsigned int i = 0;
+	unsigned int i = 0, maxFileSize = 0;
 	for(;i < blocksize; i += wordsize){
 		memcpy(&block[i], txt, wordsize);
 	}
@@ -262,7 +262,7 @@ TEST_F(FileTest, maxFilesize){
 		ASSERT_EQ(r, paffs::Result::ok);
 		i += bw;
 	}
-
+	maxFileSize = i;
 	r = fs.close(fil);
 	ASSERT_EQ(r, paffs::Result::ok);
 	r = fs.unmount();
@@ -274,7 +274,7 @@ TEST_F(FileTest, maxFilesize){
 	fs.resetLastErr();
 	fs.getObjInfo("/file", &info);
 	ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
-	ASSERT_EQ(i, info.size);
+	ASSERT_EQ(maxFileSize, info.size);
 	fil = fs.open("/file", paffs::FW);
 	if(fs.getLastErr() != paffs::Result::ok)
 		printf("%s!\n", paffs::err_msg(fs.getLastErr()));
@@ -288,9 +288,47 @@ TEST_F(FileTest, maxFilesize){
 		EXPECT_TRUE(ArraysMatch(block, blockcopy, blocksize));
 		i -= bw;
 	}
-	//TODO: Also delete everything
 
 	r = fs.close(fil);
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	r = fs.truncate("/file", maxFileSize / 2);
+	ASSERT_EQ(r, paffs::Result::ok);
+	fs.resetLastErr();
+	fs.getObjInfo("/file", &info);
+	ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
+	ASSERT_EQ(maxFileSize / 2, info.size);
+
+	fil = fs.open("/file", paffs::FR);
+	if(fs.getLastErr() != paffs::Result::ok)
+		printf("%s!\n", paffs::err_msg(fs.getLastErr()));
+	ASSERT_NE(fil, nullptr);
+	r = fs.seek(fil, maxFileSize / 2 - blocksize / 2);
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	memset(blockcopy, 0, blocksize);
+	std::cout << "Intentionally reading over Filesize" << std::endl;
+	r = fs.read(fil, blockcopy, blocksize, &bw);
+	EXPECT_EQ(bw, blocksize / 2);
+	ASSERT_EQ(r, paffs::Result::ok);
+	EXPECT_TRUE(ArraysMatch(&block[blocksize/2], blockcopy, blocksize/2));
+
+	r = fs.remove("/file");
+	ASSERT_EQ(r, paffs::Result::einval);
+	r = fs.close(fil);
+	ASSERT_EQ(r, paffs::Result::ok);
+	r = fs.remove("/file");
+	ASSERT_EQ(r, paffs::Result::ok);
+
+	//Check if file is missing
+	paffs::Dir* dir;
+
+	// root
+	dir = fs.openDir("/");
+	ASSERT_NE(dir, nullptr);
+	ASSERT_EQ(dir->no_entrys, 0);
+
+	r = fs.closeDir(dir);
 	ASSERT_EQ(r, paffs::Result::ok);
 }
 

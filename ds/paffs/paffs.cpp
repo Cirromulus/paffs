@@ -268,6 +268,10 @@ Result Paffs::flush(Obj* obj){
 	return devices[0]->flush(obj);
 }
 
+Result Paffs::truncate(const char* path, unsigned int newLength){
+	return devices[0]->truncate(path, newLength);
+}
+
 Result Paffs::chmod(const char* path, Permission perm){
 	return devices[0]->chmod(path, perm);
 }

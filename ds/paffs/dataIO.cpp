@@ -31,7 +31,10 @@ Result DataIO::writeInodeData(Inode* inode,
 
 	//todo: use pageFrom as offset to reduce memory usage and IO
 	unsigned int pageFrom = offs/dataBytesPerPage;
-	unsigned int toPage = (offs + bytes - 1) / dataBytesPerPage;
+	unsigned int toPage = (offs + bytes) / dataBytesPerPage;
+	if((offs + bytes) % dataBytesPerPage == 0){
+		toPage--;
+	}
 
 	Result res = pac.setTargetInode(inode);
 	if(res != Result::ok){
@@ -75,13 +78,16 @@ Result DataIO::readInodeData(Inode* inode,
 		return dev->lasterr = Result::einval;
 	}
 
-	*bytes_read = 0;
-	unsigned int pageFrom = offs/dataBytesPerPage;
-	unsigned int toPage = (offs + bytes - 1) / dataBytesPerPage;
-
 	if(offs + bytes > inode->size){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read bigger than size of object! (was: %d, max: %lu)", offs+bytes, static_cast<long unsigned>(inode->size));
 		bytes = inode->size - offs;
+	}
+
+	*bytes_read = 0;
+	unsigned int pageFrom = offs/dataBytesPerPage;
+	unsigned int toPage = (offs + bytes) / dataBytesPerPage;
+	if((offs + bytes) % dataBytesPerPage == 0){
+		toPage--;
 	}
 
 	Result res = pac.setTargetInode(inode);
@@ -99,9 +105,24 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried deleting InodeData in readOnly mode!");
 		return Result::bug;
 	}
-	//TODO: This calculation contains errors in border cases
+
 	unsigned int pageFrom = offs/dataBytesPerPage;
-	unsigned int toPage = (inode->size - 1) / dataBytesPerPage;
+	unsigned int toPage = inode->size / dataBytesPerPage;
+	if(offs % dataBytesPerPage != 0){
+		pageFrom++;
+	}
+	if(inode->size % dataBytesPerPage == 0){
+		toPage--;
+	}
+	if(pageFrom > toPage){
+		//We are deleting just some bytes on the same page
+		inode->size = offs;
+		return Result::ok;
+	}
+	if(inode->reservedPages == 0){
+		inode->size = offs;
+		return Result::ok;
+	}
 
 	if(inode->size < offs){
 		//Offset bigger than actual filesize
@@ -113,18 +134,6 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "could not set new Inode!");
 		return r;
 	}
-
-	if(inode->reservedPages == 0){
-		inode->size = offs;
-		return Result::ok;
-	}
-
-	if(inode->size >= (inode->reservedPages - 1) * dataBytesPerPage){
-		//doesn't leave a whole page blank
-		inode->size = offs;
-		return Result::ok;
-	}
-
 
 	for(unsigned int page = 0; page <= toPage - pageFrom; page++){
 		Addr pageAddr;
@@ -163,14 +172,15 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 			return r;
 		}
 
+		r = pac.setPage(page+pageFrom, 0);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete page %u to %u", pageFrom, toPage);
+			return r;
+		}
+
 		inode->reservedPages--;
 	}
 
-	r = pac.deletePage(pageFrom, toPage);
-	if(r != Result::ok){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete page %u to %u", pageFrom, toPage);
-		return r;
-	}
 	inode->size = offs;
 	return Result::ok;
 }
