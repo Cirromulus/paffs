@@ -2,15 +2,12 @@
 \begin{itemize}
     \item Superblock sometimes does not get marked as unset (but marked as free)
     \item Add "how to use" to this document
-    \item Add a "high space usage" mode limiting writes 
     \item Add possibility to having multiple PageAddressCaches
-    \item Add check if dirty in commit Area Summaries to enable read-only (half finished)
     \item Add userdata write-back upon corrected Biterror
-	\item When ASCache runs full, some used pages cant be marked as dirty. Build sanity checker, scanning whole FS and marking unreachable pages as such.
-	\item Implement dynamic number of uncommitted areas to superpage. (Maybe call it Checkpoint?)
-	\item TreeCache - full commit from time to time. (Maybe 'used' marker?)
-	\item GC: Static Wear levelling, keep deletioncount in mind.
-	\item Implement additional driver function for copying pages for optimizing.
-	\item Use Inode pointer space for very small files to speed up access and save space.
-	\item Implement DATA Buffer to speed up everything. Note: Low priority and high effort.
+    \item Implement dynamic number of uncommitted areas to superpage. (Maybe call it Checkpoint?)
+    \item TreeCache - full commit from time to time. (Maybe 'used' marker?)
+    \item GC: Static Wear levelling, keep deletioncount in mind.
+    \item Implement additional driver function for copying pages for optimizing.
+    \item Use Inode pointer space for very small files to speed up access and save space.
+    \item Implement DATA Buffer to speed up everything. Note: Low priority and high effort.
 \end{itemize}

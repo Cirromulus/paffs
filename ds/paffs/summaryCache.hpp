@@ -11,10 +11,13 @@
 
 namespace paffs {
 
-struct AreaSummaryElem{
+class AreaSummaryElem{
 	unsigned char entry[dataPagesPerArea / 4 + 1];	//assumes an Odd number of dataPagesPerArea
-	unsigned char statusBits; //dirty < asWritten < loadedFromSuperIndex
+	unsigned char statusBits; //dirty < asWritten < loadedFromSuperIndex < used
+	AreaPos area;
 	PageOffs dirtyPages;
+	void setUsed(bool used = true);
+public:
 	AreaSummaryElem();
 	void clear();
 	SummaryEntry getStatus(PageOffs page);
@@ -29,8 +32,11 @@ struct AreaSummaryElem{
 	 */
 	bool isLoadedFromSuperPage();
 	void setLoadedFromSuperPage(bool loaded = true);
+	bool isUsed();
 	PageOffs getDirtyPages();
 	void setDirtyPages(PageOffs pages);
+	void setArea(AreaPos areaPos);
+	AreaPos getArea();
 };
 
 class SummaryCache{
@@ -58,6 +64,8 @@ public:
 	//for retired or unused Areas
 	Result deleteSummary(AreaPos area);
 
+	//For Garbage collection to consider cached AS-Areas before others
+	bool isCached(AreaPos area);
 	//For Garbage collection to consider committed AS-Areas before others
 	bool wasASWritten(AreaPos area);
 
@@ -66,10 +74,9 @@ public:
 
 	/**
 	 * Loads all unclosed AreaSummaries in RAM upon Mount
-	 *
+	 * Complete wipe of all previous Information
 	 * @warning High Stack usage scaling with dataPagesPerArea
 	 */
-
 	Result loadAreaSummaries();
 
 	/**
@@ -84,7 +91,7 @@ private:
 	 * committing its new AS.
 	 * @warn Decreases wear-off efficiency if used regularly.
 	 */
-	Result commitASHard(int &clearedArea);
+	Result commitASHard(int &clearedAreaCachePosition);
 
 	SummaryEntry getPackedStatus(uint16_t position, PageOffs page);
 
@@ -106,12 +113,13 @@ private:
 
 	PageOffs countUnusedPages(uint16_t position);
 
+	Result commitAndEraseElem(uint16_t position);
 	/**
 	 * @warn Area needs to be in translation array
 	 */
 	Result readAreasummary(AreaPos area, SummaryEntry* out_summary, bool complete);
 
-	Result writeAreasummary(AreaPos area, SummaryEntry* summary);
+	Result writeAreasummary(uint16_t pos);
 
 };
 

@@ -56,17 +56,13 @@ Result DataIO::writeInodeData(Inode* inode,
 	unsigned pageoffs = offs % dataBytesPerPage;
 	res = writePageData(pageFrom, toPage, pageoffs, bytes, data,
 			pac, bytes_written, inode->size, inode->reservedPages);
-	if(res != Result::ok){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "could not write pageData");
-		return res;
-	}
 
 	if(inode->size < *bytes_written + offs)
 		inode->size = *bytes_written + offs;
 
 	//the Tree UpdateExistingInode has to be done by high level functions,
 	//bc they may modify it by themselves
-	return Result::ok;
+	return res;
 }
 
 Result DataIO::readInodeData(Inode* inode,
@@ -135,7 +131,7 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 		return r;
 	}
 
-	for(unsigned int page = 0; page <= toPage - pageFrom; page++){
+	for(int page = toPage - pageFrom; page >= 0; page--){
 		Addr pageAddr;
 		r = pac.getPage(page+pageFrom, &pageAddr);
 		if(r != Result::ok){
@@ -260,23 +256,47 @@ Result DataIO::readTreeNode(Addr addr, TreeNode* node){
 	}
 
 	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::index){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ TREEENODE operation on %s!", areaNames[dev->areaMap[extractLogicalArea(addr)].type]);
+		if(traceMask & PAFFS_TRACE_AREA){
+			printf("Info: \n\t%" PRIu32 " used Areas\n", dev->usedAreas);
+			for(unsigned int i = 0; i < areasNo; i++){
+				printf("\tArea %03d on %03u as %10s from page %4d %s\n"
+						, i, dev->areaMap[i].position, areaNames[dev->areaMap[i].type]
+						, dev->areaMap[i].position*blocksPerArea*pagesPerBlock
+						, areaStatusNames[dev->areaMap[i].status]);
+				if(i > 128){
+					printf("\n -- truncated 128-%u Areas.\n", areasNo);
+					break;
+				}
+			}
+			printf("\t----------------------\n");
+		}
+		PAFFS_DBG(PAFFS_TRACE_BUG, "READ TREEENODE operation on %s (Area %" PRIu32 ", pos %" PRIu32 "!"
+				, areaNames[dev->areaMap[extractLogicalArea(addr)].type], extractLogicalArea(addr),
+				dev->areaMap[extractLogicalArea(addr)].position);
 		return Result::bug;
 	}
 
-	if(extractLogicalArea(addr) == 0){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ TREE NODE operation on (log.) first Area at %X:%X", extractLogicalArea(addr), extractPage(addr));
+	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::index){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "READ TREE NODE operation on %s Area at %X:%X",
+				areaNames[dev->areaMap[extractLogicalArea(addr)].type],
+				extractLogicalArea(addr), extractPage(addr));
 		return Result::bug;
 	}
-
 
 	Result r;
 	if(traceMask & PAFFS_TRACE_VERIFY_AS){
-		if(dev->sumCache.getPageStatus(extractLogicalArea(addr), extractPage(addr),&r) == SummaryEntry::dirty){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "READ operation of obsoleted data at %X:%X", extractLogicalArea(addr), extractPage(addr));
+		SummaryEntry s = dev->sumCache.getPageStatus(extractLogicalArea(addr), extractPage(addr),&r);
+		if(s == SummaryEntry::free){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "READ operation on FREE data at %X:%X",
+					extractLogicalArea(addr), extractPage(addr));
 			return Result::bug;
 		}
-		if(r != Result::ok){
+		if(s == SummaryEntry::dirty){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "READ operation on DIRTY data at %X:%X",
+					extractLogicalArea(addr), extractPage(addr));
+			return Result::bug;
+		}
+		if(r != Result::ok || s == SummaryEntry::error){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not verify Page status!");
 		}
 	}

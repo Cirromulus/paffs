@@ -21,6 +21,12 @@ TEST_F(SummaryCache, fillFlashAndVerify){
 	int i = 0, j = 0;
 	char filename[50];
 	bool full = false;
+
+	fs.setTraceMask(fs.getTraceMask()
+			| PAFFS_WRITE_VERIFY_AS
+			| PAFFS_TRACE_VERIFY_AS
+		);
+
 	//fill areas
 	for(i = 0; !full; i++){
 		sprintf(filename, "/%05d", i);
@@ -72,6 +78,11 @@ TEST_F(SummaryCache, fillFlashAndVerify){
 		j = 100;
 	}
 
+	fs.setTraceMask(fs.getTraceMask()
+			| PAFFS_WRITE_VERIFY_AS
+			| PAFFS_TRACE_ASCACHE
+			| PAFFS_TRACE_AREA);
+
 	ASSERT_EQ(r, paffs::Result::ok);
 	r = fs.unmount();
 	ASSERT_EQ(r, paffs::Result::ok);
@@ -104,6 +115,8 @@ TEST_F(SummaryCache, fillFlashAndVerify){
 TEST(SummaryCacheElem, packedStatusIntegrity){
 	paffs::AreaSummaryElem asElem;
 
+	//TODO: Test other features like no clear if dirty etc.
+	asElem.setArea(0);
 	for(unsigned i = 0; i < paffs::dataPagesPerArea; i++){
 		ASSERT_EQ(asElem.getStatus(i), paffs::SummaryEntry::free);
 	}

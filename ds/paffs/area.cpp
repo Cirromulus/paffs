@@ -114,7 +114,6 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 
  	Result r = gc.collectGarbage(areaType);
 	if(r != Result::ok){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "GarbageCollection did not free an Area");
 		dev->lasterr = r;
 		return 0;
 	}
@@ -190,7 +189,21 @@ void AreaManagement::retireArea(AreaPos area){
 }
 
 void AreaManagement::deleteArea(AreaPos area){
-	gc.deleteArea(area);
+	Result r = gc.deleteArea(area);
+	if(r == Result::badflash){
+		PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block in area %u "
+				"on position %u! Retired Area.", area, dev->areaMap[area].position);
+		if(traceMask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
+			printf("Info: \n");
+			for(unsigned int i = 0; i < areasNo; i++){
+				printf("\tArea %d on %u as %10s with %3u erases\n", i,
+						dev->areaMap[i].position, areaNames[dev->areaMap[i].type],
+						dev->areaMap[i].erasecount);
+			}
+		}
+	}
+
+	dev->sumCache.deleteSummary(area);
 	dev->areaMap[area].status = AreaStatus::empty;
 	dev->areaMap[area].type = AreaType::unset;
 	dev->usedAreas--;

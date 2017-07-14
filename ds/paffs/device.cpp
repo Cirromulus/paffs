@@ -183,19 +183,6 @@ Result Device::unmnt(){
 	}
 	if(!mounted)
 		return Result::notMounted;
-	if(traceMask & PAFFS_TRACE_AREA){
-		printf("Info: \n\t%" PRIu32 " used Areas\n", usedAreas);
-		for(unsigned int i = 0; i < areasNo; i++){
-			printf("\tArea %03d on %03u as %10s from page %4d %s\n"
-					, i, areaMap[i].position, areaNames[areaMap[i].type]
-					, areaMap[i].position*blocksPerArea*pagesPerBlock
-					, areaStatusNames[areaMap[i].status]);
-			if(i > 128){
-				printf("\n -- truncated 128-%u Areas.\n", areasNo);
-				break;
-			}
-		}
-	}
 	Result r;
 	InodeMap::iterator it = openInodes.begin();
 	if(it != openInodes.end()){
@@ -230,6 +217,20 @@ Result Device::unmnt(){
 		return r;
 	}
 
+	if(traceMask & PAFFS_TRACE_AREA){
+		printf("Info: \n\t%" PRIu32 " used Areas\n", usedAreas);
+		for(unsigned int i = 0; i < areasNo; i++){
+			printf("\tArea %03d on %03u as %10s from page %4d %s\n"
+					, i, areaMap[i].position, areaNames[areaMap[i].type]
+					, areaMap[i].position*blocksPerArea*pagesPerBlock
+					, areaStatusNames[areaMap[i].status]);
+			if(i > 128){
+				printf("\n -- truncated 128-%u Areas.\n", areasNo);
+				break;
+			}
+		}
+		printf("\t----------------------\n");
+	}
 	destroyDevice();
 
 	//just for cleanup & tests
@@ -271,7 +272,7 @@ Result Device::createDirInode(Inode* outInode, Permission mask){
 	if(createInode(outInode, mask) != Result::ok)
 		return Result::bug;
 	outInode->type = InodeType::dir;
-	outInode->size = sizeof(DirEntryCount);		//to hold directory-entry-count. even if it is not commited to flash
+	outInode->size = 0;
 	outInode->reservedPages = 0;
 	return Result::ok;
 }
@@ -437,6 +438,7 @@ Result Device::getInodeOfElem(Inode* &outInode, const char* fullPath){
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get next Inode");
 			delete[] fullPathC;
+			return r;
 		}
 		//todo: Dirent cachen
 		fnP = strtok(nullptr, delimiter);
@@ -522,6 +524,9 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 	memcpy(&buf[sizeof(DirEntryLength)], &newElem->no, sizeof(InodeNo));
 
 	memcpy(&buf[sizeof(DirEntryLength) + sizeof(InodeNo)], name, elemNameL);
+
+	if(contDir->size == 0)
+		contDir->size = sizeof(DirEntryCount); //To hold the Number of Entries
 
 	char* dirData = new char[contDir->size + direntryl];
 	unsigned int bytes = 0;
@@ -618,8 +623,6 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Something is fishy! (%d)", restByte);
 
 			if(newSize == 0){
-				//TODO: This shurely can be more intuitive
-				contDir->size = sizeof(DirEntryCount); //Length
 				//This was the last entry
 				return dataIO.pac.commit();
 			}
@@ -651,7 +654,7 @@ Result Device::mkDir(const char* fullPath, Permission mask){
 		return Result::notMounted;
 	if(readOnly)
 		return Result::readonly;
-	if(usedAreas >= areasNo - minFreeAreas)
+	if(usedAreas > areasNo - minFreeAreas)
 		return Result::nosp;
 
 	unsigned int lastSlash = 0;
@@ -722,7 +725,7 @@ Dir* Device::openDir(const char* path){
 	dir->self->no = dirPinode->no;
 
 	dir->self->parent = nullptr;	//no caching, so we probably don't have the parent
-	dir->no_entrys = dirData[0];
+	dir->no_entrys = dirPinode->size == 0 ? 0 : dirData[0];
 	dir->childs = new Dirent [dir->no_entrys];
 	dir->pos = 0;
 
@@ -866,7 +869,7 @@ Result Device::createFile(Inode* outFile, const char* fullPath, Permission mask)
 		return Result::notMounted;
 	if(readOnly)
 		return Result::readonly;
-	if(usedAreas >= areasNo - minFreeAreas)
+	if(usedAreas > areasNo - minFreeAreas)
 		return Result::nosp;
 
 	unsigned int lastSlash = 0;
@@ -1091,7 +1094,7 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 		return Result::einval;
 	if(readOnly)
 		return Result::readonly;
-	if(usedAreas >= areasNo - minFreeAreas)
+	if(usedAreas > areasNo - minFreeAreas)
 		return Result::nosp;
 
 	if(obj->dirent->node->type == InodeType::dir)

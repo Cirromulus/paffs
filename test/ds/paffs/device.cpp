@@ -121,6 +121,7 @@ TEST_F(FileTest, createReadWriteDeleteFile){
 
 	r = fs.remove("/file");
 	ASSERT_EQ(r, paffs::Result::ok);
+
 }
 
 TEST_F(FileTest, directoryReadWrite){
@@ -256,11 +257,11 @@ TEST_F(FileTest, maxFilesize){
 	i = 0;
 	while(true){
 		r = fs.write(fil, block, blocksize, &bw);
+		i += bw;
 		if(r == paffs::Result::nosp)
 			break;
 		EXPECT_EQ(bw, blocksize);
 		ASSERT_EQ(r, paffs::Result::ok);
-		i += bw;
 	}
 	maxFileSize = i;
 	r = fs.close(fil);
@@ -280,16 +281,22 @@ TEST_F(FileTest, maxFilesize){
 		printf("%s!\n", paffs::err_msg(fs.getLastErr()));
 	ASSERT_NE(fil, nullptr);
 
-	while(i > 0){
+	i = 0;
+	while(i < maxFileSize){
 		memset(blockcopy, 0, blocksize);
 		r = fs.read(fil, blockcopy, blocksize, &bw);
-		EXPECT_EQ(bw, blocksize);
 		ASSERT_EQ(r, paffs::Result::ok);
-		EXPECT_TRUE(ArraysMatch(block, blockcopy, blocksize));
-		i -= bw;
+		if(maxFileSize - i >= blocksize){
+			ASSERT_EQ(bw, blocksize);
+			ASSERT_TRUE(ArraysMatch(block, blockcopy, blocksize));
+		}else{
+			ASSERT_EQ(bw, maxFileSize - i);
+			ASSERT_TRUE(ArraysMatch(block, blockcopy, maxFileSize - i));
+		}
+		i += bw;
 	}
 
-	r = fs.close(fil);
+ 	r = fs.close(fil);
 	ASSERT_EQ(r, paffs::Result::ok);
 
 	r = fs.truncate("/file", maxFileSize / 2);
@@ -311,7 +318,14 @@ TEST_F(FileTest, maxFilesize){
 	r = fs.read(fil, blockcopy, blocksize, &bw);
 	EXPECT_EQ(bw, blocksize / 2);
 	ASSERT_EQ(r, paffs::Result::ok);
-	EXPECT_TRUE(ArraysMatch(&block[blocksize/2], blockcopy, blocksize/2));
+	unsigned blockStart = (maxFileSize / 2 - blocksize / 2) % blocksize;
+	unsigned overRun = blocksize - blockStart;
+	if(overRun < bw){
+		EXPECT_TRUE(ArraysMatch(blockcopy, &block[blockStart], overRun));
+		EXPECT_TRUE(ArraysMatch(&blockcopy[overRun], block, bw - overRun));
+	}else{
+		EXPECT_TRUE(ArraysMatch(blockcopy, &block[blockStart], bw));
+	}
 
 	r = fs.remove("/file");
 	ASSERT_EQ(r, paffs::Result::einval);

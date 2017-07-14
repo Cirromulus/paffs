@@ -916,7 +916,7 @@ Result Superblock::deleteSuperBlock(AreaPos area, uint8_t block) {
 		dev->areaMap[area].status = AreaStatus::empty;
 		dev->areaMap[area].type = AreaType::unset;
 		dev->usedAreas--;
-		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Area %u at pos. %u.", area, dev->areaMap[area].position);
+		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Superblock Area %u at pos. %u.", area, dev->areaMap[area].position);
 	}
 
 	BlockAbs block_offs = dev->areaMap[area].position * blocksPerArea;

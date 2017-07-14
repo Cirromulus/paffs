@@ -49,7 +49,6 @@ AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_s
 				*srcAreaContainsData = false;
 				fav_dirty_pages = dirty_pages;
 				memcpy(out_summary, curr, dataPagesPerArea);
-
 				if(dev->sumCache.wasASWritten(i))
 					//Convenient: we can reset an AS to free up cache space
 					break;
@@ -61,14 +60,16 @@ AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_s
 					continue; 	//We cant change types if area is not completely empty
 
 				if(dirty_pages > fav_dirty_pages ||
-						(dev->sumCache.wasASWritten(i) && dirty_pages == fav_dirty_pages)){
+						(dev->sumCache.wasASWritten(i) &&
+								dirty_pages != 0 && dirty_pages == fav_dirty_pages)){
 					favourite_area = i;
 					fav_dirty_pages = dirty_pages;
 					memcpy(out_summary, curr, dataPagesPerArea);
 				}
 			}else{
 				//Special Case for freeing committed AreaSummaries
-				if(dev->sumCache.wasASWritten(i) && dirty_pages > fav_dirty_pages){
+				if(dev->sumCache.isCached(i) && dev->sumCache.wasASWritten(i)
+						&& dirty_pages >= fav_dirty_pages){
 					favourite_area = i;
 					fav_dirty_pages = dirty_pages;
 					memcpy(out_summary, curr, dataPagesPerArea);
@@ -121,7 +122,8 @@ Result GarbageCollection::deleteArea(AreaPos area){
 		}
 	}
 	dev->areaMap[area].erasecount++;
-	dev->sumCache.resetASWritten(area);
+	if(dev->sumCache.isCached(area))
+		dev->sumCache.resetASWritten(area);
 	return Result::ok;
 }
 
@@ -244,34 +246,13 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 				//Safe, because we can assume deletion targetType is same Type as we want (from getNextBestArea)
 				dev->areaMap[deletion_target].status = AreaStatus::active;
 			}
+			deleteArea(deletion_target);
 		}else{
-			r = dev->sumCache.deleteSummary(deletion_target);
-			if(r != Result::ok){
-				PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not free AS of area %d", deletion_target);
-				return r;
-			}
-			dev->areaMap[deletion_target].status = AreaStatus::empty;
+			dev->areaMgmt.deleteArea(deletion_target);
 		}
 
-		//Delete old area
-		r = deleteArea(deletion_target);
-		if(r == Result::badflash){
-			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block in area %u on position %u! Retired Area.", deletion_target, dev->areaMap[deletion_target].position);
-			if(traceMask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
-				printf("Info: \n");
-				for(unsigned int i = 0; i < areasNo; i++){
-					printf("\tArea %d on %u as %10s with %3u erases\n", i, dev->areaMap[i].position, areaNames[dev->areaMap[i].type], dev->areaMap[i].erasecount);
-				}
-			}
-		}else if(r != Result::ok){
-			//Something unexpected happened
-			//TODO: Clean up
-			return r;
-		}else{
-			//we succeeded
-			//TODO: Maybe delete more available blocks. Mark them as UNSET+EMPTY
-			break;
-		}
+		//TODO: Maybe delete more available blocks. Mark them as UNSET+EMPTY
+		break;
 	}
 
 	//swap logical position of areas to keep addresses valid
