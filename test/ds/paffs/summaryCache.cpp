@@ -78,10 +78,12 @@ TEST_F(SummaryCache, fillFlashAndVerify){
 		j = 100;
 	}
 
-	fs.setTraceMask(fs.getTraceMask()
+/*	fs.setTraceMask(fs.getTraceMask()
 			| PAFFS_WRITE_VERIFY_AS
 			| PAFFS_TRACE_ASCACHE
-			| PAFFS_TRACE_AREA);
+			| PAFFS_TRACE_AREA
+			| PAFFS_TRACE_SUPERBLOCK
+			| PAFFS_TRACE_VERBOSE);*/
 
 	ASSERT_EQ(r, paffs::Result::ok);
 	r = fs.unmount();

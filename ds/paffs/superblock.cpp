@@ -616,18 +616,6 @@ Result Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos *directArea, Jump
 	return dev->driver->writePage(*directArea * totalPagesPerArea + page, entry, sizeof(JumpPadEntry));
 }
 
-/*Result Superblock::readJumpPadEntry(Addr addr, JumpPadEntry* entry){
-	if(sizeof(JumpPadEntry) > dataBytesPerPage){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "JumpPadEntry bigger than dataBytes per Page! (%zu, %u)",
-				sizeof(JumpPadEntry), dataBytesPerPage);
-		return Result::nimpl;
-	}
-	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Reading JumpPad entry at phys. area %" PRIu32 " page %" PRIu32,
-			extractLogicalArea(addr), extractPage(addr));
-	//No check of areaType because we may not have an AreaMap
-	return dev->driver->readPage(getPageNumberFromDirect(addr), entry, sizeof(JumpPadEntry));
-}*/
-
 Result Superblock::insertNewSuperIndex(Addr logPrev, AreaPos *directArea, SuperIndex* entry){
 	if(dev->areaMap[extractLogicalArea(logPrev)].position != *directArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Logical (log: %d->%d) and direct Address (%d) differ!",
@@ -851,7 +839,7 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 		for(unsigned int j = 0; j < dataPagesPerArea; j++){
 			if(buf[pointer + j/8] & 1 << j%8){
 				//TODO: Normally, we would check in the OOB for a Checksum or so, which is present all the time
-				Addr tmp = combineAddress(entry->asPositions[i], j);
+				Addr tmp = combineAddress(entry->areaMap[entry->asPositions[i]].position, j);
 				r = dev->driver->readPage(getPageNumberFromDirect(tmp), pagebuf, dataBytesPerPage);
 				if(r != Result::ok){
 					if(r == Result::biterrorCorrected){
