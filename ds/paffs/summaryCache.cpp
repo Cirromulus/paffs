@@ -16,6 +16,7 @@
 namespace paffs {
 
 AreaSummaryElem::AreaSummaryElem(){
+	statusBits = 0;
 	clear();
 };
 void AreaSummaryElem::clear(){
