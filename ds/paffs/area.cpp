@@ -27,7 +27,7 @@ const char* areaNames[] = {
 const char* areaStatusNames[] = {
 		"CLOSED",
 		"ACTIVE",
-		"EMPTY "
+		"EMPTY"
 };
 
 //Returns the absolute page number from *indirect* address
@@ -89,8 +89,21 @@ unsigned int extractPage(Addr addr){
 }
 
 unsigned int AreaManagement::findWritableArea(AreaType areaType){
-	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != AreaStatus::closed){
+	if(dev->activeArea[areaType] != 0){
+		if(dev->areaMap[dev->activeArea[areaType]].status != AreaStatus::active){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "ActiveArea of %s not active "
+					"(%s, %" PRIu32 " on %" PRIu32 ")",
+					areaNames[areaType],
+					areaStatusNames[dev->areaMap[dev->activeArea[areaType]].status],
+					dev->activeArea[areaType],
+					dev->areaMap[dev->activeArea[areaType]].position);
+		}
 		//current Area has still space left
+		if(dev->areaMap[dev->activeArea[areaType]].type != areaType){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "ActiveArea does not contain correct "
+					"areaType! (Should %s, was %s)", areaNames[areaType],
+					areaNames[dev->areaMap[dev->activeArea[areaType]].type]);
+		}
 		return dev->activeArea[areaType];
 	}
 
@@ -165,6 +178,16 @@ Result AreaManagement::manageActiveAreaFull(AreaPos *area, AreaType areaType){
 
 //TODO: Add initAreaAs(...) to handle typical areaMap[abc].type = def; initArea(...);
 void AreaManagement::initArea(AreaPos area){
+	if(dev->areaMap[area].type == AreaType::unset){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Initing Area with invalid type!");
+	}
+	if(dev->activeArea[dev->areaMap[area].type] != 0 &&
+			dev->activeArea[dev->areaMap[area].type] != area){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Activating area %" PRIu32 " while different Area "
+				"(%" PRIu32 " on %" PRIu32 ") still active!",
+				area, dev->activeArea[dev->areaMap[area].type],
+				dev->areaMap[dev->activeArea[dev->areaMap[area].type]].position);
+	}
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %u (pos %u) as %s.", static_cast<unsigned int>(area), static_cast<unsigned int>(dev->areaMap[area].position), areaNames[dev->areaMap[area].type]);
 	if(dev->areaMap[area].status == AreaStatus::empty){
 		dev->usedAreas++;
@@ -174,7 +197,7 @@ void AreaManagement::initArea(AreaPos area){
 
 Result AreaManagement::closeArea(AreaPos area){
 	dev->areaMap[area].status = AreaStatus::closed;
-
+	dev->activeArea[dev->areaMap[area].type] = 0;
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Closed %s Area %u at pos. %u.", areaNames[dev->areaMap[area].type], area, dev->areaMap[area].position);
 	return Result::ok;
 }
@@ -237,6 +260,7 @@ Result AreaManagement::deleteArea(AreaPos area){
 		return Result::bug;
 	}
 	Result r = deleteAreaContents(area);
+	//dev->activeArea[dev->areaMap[area].type] = 0;
 	dev->areaMap[area].status = AreaStatus::empty;
 	dev->areaMap[area].type = AreaType::unset;
 	dev->usedAreas--;

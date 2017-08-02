@@ -211,7 +211,6 @@ Result DataIO::writeTreeNode(TreeNode* node){
 		//so generate the areaSummary in Memory
 		dev->areaMgmt.initArea(dev->activeArea[AreaType::index]);
 	}
-	//FIXME copied from inodeData, is this ok?
 	if(dev->lasterr != Result::ok){
 		return dev->lasterr;
 	}

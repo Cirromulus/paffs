@@ -31,6 +31,16 @@ Driver* getDriverSpecial(const uint8_t deviceId, void* fc){
 	return NULL;
 }
 
+virtual Result OfficeModelNexys3Driver::initializeNand(){
+	nand->enableLatchUpProtection();
+	return Result::ok;
+}
+virtual Result OfficeModelNexys3Driver::deInitializeNand(){
+	//FIXME Does this actually turn off NAND?
+	nand->disableLatchUpProtection();
+	return Result::ok;
+}
+
 
 Result OfficeModelNexys3Driver::writePage(uint64_t page_no,
 								void* data, unsigned int data_len){

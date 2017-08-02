@@ -19,15 +19,15 @@ namespace paffs{
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
 #define PAFFS_DBG(mask, msg, ...) do {\
-		if(mask & traceMask || mask & PAFFS_TRACE_ALWAYS){\
+		if((mask) & traceMask || (mask) & PAFFS_TRACE_ALWAYS){\
 			fprintf(stderr, "paffs: " msg "\n\t-line %d, file %s\n", ##__VA_ARGS__,  __LINE__, __FILENAME__);\
-			if(mask & PAFFS_TRACE_BUG)\
+			if((mask) & PAFFS_TRACE_BUG)\
 				raise(SIGINT);\
 		}\
 	} while(0)
 
 #define PAFFS_DBG_S(mask, msg, ...) do {\
-		if(mask & traceMask || mask & PAFFS_TRACE_ALWAYS){\
+		if((mask) & traceMask || (mask) & PAFFS_TRACE_ALWAYS){\
 			fprintf(stderr, "paffs: " msg "\n", ##__VA_ARGS__);\
 		}\
 	} while(0)
@@ -52,7 +52,7 @@ namespace paffs{
 #define PAFFS_TRACE_VERIFY_TC	0x00010000
 #define PAFFS_TRACE_VERIFY_NAND	0x00020000
 #define PAFFS_TRACE_VERIFY_AS	0x00040000
-#define PAFFS_WRITE_VERIFY_AS	0x00080000 //only debug hack, may collide with ECC
+#define PAFFS_WRITE_VERIFY_AS	0x00080000
 #define PAFFS_TRACE_VERIFY_ALL	0x00070000
 
 #define PAFFS_TRACE_SUPERBLOCK	0x00100000

@@ -38,7 +38,6 @@ public:
 		}
 		if_fpga = new Amap(spacewire);
 		nand = new Nand(*if_fpga, 0x00200000);
-		nand->enableLatchUpProtection();
 	}
 
 	~OfficeModelNexys3Driver(){
@@ -46,6 +45,8 @@ public:
 		delete if_fpga;
 	}
 
+	virtual Result initializeNand();
+	virtual Result deInitializeNand();
 	Result writePage(uint64_t page_no, void* data, unsigned int data_len);
 	Result readPage(uint64_t page_no, void* data, unsigned int data_len);
 	Result eraseBlock(uint32_t block_no);

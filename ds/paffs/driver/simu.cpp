@@ -31,6 +31,14 @@ Driver* getDriverSpecial(const uint8_t deviceId, void* fc){
 }
 
 
+Result SimuDriver::initializeNand(){
+	memset(buf, 0xFF, totalBytesPerPage);
+	return Result::ok;
+}
+Result SimuDriver::deInitializeNand(){
+	return Result::ok;
+}
+
 Result SimuDriver::writePage(uint64_t page_no,
 								void* data, unsigned int data_len){
 	if(!cell)
@@ -137,10 +145,6 @@ Nandaddress SimuDriver::translateBlockToAddress(uint32_t block, FlashCell* fc){
 	r.block = block % fc->planeSize;
 	r.page = 0;
 	return r;
-}
-
-void SimuDriver::init(){
-	memset(buf, 0xFF, totalBytesPerPage);
 }
 
 }

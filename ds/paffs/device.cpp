@@ -47,6 +47,9 @@ Result Device::format(bool complete){
 	Result r = initializeDevice();
 	if(r != Result::ok)
 		return r;
+	r = driver->initializeNand();
+	if(r != Result::ok)
+		return r;
 
 	if(complete)
 		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Deleting all areas.\n");
@@ -127,6 +130,7 @@ Result Device::format(bool complete){
 		return r;
 	}
 	destroyDevice();
+	driver->deInitializeNand();
 	return Result::ok;
 }
 
@@ -149,6 +153,10 @@ Result Device::mnt(bool readOnlyMode){
 	if(r != Result::ok)
 		return r;
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Inited Device");
+	r = driver->initializeNand();
+	if(r != Result::ok)
+		return r;
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Inited Driver");
 
 	r = sumCache.loadAreaSummaries();
 	if(r == Result::nf){
@@ -232,7 +240,7 @@ Result Device::unmnt(){
 		printf("\t----------------------\n");
 	}
 	destroyDevice();
-
+	driver->deInitializeNand();
 	//just for cleanup & tests
 	tree.wipeCache();
 	mounted = false;

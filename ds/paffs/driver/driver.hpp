@@ -16,6 +16,8 @@ namespace paffs{
 		Driver(){};
 		virtual ~Driver(){};
 
+		virtual Result initializeNand() = 0;
+		virtual Result deInitializeNand() = 0;
 		virtual Result writePage (PageAbs page_no,
 				void* data, unsigned int data_len) = 0;
 		virtual Result readPage (PageAbs page_no,

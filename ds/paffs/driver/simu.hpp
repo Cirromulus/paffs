@@ -21,11 +21,9 @@ public:
 	SimuDriver(){
 		selfLoaded = true;
 		cell = new FlashCell();
-		init();
 	}
 	SimuDriver(void *c){
 		cell = static_cast<FlashCell*>(c);
-		init();
 	};
 
 	~SimuDriver(){
@@ -33,7 +31,8 @@ public:
 			delete cell;
 	}
 
-	//See paffs.h struct p_drv
+	virtual Result initializeNand();
+	virtual Result deInitializeNand();
 	Result writePage(uint64_t page_no, void* data, unsigned int data_len);
 	Result readPage(uint64_t page_no, void* data, unsigned int data_len);
 	Result eraseBlock(uint32_t block_no);
@@ -43,8 +42,6 @@ private:
 	Nandaddress translatePageToAddress(uint64_t sector, FlashCell* fc);
 
 	Nandaddress translateBlockToAddress(uint32_t block, FlashCell* fc);
-
-	void init();
 };
 
 }

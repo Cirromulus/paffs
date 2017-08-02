@@ -23,6 +23,14 @@ Driver* getDriverSpecial(const uint8_t deviceId, void* fc){
 }
 
 
+virtual Result NullDriver::initializeNand(){
+	memset(buf, 0xFF, totalBytesPerPage);
+	return Result::ok;
+}
+virtual Result NullDriver::deInitializeNand(){
+	return Result::ok;
+}
+
 Result NullDriver::writePage(uint64_t page_no,
 								void* data, unsigned int data_len){
 	(void) page_no;

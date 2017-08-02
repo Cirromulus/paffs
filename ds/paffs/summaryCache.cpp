@@ -268,8 +268,9 @@ Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry sta
 		}
 	}
 	if(dev->areaMap[area].type == AreaType::unset){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried setting Pagestatus on UNSET area %" PRIu32 " (on %" PRIu32 ")",
-				area, dev->areaMap[area].position);
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried setting Pagestatus on UNSET area "
+				"%" PRIu32 " (on %" PRIu32 ", status %d)",
+				area, dev->areaMap[area].position, dev->areaMap[area].status);
 		return Result::bug;
 	}
 
@@ -298,12 +299,6 @@ Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry sta
 			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Area %" PRIu32 " has run full of dirty pages, deleting.", area);
 			//This also deletes the summary entry
 			dev->areaMgmt.deleteArea(area);
-			for(int i = AreaType::unset; i < AreaType::no; i++){
-				if(dev->activeArea[i] == area){
-					dev->activeArea[i] = 0;
-					PAFFS_DBG(PAFFS_TRACE_AREA | PAFFS_TRACE_ASCACHE, "Summary deleted active area.");
-				}
-			}
 		}
 	}
 	return Result::ok;
@@ -475,7 +470,8 @@ Result SummaryCache::loadAreaSummaries(){
 				}
 			}
 			if(dev->areaMap[index.asPositions[i]].status == AreaStatus::active){
-				dev->activeArea[dev->areaMap[index.asPositions[i]].type] = dev->areaMap[index.asPositions[i]].position;
+				dev->activeArea[dev->areaMap[index.asPositions[i]].type] =
+						dev->areaMap[index.asPositions[i]].position;
 			}
 			PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Loaded area summary %d on %d", index.asPositions[i], dev->areaMap[index.asPositions[i]].position);
 		}

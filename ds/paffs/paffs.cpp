@@ -47,7 +47,7 @@ const char* resultMsg[] = {
 		"Object too big",
 		"Input values malformed",
 		"Operation not yet supported",
-		"Gratulations, you found a Bug",
+		"An internal Error occured",
 		"Node is already root, no Parent",
 		"No (usable) space left on device",
 		"Not enough RAM for cache",

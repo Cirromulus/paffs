@@ -263,9 +263,15 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 	dev->areaMap[deletion_target].erasecount = dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].erasecount;
 	dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].erasecount = tmp2;
 
-	//TODO: Check if unset mode is really doing the trick
-	if(targetType != AreaType::unset)
+	if(targetType != AreaType::unset){
+		//This assumes that current activearea is closed...
+		if(dev->activeArea[targetType] != 0){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "old active Area (%" PRIu32 " on %" PRIu32 ") is not closed!",
+					dev->activeArea[targetType], dev->areaMap[dev->activeArea[targetType]].position);
+			return Result::bug;
+		}
 		dev->activeArea[targetType] = deletion_target;
+	}
 
 	PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "Garbagecollection erased pos %u and gave area %u pos %u.", dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].position, dev->activeArea[targetType], dev->areaMap[dev->activeArea[targetType]].position);
 
