@@ -34,7 +34,11 @@ public:
 	GarbageCollection gc;
 	AreaManagement(Device *mdev): dev(mdev), gc(mdev){};
 
-	//Returns same area if there is still writable Space left
+	/**
+	 * May call garbage collection
+	 * May return an empty or active area
+	 * Returns same area if there is still writable space left
+	 */
 	unsigned int findWritableArea(AreaType areaType);
 
 	Result findFirstFreePage(unsigned int* p_out, unsigned int area);
@@ -44,7 +48,8 @@ public:
 	void initArea(AreaPos area);
 	Result closeArea(AreaPos area);
 	void retireArea(AreaPos area);
-	void deleteArea(AreaPos area);
+	Result deleteAreaContents(AreaPos area);
+	Result deleteArea(AreaPos area);
 };
 
 }  // namespace paffs

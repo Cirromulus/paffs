@@ -19,6 +19,7 @@ class AreaSummaryElem{
 	void setUsed(bool used = true);
 public:
 	AreaSummaryElem();
+	~AreaSummaryElem();
 	void clear();
 	SummaryEntry getStatus(PageOffs page);
 	void setStatus(PageOffs page, SummaryEntry value);

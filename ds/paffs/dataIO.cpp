@@ -199,6 +199,19 @@ Result DataIO::writeTreeNode(TreeNode* node){
 
 	dev->lasterr = Result::ok;
 	dev->activeArea[AreaType::index] = dev->areaMgmt.findWritableArea(AreaType::index);
+/*	if(dev->areaMap[dev->activeArea[AreaType::index]].status != AreaStatus::active){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "findWritableArea returned an inactive area "
+				"(%" PRIu32 " on %" PRIu32 ")!", dev->activeArea[AreaType::index],
+				dev->areaMap[dev->activeArea[AreaType::index]].position);
+		return Result::bug;
+	}*/
+	//Handle Areas
+	if(dev->areaMap[dev->activeArea[AreaType::index]].status == AreaStatus::empty){
+		//We'll have to use a fresh area,
+		//so generate the areaSummary in Memory
+		dev->areaMgmt.initArea(dev->activeArea[AreaType::index]);
+	}
+	//FIXME copied from inodeData, is this ok?
 	if(dev->lasterr != Result::ok){
 		return dev->lasterr;
 	}
@@ -206,7 +219,6 @@ Result DataIO::writeTreeNode(TreeNode* node){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "WRITE TREE NODE findWritableArea returned 0");
 		return Result::bug;
 	}
-
 	if(node->self != 0){
 		//We have to invalidate former position first
 		Result r = dev->sumCache.setPageStatus(extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);

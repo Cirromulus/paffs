@@ -23,11 +23,6 @@ public:
 	Result collectGarbage(AreaType target);
 
 	/**
-	 * Deletes an area. This may be used by Summary Cache if the last page was set to dirty.
-	 */
-	Result deleteArea(AreaPos area);
-
-	/**
 	 *	Moves all valid Pages to new Area.
 	 */
 	Result moveValidDataToNewArea(AreaPos srcArea,

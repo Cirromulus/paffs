@@ -19,6 +19,9 @@ AreaSummaryElem::AreaSummaryElem(){
 	statusBits = 0;
 	clear();
 };
+AreaSummaryElem::~AreaSummaryElem(){
+	clear();
+};
 void AreaSummaryElem::clear(){
 	if(isDirty()){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to clear a dirty cache elem!");
@@ -153,12 +156,29 @@ Result SummaryCache::commitASHard(int &clearedAreaCachePosition){
 			(dev->areaMap[it.first].type == AreaType::data || dev->areaMap[it.first].type == AreaType::index)){
 
 			PageOffs dirtyPages = countDirtyPages(cachePos);
-
+			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Checking Area %" PRIu32 " "
+					"with %" PRIu32 " dirty pages", it.first, dirtyPages);
 			if(dirtyPages >= favDirtyPages){
 				favouriteArea = it.first;
 				clearedAreaCachePosition = it.second;
 				favDirtyPages = dirtyPages;
 			}
+		}else{
+			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Ignored Area %" PRIu32 " "
+								"at cache pos %" PRIu32, it.first, it.second);
+			if(!summaryCache[cachePos].isDirty()){
+				PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "\tnot dirty");
+			}
+			if(!summaryCache[cachePos].isAsWritten()){
+				PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "\tnot AS written");
+			}
+			if(dev->areaMap[it.first].status == AreaStatus::active){
+				PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "\tis active (%s)", areaNames[dev->areaMap[it.first].type]);
+			}
+			if(dev->areaMap[it.first].type != AreaType::data && dev->areaMap[it.first].type != AreaType::index){
+				PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "\tnot data/index");
+			}
+
 		}
 	}
 
@@ -278,6 +298,12 @@ Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry sta
 			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Area %" PRIu32 " has run full of dirty pages, deleting.", area);
 			//This also deletes the summary entry
 			dev->areaMgmt.deleteArea(area);
+			for(int i = AreaType::unset; i < AreaType::no; i++){
+				if(dev->activeArea[i] == area){
+					dev->activeArea[i] = 0;
+					PAFFS_DBG(PAFFS_TRACE_AREA | PAFFS_TRACE_ASCACHE, "Summary deleted active area.");
+				}
+			}
 		}
 	}
 	return Result::ok;
@@ -782,7 +808,7 @@ Result SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bo
 		pointer += btr;
 	}
 	//buffer ready
-	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "AreaSummary Buffer was filled with %u Bytes.", pointer);
+	//PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "AreaSummary Buffer was filled with %u Bytes.", pointer);
 
 	if(buf[0] == 0xFF){
 		//Magic marker not here, so no AS present

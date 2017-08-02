@@ -39,9 +39,9 @@ void Superblock::printSuperIndex(SuperIndex* ind){
 			extractPage(ind->rootNode));
 	printf("Used Areas: %" PRIu32 "\n", ind->usedAreas);
 	printf("areaMap:\n");
-	for(AreaPos i = 0; i < 8; i ++){
-		printf("\t%" PRIu32 "->%" PRIu32 "\n", i, ind->areaMap[i].position);
-		printf("\tType: %s\n", areaNames[ind->areaMap[i].type]);
+	for(AreaPos i = 0; i < areasNo && i < 128; i ++){
+		printf("\t%02" PRIu32 "->%02" PRIu32, i, ind->areaMap[i].position);
+		printf(" %10s", areaNames[ind->areaMap[i].type]);
 		bool found = false;
 		for(unsigned int asOffs = 0; asOffs < 2; asOffs++){
 			if(ind->asPositions[asOffs] != 0 &&
@@ -56,13 +56,14 @@ void Superblock::printSuperIndex(SuperIndex* ind){
 					if(ind->areaSummary[asOffs][j] == SummaryEntry::dirty)
 						dirty++;
 				}
-				printf("\tFree/Used/Dirty Pages: %u/%u/%u\n", free, used, dirty);
+				printf("\tFree/Used/Dirty Pages: %u/%u/%u", free, used, dirty);
 				asOffs++;
 			}
 		}if(!found){
-			printf("\tSummary not present.\n");
+			//printf("\tSummary not present.\n");
 		}
-		printf("\t----------------\n");
+		//printf("\t----------------\n");
+		printf("\n");
 	}
 }
 

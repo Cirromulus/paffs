@@ -112,21 +112,6 @@ Result GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstAre
 	return Result::ok;
 }
 
-Result GarbageCollection::deleteArea(AreaPos area){
-	for(unsigned int i = 0; i < blocksPerArea; i++){
-		Result r = dev->driver->eraseBlock(dev->areaMap[area].position*blocksPerArea + i);
-		if(r != Result::ok){
-			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block n° %u (Area %u)!", dev->areaMap[area].position*blocksPerArea + i, area);
-			dev->areaMgmt.retireArea(area);
-			return Result::badflash;
-		}
-	}
-	dev->areaMap[area].erasecount++;
-	if(dev->sumCache.isCached(area))
-		dev->sumCache.resetASWritten(area);
-	return Result::ok;
-}
-
 /**
  * Changes active Area to one of the new freed areas.
  * Necessary to not have any get/setPageStatus calls!
@@ -138,8 +123,22 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 	bool srcAreaContainsData = false;
 	AreaPos deletion_target = 0;
 	Result r;
-
 	AreaPos lastDeletionTarget = 0;
+
+	if(traceMask && PAFFS_TRACE_VERIFY_AS){
+		unsigned char buf[totalBytesPerPage];
+		for(unsigned i = 0; i < totalPagesPerArea; i++){
+			Addr addr = combineAddress(dev->activeArea[AreaType::garbageBuffer], i);
+			dev->driver->readPage(getPageNumber(addr, dev), buf, totalBytesPerPage);
+			for(unsigned j = 0; j < totalBytesPerPage; j++){
+				if(buf[j] != 0xFF){
+					PAFFS_DBG(PAFFS_TRACE_BUG, "Garbage buffer "
+							"on %" PRIu32 " is not empty!", dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].position);
+					return Result::bug;
+				}
+			}
+		}
+	}
 	while(1){
 		deletion_target = findNextBestArea(targetType, summary, &srcAreaContainsData);
 		if(deletion_target == 0){
@@ -235,6 +234,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 				//TODO: Maybe copy rest of Pages before quitting
 				return r;
 			}
+			dev->areaMgmt.deleteAreaContents(deletion_target);
 			//Copy the updated (no SummaryEntry::dirty pages) summary to the deletion_target (it will be the fresh area!)
 			r = dev->sumCache.setSummaryStatus(deletion_target, summary);
 			if(r != Result::ok){
@@ -246,7 +246,6 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 				//Safe, because we can assume deletion targetType is same Type as we want (from getNextBestArea)
 				dev->areaMap[deletion_target].status = AreaStatus::active;
 			}
-			deleteArea(deletion_target);
 		}else{
 			dev->areaMgmt.deleteArea(deletion_target);
 		}

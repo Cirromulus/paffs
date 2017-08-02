@@ -88,7 +88,6 @@ unsigned int extractPage(Addr addr){
 	return page;
 }
 
-//May call garbage collection
 unsigned int AreaManagement::findWritableArea(AreaType areaType){
 	if(dev->activeArea[areaType] != 0 && dev->areaMap[dev->activeArea[areaType]].status != AreaStatus::closed){
 		//current Area has still space left
@@ -188,8 +187,32 @@ void AreaManagement::retireArea(AreaPos area){
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %u at pos. %u.", area, dev->areaMap[area].position);
 }
 
-void AreaManagement::deleteArea(AreaPos area){
-	Result r = gc.deleteArea(area);
+Result AreaManagement::deleteAreaContents(AreaPos area){
+	if(area >= areasNo){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Invalid area! "
+				"Was %" PRIu32 ", should < %" PRIu32, area, areasNo);
+		return Result::bug;
+	}
+	if(area == dev->activeArea[AreaType::data] ||
+		area == dev->activeArea[AreaType::index]){
+		PAFFS_DBG(PAFFS_TRACE_BUG,
+				"deleted active area %" PRIu32 ", is this OK?", area);
+	}
+	Result r = Result::ok;
+
+	for(unsigned int i = 0; i < blocksPerArea; i++){
+		r = dev->driver->eraseBlock(dev->areaMap[area].position*blocksPerArea + i);
+		if(r != Result::ok){
+			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block n° %u (Area %u)!", dev->areaMap[area].position*blocksPerArea + i, area);
+			dev->areaMgmt.retireArea(area);
+			r = Result::badflash;
+			break;
+		}
+	}
+	dev->areaMap[area].erasecount++;
+	if(dev->sumCache.isCached(area))
+		dev->sumCache.resetASWritten(area);
+
 	if(r == Result::badflash){
 		PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block in area %u "
 				"on position %u! Retired Area.", area, dev->areaMap[area].position);
@@ -202,12 +225,23 @@ void AreaManagement::deleteArea(AreaPos area){
 			}
 		}
 	}
-
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Deleted Area %u Contents at pos. %u.", area, dev->areaMap[area].position);
 	dev->sumCache.deleteSummary(area);
+	return r;
+}
+
+Result AreaManagement::deleteArea(AreaPos area){
+	if(area >= areasNo){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Invalid area! "
+				"Was %" PRIu32 ", should < %" PRIu32, area, areasNo);
+		return Result::bug;
+	}
+	Result r = deleteAreaContents(area);
 	dev->areaMap[area].status = AreaStatus::empty;
 	dev->areaMap[area].type = AreaType::unset;
 	dev->usedAreas--;
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Area %u at pos. %u.", area, dev->areaMap[area].position);
+	return r;
 }
 
 }  // namespace paffs
