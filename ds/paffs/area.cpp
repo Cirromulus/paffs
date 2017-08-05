@@ -136,10 +136,16 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 		return 0;
 	}
 
-	if(dev->activeArea[areaType] != 0 &&
-			dev->areaMap[dev->activeArea[areaType]].status != AreaStatus::closed){
+	if(dev->activeArea[areaType] != 0){
 		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found GC'ed Area %u for %s",
 				dev->activeArea[areaType], areaNames[areaType]);
+		if(dev->areaMap[dev->activeArea[areaType]].status != AreaStatus::active){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "An Active Area is not active after GC!"
+					" (Area %" PRIu32 " on %" PRIu32 ")", dev->activeArea[areaType],
+					dev->areaMap[dev->activeArea[areaType]].position);
+			dev->lasterr = Result::bug;
+			return 0;
+		}
 		return dev->activeArea[areaType];
 	}
 
@@ -219,7 +225,7 @@ Result AreaManagement::deleteAreaContents(AreaPos area){
 	if(area == dev->activeArea[AreaType::data] ||
 		area == dev->activeArea[AreaType::index]){
 		PAFFS_DBG(PAFFS_TRACE_BUG,
-				"deleted active area %" PRIu32 ", is this OK?", area);
+				"deleted content of active area %" PRIu32 ", is this OK?", area);
 	}
 	Result r = Result::ok;
 
@@ -259,8 +265,14 @@ Result AreaManagement::deleteArea(AreaPos area){
 				"Was %" PRIu32 ", should < %" PRIu32, area, areasNo);
 		return Result::bug;
 	}
+	if(area == dev->activeArea[AreaType::data] ||
+		area == dev->activeArea[AreaType::index]){
+		PAFFS_DBG(PAFFS_TRACE_BUG,
+				"deleted active area %" PRIu32 ", is this OK?", area);
+	}
+
 	Result r = deleteAreaContents(area);
-	//dev->activeArea[dev->areaMap[area].type] = 0;
+
 	dev->areaMap[area].status = AreaStatus::empty;
 	dev->areaMap[area].type = AreaType::unset;
 	dev->usedAreas--;

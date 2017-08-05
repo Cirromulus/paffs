@@ -239,6 +239,7 @@ Result Device::unmnt(){
 		}
 		printf("\t----------------------\n");
 	}
+
 	destroyDevice();
 	driver->deInitializeNand();
 	//just for cleanup & tests

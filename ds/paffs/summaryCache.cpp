@@ -470,8 +470,7 @@ Result SummaryCache::loadAreaSummaries(){
 				}
 			}
 			if(dev->areaMap[index.asPositions[i]].status == AreaStatus::active){
-				dev->activeArea[dev->areaMap[index.asPositions[i]].type] =
-						dev->areaMap[index.asPositions[i]].position;
+				dev->activeArea[dev->areaMap[index.asPositions[i]].type] = index.asPositions[i];
 			}
 			PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Loaded area summary %d on %d", index.asPositions[i], dev->areaMap[index.asPositions[i]].position);
 		}
