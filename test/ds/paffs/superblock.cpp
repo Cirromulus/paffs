@@ -73,11 +73,4 @@ TEST_F(SuperBlock, multipleRemounts){
 		r = fs.unmount();
 		ASSERT_EQ(r, paffs::Result::ok);
 	}
-	/*	fs.setTraceMask(fs.getTraceMask() |
-		PAFFS_TRACE_SUPERBLOCK |
-		PAFFS_TRACE_ASCACHE |
-		PAFFS_TRACE_AREA |
-		PAFFS_TRACE_INFO |
-		PAFFS_TRACE_VERBOSE
-	);*/
 }
