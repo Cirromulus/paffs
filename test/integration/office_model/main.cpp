@@ -12,7 +12,7 @@ extern "C"
 }
 #include <gpio.h>
 #include <sevensegment.h>
-#include <paffs/paffs.hpp>
+#include <paffs.hpp>
 
 #include <string.h>
 

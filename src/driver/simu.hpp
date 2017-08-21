@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "../../../simu/flashCell.h"
+#include <simu/flashCell.h>
 #include <stddef.h>
 #include "driver.hpp"
 

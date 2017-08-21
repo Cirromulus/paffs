@@ -1,19 +1,18 @@
 /*
- * standard.hpp
+ * Default configuration
  *
  *  Created on: Feb 14, 2017
- *      Author: user
+ *      Author: Pascal Pieper
  */
 #include <stdint.h>
-#include "../../../../simu/types.hpp"
 #pragma once
 
 namespace paffs{
 	//Flash config
-	static constexpr uint16_t dataBytesPerPage  = PAGE_DATA;
-	static constexpr uint8_t  oobBytesPerPage = PAGE_AUX;
-	static constexpr uint16_t pagesPerBlock = BLOCK_SIZE;
-	static constexpr uint16_t blocksTotal = PLANE_SIZE*CELL_SIZE;
+	static constexpr uint16_t dataBytesPerPage  = 512;
+	static constexpr uint8_t  oobBytesPerPage = 16;
+	static constexpr uint16_t pagesPerBlock = 64;
+	static constexpr uint16_t blocksTotal = 16;
 	static constexpr uint8_t  blocksPerArea = 2;
 	static constexpr uint8_t  jumpPadNo = 1;				//Should scale with max(0, log2(blocks / 16))
 

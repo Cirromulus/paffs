@@ -4,7 +4,8 @@
  *  Created on: 17.01.2017
  *      Author: Pascal Pieper
  */
-#include "../commonTypes.hpp"
+
+#include <commonTypes.hpp>
 #include <outpost/rtos/timer.h>
 #include <outpost/rtos/clock.h>
 #pragma once

@@ -1,11 +1,12 @@
 import os
 
-rootpath = Dir('../../').abspath
+rootpath = Dir('../../../').abspath
+buildpath = os.path.join(rootpath, 'build')
+pluginpath = os.path.join(rootpath, '../')
 extpath = os.path.join(rootpath, 'ext')
-
 print("Integration Test")
 
-envGlobal = Environment(toolpath=[os.path.join(extpath, 'scons-build-tools/site_tools')],
+envGlobal = Environment(toolpath=[os.path.join(pluginpath, 'scons-build-tools/site_tools')],
                         tools=['compiler_sparc_rtems_gcc', 'settings_buildpath', 'utils_buildsize', 'utils_buildformat'],
                         OS='rtems',
                         BOARD='nexys3',
@@ -16,7 +17,7 @@ envGlobal = Environment(toolpath=[os.path.join(extpath, 'scons-build-tools/site_
                         },
                         ENV=os.environ)
 
-buildfolder = os.path.join(rootpath, 'debug/it_build/')
+buildfolder = os.path.join(rootpath, 'build/it_debug/')
 envGlobal.ParseFlags('-DDEBUG')
 envGlobal['CCFLAGS_optimize'] = ['-O0']
 envGlobal['RTEMS_ROOT_FOLDER'] = '/opt/rtems-4.10.x'
@@ -36,34 +37,25 @@ envGlobal.Tool('compiler_sparc_rtems_gcc')
 envGlobal.Tool('settings_buildpath')
 envGlobal['BASEPATH'] = rootpath 
 envGlobal['BUILDPATH'] = os.path.abspath(buildfolder)
-envGlobal['OUTPOST_CORE_PATH'] = os.path.join(extpath, 'outpost-core')
+envGlobal['OUTPOST_CORE_PATH'] = os.path.join(pluginpath, 'outpost-core')
 envGlobal['EXTPATH'] = extpath
 envGlobal['CXXFLAGS_language'] = ['-std=gnu++11']
 envGlobal['CFLAGS_language'] = ['-std=gnu99']
 
-
 envGlobal.Append(CPPPATH=[
-    rootpath,
-    os.path.abspath(os.path.join(rootpath, "ds")),
+	#This defines wich config will be used.	This may be a local copy as well.
+	os.path.join(pluginpath, 'paffs/config/K9F8G08U0M')
 ])
-
-envGlobal['PAFFSCONFIG'] = 'K9F8G08U0M'
 
 envGlobal.SConscript([
-        os.path.join(rootpath, 'ds/paffs/SConscript'),
-        os.path.join(rootpath, 'ds/paffs/driver/SConscript.office_model_nexys3'),
+        os.path.join(rootpath, 'src/SConscript'),
+        os.path.join(rootpath, 'src/driver/SConscript.office_model_nexys3'),
     ],
     exports=['envGlobal'])
-
-envGlobal.Append(LIBS=[
-	#nix
-])
 
 env = envGlobal.Clone()
 
 files = env.Glob('*.cpp')
-
-#print(env['LIBS'])
 
 programElf = env.Program('office.elf', files)
 programBin = env.Bin(programElf) 

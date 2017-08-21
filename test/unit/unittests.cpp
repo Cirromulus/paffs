@@ -5,7 +5,7 @@
  *      Author: user
  */
 
-#include "../../../ext/outpost-core/modules/utils/ext/googletest-1.8.0-fused/gmock/gmock.h"
+#include <gmock/gmock.h>
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

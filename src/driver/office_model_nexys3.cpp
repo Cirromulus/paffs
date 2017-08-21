@@ -31,11 +31,11 @@ Driver* getDriverSpecial(const uint8_t deviceId, void* fc){
 	return NULL;
 }
 
-virtual Result OfficeModelNexys3Driver::initializeNand(){
+Result OfficeModelNexys3Driver::initializeNand(){
 	nand->enableLatchUpProtection();
 	return Result::ok;
 }
-virtual Result OfficeModelNexys3Driver::deInitializeNand(){
+Result OfficeModelNexys3Driver::deInitializeNand(){
 	//FIXME Does this actually turn off NAND?
 	nand->disableLatchUpProtection();
 	return Result::ok;

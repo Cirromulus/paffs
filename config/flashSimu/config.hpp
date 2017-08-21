@@ -5,7 +5,7 @@
  *      Author: user
  */
 #include <stdint.h>
-#include <simu/types.hpp>
+#include <simu/config.hpp>
 #pragma once
 
 namespace paffs{

@@ -12,29 +12,25 @@ envGlobal.SConscript([
 	os.path.join('$OUTPOST_CORE_PATH', 'modules/SConscript.library'),
 	], exports='envGlobal')
 
-if not envGlobal['PAFFSCONFIG']:
-	print('No configuration set!')
-	envGlobal['PAFFSCONFIG'] = 'default'
-else:
-	print('Paffs configuration: ' + str(envGlobal['PAFFSCONFIG']))
-
+#TODO: Move config from Lib to user 
 envGlobal.Append(CPPPATH=[
 	os.path.join(os.path.abspath("./config/"), '$PAFFSCONFIG')
 ])
-
-env = envGlobal.Clone()
-
-files  = env.Glob('*.cpp')
-
-#for file in files:
-#    print (file)
-
-library = env.StaticLibrary('paffs', files)
 
 envGlobal.Append(LIBS=[
 	'paffs',
 	'outpost_rtos',
 	'outpost_time',
 ])
+
+#intentionally not using clone because if we chose Simu driver,
+# it will choose its own config
+
+files  = envGlobal.Glob('*.cpp')
+
+#for file in files:
+#    print (file)
+
+library = envGlobal.StaticLibrary('paffs', files)
 
 envGlobal.Install('$BUILDPATH/lib', library)
