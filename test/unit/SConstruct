@@ -98,6 +98,9 @@ envGlobal.Append(CPPPATH=[
 ])
 
 envGlobal.SConscript([
+	#this is needed for simudriver, b.c. it chooses its Config based on simu/config.hpp
+	os.path.join('$PLUGINPATH', 'satfon-simulation/simu/SConscript'),
+	
     os.path.join(rootpath, 'src/SConscript'),
 	os.path.join(rootpath, 'src/driver/SConscript.simudriver'),
     os.path.join(outpost_core_path, 'modules/SConscript.test'),

@@ -8,14 +8,11 @@ print("PAFFS")
 
 envGlobal.Append(CPPPATH=[os.path.abspath('.')])
 
+
+
 envGlobal.SConscript([
 	os.path.join('$OUTPOST_CORE_PATH', 'modules/SConscript.library'),
 	], exports='envGlobal')
-
-#TODO: Move config from Lib to user 
-envGlobal.Append(CPPPATH=[
-	os.path.join(os.path.abspath("./config/"), '$PAFFSCONFIG')
-])
 
 envGlobal.Append(LIBS=[
 	'paffs',
@@ -23,14 +20,13 @@ envGlobal.Append(LIBS=[
 	'outpost_time',
 ])
 
-#intentionally not using clone because if we chose Simu driver,
-# it will choose its own config
+env = envGlobal.Clone()
 
-files  = envGlobal.Glob('*.cpp')
+files  = env.Glob('*.cpp')
 
 #for file in files:
 #    print (file)
 
-library = envGlobal.StaticLibrary('paffs', files)
+library = env.StaticLibrary('paffs', files)
 
 envGlobal.Install('$BUILDPATH/lib', library)
