@@ -140,7 +140,7 @@ Amap::write(uint32_t address,
     printk("Amap::write before send\n");
 #endif
     mRetries = 0;
-    while (mSpacewire.send(txBuffer, outpost::time::zero()) != hal::SpaceWire::Result::success)
+    while (mSpacewire.send(txBuffer, outpost::time::Duration::zero()) != hal::SpaceWire::Result::success)
     {
     	printf(".\n");
         // retry 100 times until packet can be send
@@ -230,7 +230,7 @@ Amap::read(uint32_t address,
 
     mRetries = 0;
     // Send message
-    while (mSpacewire.send(txBuffer, outpost::time::zero()) != hal::SpaceWire::Result::success)
+    while (mSpacewire.send(txBuffer, outpost::time::Duration::zero()) != hal::SpaceWire::Result::success)
     {
         printf(".\n");
         // Retry 100 times until packet can be send
@@ -302,7 +302,7 @@ Amap::ping(Information& info,
 
     // Send message
     mRetries = 0;
-    while (mSpacewire.send(txBuffer, outpost::time::zero()) != hal::SpaceWire::Result::success)
+    while (mSpacewire.send(txBuffer, outpost::time::Duration::zero()) != hal::SpaceWire::Result::success)
     {
         // Retry 100 times until packet can be send
         mRetries++;

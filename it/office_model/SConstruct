@@ -1,6 +1,6 @@
 import os
 
-rootpath = Dir('../../../').abspath
+rootpath = Dir('../../').abspath
 buildpath = os.path.join(rootpath, 'build')
 pluginpath = os.path.join(rootpath, '../')
 extpath = os.path.join(rootpath, 'ext')
@@ -17,7 +17,7 @@ envGlobal = Environment(toolpath=[os.path.join(pluginpath, 'scons-build-tools/si
                         },
                         ENV=os.environ)
 
-buildfolder = os.path.join(rootpath, 'build/it_debug/')
+buildfolder = os.path.join(buildpath, 'it_debug/')
 envGlobal.ParseFlags('-DDEBUG')
 envGlobal['CCFLAGS_optimize'] = ['-O0']
 envGlobal['RTEMS_ROOT_FOLDER'] = '/opt/rtems-4.10.x'
