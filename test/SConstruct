@@ -33,7 +33,7 @@ AddOption(
 
 print("UNITTESTS")
 
-rootpath = Dir('../../').abspath
+rootpath = Dir('..').abspath
 buildpath = os.path.join(rootpath, 'build')
 pluginpath = os.path.join(rootpath, '../')
 outpost_core_path = os.path.join(pluginpath, 'outpost-core')
@@ -110,12 +110,12 @@ envGlobal.SConscript([
 
 
 env = envGlobal.Clone()
-print("Libs of unittests: ")
-for l in env['LIBS']:
-	print ("\t" + str(l))
-print("CPPPATH of unittests: ")
-for p in envGlobal['CPPPATH']:
-	print ("\t" + str(p))
+#print("Libs of unittests: ")
+#for l in env['LIBS']:
+#	print ("\t" + str(l))
+#print("CPPPATH of unittests: ")
+#for p in envGlobal['CPPPATH']:
+#	print ("\t" + str(p))
 
 files = Glob('*.cpp')
 

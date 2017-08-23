@@ -145,9 +145,8 @@ outpost::leon3::SpaceWireLight::requestBuffer(
 
 outpost::hal::SpaceWire::Result::Type
 outpost::leon3::SpaceWireLight::send(
-		TransmitBuffer* buffer, outpost::time::Duration timeout)
+		TransmitBuffer* buffer, outpost::time::Duration)
 {
-	(void) timeout;
     mSpwlBuffer.data = &buffer->getData()[0];
     mSpwlBuffer.nbytes = buffer->getLength();
     mSpwlBuffer.eop = toEopFlags(buffer->getEndMarker());
