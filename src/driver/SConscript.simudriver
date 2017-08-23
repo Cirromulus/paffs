@@ -10,7 +10,8 @@ envGlobal.Append(LIBS=[
 	'simu',
 ])
 
+env = envGlobal.Clone()
 files  = ['simu.cpp', 'yaffs_ecc.cpp']
-library = envGlobal.StaticLibrary('simuDriver', files)
+library = env.StaticLibrary('simuDriver', files)
 
 envGlobal.Install('$BUILDPATH/lib', library)

@@ -12,23 +12,24 @@
 namespace paffs{
 
 Driver* getDriver(const uint8_t deviceId){
+	(void) deviceId;
 	Driver* out = new NullDriver();
 	return out;
 }
 
 Driver* getDriverSpecial(const uint8_t deviceId, void* fc){
+	(void) deviceId;
 	(void) fc;
 	Driver* out = new NullDriver();
 	return out;
 }
 
 
-virtual Result NullDriver::initializeNand(){
-	memset(buf, 0xFF, totalBytesPerPage);
-	return Result::ok;
+Result NullDriver::initializeNand(){
+	return Result::nimpl;
 }
-virtual Result NullDriver::deInitializeNand(){
-	return Result::ok;
+Result NullDriver::deInitializeNand(){
+	return Result::nimpl;
 }
 
 Result NullDriver::writePage(uint64_t page_no,

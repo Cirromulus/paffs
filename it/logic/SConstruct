@@ -31,9 +31,9 @@ AddOption(
 	help='clang build',
 	default=False)
 
-print("UNITTESTS")
+print("INTEGRATION TESTS")
 
-rootpath = Dir('..').abspath
+rootpath = Dir('../../').abspath
 buildpath = os.path.join(rootpath, 'build')
 pluginpath = os.path.join(rootpath, '../')
 outpost_core_path = os.path.join(pluginpath, 'outpost-core')
@@ -92,15 +92,17 @@ if GetOption('with_clang'):
 	envGlobal.Append(CXXFLAGS_target = clangcxflags)
 	envGlobal.Append(LINKFLAGS_target = clanglflags)
 
-
 envGlobal.Append(CPPPATH=[
 	#This defines wich config will be used.	This may be a local copy as well.
-	os.path.join(pluginpath, 'paffs/config/default')
+	os.path.abspath(os.path.join(rootpath, "config/flashSimu"))
 ])
 
 envGlobal.SConscript([
+	#this is needed for simudriver, b.c. it chooses its Config based on simu/config.hpp
+	os.path.join('$PLUGINPATH', 'satfon-simulation/simu/SConscript'),
+	
     os.path.join(rootpath, 'src/SConscript'),
-	os.path.join(rootpath, 'src/driver/SConscript.nulldriver'),
+	os.path.join(rootpath, 'src/driver/SConscript.simudriver'),
     os.path.join(outpost_core_path, 'modules/SConscript.test'),
     ],
 	exports='envGlobal'
@@ -117,7 +119,7 @@ env = envGlobal.Clone()
 
 files = Glob('*.cpp')
 
-program = env.Program('unittest', files)
+program = env.Program('integrationtest', files)
 
 env.Alias('test', '$BUILDPATH')
 env.Default('test')

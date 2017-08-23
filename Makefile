@@ -12,27 +12,33 @@ else
 endif
 
 TESTDIR=./test/
-INTEGRATIONDIR=./it/office_model
+EMBEDDEDINTEGRATIONDIR=./it/office_model
+INTEGRATIONDIR=./it/logic
 
-all: get-dep test test-it doc
+all: test-unit test-integration doc
 
+build-embedded:
+	@scons $(MAKEJOBS) -C $(EMBEDDEDINTEGRATIONDIR)
+	
 build-integration:
+	@scons $(MAKEJOBS) -C $(INTEGRATIONDIR) --release-build	
+
+build-integration-debug:
 	@scons $(MAKEJOBS) -C $(INTEGRATIONDIR)
 
-build-test:
+build-unittest:
 	@scons $(MAKEJOBS) -C $(TESTDIR) --release-build
 	
-build-debugtest:
+build-unittest-debug:
 	@scons $(MAKEJOBS) -C $(TESTDIR)
 
-test: build-test
-	./build/release/unittest --gtest_output=xml:./build/release/test/coverage.xml
+test-unit: build-unittest
+	./build/release/unittest --gtest_output=xml:./build/release/test/unit_coverage.xml
 
-test-it: build-integration
-	#To be added
-	#/opt/grmon-eval-2.0.83/linux64/bin/grmon -uart /dev/cobc_dsu_2 -stack 0x40fffff0 -baud 460800 -gdb
+test-integration: build-integration
+	./build/release/integrationtest --gtest_output=xml:./build/release/test/integration_coverage.xml
 
-it-deploy: build-integration
+test-embedded: build-embedded
 	/opt/grmon-eval-2.0.83/linux64/bin/grmon -uart /dev/cobc_dsu_2 -stack 0x40fffff0 -baud 460800 -gdb
 
 get-dep:
