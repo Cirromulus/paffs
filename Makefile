@@ -52,4 +52,6 @@ doc:
 clean:
 	@scons -C $(TESTDIR) -c
 	@scons -C $(INTEGRATIONDIR) -c
+	@scons -C $(EMBEDDEDINTEGRATIONDIR) -c
 	@$(MAKE) -C doc/PAFFS_DOCUMENTATION clean
+	rm -rf build/

@@ -22,5 +22,3 @@ namespace paffs{
 	static constexpr uint8_t  areaSummaryCacheSize = 8;		//Currently  2 Bit per dataPagesPerArea
 	static constexpr uint8_t  maxNumberOfDevices = 1;
 };
-
-#include "../auto.hpp"

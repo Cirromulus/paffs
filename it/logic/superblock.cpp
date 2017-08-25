@@ -7,7 +7,7 @@
 
 #include "commonTest.hpp"
 #include <stdio.h>
-#include <config.hpp>
+#include <paffs/config.hpp>
 
 class SuperBlock : public InitFs{};
 

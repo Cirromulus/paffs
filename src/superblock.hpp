@@ -9,7 +9,6 @@
 
 #include <stdint.h>
 #include "commonTypes.hpp"
-#include <config.hpp>
 
 namespace paffs{
 

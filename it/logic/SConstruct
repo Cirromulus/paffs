@@ -93,14 +93,11 @@ if GetOption('with_clang'):
 	envGlobal.Append(LINKFLAGS_target = clanglflags)
 
 envGlobal.Append(CPPPATH=[
-	#This defines wich config will be used.	This may be a local copy as well.
-	os.path.abspath(os.path.join(rootpath, "config/flashSimu"))
+	#This defines which config paffs will use.
+	os.path.abspath("./config/")
 ])
 
 envGlobal.SConscript([
-	#this is needed for simudriver, b.c. it chooses its Config based on simu/config.hpp
-	os.path.join('$PLUGINPATH', 'satfon-simulation/simu/SConscript'),
-	
     os.path.join(rootpath, 'src/SConscript'),
 	os.path.join(rootpath, 'src/driver/SConscript.simudriver'),
     os.path.join(outpost_core_path, 'modules/SConscript.test'),

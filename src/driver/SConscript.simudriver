@@ -7,10 +7,16 @@ print("SIMUDRIVER")
 
 envGlobal.Append(LIBS=[
 	'simuDriver',
-	'simu',
 ])
 
+envGlobal.SConscript([
+	os.path.join('$PLUGINPATH', 'satfon-simulation/simu/SConscript'),
+    ],
+	exports='envGlobal'
+)
+
 env = envGlobal.Clone()
+	
 files  = ['simu.cpp', 'yaffs_ecc.cpp']
 library = env.StaticLibrary('simuDriver', files)
 

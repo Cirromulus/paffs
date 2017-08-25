@@ -23,7 +23,7 @@
  *
  */
 
-#include "commonTypes.hpp"
+#include <commonTypes.hpp>
 #include <inttypes.h>
 
 #pragma once

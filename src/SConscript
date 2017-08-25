@@ -8,8 +8,6 @@ print("PAFFS")
 
 envGlobal.Append(CPPPATH=[os.path.abspath('.')])
 
-
-
 envGlobal.SConscript([
 	os.path.join('$OUTPOST_CORE_PATH', 'modules/SConscript.library'),
 	], exports='envGlobal')
