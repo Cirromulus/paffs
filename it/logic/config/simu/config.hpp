@@ -7,8 +7,9 @@
 
 #pragma once
 
+#include <inttypes.h>
 
-#define DATA_TYPE unsigned char
+#define DATA_TYPE uint8_t
 #define PAGE_DATA 512
 #define PAGE_AUX (PAGE_DATA / 32)
 #define PAGE_SIZE (PAGE_DATA + PAGE_AUX)
