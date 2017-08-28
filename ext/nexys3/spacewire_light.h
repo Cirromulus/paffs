@@ -76,7 +76,7 @@ public:
     requestBuffer(TransmitBuffer *& buffer, outpost::time::Duration timeout);
 
     virtual Result::Type
-    send(TransmitBuffer* buffer);
+    send(TransmitBuffer* buffer, outpost::time::Duration timeout);
 
 
     virtual Result::Type

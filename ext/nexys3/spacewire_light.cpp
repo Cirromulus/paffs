@@ -145,7 +145,7 @@ outpost::leon3::SpaceWireLight::requestBuffer(
 
 outpost::hal::SpaceWire::Result::Type
 outpost::leon3::SpaceWireLight::send(
-		TransmitBuffer* buffer)
+		TransmitBuffer* buffer, outpost::time::Duration)
 {
     mSpwlBuffer.data = &buffer->getData()[0];
     mSpwlBuffer.nbytes = buffer->getLength();
