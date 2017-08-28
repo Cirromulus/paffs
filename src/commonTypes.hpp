@@ -193,4 +193,4 @@ class Driver;
 }  // namespace paffs
 
 #include <paffs/config.hpp>
-#include "./config/auto.hpp"
+#include "config/auto.hpp"

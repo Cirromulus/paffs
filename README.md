@@ -6,13 +6,13 @@ For Integration Tests, it needs the satfon-simulation repo in the parent directo
 
 To build with a special driver, modify the SConstruct file.
 
-For cloning all necessary repositories in parent dir, run make get-dep
-For Unittests, run make test.
-For Integration Tests, run make test-it.
+- For cloning all necessary repositories in parent dir, run make get-dep
+- For Unittests, run make test.
+- For Integration Tests, run make test-it.
 
-
-/
--paffs/
--scons-build-tools/
--outpost-core/
--satfon-simulation/
+Expected structure
+------
+- paffs/
+- scons-build-tools/
+- outpost-core/
+- satfon-simulation/
