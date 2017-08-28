@@ -341,7 +341,6 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 Result Superblock::findFirstFreeEntryInArea(AreaPos area, PageOffs* out_pos,
 		unsigned int required_pages){
 	PageOffs pageOffs[blocksPerArea];
-	int ffBlock = -1;
 	Result r;
 	for(int block = 0; block < blocksPerArea; block++){
 		r = findFirstFreeEntryInBlock(area, block, &pageOffs[block], required_pages);
@@ -350,18 +349,25 @@ Result Superblock::findFirstFreeEntryInArea(AreaPos area, PageOffs* out_pos,
 				//We are last entry, no matter what previous blocks contain or not, this is full
 				return Result::nf;
 			}
+			//If this block is full and not on the last position,
+			//the next block has to be empty.
+			r = findFirstFreeEntryInBlock(area, block+1, &pageOffs[block + 1], required_pages);
+			*out_pos = (block + 1) * pagesPerBlock + pageOffs[block + 1];
+			return r;
 		}else if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free Entry in phys. Area %" PRIu32, area);
 			return r;
 		}else{
-			if(ffBlock < 0 || pageOffs[block] != 0)
-				ffBlock = block;
+			if(pageOffs[block] != 0){
+				//This block contains Entries, but is not full.
+				//It has to be the most recent block
+				*out_pos = block * pagesPerBlock + pageOffs[block];
+				return r;
+			}
 		}
 	}
-	if (ffBlock < 0)
-		return Result::nf;//this should never be reached
-
-	*out_pos = ffBlock * pagesPerBlock + pageOffs[ffBlock];
+	//Every Block is empty, so return first page in first block!
+	*out_pos = 0;
 	return Result::ok;
 }
 
