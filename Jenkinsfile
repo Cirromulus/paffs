@@ -26,8 +26,8 @@ pipeline {
 	stages {
 		stage('checkout') {
 			steps {
-				dir('outpost-core') {
-		        	// https://hbryavsci1l.hb.dlr.de:8929/avionics-software-open/outpost-core.git
+			dir('paffs') {
+		        	// https://hbryavsci1l.hb.dlr.de:8929/avionics-software-open/paffs.git
 		        	checkout scm
 		        }
 		        dir('scons-build-tools') {
@@ -38,23 +38,30 @@ pipeline {
 		            git credentialsId: 'd895b75a-06cc-4446-a936-afe31d36d02b',
 		            	url: 'https://hbryavsci1l.hb.dlr.de:8929/avionics-software-open/satfon-simulation.git'
 		        }
-		        dir('paffs') {
+		        dir('outpost-core') {
 		            git credentialsId: 'd895b75a-06cc-4446-a936-afe31d36d02b',
-		            	url: 'https://hbryavsci1l.hb.dlr.de:8929/avionics-software-open/paffs.git'
+		            	url: 'https://hbryavsci1l.hb.dlr.de:8929/avionics-software-open/outpost-core.git'
 		        }
 			}
 	    }
-		stage("build") {
+		stage("build-unit") {
 			steps {
 				dir('paffs') {
-					sh 'make test'
+					sh 'make test-unit'
+				}
+			}
+		}
+		stage("build-integration") {
+			steps {
+				dir('paffs') {
+					sh 'make test-integration'
 				}
 			}
 		}
 		stage("test") {
 			steps {
-				dir('paffs') {
-					step([$class: 'XUnitPublisher',
+			dir('paffs') {
+			step([$class: 'XUnitPublisher',
 	                    testTimeMargin: '3000',
 	                    thresholdMode: 1,
 	                    thresholds: [
