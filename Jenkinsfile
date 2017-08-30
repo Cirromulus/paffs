@@ -58,6 +58,13 @@ pipeline {
 				}
 			}
 		}
+		stage("build-embedded") {
+			steps {
+				dir('paffs') {
+					sh 'make build-embedded'
+				}
+			}
+		}
 		stage("test") {
 			steps {
 			dir('paffs') {
