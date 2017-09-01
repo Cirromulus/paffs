@@ -49,6 +49,9 @@ public:
 
 	Result chmod(const char* path, Permission perm);
 	Result remove(const char* path);
+	Result getListOfOpenFiles(Obj* list[]);
+	uint8_t getNumberOfOpenFiles();
+	uint8_t getNumberOfOpenInodes();
 
 	//ONLY FOR DEBUG
 	Device* getDevice();

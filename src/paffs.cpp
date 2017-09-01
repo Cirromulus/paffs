@@ -93,7 +93,21 @@ void Paffs::printCacheSizes(){
 	);
 
 	PAFFS_DBG_S(PAFFS_TRACE_INFO,
-			"Size of Address: %zu. Addresses per Page: %u. AddrListCacheElem: %zu Bytes.\n"
+			"Size of File object: %zu Byte. Max Open Files: %u.\n"
+			"\tOverall File cache Size: %zu Byte.",
+				sizeof(Obj), maxNumberOfFiles,
+				sizeof(Obj) * maxNumberOfFiles
+	);
+
+	PAFFS_DBG_S(PAFFS_TRACE_INFO,
+			"Size of Inode object: %zu Byte. Max open Inodes: %u.\n"
+			"\tOverall Inode cache Size: %zu Byte.",
+				sizeof(Inode), maxNumberOfInodes,
+				sizeof(Inode) * maxNumberOfInodes
+	);
+
+	PAFFS_DBG_S(PAFFS_TRACE_INFO,
+			"Size of Address: %zu. Addresses per Page: %u. AddrListCacheElem: %zu Byte.\n"
 			"\tOverall AddrBuffer Size: %zu Byte",
 			sizeof(Addr), addrsPerPage, sizeof(AddrListCacheElem),
 			sizeof(PageAddressCache)
@@ -277,6 +291,17 @@ Result Paffs::chmod(const char* path, Permission perm){
 }
 Result Paffs::remove(const char* path){
 	return devices[0]->remove(path);
+}
+
+Result Paffs::getListOfOpenFiles(Obj* list[]){
+	return devices[0]->getListOfOpenFiles(list);
+}
+
+uint8_t Paffs::getNumberOfOpenFiles(){
+	return devices[0]->getNumberOfOpenFiles();
+}
+uint8_t Paffs::getNumberOfOpenInodes(){
+	return devices[0]->getNumberOfOpenInodes();
 }
 
 //ONLY FOR DEBUG

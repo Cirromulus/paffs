@@ -12,6 +12,10 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#ifdef __CDT_PARSER__
+#	define TEST void test
+#endif
+
 //Source: stack overflow, Fraser '12
 template<typename T, size_t size>
 ::testing::AssertionResult ArraysMatch(const T (&expected)[size],

@@ -125,7 +125,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 	Result r;
 	AreaPos lastDeletionTarget = 0;
 
-	if(traceMask && PAFFS_TRACE_VERIFY_AS){
+	if(traceMask & PAFFS_TRACE_VERIFY_AS){
 		unsigned char buf[totalBytesPerPage];
 		for(unsigned i = 0; i < totalPagesPerArea; i++){
 			Addr addr = combineAddress(dev->activeArea[AreaType::garbageBuffer], i);

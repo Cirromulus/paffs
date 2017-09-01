@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <outpost/time/time_epoch.h>
 #include "paffs_trace.hpp"
+#include "smartInodePtr.hpp"
 
 #pragma once
 
@@ -122,18 +123,18 @@ struct Inode{
 	//TODO: Add pointer to a PAC if cached
 };
 
-//could be later used for caching file paths
+//could be later used for caching file paths, can be a file, directory or link
 struct Dirent{
 	InodeNo no; //This is used for lazy loading of Inode
-	Inode* node; //can be NULL if not loaded yet
+	SmartInodePtr node; //can be NULL if not loaded yet
 	Dirent* parent;
 	char* name;
 };
 
-//An object can be a file, directory or link
+//An object is a file
 struct Obj{
 	bool rdnly;
-	Dirent* dirent;
+	Dirent dirent;
 	unsigned int fp;	//Current filepointer
 	Fileopenmask fo;	//TODO actually use this for read/write
 };
@@ -141,7 +142,7 @@ struct Obj{
 struct Dir{
 	Dirent* self;
 	Dirent* childs;
-	DirEntryCount no_entrys;
+	DirEntryCount no_entries;
 	DirEntryCount pos;
 };
 

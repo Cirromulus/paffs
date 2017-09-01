@@ -13,7 +13,9 @@
 #include "summaryCache.hpp"
 #include <outpost/rtos/clock.h>
 #include <outpost/time/clock.h>
-#include <map>
+
+#include "pools.hpp"
+
 
 #pragma once
 
@@ -22,10 +24,8 @@ namespace paffs {
 extern outpost::rtos::SystemClock systemClock;
 
 class Device{
-	typedef std::pair<Inode*, uint8_t> InodeWithRefcount;
-	typedef std::map<InodeNo, InodeWithRefcount>  InodeMap;
-	typedef std::pair<InodeNo, InodeWithRefcount> InodeMapElem;
-	InodeMap openInodes;
+	InodePool<maxNumberOfInodes> inodePool;
+	ObjectPool<maxNumberOfFiles, Obj> filesPool;
 
 public:
 	Driver *driver;
@@ -57,7 +57,7 @@ public:
 	Result mkDir(const char* fullPath, Permission mask);
 	Dir* openDir(const char* path);
 	Dirent* readDir(Dir* dir);
-	Result closeDir(Dir* dir);
+	Result closeDir(Dir* &dir);
 	void rewindDir(Dir* dir);
 
 	//File
@@ -74,37 +74,38 @@ public:
 	Result truncate(const char* path, unsigned int newLength);
 	Result remove(const char* path);
 	Result chmod(const char* path, Permission perm);
+	Result getListOfOpenFiles(Obj* list[]);
+	uint8_t getNumberOfOpenFiles();
+	uint8_t getNumberOfOpenInodes();
 
 private:
 
 	Result initializeDevice();
 	Result destroyDevice();
 
-	Result createInode(Inode* outInode, Permission mask);
-	Result createDirInode(Inode* outInode, Permission mask);
-	Result createFilInode(Inode* outInode, Permission mask);
+	Result createInode(SmartInodePtr &outInode, Permission mask);
+	Result createDirInode(SmartInodePtr &outInode, Permission mask);
+	Result createFilInode(SmartInodePtr &outInode, Permission mask);
 	void   destroyInode(Inode* node);
-	Result getParentDir(const char* fullPath, Inode* parDir,
+	Result getParentDir(const char* fullPath, SmartInodePtr &parDir,
 			unsigned int *lastSlash);
-	Result getInodeInDir( InodeNo *inode, Inode* folder, const char* name);
+	Result getInodeNoInDir( InodeNo *inode, Inode* folder, const char* name);
 	/**
 	 * @param outInode has to point to an Inode, it is used as a buffer!
 	 */
-	Result getInodeOfElem(Inode* &outInode, const char* fullPath);
+	Result getInodeOfElem(SmartInodePtr &outInode, const char* fullPath);
 	/**
 	 * @warn does not store the target into List, just checks whether it has to load it from tree
 	 * TODO: Future possibility is to store this target into cache (no buffer needed)
 	 *
-	 * @param target has to point to an Inode, it is used as a buffer!
+	 * @param target shall not point to valid data
 	 */
-	Result findOrLoadInode(InodeNo no, Inode* &target);
-	void   addOpenInode(InodeNo no, Inode* &target, Inode* source);
-	Result removeOpenInode(InodeNo no);
+	Result findOrLoadInode(InodeNo no, SmartInodePtr &target);
 
 	//newElem should be already inserted in Tree
 	Result insertInodeInDir(const char* name, Inode* contDir, Inode* newElem);
-	Result removeInodeFromDir(Inode* contDir, Inode* elem);
-	Result createFile(Inode* outFile, const char* fullPath, Permission mask);
+	Result removeInodeFromDir(Inode* contDir, InodeNo elem);
+	Result createFile(SmartInodePtr &outFile, const char* fullPath, Permission mask);
 };
 
 }  // namespace paffs

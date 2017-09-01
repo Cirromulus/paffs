@@ -12,6 +12,11 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#ifdef __CDT_PARSER__
+#	define TEST void test
+#	define TEST_F void test_f
+#endif
+
 class InitFs : public testing::Test{
 	static std::vector<paffs::Driver*> &collectDrivers(){
 		static std::vector<paffs::Driver*> drv;
@@ -43,6 +48,8 @@ public:
 	}
 
 	virtual void TearDown(){
+		EXPECT_EQ(fs.getDevice()->getNumberOfOpenFiles(), 0u);
+		EXPECT_EQ(fs.getDevice()->getNumberOfOpenInodes(), 0u);
 		paffs::Result r = fs.unmount();
 		ASSERT_THAT(r, testing::AnyOf(testing::Eq(paffs::Result::ok), testing::Eq(paffs::Result::notMounted)));
 	}

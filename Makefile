@@ -15,7 +15,7 @@ TESTDIR=./test/
 EMBEDDEDINTEGRATIONDIR=./it/office_model
 INTEGRATIONDIR=./it/logic
 
-all: test-unit test-integration doc
+all: build-unittest build-integration
 
 build-embedded:
 	@scons $(MAKEJOBS) -C $(EMBEDDEDINTEGRATIONDIR)

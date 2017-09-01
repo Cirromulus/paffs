@@ -35,7 +35,6 @@ Device::~Device(){
 	delete driver;
 }
 
-
 Result Device::format(bool complete){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
@@ -105,19 +104,22 @@ Result Device::format(bool complete){
 	r = tree.start_new_tree();
 	if(r != Result::ok)
 		return r;
-
-	Inode rootDir;
-	memset(&rootDir, 0, sizeof(Inode));
-
-	r = createDirInode(&rootDir, R | W | X);
-	if(r != Result::ok){
-		destroyDevice();
-		return r;
-	}
-	r = tree.insertInode(&rootDir);
-	if(r != Result::ok){
-		destroyDevice();
-		return r;
+	{
+		SmartInodePtr rootDir;
+		r = createDirInode(rootDir, R | W | X);
+		if(r != Result::ok){
+			destroyDevice();
+			return r;
+		}
+		if(rootDir->no != 0){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "Root Dir has Number != 0!");
+			return Result::bug;
+		}
+		r = tree.insertInode(rootDir);
+		if(r != Result::ok){
+			destroyDevice();
+			return r;
+		}
 	}
 	r = tree.commitCache();
 	if(r != Result::ok){
@@ -180,6 +182,13 @@ Result Device::mnt(bool readOnlyMode){
 		//Superblock does not need an active Area,
 		//data and index active areas are extracted by areaSummaryCache
 	}
+	SmartInodePtr rootDir;
+	r = findOrLoadInode(0, rootDir);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Could not load Inode of Root Dir!");
+		return r;
+	}
+	//TODO: Supress decrease or increase reference to node 0 manually
 	mounted = true;
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Mount sucessful");
 	return r;
@@ -192,11 +201,13 @@ Result Device::unmnt(){
 	if(!mounted)
 		return Result::notMounted;
 	Result r;
-	InodeMap::iterator it = openInodes.begin();
-	if(it != openInodes.end()){
-		PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Unclosed files remain, closing for unmount");
-		while(it != openInodes.end()){
 
+	InodePool<maxNumberOfInodes>::InodeMap::iterator it = inodePool.map.begin();
+	if(it != inodePool.map.end()){
+		PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Unclosed files remain, closing for unmount");
+		while(it != inodePool.map.end()){
+			PAFFS_DBG_S(PAFFS_TRACE_ALWAYS, "Close Inode %" PRIu32 " with %u references",
+					it->first, it->second.second);
 			//TODO: Later, we would choose the actual pac instance (or the PAC will choose the actual Inode...
 			r = dataIO.pac.setTargetInode(it->second.first);
 			if(r != Result::ok){
@@ -209,7 +220,8 @@ Result Device::unmnt(){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit pac of an open file");
 			}
 
-			it = openInodes.erase(it);
+			inodePool.pool.freeObject(it->second.first);
+			it = inodePool.map.erase(it);
 		}
 	}
 
@@ -248,18 +260,22 @@ Result Device::unmnt(){
 	return Result::ok;
 }
 
-Result Device::createInode(Inode* outInode, Permission mask){
+Result Device::createInode(SmartInodePtr &outInode, Permission mask){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	memset(outInode, 0, sizeof(Inode));
 
 	//FIXME: is this the best way to find a new number?
-	Result r = tree.findFirstFreeNo(&outInode->no);
+	InodeNo no;
+	Result r = tree.findFirstFreeNo(&no);
 	if(r != Result::ok)
 		return r;
-
+	r = inodePool.requireNewInode(no, outInode);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not require new Inode from Pool");
+		return r;
+	}
 	outInode->perm = (mask & permMask);
 	if(mask & W)
 		outInode->perm |= R;
@@ -273,7 +289,7 @@ Result Device::createInode(Inode* outInode, Permission mask){
 /**
  * creates DirInode ONLY IN RAM
  */
-Result Device::createDirInode(Inode* outInode, Permission mask){
+Result Device::createDirInode(SmartInodePtr &outInode, Permission mask){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
@@ -289,7 +305,7 @@ Result Device::createDirInode(Inode* outInode, Permission mask){
 /**
  * creates FilInode ONLY IN RAM
  */
-Result Device::createFilInode(Inode* outInode, Permission mask){
+Result Device::createFilInode(SmartInodePtr &outInode, Permission mask){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
@@ -302,6 +318,7 @@ Result Device::createFilInode(Inode* outInode, Permission mask){
 }
 
 void Device::destroyInode(Inode* node){
+	printf("HELLO?\n");
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return;
@@ -310,7 +327,7 @@ void Device::destroyInode(Inode* node){
 	delete node;
 }
 
-Result Device::getParentDir(const char* fullPath, Inode* parDir, unsigned int *lastSlash){
+Result Device::getParentDir(const char* fullPath, SmartInodePtr &parDir, unsigned int *lastSlash){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
@@ -341,10 +358,14 @@ Result Device::getParentDir(const char* fullPath, Inode* parDir, unsigned int *l
 }
 
 //Currently Linearer Aufwand
-Result Device::getInodeInDir(InodeNo *inode, Inode* folder, const char* name){
+Result Device::getInodeNoInDir(InodeNo* inode, Inode* folder, const char* name){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
+	}
+	if(folder == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Folder Inode pointer invalid!");
+		return Result::bug;
 	}
 
 	if(folder->type != InodeType::dir){
@@ -404,17 +425,17 @@ Result Device::getInodeInDir(InodeNo *inode, Inode* folder, const char* name){
 
 }
 
-Result Device::getInodeOfElem(Inode* &outInode, const char* fullPath){
+Result Device::getInodeOfElem(SmartInodePtr &outInode, const char* fullPath){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
 	}
-	Inode* buffer = outInode;
-	if(tree.getInode(0, buffer) != Result::ok){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find rootInode! (%s)", resultMsg[static_cast<int>(lasterr)]);
+	SmartInodePtr curr;
+	if(findOrLoadInode(0, curr) != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get rootInode! (%s)",
+				resultMsg[static_cast<int>(lasterr)]);
 		return Result::fail;
 	}
-	Inode *curr = outInode;
 
 	unsigned int fpLength = strlen(fullPath);
 	char* fullPathC = new char[fpLength + 1];
@@ -437,12 +458,15 @@ Result Device::getInodeOfElem(Inode* &outInode, const char* fullPath){
 
 		Result r;
 		InodeNo next;
-		if((r = getInodeInDir(&next, curr, fnP)) != Result::ok){
+		if((r = getInodeNoInDir(&next, curr, fnP)) != Result::ok){
 			delete[] fullPathC;
 			//this may be a NotFound
 			return r;
 		}
-		curr = buffer;
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "Could not remove Inode Reference!");
+			return r;
+		}
 		r = findOrLoadInode(next, curr);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get next Inode");
@@ -457,47 +481,20 @@ Result Device::getInodeOfElem(Inode* &outInode, const char* fullPath){
 	return Result::ok;
 }
 
-Result Device::findOrLoadInode(InodeNo no, Inode* &target){
-	InodeMap::iterator it = openInodes.find(no);
-	if(it != openInodes.end()){
-		target = it->second.first;
-	}else{
-		Result r = tree.getInode(no, target);
-		if(r != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get Inode of elem (%" PRIu32 ")", no);
-			return r;
-		}
+Result Device::findOrLoadInode(InodeNo no, SmartInodePtr &target){
+	Result r = inodePool.getExistingInode(no, target);
+	if(r == Result::ok){
+		return r;
 	}
-	return Result::ok;
-}
-
-void Device::addOpenInode(InodeNo no, Inode* &target, Inode* source){
-	InodeMap::iterator it = openInodes.find(no);
-	if(it == openInodes.end()){
-		//Not yet opened
-		target = new Inode;
-		*target = *source;
-		openInodes.insert(InodeMapElem(no,
-				InodeWithRefcount(target, 1)));
-	}else{
-		target = it->second.first;	//Inode Pointer
-		it->second.second++;				//Inode Refcount
+	r = inodePool.requireNewInode(no, target);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get new Inode from pool");
+		return r;
 	}
-}
-Result Device::removeOpenInode(InodeNo no){
-	InodeMap::iterator it = openInodes.find(no);
-	if(it == openInodes.end()){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Obj's inode was not found in openlist!");
-		return Result::bug;
-	}
-	if(it->second.second == 0){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Obj's Refcount is already zero!");
-		return Result::bug;
-	}
-	it->second.second--;			//Inode refcount
-	if(it->second.second == 0){
-		delete it->second.first;	//Inode
-		openInodes.erase(it);
+	r = tree.getInode(no, target);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get Inode of elem (%" PRIu32 ")", no);
+		return r;
 	}
 	return Result::ok;
 }
@@ -505,11 +502,11 @@ Result Device::removeOpenInode(InodeNo no){
 
 Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem){
 	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Device has no driver set!");
 		return Result::fail;
 	}
 	if(contDir == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Container Directory was null!");
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Container Directory was null!");
 		return Result::bug;
 	}
 
@@ -589,7 +586,7 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 
 
 //TODO: mark deleted treeCacheNodes as dirty
-Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
+Result Device::removeInodeFromDir(Inode* contDir, InodeNo elem){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
@@ -618,21 +615,24 @@ Result Device::removeInodeFromDir(Inode* contDir, Inode* elem){
 	FileSize pointer = sizeof(DirEntryCount);
 	while(pointer < contDir->size){
 		DirEntryLength entryl = static_cast<DirEntryLength> (dirData[pointer]);
-		if(memcmp(&dirData[pointer + sizeof(DirEntryLength)], &(elem->no), sizeof(InodeNo)) == 0){
+		if(memcmp(&dirData[pointer + sizeof(DirEntryLength)], &elem, sizeof(InodeNo)) == 0){
 			//Found
 			unsigned int newSize = contDir->size - entryl;
 			unsigned int restByte = newSize - pointer;
 			if(newSize == sizeof(DirEntryCount))
 				newSize = 0;
 
-			if((r = dataIO.deleteInodeData(contDir, newSize)) != Result::ok)
+			if((r = dataIO.deleteInodeData(contDir, newSize)) != Result::ok){
+				delete[] dirData;
 				return r;
+			}
 
 			if(restByte > 0 && restByte < 4)	//should either be 0 (no entries left) or bigger than 4 (minimum size for one entry)
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Something is fishy! (%d)", restByte);
 
 			if(newSize == 0){
 				//This was the last entry
+				delete[] dirData;
 				return dataIO.pac.commit();
 			}
 
@@ -668,8 +668,8 @@ Result Device::mkDir(const char* fullPath, Permission mask){
 
 	unsigned int lastSlash = 0;
 
-	Inode parDir;
-	Result res = getParentDir(fullPath, &parDir, &lastSlash);
+	SmartInodePtr parDir;
+	Result res = getParentDir(fullPath, parDir, &lastSlash);
 	if(res != Result::ok)
 		return res;
 
@@ -677,15 +677,16 @@ Result Device::mkDir(const char* fullPath, Permission mask){
 		return Result::objNameTooLong;
 	}
 
-	Inode newDir;
-	Result r = createDirInode(&newDir, mask);
+	SmartInodePtr newDir;
+	Result r = createDirInode(newDir, mask);
 	if(r != Result::ok)
 		return r;
-	r = tree.insertInode(&newDir);
+	r = tree.insertInode(newDir);
 	if(r != Result::ok)
 		return r;
 
-	return insertInodeInDir(&fullPath[lastSlash], &parDir, &newDir);
+	r = insertInodeInDir(&fullPath[lastSlash], parDir, newDir);
+	return r;
 }
 
 Dir* Device::openDir(const char* path){
@@ -703,8 +704,7 @@ Dir* Device::openDir(const char* path){
 		return nullptr;
 	}
 
-	Inode buf;
-	Inode *dirPinode = &buf;
+	SmartInodePtr dirPinode;
 	Result r = getInodeOfElem(dirPinode, path);
 	if(r != Result::ok){
 		if(r != Result::nf){
@@ -729,13 +729,12 @@ Dir* Device::openDir(const char* path){
 	Dir* dir = new Dir;
 	dir->self = new Dirent;
 	dir->self->name = const_cast<char*>("not_impl.");
-
-	addOpenInode(dirPinode->no, dir->self->node, dirPinode);
+	dir->self->node = dirPinode;
 	dir->self->no = dirPinode->no;
 
 	dir->self->parent = nullptr;	//no caching, so we probably don't have the parent
-	dir->no_entrys = dirPinode->size == 0 ? 0 : dirData[0];
-	dir->childs = new Dirent [dir->no_entrys];
+	dir->no_entries = dirPinode->size == 0 ? 0 : dirData[0];
+	dir->childs = new Dirent [dir->no_entries];
 	dir->pos = 0;
 
 	unsigned int p = sizeof(DirEntryCount);
@@ -748,7 +747,6 @@ Dir* Device::openDir(const char* path){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "Dirname length was bigger than possible (%u)!", dirnamel);
 			delete[] dir->childs;
 			delete[] dirData;
-			delete dir->self->node;
 			delete dir->self;
 			delete dir;
 			lasterr = Result::bug;
@@ -756,18 +754,18 @@ Dir* Device::openDir(const char* path){
 		}
 		p += sizeof(DirEntryLength);
 		memcpy(&dir->childs[entry].no, &dirData[p], sizeof(InodeNo));
-		dir->childs[entry].node = nullptr;
 		p += sizeof(InodeNo);
 		dir->childs[entry].name = new char[dirnamel+2];    //+2 weil 1. Nullbyte und 2. Vielleicht ein Zeichen '/' dazukommt
 		memcpy(dir->childs[entry].name, &dirData[p], dirnamel);
 		dir->childs[entry].name[dirnamel] = 0;
+		dir->childs[entry].parent = dir->self;
 		p += dirnamel;
 	}
 
 	delete[] dirData;
 
-	if(entry != dir->no_entrys){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Directory stated it had %u entries, but has actually %u!", dir->no_entrys, entry);
+	if(entry != dir->no_entries){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Directory stated it had %u entries, but has actually %u!", dir->no_entries, entry);
 		lasterr = Result::bug;
 		return nullptr;
 	}
@@ -775,7 +773,7 @@ Dir* Device::openDir(const char* path){
 	return dir;
 }
 
-Result Device::closeDir(Dir* dir){
+Result Device::closeDir(Dir* &dir){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
@@ -785,16 +783,14 @@ Result Device::closeDir(Dir* dir){
 	if(dir->childs == nullptr)
 		return Result::einval;
 
-	for(int i = 0; i < dir->no_entrys; i++){
+	for(int i = 0; i < dir->no_entries; i++){
 		delete[] dir->childs[i].name;
-		if(dir->childs[i].node != nullptr)
-			removeOpenInode(dir->childs[i].node->no);
 	}
 	delete[] dir->childs;
-	Result r = removeOpenInode(dir->self->no);
 	delete dir->self;
 	delete dir;
-	return r;
+	dir = nullptr;
+	return Result::ok;
 }
 
 /**
@@ -810,10 +806,10 @@ Dirent* Device::readDir(Dir* dir){
 		lasterr = Result::notMounted;
 		return nullptr;
 	}
-	if(dir->no_entrys == 0)
+	if(dir->no_entries == 0)
 		return nullptr;
 
-	if(dir->pos == dir->no_entrys){
+	if(dir->pos == dir->no_entries){
 		return nullptr;
 	}
 
@@ -823,7 +819,7 @@ Dirent* Device::readDir(Dir* dir){
 		return nullptr;
 	}*/
 
-	if(dir->pos > dir->no_entrys){
+	if(dir->pos > dir->no_entries){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ DIR on dir that points further than its contents");
 		lasterr = Result::bug;
 		return nullptr;
@@ -838,19 +834,16 @@ Dirent* Device::readDir(Dir* dir){
 	if(dir->childs[dir->pos].node != nullptr){
 		return &dir->childs[dir->pos++];
 	}
-	Inode buf;
-	Inode *item = &buf;
-	Result r = findOrLoadInode(dir->childs[dir->pos].no, item);
+	Result r = findOrLoadInode(dir->childs[dir->pos].no, dir->childs[dir->pos].node);
 	if(r != Result::ok){
 	   lasterr = Result::bug;
 	   return nullptr;
 	}
-	if((item->perm & R) == 0){
+	if((dir->childs[dir->pos].node->perm & R) == 0){
 		lasterr = Result::noperm;
+		dir->pos++;
 		return nullptr;
 	}
-
-	addOpenInode(item->no, dir->childs[dir->pos].node, item);
 
 	if(dir->childs[dir->pos].node->type == InodeType::dir){
 		int namel = strlen(dir->childs[dir->pos].name);
@@ -869,7 +862,7 @@ void Device::rewindDir(Dir* dir){
     dir->pos = 0;
 }
 
-Result Device::createFile(Inode* outFile, const char* fullPath, Permission mask){
+Result Device::createFile(SmartInodePtr &outFile, const char* fullPath, Permission mask){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
@@ -883,8 +876,8 @@ Result Device::createFile(Inode* outFile, const char* fullPath, Permission mask)
 
 	unsigned int lastSlash = 0;
 
-	Inode parDir;
-	Result res = getParentDir(fullPath, &parDir, &lastSlash);
+	SmartInodePtr parDir;
+	Result res = getParentDir(fullPath, parDir, &lastSlash);
 	if(res != Result::ok){
 		return res;
 	}
@@ -903,7 +896,8 @@ Result Device::createFile(Inode* outFile, const char* fullPath, Permission mask)
 		return res;
 	}
 
-	return insertInodeInDir(&fullPath[lastSlash], &parDir, outFile);
+	res = insertInodeInDir(&fullPath[lastSlash], parDir, outFile);
+	return res;
 }
 
 Obj* Device::open(const char* path, Fileopenmask mask){
@@ -920,9 +914,9 @@ Obj* Device::open(const char* path, Fileopenmask mask){
 		lasterr = Result::readonly;
 		return nullptr;
 	}
-	Inode buf;
-	Inode *file = &buf;
-	Result r = getInodeOfElem(file, path);
+	SmartInodePtr file;
+	Result r;
+	r = getInodeOfElem(file, path);
 	if(r == Result::nf){
 		//create new file
 		if(mask & FC){
@@ -960,14 +954,18 @@ Obj* Device::open(const char* path, Fileopenmask mask){
 		return nullptr;
 	}
 
-	Obj* obj = new Obj;
-	obj->dirent = new Dirent;
-	obj->dirent->name = new char[strlen(path)];
-	addOpenInode(file->no, obj->dirent->node, file);
-	obj->dirent->no = file->no;
-	obj->dirent->parent = nullptr;		//TODO: Sollte aus cache gesucht werden, erstellt in "getInodeOfElem(path))" ?
+	Obj* obj;
+	lasterr = filesPool.getNewObject(obj);
+	if(lasterr != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Too many open files!");
+		return nullptr;
+	}
+	obj->dirent.name = new char[strlen(path)];
+	obj->dirent.node = file;
+	obj->dirent.no = file->no;
+	obj->dirent.parent = nullptr;		//TODO: Sollte aus cache gesucht werden, erstellt in "getInodeOfElem(path))" ?
 
-	memcpy(obj->dirent->name, path, strlen(path));
+	memcpy(obj->dirent.name, path, strlen(path));
 
 	if(mask & FA){
 		obj->fp = file->size;
@@ -992,14 +990,11 @@ Result Device::close(Obj* obj){
 	}
 	Result r = flush(obj);
 	if(r != Result::ok){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not flush obj %" PRIu32, obj->dirent->no);
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not flush obj %" PRIu32, obj->dirent.no);
 	}
-	r = removeOpenInode(obj->dirent->no);
 
-	delete[] obj->dirent->name;
-	delete obj->dirent;
-	delete obj;
-
+	delete[] obj->dirent.name;
+	filesPool.freeObject(obj);
 	return r;
 }
 
@@ -1016,8 +1011,7 @@ Result Device::touch(const char* path){
 		//If we use reserved Areas, extensive touching may fill flash anyway
 		return Result::nosp;
 
-	Inode buf;
-	Inode *file = &buf;
+	SmartInodePtr file;
 	Result r = getInodeOfElem(file, path);
 	if(r == Result::nf){
 		//create new file
@@ -1030,7 +1024,8 @@ Result Device::touch(const char* path){
 		if(r != Result::ok)
 			return r;
 		file->mod = systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
-		return tree.updateExistingInode(file);
+		r = tree.updateExistingInode(file);
+		return r;
 	}
 
 }
@@ -1044,8 +1039,7 @@ Result Device::getObjInfo(const char *fullPath, ObjInfo* nfo){
 	if(!mounted)
 		return Result::notMounted;
 	Result r;
-	Inode buf;
-	Inode *object = &buf;
+	SmartInodePtr object;
 	if((r = getInodeOfElem(object, fullPath)) != Result::ok){
 		return lasterr = r;
 	}
@@ -1067,21 +1061,21 @@ Result Device::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned in
 	if(obj == nullptr)
 		return lasterr = Result::einval;
 
-	if(obj->dirent->node->type == InodeType::dir){
+	if(obj->dirent.node->type == InodeType::dir){
 		return lasterr = Result::einval;
 	}
-	if(obj->dirent->node->type == InodeType::lnk){
+	if(obj->dirent.node->type == InodeType::lnk){
 		return lasterr = Result::nimpl;
 	}
-	if((obj->dirent->node->perm & R) == 0)
+	if((obj->dirent.node->perm & R) == 0)
 		return Result::noperm;
 
-	if(obj->dirent->node->size == 0){
+	if(obj->dirent.node->size == 0){
 		*bytes_read = 0;
 		return Result::ok;
 	}
 
-	Result r = dataIO.readInodeData(obj->dirent->node, obj->fp, bytes_to_read, bytes_read, buf);
+	Result r = dataIO.readInodeData(obj->dirent.node, obj->fp, bytes_to_read, bytes_read, buf);
 	if(r != Result::ok){
 		return r;
 	}
@@ -1105,20 +1099,24 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 		return Result::readonly;
 	if(usedAreas > areasNo - minFreeAreas)
 		return Result::nosp;
+	if(obj->dirent.node == nullptr){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Objects dirent.node is invalid!");
+		return Result::bug;
+	}
 
-	if(obj->dirent->node->type == InodeType::dir)
+	if(obj->dirent.node->type == InodeType::dir)
 		return Result::einval;
-	if(obj->dirent->node->type == InodeType::lnk)
+	if(obj->dirent.node->type == InodeType::lnk)
 		return Result::nimpl;
-	if((obj->dirent->node->perm & W) == 0)
+	if((obj->dirent.node->perm & W) == 0)
 		return Result::noperm;
 
-	Result r = dataIO.writeInodeData(obj->dirent->node, obj->fp, bytes_to_write, bytes_written, buf);
+	Result r = dataIO.writeInodeData(obj->dirent.node, obj->fp, bytes_to_write, bytes_written, buf);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write %u of %u bytes",
 				bytes_to_write - *bytes_written, bytes_to_write);
 		if(*bytes_written > 0){
-			Result r2 = tree.updateExistingInode(obj->dirent->node);
+			Result r2 = tree.updateExistingInode(obj->dirent.node);
 			if(r2 != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "could not update Inode of unsuccessful inode write "
 						"(%s)", err_msg(r2));
@@ -1133,17 +1131,17 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 		return Result::fail;
 	}
 
-	obj->dirent->node->mod = systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
+	obj->dirent.node->mod = systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
 
 	obj->fp += *bytes_written;
-	if(obj->fp > obj->dirent->node->size){
+	if(obj->fp > obj->dirent.node->size){
 		//size was increased
-		if(obj->dirent->node->reservedPages * dataBytesPerPage < obj->fp){
+		if(obj->dirent.node->reservedPages * dataBytesPerPage < obj->fp){
 			PAFFS_DBG(PAFFS_TRACE_WRITE, "Reserved size is smaller than actual size "
 					"which is OK if we skipped pages");
 		}
 	}
-	return tree.updateExistingInode(obj->dirent->node);
+	return tree.updateExistingInode(obj->dirent.node);
 }
 
 Result Device::seek(Obj* obj, int m, Seekmode mode){
@@ -1160,9 +1158,9 @@ Result Device::seek(Obj* obj, int m, Seekmode mode){
 		obj->fp = m;
 		break;
 	case Seekmode::end :
-		if(-m > static_cast<int>(obj->dirent->node->size))
+		if(-m > static_cast<int>(obj->dirent.node->size))
 			return Result::einval;
-		obj->fp = obj->dirent->node->size + m;
+		obj->fp = obj->dirent.node->size + m;
 		break;
 	case Seekmode::cur :
 		if(static_cast<int>(obj->fp) + m < 0)
@@ -1186,7 +1184,7 @@ Result Device::flush(Obj* obj){
 		return Result::ok;
 
 	//TODO: When Inodes get Link to its PAC, this would be more elegant
-	Result r = dataIO.pac.setTargetInode(obj->dirent->node);
+	Result r = dataIO.pac.setTargetInode(obj->dirent.node);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Target Inode!");
 		return r;
@@ -1209,33 +1207,30 @@ Result Device::truncate(const char* path, unsigned int newLength){
 	if(readOnly)
 		return Result::readonly;
 
-	Inode buf;
-	Inode *object = &buf;
+	SmartInodePtr object;
 	Result r;
 	if((r = getInodeOfElem(object, path)) != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get Inode of elem");
 		return r;
 	}
 
-	if(object != &buf){
-		//This elem is in openInode list
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Object still opened, cant remove!");
-		return Result::einval;
+	if(!(object->perm & W)){
+		return Result::noperm;
 	}
 
-	if(!(object->perm & W))
-		return Result::noperm;
-
-	if(object->type == InodeType::dir)
-		if(object->size > sizeof(DirEntryCount))
+	if(object->type == InodeType::dir){
+		if(object->size > sizeof(DirEntryCount)){
 			return Result::dirnotempty;
+		}
+	}
 
 	r = dataIO.deleteInodeData(object, newLength);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete Inode Data");
 		return r;
 	}
-	return dataIO.pac.commit();
+	r = dataIO.pac.commit();
+	return r;
 }
 
 Result Device::remove(const char* path){
@@ -1244,22 +1239,22 @@ Result Device::remove(const char* path){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete the files contents");
 		return r;
 	}
-	Inode buf;
-	Inode *object = &buf;
+	SmartInodePtr object;
 	if((r = getInodeOfElem(object, path)) != Result::ok)
 		return r;
-	if(object != &buf){
-		//This elem is in openInode list
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Object still opened, cant remove!");
+
+	//If reference count is bigger than our own reference
+	if(inodePool.map[object->no].second > 1){
+		//Still opened by others
 		return Result::einval;
 	}
 
-	Inode parentDir;
+	SmartInodePtr parentDir;
 	unsigned int lastSlash = 0;
-	if((r = getParentDir(path, &parentDir, &lastSlash)) != Result::ok)
+	if((r = getParentDir(path, parentDir, &lastSlash)) != Result::ok)
 		return r;
 
-	if((r = removeInodeFromDir(&parentDir, object)) != Result::ok)
+	if((r = removeInodeFromDir(parentDir, object->no)) != Result::ok)
 		return r;
 	return tree.deleteInode(object->no);
 }
@@ -1268,13 +1263,31 @@ Result Device::chmod(const char* path, Permission perm){
 	if(!mounted)
 		return Result::notMounted;
 	Result r;
-	Inode buf;
-	Inode *object = &buf;
+	SmartInodePtr object;
 	if((r = getInodeOfElem(object, path)) != Result::ok){
 		return r;
 	}
 	object->perm = perm;
-	return tree.updateExistingInode(object);
+	r = tree.updateExistingInode(object);
+	return r;
+}
+
+Result Device::getListOfOpenFiles(Obj* list[]){
+	unsigned int pos = 0;
+	for(unsigned int i = 0; i < maxNumberOfFiles; i++){
+		if(filesPool.activeObjects.getBit(i)){
+			list[pos++] = &filesPool.objects[i];
+		}
+	}
+	return Result::ok;
+}
+
+uint8_t Device::getNumberOfOpenFiles(){
+	return filesPool.getUsage();
+}
+
+uint8_t Device::getNumberOfOpenInodes(){
+	return inodePool.getUsage();
 }
 
 Result Device::initializeDevice(){
@@ -1326,6 +1339,8 @@ Result Device::destroyDevice(){
 		return Result::fail;
 	}
 	memset(activeArea, 0, sizeof(AreaPos)*AreaType::no);
+	inodePool.clear();
+	filesPool.clear();
 	return Result::ok;
 }
 

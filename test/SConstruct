@@ -6,30 +6,6 @@ AddOption(
     action='store_true',
     help='release build',
     default=False)
-    
-AddOption(
-	'--with-clang',
-	action='store_true',
-	help='clang build',
-	default=False)
-	
-AddOption(
-	'--msan',
-	action='store_true',
-	help='clang build',
-	default=False)
-	
-AddOption(
-	'--usan',
-	action='store_true',
-	help='clang build',
-	default=False)
-	
-AddOption(
-	'--asan',
-	action='store_true',
-	help='clang build',
-	default=False)
 
 print("UNITTESTS")
 
@@ -48,18 +24,14 @@ if GetOption('release_build'):
     print("release_build")
     buildfolder = os.path.join(buildpath, 'release')
     envGlobal['CCFLAGS_optimize'] = ['-O3']
+    envGlobal.Tool('compiler_hosted_llvm_sanitizer')
 else:
     print("debug_build")
     buildfolder = buildfolder = os.path.join(buildpath, 'debug')
     envGlobal['CCFLAGS_optimize'] = ['-O0']
     envGlobal.ParseFlags('-DDEBUG')
-    
-if GetOption('with_clang'):
-	envGlobal.Tool('compiler_hosted_llvm')
-	buildfolder += "_llvm"
-else:
-	envGlobal.Tool('compiler_hosted_gcc')
-	
+    envGlobal.Tool('compiler_hosted_gcc')
+
 envGlobal.Tool('settings_buildpath')
 envGlobal['BUILDPATH'] = os.path.abspath(buildfolder)
 envGlobal['ROOTPATH'] = rootpath
@@ -72,25 +44,9 @@ clangcflags = [
 	'-fno-omit-frame-pointer',
 	'-fno-optimize-sibling-calls',
 ]
-if GetOption('with_clang'):
-	if GetOption('msan'):
-		clangcflags.extend([
-			'-fsanitize=memory',
-			'-stdlib=libc++',
-		])
-	elif GetOption('usan'):
-		clangcflags.extend([
-			'-fsanitize=undefined',
-		])
-	elif GetOption('asan'):
-		clangcflags.extend([
-			'-fsanitize=address',
-		])
-	
-if GetOption('with_clang'):
-	envGlobal.Append(CCFLAGS_target = clangcflags)
-	envGlobal.Append(CXXFLAGS_target = clangcxflags)
-	envGlobal.Append(LINKFLAGS_target = clanglflags)
+
+envGlobal.Append(CCFLAGS_target = clangcflags)
+envGlobal.Append(CXXFLAGS_target = clangcflags)
 
 
 envGlobal.Append(CPPPATH=[

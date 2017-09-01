@@ -154,6 +154,8 @@ TEST_F(FileTest, directoryReadWrite){
 	ASSERT_NE(entr, nullptr);
 	ASSERT_EQ(entr->node->type, paffs::InodeType::dir);
 	EXPECT_TRUE(StringsMatch(entr->name, "b/"));
+	entr = fs.readDir(dir);
+	ASSERT_EQ(entr, nullptr);
 	r = fs.closeDir(dir);
 	ASSERT_EQ(r, paffs::Result::ok);
 
@@ -340,7 +342,7 @@ TEST_F(FileTest, maxFilesize){
 	// root
 	dir = fs.openDir("/");
 	ASSERT_NE(dir, nullptr);
-	ASSERT_EQ(dir->no_entrys, 0);
+	ASSERT_EQ(dir->no_entries, 0);
 
 	r = fs.closeDir(dir);
 	ASSERT_EQ(r, paffs::Result::ok);
@@ -404,6 +406,13 @@ TEST_F(FileTest, multiplePointersToSameFile){
 			ringBufSize--;
 		}
 	}
+	ASSERT_EQ(fs.getNumberOfOpenFiles(), 2);
+	paffs::Obj* list[2];
+	r = fs.getListOfOpenFiles(list);
+	ASSERT_EQ(r, paffs::Result::ok);
+	ASSERT_EQ(list[1], inFil);
+	ASSERT_EQ(list[0], outFil);
+
 	r = fs.close(inFil);
 	ASSERT_EQ(r, paffs::Result::ok);
 	r = fs.close(outFil);
