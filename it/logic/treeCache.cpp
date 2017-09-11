@@ -21,7 +21,7 @@ TEST_F (TreeTest, Sizes) {
 
 TEST_F(TreeTest, handleMoreThanCacheLimit){
 	//Double cache size
-	paffs::Device *d = fs.getDevice();
+	paffs::Device *d = fs.getDevice(0);
 	paffs::Result r;
 
 	//insert
@@ -48,7 +48,7 @@ TEST_F(TreeTest, handleMoreThanCacheLimit){
 }
 
 TEST_F(TreeTest, coalesceAndRedistributeTree){
-	paffs::Device *d = fs.getDevice();
+	paffs::Device *d = fs.getDevice(0);
 	paffs::Result r;
 
 	//insert

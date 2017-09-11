@@ -23,7 +23,9 @@ public:
 	Paffs(std::vector<Driver*> &deviceDrivers);
 	~Paffs();
 
-	Result format(bool complete=false);
+	Result format(bool complete = false);
+	Result format(BadBlockList badBlockList[maxNumberOfDevices],
+			bool complete = false);
 	Result mount(bool readoOnly=false);
 	Result unmount();
 	Result getLastErr();
@@ -54,7 +56,7 @@ public:
 	uint8_t getNumberOfOpenInodes();
 
 	//ONLY FOR DEBUG
-	Device* getDevice();
+	Device* getDevice(unsigned int number);
 	void setTraceMask(unsigned int mask);
 	unsigned int getTraceMask();
 };

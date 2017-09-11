@@ -113,7 +113,8 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 		 * If some day we support data cache, this would be allowed to use this pool as well.
 		**/
 		for(unsigned int area = 0; area < areasNo; area++){
-			if(dev->areaMap[area].status == AreaStatus::empty){
+			if(dev->areaMap[area].status == AreaStatus::empty &&
+					dev->areaMap[area].type != AreaType::retired){
 				dev->areaMap[area].type = areaType;
 				initArea(area);
 				PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found empty Area %u for %s", area, areaNames[areaType]);
@@ -222,6 +223,11 @@ Result AreaManagement::deleteAreaContents(AreaPos area){
 				"Was %" PRIu32 ", should < %" PRIu32, area, areasNo);
 		return Result::bug;
 	}
+	if(dev->areaMap[area].type == AreaType::retired){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried deleting a retired area contents! %"
+				PRIu32 " on %" PRIu32, area, dev->areaMap[area].position);
+		return Result::bug;
+	}
 	if(area == dev->activeArea[AreaType::data] ||
 		area == dev->activeArea[AreaType::index]){
 		PAFFS_DBG(PAFFS_TRACE_BUG,
@@ -263,6 +269,11 @@ Result AreaManagement::deleteArea(AreaPos area){
 	if(area >= areasNo){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Invalid area! "
 				"Was %" PRIu32 ", should < %" PRIu32, area, areasNo);
+		return Result::bug;
+	}
+	if(dev->areaMap[area].type == AreaType::retired){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried deleting a retired area! %"
+				PRIu32 " on %" PRIu32, area, dev->areaMap[area].position);
 		return Result::bug;
 	}
 	if(area == dev->activeArea[AreaType::data] ||

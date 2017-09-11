@@ -19,7 +19,7 @@ TEST_F(SuperBlock, multipleRemounts){
 	char buf[6];
 	unsigned int bw;
 
-	fs.getDevice()->superblock.setTestmode(true);
+	fs.getDevice(0)->superblock.setTestmode(true);
 
 	fil = fs.open("/file", paffs::FC);
 	ASSERT_NE(fil, nullptr);

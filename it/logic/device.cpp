@@ -11,9 +11,7 @@
 #include <stdlib.h>     /* srand, rand */
 #include <time.h>       /* time */
 
-class FileTest : public InitFs{
-
-};
+class FileTest : public InitFs{};
 
 TEST_F(FileTest, seekReadWrite){
 	paffs::Obj *fil;

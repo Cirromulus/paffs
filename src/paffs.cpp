@@ -113,6 +113,13 @@ void Paffs::printCacheSizes(){
 			sizeof(PageAddressCache)
 	);
 
+	PAFFS_DBG_S(PAFFS_TRACE_INFO,
+			"Size of Device: %zu. Number of Devices: %u.\n"
+			"\tOverall Devices Size: %zu Byte",
+			sizeof(Device), maxNumberOfDevices,
+			sizeof(Device) * maxNumberOfDevices
+	);
+
 	PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------------------\n");
 }
 
@@ -152,6 +159,12 @@ void Paffs::resetLastErr(){
 }
 
 Result Paffs::format(bool complete){
+	BadBlockList noBadBlocks[maxNumberOfDevices];
+	return format(noBadBlocks, complete);
+}
+
+Result Paffs::format(BadBlockList badBlockList[maxNumberOfDevices],
+		bool complete){
 	//TODO: Handle errors
 	PAFFS_DBG_S(PAFFS_TRACE_INFO, "-----------------");
 
@@ -180,7 +193,7 @@ Result Paffs::format(bool complete){
 	Result r = Result::ok;
 	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
 		if(validDevices[i]){
-			Result r_ = devices[i]->format(complete);
+			Result r_ = devices[i]->format(badBlockList[i], complete);
 			if(r != Result::ok)
 				r = r_;
 		}
@@ -305,8 +318,11 @@ uint8_t Paffs::getNumberOfOpenInodes(){
 }
 
 //ONLY FOR DEBUG
-Device* Paffs::getDevice(){
-	return devices[0];
+Device* Paffs::getDevice(unsigned int number){
+	if(number >= maxNumberOfDevices){
+		return nullptr;
+	}
+	return devices[number];
 }
 
 void Paffs::setTraceMask(unsigned int mask){

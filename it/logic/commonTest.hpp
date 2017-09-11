@@ -5,8 +5,7 @@
  *      Author: rooot
  */
 
-#ifndef SOURCE_DIRECTORY__DS_PAFFS_TESTS_COMMONTEST_HPP_
-#define SOURCE_DIRECTORY__DS_PAFFS_TESTS_COMMONTEST_HPP_
+#pragma once
 
 #include <paffs.hpp>
 #include <gmock/gmock.h>
@@ -43,10 +42,13 @@ public:
 	}
 
 	virtual void TearDown(){
-		EXPECT_EQ(fs.getDevice()->getNumberOfOpenFiles(), 0u);
-		EXPECT_EQ(fs.getDevice()->getNumberOfOpenInodes(), 0u);
+		EXPECT_EQ(fs.getDevice(0)->getNumberOfOpenFiles(), 0u);
+		EXPECT_EQ(fs.getDevice(0)->getNumberOfOpenInodes(), 0u);
 		paffs::Result r = fs.unmount();
-		ASSERT_THAT(r, testing::AnyOf(testing::Eq(paffs::Result::ok), testing::Eq(paffs::Result::notMounted)));
+		ASSERT_THAT(r, testing::AnyOf(
+				testing::Eq(paffs::Result::ok),
+				testing::Eq(paffs::Result::notMounted))
+		);
 	}
 
 	virtual ~InitFs(){}
@@ -82,5 +84,3 @@ template<typename T>
 }
 
 ::testing::AssertionResult StringsMatch(const char *a, const char*b);
-
-#endif /* SOURCE_DIRECTORY__DS_PAFFS_TESTS_COMMONTEST_HPP_ */

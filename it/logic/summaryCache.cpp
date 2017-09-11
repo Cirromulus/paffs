@@ -7,12 +7,94 @@
 
 #include "commonTest.hpp"
 #include <paffs.hpp>
+#include "../../src/driver/simu.hpp"
+#include <stdlib.h>
 #include <stdio.h>
 
-class SummaryCache : public InitFs{};
 using namespace testing;
 
+class SummaryCache : public InitFs{};
+
+class InitWithBadBlocks : public testing::Test{
+	static constexpr unsigned int numberOfBadBlocks = 3;
+	static std::vector<paffs::Driver*> &collectDrivers(){
+		static std::vector<paffs::Driver*> drv;
+		drv.clear();
+		drv.push_back(paffs::getDriver(0));
+		return drv;
+	}
+public:
+	//automatically loads default driver "0" with default flash
+	paffs::Paffs fs;
+	paffs::BadBlockList bbl[paffs::maxNumberOfDevices];
+	InitWithBadBlocks() : fs(collectDrivers()){
+		for(unsigned int i = 0; i < paffs::maxNumberOfDevices; i++){
+			paffs::BlockAbs a,b,c;
+			a = (rand() % ((paffs::areasNo - 1) * paffs::blocksPerArea)) + paffs::blocksPerArea;
+			b = (rand() % ((paffs::areasNo - 1) * paffs::blocksPerArea)) + paffs::blocksPerArea;
+			c = (rand() % ((paffs::areasNo - 1) * paffs::blocksPerArea)) + paffs::blocksPerArea;
+			paffs::BlockAbs blocks[] = {a, b, c};
+			printf("Device %u, marked bad blocks at %u, %u and %u\n", i, a, b, c);
+			bbl[i] = paffs::BadBlockList(blocks, numberOfBadBlocks);
+		}
+	};
+
+	void assertBadBlocksAsUnused(){
+		for(unsigned i = 0; i < paffs::maxNumberOfDevices; i++){
+			paffs::Device* dev = fs.getDevice(i);
+			paffs::SimuDriver* drv = static_cast<paffs::SimuDriver*>(dev->driver);
+			DebugInterface* dbg = drv->getDebugInterface();
+			for(unsigned block = 0; block < bbl[i].mSize; block++){
+				AccessValues v = dbg->getAccessValues(
+						bbl[i].mList[block] / dbg->getPlaneSize(),
+						bbl[i].mList[block] % dbg->getPlaneSize(), 0, 0);
+				ASSERT_EQ(v.times_read, 0u);
+				ASSERT_EQ(v.times_reset, 0u);
+				ASSERT_EQ(v.times_written, 0u);
+			}
+		}
+	}
+
+	virtual void SetUp(){
+		fs.setTraceMask(
+			PAFFS_TRACE_VERIFY_TC |
+			PAFFS_TRACE_VERIFY_AS |
+			PAFFS_TRACE_ERROR |
+			PAFFS_TRACE_BUG
+		);
+		paffs::Result r = fs.format(bbl, true);
+		if(r != paffs::Result::ok){
+			std::cerr << "Could not format device!" << std::endl;
+		}
+		ASSERT_EQ(r, paffs::Result::ok);
+		r = fs.mount();
+		if(r != paffs::Result::ok){
+			std::cerr << "Could not mount device!" << std::endl;
+		}
+		ASSERT_EQ(r, paffs::Result::ok);
+		assertBadBlocksAsUnused();
+	}
+
+	virtual void TearDown(){
+		paffs::Result r = fs.unmount();
+		ASSERT_THAT(r, testing::AnyOf(testing::Eq(paffs::Result::ok), testing::Eq(paffs::Result::notMounted)));
+		assertBadBlocksAsUnused();
+	}
+
+	virtual ~InitWithBadBlocks(){};
+};
+
+void fillFlashAndVerify(paffs::Paffs &fs);
+
 TEST_F(SummaryCache, fillFlashAndVerify){
+	fillFlashAndVerify(fs);
+}
+
+TEST_F(InitWithBadBlocks, fillFlashAndVerifyWithBadBlocks){
+	fillFlashAndVerify(fs);
+}
+
+void fillFlashAndVerify(paffs::Paffs &fs){
 	paffs::Obj *fil;
 	paffs::Result r;
 	char txt[] = "Hallo";
@@ -56,7 +138,7 @@ TEST_F(SummaryCache, fillFlashAndVerify){
 
 			r = fs.close(fil);
 			ASSERT_EQ(r, paffs::Result::ok);
-			ASSERT_EQ(fs.getDevice()->tree.cache.isTreeCacheValid(), true);
+			ASSERT_EQ(fs.getDevice(0)->tree.cache.isTreeCacheValid(), true);
 		}
 	}
 	int ic = i, jc = j;

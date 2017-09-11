@@ -100,6 +100,36 @@ static const DirEntryLength maxDirEntryLength = 255;
 //Together with area = 0, it is used to mark an unused page in Inode
 static const PageOffs unusedMarker = 0xFFFFFFFF;
 
+struct BadBlockList{
+	BlockAbs *mList;
+	uint16_t mSize;
+	BadBlockList(): mList(nullptr), mSize(0){};
+	BadBlockList(BlockAbs *list, uint16_t size):mSize(size){
+		mList = new BlockAbs[size];
+		memcpy(mList, list, size*sizeof(BlockAbs));
+	};
+	BadBlockList& operator= (BadBlockList const &other){
+		mList = new BlockAbs[other.mSize];
+		memcpy(mList, other.mList, other.mSize*sizeof(BlockAbs));
+		mSize = other.mSize;
+		return *this;
+	}
+	BadBlockList(BadBlockList const &other){
+		*this = other;
+	}
+	~BadBlockList(){
+		if(mList != nullptr){
+			delete[] mList;
+		}
+	}
+	BlockAbs operator [](size_t pos){
+		if(pos > mSize){
+			return 0;
+		}
+		return mList[pos];
+	}
+};
+
 enum class InodeType : uint8_t{
 	file,
 	dir,

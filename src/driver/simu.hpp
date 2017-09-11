@@ -31,6 +31,11 @@ public:
 			delete cell;
 	}
 
+	//DEBUG
+	DebugInterface* getDebugInterface(){
+		return cell->getDebugInterface();
+	}
+
 	virtual Result initializeNand();
 	virtual Result deInitializeNand();
 	Result writePage(uint64_t page_no, void* data, unsigned int data_len);

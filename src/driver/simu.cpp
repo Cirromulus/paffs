@@ -103,7 +103,10 @@ Result SimuDriver::readPage(uint64_t page_no,
 Result SimuDriver::eraseBlock(uint32_t block_no){
 	if(!cell)
 		return Result::fail;
-
+	if(block_no > blocksTotal){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried erasing Block out of bounds!"
+				"Was %" PRIu32 ", should < %" PRIu32, block_no, blocksTotal);
+	}
 	Nandaddress d = translateBlockToAddress(block_no, cell);
 	return cell->eraseBlock(d.plane, d.block) == 0 ? Result::ok : Result::fail;
 }

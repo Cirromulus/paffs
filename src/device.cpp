@@ -36,6 +36,11 @@ Device::~Device(){
 }
 
 Result Device::format(bool complete){
+	BadBlockList noBadBlocks;
+	return format(noBadBlocks, complete);
+}
+
+Result Device::format(BadBlockList badBlockList, bool complete){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;
@@ -56,17 +61,41 @@ Result Device::format(bool complete){
 	unsigned char hadAreaType = 0;
 	unsigned char hadSuperblocks = 0;
 
+	for(unsigned int block = 0; block < badBlockList.mSize; block++){
+		AreaPos area = badBlockList[block] / blocksPerArea;
+		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Retiring Area %" PRIu32,
+				area);
+
+		if(badBlockList[block] > blocksTotal){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid Bad Block given! "
+					"was %" PRIu32 " area %" PRIu32 ", should < %" PRIu32,
+					badBlockList[block], area, blocksTotal);
+			return Result::einval;
+		}
+
+		areaMap[area].type = AreaType::retired;
+		if(area == 0){
+			//First and reserved Area
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Bad block in reserved first Area!");
+			return Result::fail;
+		}
+	}
+
 	for(unsigned int area = 0; area < areasNo; area++){
 		areaMap[area].status = AreaStatus::empty;
 		areaMap[area].erasecount = 0;
 		areaMap[area].position = area;
+
+		if(areaMap[area].type == AreaType::retired){
+			continue;
+		}
 
 		if(hadAreaType &
 				(1 << AreaType::superblock |
 				1 << AreaType::garbageBuffer) ||
 				complete){
 			for(unsigned int p = 0; p < blocksPerArea; p++){
-				r = driver->eraseBlock(p + area);
+				r = driver->eraseBlock(p + area * blocksPerArea);
 				if(r != Result::ok){
 					PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
 							"Found bad block %u during formatting", p + area);
