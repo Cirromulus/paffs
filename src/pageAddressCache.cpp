@@ -444,7 +444,7 @@ Result PageAddressCache::writeAddrList(Addr &to , Addr list[addrsPerPage]){
 
 	unsigned int firstFreePage = 0;
 	if(dev->areaMgmt.findFirstFreePage(&firstFreePage,
-			dev->activeArea[AreaType::index]) == Result::nosp){
+			dev->activeArea[AreaType::index]) == Result::nospace){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::index]);
 		return dev->lasterr = Result::bug;
 	}

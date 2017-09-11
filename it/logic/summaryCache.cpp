@@ -32,7 +32,7 @@ TEST_F(SummaryCache, fillFlashAndVerify){
 		sprintf(filename, "/%05d", i);
 		r = fs.mkDir(filename, paffs::FC);
 		if(r != paffs::Result::ok){
-			ASSERT_THAT(r, AnyOf(Eq(paffs::Result::nosp), Eq(paffs::Result::toobig)));
+			ASSERT_THAT(r, AnyOf(Eq(paffs::Result::nospace), Eq(paffs::Result::toobig)));
 			break;
 		}
 		for(j = 0; j < 100; j++){
@@ -40,14 +40,14 @@ TEST_F(SummaryCache, fillFlashAndVerify){
 			fil = fs.open(filename, paffs::FC);
 			if(fil == nullptr){
 				std::cout << filename << ": " << paffs::err_msg(fs.getLastErr()) << std::endl;
-				ASSERT_THAT(fs.getLastErr(), AnyOf(Eq(paffs::Result::nosp), Eq(paffs::Result::toobig)));
+				ASSERT_THAT(fs.getLastErr(), AnyOf(Eq(paffs::Result::nospace), Eq(paffs::Result::toobig)));
 				full = true;
 				break;
 			}
 			ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
 
 			r = fs.write(fil, txt, strlen(txt), &bw);
-			if(r == paffs::Result::nosp){
+			if(r == paffs::Result::nospace){
 				full = true;
 				break;
 			}

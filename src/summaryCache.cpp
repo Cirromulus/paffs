@@ -312,7 +312,7 @@ SummaryEntry SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result *re
 	}
 	if(translation.find(area) == translation.end()){
 		Result r = loadUnbufferedArea(area, false);
-		if(r == Result::nosp){
+		if(r == Result::nospace){
 			//load one-shot AS in read only
 			SummaryEntry buf[dataPagesPerArea];
 			r = readAreasummary(area, buf, true);
@@ -537,7 +537,7 @@ Result SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent){
 		r = freeNextBestSummaryCacheEntry(urgent);
 		if(!urgent && r == Result::nf){
 			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Nonurgent Cacheclean did not return free space, activating read-only");
-			return Result::nosp;
+			return Result::nospace;
 		}
 		if(r != Result::ok){
 			PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Urgent Cacheclean did not return free space, expect errors");

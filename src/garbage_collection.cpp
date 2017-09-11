@@ -150,12 +150,12 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 
 			if(targetType != AreaType::index){
 				PAFFS_DBG_S(PAFFS_TRACE_GC, "And we use reserved Areas for INDEX only.");
-				return Result::nosp;
+				return Result::nospace;
 			}
 
 			if(dev->usedAreas <= areasNo){
 				PAFFS_DBG_S(PAFFS_TRACE_GC, "and have no reserved Areas left.");
-				return Result::nosp;
+				return Result::nospace;
 			}
 
 			//This happens if we couldn't erase former srcArea which was not empty

@@ -165,7 +165,7 @@ Result AreaManagement::findFirstFreePage(unsigned int* p_out, unsigned int area)
 		if(r != Result::ok)
 			return r;
 	}
-	return Result::nosp;
+	return Result::nospace;
 }
 
 Result AreaManagement::manageActiveAreaFull(AreaPos *area, AreaType areaType){

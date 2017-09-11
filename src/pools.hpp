@@ -17,7 +17,7 @@ template<size_t size, typename T> struct ObjectPool{
 	Result getNewObject(T* &outObj){
 		size_t objOffs = activeObjects.findFirstFree();
 		if(objOffs >= size){
-			return Result::nosp;
+			return Result::nospace;
 		}
 		activeObjects.setBit(objOffs);
 		objects[objOffs] = T();

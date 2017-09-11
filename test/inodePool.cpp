@@ -95,5 +95,5 @@ TEST_F(SmartInodePointer, shouldReportErrorIfInodePoolIsEmpty){
 		ar[i] = getInode(i);
 	}
 	Result r = inodePool.requireNewInode(inodePoolSize+1, ar[inodePoolSize]);
-	ASSERT_EQ(r, Result::nosp);
+	ASSERT_EQ(r, Result::nospace);
 }

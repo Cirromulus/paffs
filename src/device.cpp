@@ -664,7 +664,7 @@ Result Device::mkDir(const char* fullPath, Permission mask){
 	if(readOnly)
 		return Result::readonly;
 	if(usedAreas > areasNo - minFreeAreas)
-		return Result::nosp;
+		return Result::nospace;
 
 	unsigned int lastSlash = 0;
 
@@ -872,7 +872,7 @@ Result Device::createFile(SmartInodePtr &outFile, const char* fullPath, Permissi
 	if(readOnly)
 		return Result::readonly;
 	if(usedAreas > areasNo - minFreeAreas)
-		return Result::nosp;
+		return Result::nospace;
 
 	unsigned int lastSlash = 0;
 
@@ -1009,7 +1009,7 @@ Result Device::touch(const char* path){
 		return Result::readonly;
 	if(usedAreas > areasNo - minFreeAreas)
 		//If we use reserved Areas, extensive touching may fill flash anyway
-		return Result::nosp;
+		return Result::nospace;
 
 	SmartInodePtr file;
 	Result r = getInodeOfElem(file, path);
@@ -1098,7 +1098,7 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 	if(readOnly)
 		return Result::readonly;
 	if(usedAreas > areasNo - minFreeAreas)
-		return Result::nosp;
+		return Result::nospace;
 	if(obj->dirent.node == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Objects dirent.node is invalid!");
 		return Result::bug;

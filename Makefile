@@ -32,6 +32,8 @@ build-unittest:
 build-unittest-debug:
 	@scons $(MAKEJOBS) -C $(TESTDIR)
 
+test: test-unit test-integration
+
 test-unit: build-unittest
 	./build/release/unittest --gtest_output=xml:./build/release/test/unit_coverage.xml
 

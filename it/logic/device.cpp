@@ -260,7 +260,7 @@ TEST_F(FileTest, maxFilesize){
 	while(true){
 		r = fs.write(fil, block, blocksize, &bw);
 		i += bw;
-		if(r == paffs::Result::nosp)
+		if(r == paffs::Result::nospace)
 			break;
 		EXPECT_EQ(bw, blocksize);
 		ASSERT_EQ(r, paffs::Result::ok);

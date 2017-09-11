@@ -30,7 +30,7 @@ enum class Result : uint8_t{
 	nimpl,
 	bug,
 	noparent,
-	nosp,
+	nospace,
 	lowmem,
 	noperm,
 	dirnotempty,
