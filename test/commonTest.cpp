@@ -9,7 +9,6 @@
 
 using namespace paffs;
 
-
 ::testing::AssertionResult StringsMatch(const char *a, const char*b){
 	if(strlen(a) != strlen(b))
 		return ::testing::AssertionFailure() << "Size differs, " << strlen(a)

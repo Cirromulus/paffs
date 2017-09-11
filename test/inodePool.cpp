@@ -7,7 +7,6 @@
 
 
 #include "commonTest.hpp"
-#include <paffs.hpp>
 #include <stdio.h>
 
 using namespace testing;
@@ -44,11 +43,7 @@ public:
 	virtual ~SmartInodePointer(){};
 };
 
-SmartInodePtr getInode(InodeNo no);
-
-void checkPoolRefs(InodeNo no, unsigned int refs);
-
-TEST(SmartInodePointer, CopyOperator){
+TEST_F(SmartInodePointer, validReferenceAfterCopyFunctionsAndScopeChanges){
 	{
 		SmartInodePtr a;
 
@@ -94,28 +89,11 @@ TEST(SmartInodePointer, CopyOperator){
 	checkPoolRefs(2, 1);
 }
 
-TEST(SmartInodePointer, sizes){
-	SmartInodePtr ar[size+1];
-	for(int i = 0; i < size; i++){
+TEST_F(SmartInodePointer, shouldReportErrorIfInodePoolIsEmpty){
+	SmartInodePtr ar[inodePoolSize+1];
+	for(unsigned int i = 0; i < inodePoolSize; i++){
 		ar[i] = getInode(i);
 	}
-	Result r = inodePool.requireNewInode(size+1, ar[size]);
+	Result r = inodePool.requireNewInode(inodePoolSize+1, ar[inodePoolSize]);
 	ASSERT_EQ(r, Result::nosp);
-}
-
-SmartInodePtr getInode(InodeNo no){
-	SmartInodePtr ret;
-	Result r = inodePool.requireNewInode(no, ret);
-	EXPECT_EQ(r, Result::ok);
-	return ret;
-}
-
-void checkPoolRefs(InodeNo no, unsigned int refs){
-	InodePoolBase::InodeMap::iterator it = inodePool.map.find(no);
-	if(refs == 0){
-		ASSERT_EQ(it, inodePool.map.end());
-		return;
-	}
-	ASSERT_NE(it, inodePool.map.end());
-	ASSERT_EQ(it->second.second, refs);				//Inode Refcount
 }
