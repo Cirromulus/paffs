@@ -1,6 +1,6 @@
 
 # Path to the root folder. Needed to find the latex base files.
-ROOTPATH = ../base/trunk
+ROOTPATH = ../../../xetex-document-base/
 
 # The temporary files of the latex build will not be generated here but in
 # BUILDPATH = $(ROOTPATH)/build/$(BUILDFOLDER).

@@ -45,6 +45,7 @@ get-dep:
 	if [ ! -d "../outpost-core" ]; then git clone ssh://git@hbryavsci1l.hb.dlr.de:10022/avionics-software-open/outpost-core.git ../outpost-core; fi
 	if [ ! -d "../satfon-simulation" ]; then git clone ssh://git@hbryavsci1l.hb.dlr.de:10022/avionics-software-open/satfon-simulation.git ../satfon-simulation; fi
 	if [ ! -d "../scons-build-tools" ]; then git clone ssh://git@hbryavsci1l.hb.dlr.de:10022/avionics-software-open/scons-build-tools.git ../scons-build-tools; fi
+	if [ ! -d "../xetex-document-base" ]; then ssh://git@hbryavsci1l.hb.dlr.de:10022/avionics-software/xetex-document-base.git ../xetex-document-base; fi
 
 doc:
 	@$(MAKE) -C doc/PAFFS_DOCUMENTATION
@@ -53,5 +54,5 @@ clean:
 	@scons -C $(TESTDIR) -c
 	@scons -C $(INTEGRATIONDIR) -c
 	@scons -C $(EMBEDDEDINTEGRATIONDIR) -c
-	@$(MAKE) -C doc/PAFFS_DOCUMENTATION clean
 	rm -rf build/
+	@$(MAKE) -C doc/PAFFS_DOCUMENTATION clean
