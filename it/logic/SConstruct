@@ -24,16 +24,16 @@ envGlobal = Environment(toolpath=[os.path.join(pluginpath, 'scons-build-tools/si
 if GetOption('release_build'):
     print("release_build")
     buildfolder = os.path.join(buildpath, 'release')
-    envGlobal['CCFLAGS_optimize'] = ['-O3']
     envGlobal.Tool('compiler_hosted_llvm_sanitizer')
 else:
     envGlobal.Tool('compiler_hosted_gcc')
     print("debug_build")
-    buildfolder = buildfolder = os.path.join(buildpath, 'debug')
+    buildfolder = os.path.join(buildpath, 'debug')
     envGlobal['CCFLAGS_optimize'] = ['-O0']
     envGlobal.ParseFlags('-DDEBUG')
 
 envGlobal.Tool('settings_buildpath')
+buildfolder = os.path.join(buildfolder, 'it')
 envGlobal['BUILDPATH'] = os.path.abspath(buildfolder)
 envGlobal['ROOTPATH'] = rootpath
 envGlobal['OUTPOST_CORE_PATH'] = os.path.join(pluginpath, 'outpost-core')

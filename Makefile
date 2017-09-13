@@ -35,10 +35,10 @@ build-unittest-debug:
 test: test-unit test-integration
 
 test-unit: build-unittest
-	./build/release/unittest --gtest_output=xml:./build/release/test/unit_coverage.xml
+	./build/release/unit/unittest --gtest_output=xml:./build/release/test/unit_coverage.xml
 
 test-integration: build-integration
-	./build/release/integrationtest --gtest_output=xml:./build/release/test/integration_coverage.xml
+	./build/release/it/integrationtest --gtest_output=xml:./build/release/test/integration_coverage.xml
 
 test-embedded: build-embedded
 	/opt/grmon-eval-2.0.83/linux64/bin/grmon -uart /dev/cobc_dsu_2 -stack 0x40fffff0 -baud 460800 -gdb
