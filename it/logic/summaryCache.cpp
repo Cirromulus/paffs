@@ -16,41 +16,69 @@ using namespace testing;
 class SummaryCache : public InitFs{};
 
 class InitWithBadBlocks : public testing::Test{
-	static constexpr unsigned int numberOfBadBlocks = 3;
+	static constexpr unsigned int numberOfBadBlocks = 4;
+	static constexpr unsigned int numberOfNotifiedBlocks = 3;
 	static std::vector<paffs::Driver*> &collectDrivers(){
 		static std::vector<paffs::Driver*> drv;
 		drv.clear();
 		drv.push_back(paffs::getDriver(0));
 		return drv;
 	}
-public:
-	//automatically loads default driver "0" with default flash
-	paffs::Paffs fs;
+	paffs::BlockAbs allBadBlocks[paffs::maxNumberOfDevices][numberOfBadBlocks];
 	paffs::BadBlockList bbl[paffs::maxNumberOfDevices];
+public:
+	paffs::Paffs fs;
+	//automatically loads default driver "0" with default flash
 	InitWithBadBlocks() : fs(collectDrivers()){
-		for(unsigned int i = 0; i < paffs::maxNumberOfDevices; i++){
-			paffs::BlockAbs a,b,c;
-			a = (rand() % ((paffs::areasNo - 1) * paffs::blocksPerArea)) + paffs::blocksPerArea;
-			b = (rand() % ((paffs::areasNo - 1) * paffs::blocksPerArea)) + paffs::blocksPerArea;
-			c = (rand() % ((paffs::areasNo - 1) * paffs::blocksPerArea)) + paffs::blocksPerArea;
-			paffs::BlockAbs blocks[] = {a, b, c};
-			printf("Device %u, marked bad blocks at %u, %u and %u\n", i, a, b, c);
-			bbl[i] = paffs::BadBlockList(blocks, numberOfBadBlocks);
+		for(unsigned int device = 0; device < paffs::maxNumberOfDevices; device++){
+			for(unsigned block = 0; block < numberOfBadBlocks; block++){
+				allBadBlocks[device][block] = (rand() %
+						((paffs::areasNo - 1) * paffs::blocksPerArea))
+						+ paffs::blocksPerArea;
+				if(block >= numberOfNotifiedBlocks){
+					fs.getDevice(device)->driver->markBad(allBadBlocks[device][block]);
+				}
+			}
+			printf("Device %u:\n\tListed, but not marked blocks:", device);
+			for(unsigned i = 0; i < numberOfNotifiedBlocks; i++){
+				printf(" %u", allBadBlocks[device][i]);
+			}
+			printf("\n\tMarked, but not listed blocks:");
+			for(unsigned i = numberOfNotifiedBlocks; i < numberOfBadBlocks; i++){
+				printf(" %u", allBadBlocks[device][i]);
+			}
+			printf("\n");
+			bbl[device] = paffs::BadBlockList(allBadBlocks[device], numberOfNotifiedBlocks);
 		}
 	};
 
 	void assertBadBlocksAsUnused(){
-		for(unsigned i = 0; i < paffs::maxNumberOfDevices; i++){
-			paffs::Device* dev = fs.getDevice(i);
+		for(unsigned device = 0; device < paffs::maxNumberOfDevices; device++){
+			paffs::Device* dev = fs.getDevice(device);
 			paffs::SimuDriver* drv = static_cast<paffs::SimuDriver*>(dev->driver);
 			DebugInterface* dbg = drv->getDebugInterface();
-			for(unsigned block = 0; block < bbl[i].mSize; block++){
+			for(unsigned block = 0; block < numberOfBadBlocks; block++){
 				AccessValues v = dbg->getAccessValues(
-						bbl[i].mList[block] / dbg->getPlaneSize(),
-						bbl[i].mList[block] % dbg->getPlaneSize(), 0, 0);
-				ASSERT_EQ(v.times_read, 0u);
-				ASSERT_EQ(v.times_reset, 0u);
-				ASSERT_EQ(v.times_written, 0u);
+						allBadBlocks[device][block] / dbg->getPlaneSize(),
+						allBadBlocks[device][block] % dbg->getPlaneSize(), 0, 0);
+				//One Write is allowed, for the Bad-Block marker!
+				ASSERT_EQ(v.times_written, 1u);
+					ASSERT_EQ(v.times_reset, 0u);
+				if(block < numberOfNotifiedBlocks){
+					ASSERT_EQ(v.times_read, 0u);
+				}else{
+					//The block has to be checked, but not reset
+					bool areaAlreadyRetired = false;
+					for(unsigned i = 0; i < block && !areaAlreadyRetired; i++){
+						areaAlreadyRetired |=
+							allBadBlocks[device][i] / paffs::blocksPerArea
+							== allBadBlocks[device][block] / paffs::blocksPerArea;
+							//This area was already retired, so no additional check
+					}
+					if(!areaAlreadyRetired){
+						ASSERT_EQ(v.times_read, 1u);
+					}
+				}
 			}
 		}
 	}
@@ -60,7 +88,8 @@ public:
 			PAFFS_TRACE_VERIFY_TC |
 			PAFFS_TRACE_VERIFY_AS |
 			PAFFS_TRACE_ERROR |
-			PAFFS_TRACE_BUG
+			PAFFS_TRACE_BUG |
+			PAFFS_TRACE_BAD_BLOCKS
 		);
 		paffs::Result r = fs.format(bbl, true);
 		if(r != paffs::Result::ok){

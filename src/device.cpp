@@ -63,8 +63,8 @@ Result Device::format(BadBlockList badBlockList, bool complete){
 
 	for(unsigned int block = 0; block < badBlockList.mSize; block++){
 		AreaPos area = badBlockList[block] / blocksPerArea;
-		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Retiring Area %" PRIu32,
-				area);
+		PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS, "Retiring Area %" PRIu32
+				" because of given List", area);
 
 		if(badBlockList[block] > blocksTotal){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid Bad Block given! "
@@ -72,13 +72,13 @@ Result Device::format(BadBlockList badBlockList, bool complete){
 					badBlockList[block], area, blocksTotal);
 			return Result::einval;
 		}
-
-		areaMap[area].type = AreaType::retired;
 		if(area == 0){
 			//First and reserved Area
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Bad block in reserved first Area!");
 			return Result::fail;
 		}
+		driver->markBad(badBlockList[block]);
+		areaMap[area].type = AreaType::retired;
 	}
 
 	for(unsigned int area = 0; area < areasNo; area++){
@@ -90,6 +90,21 @@ Result Device::format(BadBlockList badBlockList, bool complete){
 			continue;
 		}
 
+		bool anyBlockInAreaBad = false;
+		for(unsigned block = 0; block < blocksPerArea; block++){
+			if(driver->checkBad(area * blocksPerArea + block) != Result::ok){
+				PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
+						"Found marked bad block %" PRIu32 " during formatting, "
+						"retiring area %" PRIu32, area * blocksPerArea + block, area);
+				anyBlockInAreaBad = true;
+			}
+		}
+		if(anyBlockInAreaBad){
+			areaMap[area].type = AreaType::retired;
+			continue;
+		}
+
+
 		if(hadAreaType &
 				(1 << AreaType::superblock |
 				1 << AreaType::garbageBuffer) ||
@@ -98,7 +113,8 @@ Result Device::format(BadBlockList badBlockList, bool complete){
 				r = driver->eraseBlock(p + area * blocksPerArea);
 				if(r != Result::ok){
 					PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
-							"Found bad block %u during formatting", p + area);
+							"Found non-marked bad block %u during formatting, "
+							"retiring area %" PRIu32, p + area * blocksPerArea, area);
 					areaMap[area].type = AreaType::retired;
 					break;
 				}
