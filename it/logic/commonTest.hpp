@@ -25,7 +25,8 @@ public:
 	};
 
 	virtual void SetUp(){
-		paffs::Result r = fs.format(true);
+		paffs::BadBlockList bbl[paffs::maxNumberOfDevices];	//Empty
+		paffs::Result r = fs.format(bbl);
 		fs.setTraceMask(
 			PAFFS_TRACE_VERIFY_TC |
 			PAFFS_TRACE_VERIFY_AS |

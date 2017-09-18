@@ -23,7 +23,13 @@ public:
 	Paffs(std::vector<Driver*> &deviceDrivers);
 	~Paffs();
 
-	Result format(bool complete = false);
+	/**
+	 * @input badBlockList may contain empty lists
+	 * if no blocks are known to be bad
+	 * @input complete if true, delete complete flash (may take a while)
+	 * if false (default), only the superblocks are erased,
+	 * everything else is considered deleted
+	 */
 	Result format(const BadBlockList badBlockList[maxNumberOfDevices],
 			bool complete = false);
 	Result mount(bool readoOnly=false);

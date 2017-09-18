@@ -158,15 +158,10 @@ void Paffs::resetLastErr(){
 	}
 }
 
-Result Paffs::format(bool complete){
-	BadBlockList noBadBlocks[maxNumberOfDevices];
-	return format(noBadBlocks, complete);
-}
-
 Result Paffs::format(const BadBlockList badBlockList[maxNumberOfDevices],
 		bool complete){
 	//TODO: Handle errors
-	PAFFS_DBG_S(PAFFS_TRACE_INFO, "-----------------");
+	PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------");
 
 	PAFFS_DBG_S(PAFFS_TRACE_INFO, "Formatting infos:\n\t"
 			"dataBytesPerPage  : %04u\n\t"
@@ -188,7 +183,7 @@ Result Paffs::format(const BadBlockList badBlockList[maxNumberOfDevices],
 			, areaSummarySize, superChainElems
 			);
 
-	PAFFS_DBG_S(PAFFS_TRACE_INFO, "-----------------\n");
+	PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------\n");
 
 	Result r = Result::ok;
 	for(uint8_t i = 0; i < maxNumberOfDevices; i++){
