@@ -19,6 +19,36 @@ extern "C"
 using namespace outpost::nexys3;
 using namespace paffs;
 
+// initial bad blocks on NAND board 0
+//const BlockAbs badBlocksDev0[] = {1626, 3919};
+//const BlockAbs badBlocksDev1[] = {999};
+//const BlockAbs badBlocksDev2[] = {2674, 2938};
+//const BlockAbs badBlocksDev3[] = {240, 1491, 2827, 3249};
+
+// initial bad blocks on NAND board 1
+//const BlockAbs badBlocksDev0[] = {1653, 3289};
+//const BlockAbs badBlocksDev1[] = {638, 798, 1382, 2301, 3001};
+
+// initial bad blocks on NAND board 2
+//const BlockAbs badBlocksDev0[] = {2026, 3039, 3584, 3646};
+//const BlockAbs badBlocksDev1[] = {1059, 1771, 2372, 3434, 3484};
+
+// initial bad blocks on NAND board 3
+const BlockAbs badBlocksDev0[] = { 862, 3128 };
+const BlockAbs badBlocksDev1[] = { 61, 248, 1158, 1476, 2001, 2198 };
+const BlockAbs badBlocksDev2[] = { 0 };
+const BlockAbs badBlocksDev3[] = { 0 };
+
+// initial bad blocks on NAND board 4
+//const BlockAbs badBlocksDev0[] = {835, 2860, 3858, 4046};
+//const BlockAbs badBlocksDev1[] = {367, 2786};
+
+// initial bad blocks on NAND board 5
+//const BlockAbs badBlocksDev0[] = {314, 1818, 1925, 2967};
+//const BlockAbs badBlocksDev1[] = {614, 2315, 2400, 2906, 2907, 2908, 2909, 3751};
+//const BlockAbs badBlocksDev2[] = {418, 1690, 3787};
+//const BlockAbs badBlocksDev3[] = {931, 3067};
+
 rtems_task
 task_system_init(rtems_task_argument)
 {
@@ -39,6 +69,10 @@ task_system_init(rtems_task_argument)
 	SevenSegment::write(2, 'F');
 	SevenSegment::write(3, 'S');
 
+	BadBlockList badBlocks[2];
+	badBlocks[0] = BadBlockList(badBlocksDev0, 2);
+	badBlocks[1] = BadBlockList(badBlocksDev1, 6);
+
 	uint8_t leds = 0;
 	for (uint_fast8_t i = 0; i < 10; ++i)
 	{
@@ -48,7 +82,7 @@ task_system_init(rtems_task_argument)
 		rtems_task_wake_after(100);
 	}
 
-	printf("Before initing FS\n");
+
 	std::vector<paffs::Driver*> drv;
 	drv.push_back(paffs::getDriver(0));
 	Paffs *fs = new Paffs(drv);
@@ -67,7 +101,9 @@ task_system_init(rtems_task_argument)
 		}
 		if(buf == 'y' || buf == 'c'){
 			printf("You chose yes.\n");
-			r = fs->format(buf == 'c');
+			Gpio::set(8);
+			r = fs->format(badBlocks, buf == 'c');
+			Gpio::set(0);
 			if(r == Result::ok){
 				printf("Success.\n");
 			}else{

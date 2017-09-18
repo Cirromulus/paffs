@@ -24,9 +24,10 @@ public:
 	~Paffs();
 
 	/**
-	 * @input badBlockList may contain empty lists
+	 * \param[in] badBlockList may contain empty lists
 	 * if no blocks are known to be bad
-	 * @input complete if true, delete complete flash (may take a while)
+	 *
+	 * \param[in] complete if true, delete complete flash (may take a while)
 	 * if false (default), only the superblocks are erased,
 	 * everything else is considered deleted
 	 */

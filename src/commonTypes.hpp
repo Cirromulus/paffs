@@ -104,7 +104,7 @@ struct BadBlockList{
 	BlockAbs *mList;
 	uint16_t mSize;
 	BadBlockList(): mList(nullptr), mSize(0){};
-	BadBlockList(BlockAbs *list, uint16_t size):mSize(size){
+	BadBlockList(const BlockAbs *list, const uint16_t size):mSize(size){
 		mList = new BlockAbs[size];
 		memcpy(mList, list, size*sizeof(BlockAbs));
 	};
