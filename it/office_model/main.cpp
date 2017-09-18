@@ -52,9 +52,8 @@ const BlockAbs badBlocksDev3[] = { 0 };
 rtems_task
 task_system_init(rtems_task_argument)
 {
-	//setvbuf(stdout, NULL, _IONBF, 0);
 	const char* wbuf = "\nBuild: " __DATE__ " " __TIME__ "\n"
-			"This is a test write. Hello world!\n";
+			"This is a test write into a file. Hello world!\n";
 
 	printf("\n\n\n\nBuild: " __DATE__ " " __TIME__ "\n");
 	rtems_stack_checker_report_usage();
@@ -69,9 +68,10 @@ task_system_init(rtems_task_argument)
 	SevenSegment::write(2, 'F');
 	SevenSegment::write(3, 'S');
 
-	BadBlockList badBlocks[2];
-	badBlocks[0] = BadBlockList(badBlocksDev0, 2);
-	badBlocks[1] = BadBlockList(badBlocksDev1, 6);
+	BadBlockList badBlocks[] = {
+		BadBlockList(badBlocksDev0, 2),
+		BadBlockList(badBlocksDev1, 6)
+	};
 
 	uint8_t leds = 0;
 	for (uint_fast8_t i = 0; i < 10; ++i)
@@ -81,7 +81,6 @@ task_system_init(rtems_task_argument)
 		Gpio::set(leds);
 		rtems_task_wake_after(100);
 	}
-
 
 	std::vector<paffs::Driver*> drv;
 	drv.push_back(paffs::getDriver(0));
