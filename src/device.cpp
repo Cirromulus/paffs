@@ -35,11 +35,6 @@ Device::~Device(){
 	delete driver;
 }
 
-Result Device::format(bool complete){
-	BadBlockList noBadBlocks;
-	return format(noBadBlocks, complete);
-}
-
 Result Device::format(const BadBlockList &badBlockList, bool complete){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");

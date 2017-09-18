@@ -49,7 +49,12 @@ public:
 	Device(Driver* driver);
 	~Device();
 
-	Result format(bool complete = false);
+	/**
+	 * \param[in] badBlockList may be empty signalling no known bad blocks
+	 * \param[in] complete if true, delete complete flash (may take a while)
+	 * if false (default), only the superblocks are erased,
+	 * everything else is considered deleted
+	 */
 	Result format(const BadBlockList &badBlockList, bool complete = false);
 
 	Result mnt(bool readOnlyMode = false);
