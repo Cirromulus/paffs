@@ -8,6 +8,7 @@
 #pragma once
 
 #include <simu/flashCell.h>
+#include <simu/mram.hpp>
 #include <stddef.h>
 #include "driver.hpp"
 

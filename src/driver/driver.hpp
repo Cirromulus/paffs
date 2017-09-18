@@ -19,13 +19,28 @@ namespace paffs{
 
 		virtual Result initializeNand() = 0;
 		virtual Result deInitializeNand() = 0;
-		virtual Result writePage (PageAbs page_no,
-				void* data, unsigned int data_len) = 0;
-		virtual Result readPage (PageAbs page_no,
-				void* data, unsigned int data_len) = 0;
-		virtual Result eraseBlock (BlockAbs block_no) = 0;
-		virtual Result markBad (BlockAbs block_no) = 0;
-		virtual Result checkBad (BlockAbs block_no) = 0;
+		virtual Result writePage (PageAbs pageNo,
+				void* data, unsigned int dataLen) = 0;
+		virtual Result readPage (PageAbs pageNo,
+				void* data, unsigned int dataLen) = 0;
+		virtual Result eraseBlock (BlockAbs blockNo) = 0;
+		virtual Result markBad (BlockAbs blockNo) = 0;
+		virtual Result checkBad (BlockAbs blockNo) = 0;
+
+		virtual Result writeMRAM(PageAbs startByte,
+				void* const data, unsigned int dataLen){
+			(void) startByte;
+			(void) data;
+			(void) dataLen;
+			return Result::nimpl;
+		}
+		virtual Result readMRAM(PageAbs startByte,
+				void* data, unsigned int dataLen){
+			(void) startByte;
+			(void) data;
+			(void) dataLen;
+			return Result::nimpl;
+		}
 	};
 
 	Driver* getDriver(const uint8_t deviceId);
