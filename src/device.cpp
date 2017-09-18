@@ -40,7 +40,7 @@ Result Device::format(bool complete){
 	return format(noBadBlocks, complete);
 }
 
-Result Device::format(BadBlockList badBlockList, bool complete){
+Result Device::format(const BadBlockList &badBlockList, bool complete){
 	if(driver == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
 		return Result::fail;

@@ -50,7 +50,7 @@ public:
 	~Device();
 
 	Result format(bool complete = false);
-	Result format(BadBlockList badBlockList, bool complete = false);
+	Result format(const BadBlockList &badBlockList, bool complete = false);
 
 	Result mnt(bool readOnlyMode = false);
 	Result unmnt();

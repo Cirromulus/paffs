@@ -163,7 +163,7 @@ Result Paffs::format(bool complete){
 	return format(noBadBlocks, complete);
 }
 
-Result Paffs::format(BadBlockList badBlockList[maxNumberOfDevices],
+Result Paffs::format(const BadBlockList badBlockList[maxNumberOfDevices],
 		bool complete){
 	//TODO: Handle errors
 	PAFFS_DBG_S(PAFFS_TRACE_INFO, "-----------------");

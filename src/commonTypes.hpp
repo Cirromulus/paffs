@@ -122,7 +122,7 @@ struct BadBlockList{
 			delete[] mList;
 		}
 	}
-	BlockAbs operator [](size_t pos){
+	BlockAbs operator [] (size_t pos) const {
 		if(pos > mSize){
 			return 0;
 		}

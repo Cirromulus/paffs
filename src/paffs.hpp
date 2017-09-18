@@ -24,7 +24,7 @@ public:
 	~Paffs();
 
 	Result format(bool complete = false);
-	Result format(BadBlockList badBlockList[maxNumberOfDevices],
+	Result format(const BadBlockList badBlockList[maxNumberOfDevices],
 			bool complete = false);
 	Result mount(bool readoOnly=false);
 	Result unmount();
