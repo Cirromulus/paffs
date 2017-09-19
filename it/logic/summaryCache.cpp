@@ -56,7 +56,7 @@ public:
 		for(unsigned device = 0; device < paffs::maxNumberOfDevices; device++){
 			paffs::Device* dev = fs.getDevice(device);
 			paffs::SimuDriver* drv = static_cast<paffs::SimuDriver*>(dev->driver);
-			DebugInterface* dbg = drv->getDebugInterface();
+			FlashDebugInterface* dbg = drv->getDebugInterface();
 			for(unsigned block = 0; block < numberOfBadBlocks; block++){
 				AccessValues v = dbg->getAccessValues(
 						allBadBlocks[device][block] / dbg->getPlaneSize(),

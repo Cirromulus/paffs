@@ -1,0 +1,79 @@
+#test build
+import os
+
+AddOption(
+    '--release-build',
+    action='store_true',
+    help='release build',
+    default=False)
+
+
+print("MISC TESTS")
+
+rootpath = Dir('../../').abspath
+buildpath = os.path.join(rootpath, 'build')
+pluginpath = os.path.join(rootpath, '../')
+outpost_core_path = os.path.join(pluginpath, 'outpost-core')
+
+
+envGlobal = Environment(toolpath=[os.path.join(pluginpath, 'scons-build-tools/site_tools')],
+                        tools=['utils_buildformat'],
+                        BASEPATH=os.path.abspath('.'),
+                        ENV=os.environ)
+
+if GetOption('release_build'):
+    print("release_build")
+    buildfolder = os.path.join(buildpath, 'release')
+    envGlobal.Tool('compiler_hosted_llvm_sanitizer')
+else:
+    envGlobal.Tool('compiler_hosted_gcc')
+    print("debug_build")
+    buildfolder = os.path.join(buildpath, 'debug')
+    envGlobal['CCFLAGS_optimize'] = ['-O0']
+    envGlobal.ParseFlags('-DDEBUG')
+
+envGlobal.Tool('settings_buildpath')
+buildfolder = os.path.join(buildfolder, 'misc')
+envGlobal['BUILDPATH'] = os.path.abspath(buildfolder)
+envGlobal['ROOTPATH'] = rootpath
+envGlobal['OUTPOST_CORE_PATH'] = os.path.join(pluginpath, 'outpost-core')
+envGlobal['PLUGINPATH'] = pluginpath
+envGlobal['CXXFLAGS_language'] = ['-std=c++11']
+
+clangcflags = [
+	'-g3',
+	'-fno-omit-frame-pointer',
+	'-fno-optimize-sibling-calls',
+]
+	
+envGlobal.Append(CCFLAGS_target = clangcflags)
+envGlobal.Append(CXXFLAGS_target = clangcflags)
+
+envGlobal.Append(CPPPATH=[
+	#This defines which config paffs will use.
+	os.path.abspath("./config/")
+])
+
+envGlobal.SConscript([
+    os.path.join(rootpath, 'src/SConscript'),
+	os.path.join(rootpath, 'src/driver/SConscript.simudriver'),
+    #os.path.join(outpost_core_path, 'modules/SConscript.test'),
+    ],
+	exports='envGlobal'
+)
+
+
+env = envGlobal.Clone()
+#print("Libs of unittests: ")
+#for l in env['LIBS']:
+#	print ("\t" + str(l))
+#print("CPPPATH of unittests: ")
+#for p in envGlobal['CPPPATH']:
+#	print ("\t" + str(p))
+
+files = Glob('*.cpp')
+
+program = env.Program('misctest', files)
+
+env.Alias('test', '$BUILDPATH')
+env.Default('test')

@@ -37,7 +37,7 @@ public:
 	}
 
 	//DEBUG
-	DebugInterface* getDebugInterface(){
+	FlashDebugInterface* getDebugInterface(){
 		return cell->getDebugInterface();
 	}
 
