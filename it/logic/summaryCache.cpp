@@ -61,23 +61,33 @@ public:
 				AccessValues v = dbg->getAccessValues(
 						allBadBlocks[device][block] / dbg->getPlaneSize(),
 						allBadBlocks[device][block] % dbg->getPlaneSize(), 0, 0);
-				//One Write is allowed, for the Bad-Block marker!
-				ASSERT_EQ(v.times_written, 1u);
-					ASSERT_EQ(v.times_reset, 0u);
-				if(block < numberOfNotifiedBlocks){
-					ASSERT_EQ(v.times_read, 0u);
-				}else{
-					//The block has to be checked, but not reset
-					bool areaAlreadyRetired = false;
-					for(unsigned i = 0; i < block && !areaAlreadyRetired; i++){
-						areaAlreadyRetired |=
-							allBadBlocks[device][i] / paffs::blocksPerArea
-							== allBadBlocks[device][block] / paffs::blocksPerArea;
-							//This area was already retired, so no additional check
+
+				//count how many times the current area was forced bad by list
+				unsigned int areaAlreadyForcedBad = 1;
+				for(unsigned i = 0; i < block && !areaAlreadyForcedBad; i++){
+					if(allBadBlocks[device][i] / paffs::blocksPerArea
+						== allBadBlocks[device][block] / paffs::blocksPerArea){
+						areaAlreadyForcedBad ++;
 					}
-					if(!areaAlreadyRetired){
+				}
+
+				//never deleted
+				ASSERT_EQ(v.times_reset, 0u);
+
+				if(block < numberOfNotifiedBlocks){
+					//notified blocks
+					ASSERT_EQ(v.times_read, 0u);
+					//bad Block marker gets written as many times as it got the list entry
+					ASSERT_EQ(v.times_written, areaAlreadyForcedBad);
+				}else{
+					//Self-detectable blocks
+					if(areaAlreadyForcedBad > 1){
+						ASSERT_EQ(v.times_read, 0u);
+					}else{
 						ASSERT_EQ(v.times_read, 1u);
 					}
+					//One Write is allowed, for the Bad-Block marker!
+					ASSERT_EQ(v.times_written, 1u);
 				}
 			}
 		}
