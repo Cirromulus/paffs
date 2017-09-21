@@ -39,7 +39,7 @@ namespace journalEntry{
 		enum class Subtype{
 			rootnode,
 			areaMap,
-			commit
+			commit		//FIXME: Probably not needed
 		};
 		Subtype mSubtype;
 	protected:
@@ -154,7 +154,8 @@ namespace journalEntry{
 		struct Transaction : public TreeCache{
 			enum class Operation{
 				start,
-				end
+				end,
+				success,
 			};
 			Operation mOperation;
 			TransactionNumber mNumber;
@@ -171,13 +172,12 @@ namespace journalEntry{
 				remove,
 				commit
 			};
-			InodeNo mNo;
 			Addr mSelf;			//May be zero if not in flash
 			TreeNodeId mId;		//Physical representation in RAM
 			Operation mOp;
 		protected:
-			TreeModify(InodeNo no, Addr self, TreeNodeId id, Operation op) : TreeCache(Subtype::treeModify),
-						mNo(no), mSelf(self), mId(id), mOp(op){};
+			TreeModify(Addr self, TreeNodeId id, Operation op) : TreeCache(Subtype::treeModify),
+						mSelf(self), mId(id), mOp(op){};
 		public:
 			virtual ~TreeModify(){};
 		};
@@ -185,34 +185,34 @@ namespace journalEntry{
 		namespace treeModify{
 			struct Add : public TreeModify{
 				bool mIsLeaf;
-				Add(InodeNo no, Addr self, TreeNodeId id, bool isLeaf) : TreeModify(no, self, id, Operation::add),
+				Add(Addr self, TreeNodeId id, bool isLeaf) : TreeModify(self, id, Operation::add),
 						mIsLeaf(isLeaf){};
 			};
 
 			struct KeyInsert : public TreeModify{
 				InodeNo mKey;
-				KeyInsert(InodeNo no, Addr self, TreeNodeId id, InodeNo key) : TreeModify(no, self, id, Operation::keyInsert),
+				KeyInsert(Addr self, TreeNodeId id, InodeNo key) : TreeModify(self, id, Operation::keyInsert),
 						mKey(key){};
 			};
 
 			struct InodeInsert : public TreeModify{
 				Inode mInode;
-				InodeInsert(InodeNo no, Addr self, TreeNodeId id, Inode inode) : TreeModify(no, self, id, Operation::inodeInsert),
+				InodeInsert(Addr self, TreeNodeId id, Inode inode) : TreeModify(self, id, Operation::inodeInsert),
 						mInode(inode){};
 			};
 
 			struct KeyDelete : public TreeModify{
 				InodeNo mKey;
-				KeyDelete(InodeNo no, Addr self, TreeNodeId id, InodeNo key) : TreeModify(no, self, id, Operation::keyDelete),
+				KeyDelete(Addr self, TreeNodeId id, InodeNo key) : TreeModify(self, id, Operation::keyDelete),
 						mKey(key){};
 			};
 
 			struct Remove : public TreeModify{
-				Remove(InodeNo no, Addr self, TreeNodeId id) : TreeModify(no, self, id, Operation::remove){};
+				Remove(Addr self, TreeNodeId id) : TreeModify(self, id, Operation::remove){};
 			};
 
 			struct Commit : public TreeModify{
-				Commit(InodeNo no, Addr self, TreeNodeId id) : TreeModify(no, self, id, Operation::commit){};
+				Commit(Addr self, TreeNodeId id) : TreeModify(self, id, Operation::commit){};
 			};
 		};
 	};
@@ -237,14 +237,29 @@ namespace journalEntry{
 };
 
 class Journal{
-	JournalEntry log[100];
+	static constexpr unsigned int logSize = 100;
+	JournalEntry* log[logSize];
 	unsigned int pos = 0;
-public:
-	void processSuperblockEntry  (journalEntry::Superblock& entry);
-	void processTreeCacheEntry   (journalEntry::TreeCache& entry);
-	void processSummaryCacheEntry(journalEntry::SummaryCache& entry);
-	void processPageAddressEntry (journalEntry::PAC& entry);
 
-	void addEvent(JournalEntry& entry);
+	//These would be replaced with the actual caches
+	Addr rootnode = 0;
+	Inode inode;
+public:
+	void
+	addEvent(const JournalEntry& entry);
+	void
+	processBuffer();
+private:
+	void
+	processSuperblockEntry  (const journalEntry::Superblock&   entry);
+	void
+	processTreeCacheEntry   (const journalEntry::TreeCache&    entry);
+	void
+	processSummaryCacheEntry(const journalEntry::SummaryCache& entry);
+	void
+	processPageAddressEntry (const journalEntry::PAC&          entry);
+
+	JournalEntry*
+	deserializeFactory(const JournalEntry& entry);
 };
 };
