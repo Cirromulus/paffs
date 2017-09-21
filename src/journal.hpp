@@ -9,27 +9,31 @@
 #include "commonTypes.hpp"
 #include <ostream>
 
-namespace paffs{
 using namespace std;
+namespace paffs{
 
-namespace journalEntry{
+typedef uint32_t TransactionNumber;
+typedef uint32_t TreeNodeId;
 
 struct JournalEntry{
 	enum class Type{
 		superblock,
 		treeCache,
-		areaMap,
+		summaryCache,
 		inode
 	};
+	Type mType;
 protected:
 	JournalEntry(Type type) : mType(type){};
 public:
-	Type mType;
+	virtual ~JournalEntry(){};
 	friend ostream &operator<<( ostream &output, const JournalEntry &in ) {
 		output << "Type: " << static_cast<unsigned int>(in.mType);
 		return output;
 	}
 };
+
+namespace journalEntry{
 
 	struct Superblock : public JournalEntry{
 		enum class Subtype{
@@ -37,11 +41,12 @@ public:
 			areaMap,
 			commit
 		};
+		Subtype mSubtype;
 	protected:
 		Superblock(Subtype subtype) : JournalEntry(Type::superblock),
 				mSubtype(subtype){};
 	public:
-		Subtype mSubtype;
+		virtual ~Superblock(){};
 		friend ostream &operator<<( ostream &output, const Superblock &in ) {
 			output << static_cast<const JournalEntry &>(in) <<
 					" Subtype: " << static_cast<unsigned int>(in.mSubtype);
@@ -61,6 +66,7 @@ public:
 				return output;
 			}
 		};
+
 		struct AreaMap : public Superblock{
 			enum class Element{
 				type,
@@ -68,12 +74,13 @@ public:
 				erasecount,
 				position
 			};
+			AreaPos mOffs;
+			Element mElement;
 		protected:
 			AreaMap(AreaPos offs, Element element) : Superblock(Superblock::Subtype::areaMap),
 					mOffs(offs), mElement(element){};
 		public:
-			AreaPos mOffs;
-			Element mElement;
+			virtual ~AreaMap(){};
 			friend ostream &operator<<( ostream &output, const AreaMap &in ) {
 				output << static_cast<const Superblock &>(in) <<
 						" Pos: " << in.mOffs << " Element: " <<
@@ -130,10 +137,114 @@ public:
 			Commit() : Superblock(Subtype::commit){};
 		};
 	};
+
+	struct TreeCache : public JournalEntry{
+		enum class Subtype{
+			transaction,
+			treeModify
+		};
+		Subtype mSubtype;
+	protected:
+		TreeCache(Subtype subtype) : JournalEntry(Type::treeCache), mSubtype(subtype){};
+	public:
+		~TreeCache(){};
+	};
+
+	namespace treeCache{
+		struct Transaction : public TreeCache{
+			enum class Operation{
+				start,
+				end
+			};
+			Operation mOperation;
+			TransactionNumber mNumber;
+			Transaction(Operation operation, TransactionNumber number) :
+						TreeCache(Subtype::transaction), mOperation(operation), mNumber(number){};
+		};
+
+		struct TreeModify : public TreeCache{
+			enum class Operation{
+				add,
+				keyInsert,
+				inodeInsert,
+				keyDelete,
+				remove,
+				commit
+			};
+			InodeNo mNo;
+			Addr mSelf;			//May be zero if not in flash
+			TreeNodeId mId;		//Physical representation in RAM
+			Operation mOp;
+		protected:
+			TreeModify(InodeNo no, Addr self, TreeNodeId id, Operation op) : TreeCache(Subtype::treeModify),
+						mNo(no), mSelf(self), mId(id), mOp(op){};
+		public:
+			virtual ~TreeModify(){};
+		};
+
+		namespace treeModify{
+			struct Add : public TreeModify{
+				bool mIsLeaf;
+				Add(InodeNo no, Addr self, TreeNodeId id, bool isLeaf) : TreeModify(no, self, id, Operation::add),
+						mIsLeaf(isLeaf){};
+			};
+
+			struct KeyInsert : public TreeModify{
+				InodeNo mKey;
+				KeyInsert(InodeNo no, Addr self, TreeNodeId id, InodeNo key) : TreeModify(no, self, id, Operation::keyInsert),
+						mKey(key){};
+			};
+
+			struct InodeInsert : public TreeModify{
+				Inode mInode;
+				InodeInsert(InodeNo no, Addr self, TreeNodeId id, Inode inode) : TreeModify(no, self, id, Operation::inodeInsert),
+						mInode(inode){};
+			};
+
+			struct KeyDelete : public TreeModify{
+				InodeNo mKey;
+				KeyDelete(InodeNo no, Addr self, TreeNodeId id, InodeNo key) : TreeModify(no, self, id, Operation::keyDelete),
+						mKey(key){};
+			};
+
+			struct Remove : public TreeModify{
+				Remove(InodeNo no, Addr self, TreeNodeId id) : TreeModify(no, self, id, Operation::remove){};
+			};
+
+			struct Commit : public TreeModify{
+				Commit(InodeNo no, Addr self, TreeNodeId id) : TreeModify(no, self, id, Operation::commit){};
+			};
+		};
+	};
+
+	struct SummaryCache : public JournalEntry{
+		AreaPos mArea;
+		SummaryEntry mStatus;
+		SummaryCache(AreaPos area, SummaryEntry status) : JournalEntry(Type::summaryCache),
+					mArea(area), mStatus(status){};
+	};
+
+	struct PAC : public JournalEntry{
+		enum class Subtype{
+			write,
+			remove
+		};
+		Subtype mSubtype;
+		InodeNo inode;
+		//TODO
+	};
+
 };
 
 class Journal{
+	JournalEntry log[100];
+	unsigned int pos = 0;
 public:
-	void doSomething();
+	void processSuperblockEntry  (journalEntry::Superblock& entry);
+	void processTreeCacheEntry   (journalEntry::TreeCache& entry);
+	void processSummaryCacheEntry(journalEntry::SummaryCache& entry);
+	void processPageAddressEntry (journalEntry::PAC& entry);
+
+	void addEvent(JournalEntry& entry);
 };
 };

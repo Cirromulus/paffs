@@ -14,6 +14,7 @@ endif
 TESTDIR=./test/
 EMBEDDEDINTEGRATIONDIR=./it/office_model
 INTEGRATIONDIR=./it/logic
+MISCDIR=./it/misc
 
 all: build-unittest build-integration
 
@@ -32,6 +33,9 @@ build-unittest:
 build-unittest-debug:
 	@scons $(MAKEJOBS) -C $(TESTDIR)
 
+build-misc:
+	@scons $(MAKEJOBS) -C $(MISCDIR)
+
 test: test-unit test-integration
 
 test-unit: build-unittest
@@ -42,6 +46,9 @@ test-integration: build-integration
 
 test-embedded: build-embedded
 	/opt/grmon-eval-2.0.83/linux64/bin/grmon -uart /dev/cobc_dsu_2 -stack 0x40fffff0 -baud 460800 -gdb
+
+test-misc: build-misc
+	./build/debug/misc/misctest 
 
 get-dep:
 	if [ ! -d "../outpost-core" ]; then git clone ssh://git@hbryavsci1l.hb.dlr.de:10022/avionics-software-open/outpost-core.git ../outpost-core; fi
