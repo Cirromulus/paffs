@@ -29,48 +29,32 @@ Journal::addEvent(const JournalEntry& entry){
 
 void
 Journal::processBuffer(){
-	for(unsigned e = 0; e <= pos; e++){
-		JournalEntry* entry = log[e];
-		switch(entry->mType){
-		case JournalEntry::Type::superblock:
-			processSuperblockEntry(*static_cast<journalEntry::Superblock*>(entry));
-			break;
-		case JournalEntry::Type::treeCache:
-			processTreeCacheEntry(*static_cast<journalEntry::TreeCache*>(entry));
-			break;
-		default:
-			cout << "Did not recognize Event" << endl;
-			break;
+	for(unsigned e = 0; e < pos; e++){
+		JournalEntry& entry = *log[e];
+		bool found = false;
+		for(JournalTopic* topic : topics){
+			if(entry.mTopic == topic->getTopic()){
+				topic->processEntry(entry);
+				found = true;
+				break;
+			}
+		}
+		if(!found)
+		{
+			cout << "Unknown JournalEntry Topic" << endl;
+		}else
+		{
+			delete log[e];
 		}
 	}
 }
 
-void
-Journal::processSuperblockEntry  (const journalEntry::Superblock& entry)
-{
-	cout << "process Superblock entry nimpl" << endl;
-}
-void
-Journal::processTreeCacheEntry   (const journalEntry::TreeCache& entry)
-{
-	cout << "process TreeCache nimpl" << endl;
-}
-void
-Journal::processSummaryCacheEntry(const journalEntry::SummaryCache& entry)
-{
-	cout << "process SummaryCache nimpl" << endl;
-}
-void
-Journal::processPageAddressEntry (const journalEntry::PAC& entry)
-{
-	cout << "process PAC entry nimpl" << endl;
-}
 
 JournalEntry* Journal::deserializeFactory(const JournalEntry& entry){
 	JournalEntry* ret = nullptr;
-	switch(entry.mType)
+	switch(entry.mTopic)
 	{
-	case JournalEntry::Type::superblock:
+	case JournalEntry::Topic::superblock:
 		switch(static_cast<const journalEntry::Superblock*>(&entry)->mSubtype)
 		{
 		case journalEntry::Superblock::Subtype::rootnode:
@@ -82,7 +66,7 @@ JournalEntry* Journal::deserializeFactory(const JournalEntry& entry){
 			break;
 		}
 		break;
-	case JournalEntry::Type::treeCache:
+	case JournalEntry::Topic::treeCache:
 		switch(static_cast<const journalEntry::TreeCache*>(&entry)->mSubtype)
 		{
 		case journalEntry::TreeCache::Subtype::transaction:

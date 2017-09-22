@@ -4,7 +4,6 @@
  *  Created on: Feb 22, 2017
  *      Author: user
  */
-#include <paffs.hpp>
 #include <journal.hpp>
 #include <iostream>
 
@@ -15,7 +14,10 @@ int main(int argc, char **argv) {
 	(void) argc;
 	(void) argv;
 
-	Journal journal;
+	journalTopic::SuperBlock sbt;
+	journalTopic::TreeCache tct;
+
+	Journal journal(sbt, tct);
 
 	journalEntry::superblock::areaMap::Type test(0, AreaType::retired);
 	journalEntry::superblock::Rootnode rootnode(1234);

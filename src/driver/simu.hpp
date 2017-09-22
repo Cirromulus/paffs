@@ -41,8 +41,8 @@ public:
 		return cell->getDebugInterface();
 	}
 
-	Result initializeNand();
-	Result deInitializeNand();
+	Result initializeNand() override;
+	Result deInitializeNand() override;
 	Result writePage(uint64_t page_no, void* data, unsigned int data_len) override;
 	Result readPage(uint64_t page_no, void* data, unsigned int data_len) override;
 	Result eraseBlock(uint32_t block_no) override;
