@@ -31,9 +31,20 @@ void
 Journal::processBuffer(){
 	for(unsigned e = 0; e < pos; e++){
 		JournalEntry& entry = *log[e];
+		if(entry.topic == JournalEntry::Topic::transaction)
+		{
+			const journalEntry::Transaction* ta =
+					static_cast<const journalEntry::Transaction*>(&entry);
+			for(JournalTopic* topic : topics)
+			{
+				topic->setTransactionStatus(ta->status);
+			}
+			continue;
+		}
+
 		bool found = false;
 		for(JournalTopic* topic : topics){
-			if(entry.mTopic == topic->getTopic()){
+			if(entry.topic == topic->getTopic()){
 				topic->processEntry(entry);
 				found = true;
 				break;
@@ -47,15 +58,23 @@ Journal::processBuffer(){
 			delete log[e];
 		}
 	}
+
+	for(JournalTopic* topic : topics){
+		topic->finalize();
+	}
 }
 
 
 JournalEntry* Journal::deserializeFactory(const JournalEntry& entry){
 	JournalEntry* ret = nullptr;
-	switch(entry.mTopic)
+	switch(entry.topic)
 	{
+	case JournalEntry::Topic::transaction:
+		cout << "Recognized trasaction event." << endl;
+		ret = NEWELEM(journalEntry::Transaction, entry);
+		break;
 	case JournalEntry::Topic::superblock:
-		switch(static_cast<const journalEntry::Superblock*>(&entry)->mSubtype)
+		switch(static_cast<const journalEntry::Superblock*>(&entry)->subtype)
 		{
 		case journalEntry::Superblock::Subtype::rootnode:
 			cout << "Recognized rootnode change event." << endl;
@@ -67,43 +86,24 @@ JournalEntry* Journal::deserializeFactory(const JournalEntry& entry){
 		}
 		break;
 	case JournalEntry::Topic::treeCache:
-		switch(static_cast<const journalEntry::TreeCache*>(&entry)->mSubtype)
+		switch(static_cast<const journalEntry::BTree*>(&entry)->op)
 		{
-		case journalEntry::TreeCache::Subtype::transaction:
-			cout << "Recognized Treenode Transaction event." << endl;
-			ret = NEWELEM(journalEntry::treeCache::Transaction, entry);
+		case journalEntry::BTree::Operation::add:
+			cout << "Recognized Treenode Modify ADD event." << endl;
+			ret = NEWELEM(journalEntry::btree::Add, entry);
 			break;
-		case journalEntry::TreeCache::Subtype::treeModify:
-			switch(static_cast<const journalEntry::treeCache::TreeModify*>(&entry)->mOp)
-			{
-			case journalEntry::treeCache::TreeModify::Operation::add:
-				cout << "Recognized Treenode Modify ADD event." << endl;
-				ret = NEWELEM(journalEntry::treeCache::treeModify::Add, entry);
-				break;
-			case journalEntry::treeCache::TreeModify::Operation::keyInsert:
-				cout << "Recognized Treenode Modify keyInsert event." << endl;
-				ret = NEWELEM(journalEntry::treeCache::treeModify::KeyInsert, entry);
-				break;
-			case journalEntry::treeCache::TreeModify::Operation::inodeInsert:
-				cout << "Recognized Treenode Modify InodeInsert event." << endl;
-				ret = NEWELEM(journalEntry::treeCache::treeModify::InodeInsert, entry);
-				break;
-			case journalEntry::treeCache::TreeModify::Operation::keyDelete:
-				cout << "Recognized Treenode Modify KeyDelete event." << endl;
-				ret = NEWELEM(journalEntry::treeCache::treeModify::KeyDelete, entry);
-				break;
-			case journalEntry::treeCache::TreeModify::Operation::commit:
-				cout << "Recognized Treenode Modify commit event." << endl;
-				ret = NEWELEM(journalEntry::treeCache::treeModify::Commit, entry);
-				break;
-			case journalEntry::treeCache::TreeModify::Operation::remove:
-				cout << "Recognized Treenode Modify remove event." << endl;
-				ret = NEWELEM(journalEntry::treeCache::treeModify::InodeInsert, entry);
-				break;
-			}
+		case journalEntry::BTree::Operation::keyInsert:
+			cout << "Recognized Treenode Modify keyInsert event." << endl;
+			ret = NEWELEM(journalEntry::btree::KeyInsert, entry);
 			break;
-		default:
-			cout << "Did not recognize TreeCache Event" << endl;
+		case journalEntry::BTree::Operation::inodeInsert:
+			cout << "Recognized Treenode Modify InodeInsert event." << endl;
+			ret = NEWELEM(journalEntry::btree::InodeInsert, entry);
+			break;
+		case journalEntry::BTree::Operation::remove:
+			cout << "Recognized Treenode Modify remove event." << endl;
+			ret = NEWELEM(journalEntry::btree::InodeInsert, entry);
+			break;
 		}
 		break;
 	default:

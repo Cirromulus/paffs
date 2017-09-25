@@ -14,10 +14,12 @@
 #include "treeCache.hpp"
 #include "treeTypes.hpp"
 #include "treequeue.hpp" //Just for printing debug info in tree
+#include "journalTopics.hpp"
 
 namespace paffs{
 
 class Btree{
+	friend class journalTopic::TreeCache;
 	Device* dev;
 public:
 	TreeCache cache;
@@ -38,11 +40,6 @@ private:
 	void print_queued_keys_r(queue_s* q);
 	void print_keys(TreeCacheNode* c);
 
-	Addr* getPointerAsAddr(char* pointers, unsigned int pos);
-	Inode* getPointerAsInode(char* pointers, unsigned int pos);
-	void insertAddrInPointer(char* pointers, Addr* addr, unsigned int pos);
-	void insertInodeInPointer(char* pointers, Inode* inode, unsigned int pos);
-	Result updateAddrInTreeCacheNode(TreeCacheNode* node, Addr* old, Addr* newAddress);
 	bool isTreeCacheNodeEqual(TreeCacheNode* left, TreeCacheNode* right);
 
 	//bool isEqual(TreeCacheNode* left, TreeCacheNode* right);
@@ -57,15 +54,15 @@ private:
 	Result find_leaf( InodeNo key, TreeCacheNode** outtreeCacheNode);
 	Result find_in_leaf (TreeCacheNode* leaf, InodeNo key, Inode* outInode);
 	Result find(InodeNo key, Inode* outInode);
-	int cut(int length );
+	static int cut(int length );
 
 
 	// Insertion.
 
-	int get_left_index(TreeCacheNode * parent, TreeCacheNode * left);
-	Result insert_into_leaf(TreeCacheNode * leaf, Inode * pointer );
+	static int get_left_index(TreeCacheNode * parent, TreeCacheNode * left);
+	static Result insert_into_leaf(TreeCacheNode * leaf, Inode * pointer );
 	Result insert_into_leaf_after_splitting(TreeCacheNode * leaf, Inode * newInode);
-	Result insert_into_node(TreeCacheNode * newNode,
+	static Result insert_into_node(TreeCacheNode * newNode,
 				int left_index, InodeNo key, TreeCacheNode * right);
 	Result insert_into_node_after_splitting(TreeCacheNode * old_node, unsigned int left_index,
 					InodeNo key, TreeCacheNode * right);
@@ -75,7 +72,7 @@ private:
 
 	// Deletion.
 
-	int get_neighbor_index(TreeCacheNode * n );
+	static int get_neighbor_index(TreeCacheNode * n );
 	Result adjust_root(TreeCacheNode * root);
 	Result coalesce_nodes(TreeCacheNode * n, TreeCacheNode * neighbor, int neighbor_index, unsigned int k_prime);
 	Result redistribute_nodes(TreeCacheNode * n, TreeCacheNode * neighbor, int neighbor_index,

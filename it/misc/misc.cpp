@@ -21,25 +21,23 @@ int main(int argc, char **argv) {
 
 	journalEntry::superblock::areaMap::Type test(0, AreaType::retired);
 	journalEntry::superblock::Rootnode rootnode(1234);
-	journalEntry::superblock::Commit commit;
 
 	cout << test << endl;
 	cout << rootnode << endl;
-	cout << commit << endl;
 
-	journal.addEvent(rootnode);
-
-	journal.addEvent(journalEntry::treeCache::Transaction(
-			journalEntry::treeCache::Transaction::Operation::start, 0));
-	journal.addEvent(journalEntry::treeCache::treeModify::Add(0, 0xBEEF, true));
+	journal.addEvent(journalEntry::Transaction(
+			journalEntry::Transaction::Status::start));
+	journal.addEvent(journalEntry::btree::Add(0, 0xBEEF, 0xBEEF, true));
 	Inode node;
 	node.type = InodeType::dir;
-	journal.addEvent(journalEntry::treeCache::treeModify::InodeInsert(
-			0, 0, node));
-	journal.addEvent(journalEntry::treeCache::Transaction(
-			journalEntry::treeCache::Transaction::Operation::end, 0));
+	journal.addEvent(journalEntry::inode::Add(node.no));
 
-	//whoops, power went out without write (and Operation::success misses)
+	journal.addEvent(journalEntry::btree::InodeInsert(0, 0, node.no));
+	journal.addEvent(journalEntry::Transaction(
+			journalEntry::Transaction::Status::end));
+	journal.addEvent(rootnode);
+
+	//whoops, power went out without write (and Status::success misses)
 	journal.processBuffer();
 
 }

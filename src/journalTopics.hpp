@@ -9,16 +9,22 @@
 
 #include "journalEntry.hpp"
 #include "treeTypes.hpp"
+#include <map>
 
 namespace paffs
 {
 
 class JournalTopic{
+protected:
+	journalEntry::Transaction::Status taStatus =
+			journalEntry::Transaction::Status::success;
 public:
 	virtual
 	~JournalTopic(){};
 	virtual
 	JournalEntry::Topic getTopic() = 0;
+	virtual void
+	setTransactionStatus(journalEntry::Transaction::Status status);
 	virtual void
 	processEntry(JournalEntry& entry) = 0;
 	virtual void
@@ -43,8 +49,32 @@ public:
 
 class TreeCache : public JournalTopic
 {
-	TreeCacheNode tcn;
+	std::map<TreeNodeId, TreeCacheNode*> nodes;
 	//Others currently not implemented
+public:
+	virtual JournalEntry::Topic
+	getTopic() override;
+	virtual void
+	processEntry(JournalEntry& entry) override;
+	virtual void
+	finalize() override;
+};
+
+class SummaryCache : public JournalTopic
+{
+
+public:
+	virtual JournalEntry::Topic
+	getTopic() override;
+	virtual void
+	processEntry(JournalEntry& entry) override;
+	virtual void
+	finalize() override;
+};
+
+class PageAddressCache : public JournalTopic
+{
+
 public:
 	virtual JournalEntry::Topic
 	getTopic() override;

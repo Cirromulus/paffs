@@ -293,9 +293,9 @@ Result Btree::insert_into_leaf_after_splitting(TreeCacheNode * leaf, Inode * new
 
 	cache.lockTreeCacheNode(leaf);
 	Result r = cache.addNewCacheNode(&new_leaf);
+	cache.unlockTreeCacheNode(leaf);
 	if(r != Result::ok)
 		return r;
-	cache.unlockTreeCacheNode(leaf);
 
 	new_leaf->raw.is_leaf = true;
 
@@ -470,7 +470,6 @@ Result Btree::insert_into_node_after_splitting(TreeCacheNode * old_node, unsigne
 
 
 /* Inserts a new TreeCacheNode (leaf or internal TreeCacheNode) into the B+ tree.
- * Returns the root of the tree after insertion.
  */
 Result Btree::insert_into_parent(TreeCacheNode * left, InodeNo key, TreeCacheNode * right) {
 

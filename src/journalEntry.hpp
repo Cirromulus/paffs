@@ -13,44 +13,55 @@ namespace paffs
 {
 using namespace std;
 
-typedef uint32_t TransactionNumber;
 typedef uint32_t TreeNodeId;
 
 struct JournalEntry{
 	enum class Topic{
+		transaction,
 		superblock,
 		treeCache,
 		summaryCache,
 		inode,
 	};
-	Topic mTopic;
+	Topic topic;
 protected:
-	JournalEntry(Topic type) : mTopic(type){};
+	JournalEntry(Topic _topic) : topic(_topic){};
 public:
 	virtual ~JournalEntry(){};
 	friend ostream &operator<<( ostream &output, const JournalEntry &in ) {
-		output << "Type: " << static_cast<unsigned int>(in.mTopic);
+		output << "Type: " << static_cast<unsigned int>(in.topic);
 		return output;
 	}
 };
 
 namespace journalEntry{
 
+	struct Transaction : public JournalEntry{
+		enum class Status{
+			start,
+			end,
+			success,
+		};
+		Topic topic;
+		Status status;
+		Transaction(Topic _topic, Status _status) : JournalEntry(Topic::transaction),
+					topic(_topic), status(_status){};
+	};
+
 	struct Superblock : public JournalEntry{
 		enum class Subtype{
 			rootnode,
 			areaMap,
-			commit		//FIXME: Probably not needed
 		};
-		Subtype mSubtype;
+		Subtype subtype;
 	protected:
-		Superblock(Subtype subtype) : JournalEntry(Topic::superblock),
-				mSubtype(subtype){};
+		Superblock(Subtype _subtype) : JournalEntry(Topic::superblock),
+				subtype(_subtype){};
 	public:
 		virtual ~Superblock(){};
 		friend ostream &operator<<( ostream &output, const Superblock &in ) {
 			output << static_cast<const JournalEntry &>(in) <<
-					" Subtype: " << static_cast<unsigned int>(in.mSubtype);
+					" Subtype: " << static_cast<unsigned int>(in.subtype);
 			return output;
 		}
 	};
@@ -58,12 +69,12 @@ namespace journalEntry{
 	namespace superblock{
 
 		struct Rootnode : public Superblock{
-			Rootnode(Addr rootnode) : Superblock(Subtype::rootnode),
-					mRootnode(rootnode){};
-			Addr mRootnode;
+			Rootnode(Addr _rootnode) : Superblock(Subtype::rootnode),
+					rootnode(_rootnode){};
+			Addr rootnode;
 			friend ostream &operator<<( ostream &output, const Rootnode &in ) {
 				output << static_cast<const Superblock &>(in) <<
-						" Addr: " << in.mRootnode;
+						" Addr: " << in.rootnode;
 				return output;
 			}
 		};
@@ -75,17 +86,17 @@ namespace journalEntry{
 				erasecount,
 				position
 			};
-			AreaPos mOffs;
-			Element mElement;
+			AreaPos offs;
+			Element element;
 		protected:
-			AreaMap(AreaPos offs, Element element) : Superblock(Superblock::Subtype::areaMap),
-					mOffs(offs), mElement(element){};
+			AreaMap(AreaPos _offs, Element _element) : Superblock(Superblock::Subtype::areaMap),
+					offs(_offs), element(_element){};
 		public:
 			virtual ~AreaMap(){};
 			friend ostream &operator<<( ostream &output, const AreaMap &in ) {
 				output << static_cast<const Superblock &>(in) <<
-						" Pos: " << in.mOffs << " Element: " <<
-						static_cast<unsigned int>(in.mElement);
+						" Pos: " << in.offs << " Element: " <<
+						static_cast<unsigned int>(in.element);
 				return output;
 			}
 		};
@@ -93,128 +104,93 @@ namespace journalEntry{
 		namespace areaMap {
 
 			struct Type : public AreaMap{
-				Type(AreaPos offs, AreaType type) : AreaMap(offs, Element::type),
-						mType(type){};
-				AreaType mType;
+				Type(AreaPos _offs, AreaType _type) : AreaMap(_offs, Element::type),
+						type(_type){};
+				AreaType type;
 				friend ostream &operator<<( ostream &output, const Type &in ) {
 					output << static_cast<const AreaMap &>(in) <<
-							" AreaType: " << in.mType;
+							" AreaType: " << in.type;
 					return output;
 				}
 			};
 			struct Status : public AreaMap{
-				Status(AreaPos offs, AreaStatus status) : AreaMap(offs, Element::status),
-						mStatus(status){};
-				AreaStatus mStatus;
+				Status(AreaPos _offs, AreaStatus _status) : AreaMap(_offs, Element::status),
+						status(_status){};
+				AreaStatus status;
 				friend ostream &operator<<( ostream &output, const Status &in ) {
 					output << static_cast<const AreaMap &>(in) <<
-							" AreaStatus: " << in.mStatus;
+							" AreaStatus: " << in.status;
 					return output;
 				}
 			};
 			struct Erasecount : public AreaMap{
-				Erasecount(AreaPos offs, uint32_t erasecount) : AreaMap(offs, Element::erasecount),
-						mErasecount(erasecount){};
-				uint32_t mErasecount;
+				Erasecount(AreaPos _offs, uint32_t _erasecount) : AreaMap(_offs, Element::erasecount),
+						erasecount(_erasecount){};
+				uint32_t erasecount;
 				friend ostream &operator<<( ostream &output, const Erasecount &in ) {
 					output << static_cast<const AreaMap &>(in) <<
-							" Erasecount: " << in.mErasecount;
+							" Erasecount: " << in.erasecount;
 					return output;
 				}
 			};
 			struct Position : public AreaMap{
-				Position(AreaPos offs, AreaPos position) : AreaMap(offs, Element::position),
-						mPosition(position){};
-				AreaPos mPosition;
+				Position(AreaPos _offs, AreaPos _position) : AreaMap(_offs, Element::position),
+						position(_position){};
+				AreaPos position;
 			friend ostream &operator<<( ostream &output, const Position &in ) {
 				output << static_cast<const AreaMap &>(in) <<
-						" Position: " << in.mPosition;
+						" Position: " << in.position;
 				return output;
 			}
 			};
 		};
-
-		struct Commit : public Superblock{
-			Commit() : Superblock(Subtype::commit){};
-		};
 	};
 
-	struct TreeCache : public JournalEntry{
-		enum class Subtype{
-			transaction,
-			treeModify
+	struct BTree : public JournalEntry{
+		enum class Operation{
+			add,
+			keyInsert,
+			inodeInsert,
+			remove,
+			//TODO:
+			//Move all from pos X to the right
+			//delete all from pos X to Y (without removing from cache)
 		};
-		Subtype mSubtype;
+		Operation op;
+		Addr self;			//May be zero if not in flash
+		TreeNodeId id;		//Physical representation in RAM
 	protected:
-		TreeCache(Subtype subtype) : JournalEntry(Topic::treeCache), mSubtype(subtype){};
+		BTree(Addr _self, TreeNodeId _id, Operation _operation) : JournalEntry(Topic::treeCache),
+				op(_operation), self(_self), id(_id){};
 	public:
-		~TreeCache(){};
+		~BTree(){};
 	};
 
-	namespace treeCache{
-		struct Transaction : public TreeCache{
-			enum class Operation{
-				start,
-				end,
-				success,
-			};
-			Operation mOperation;
-			TransactionNumber mNumber;
-			Transaction(Operation operation, TransactionNumber number) :
-						TreeCache(Subtype::transaction), mOperation(operation), mNumber(number){};
+	namespace btree{
+		struct Add : public BTree{
+			bool isLeaf;
+			TreeNodeId parent;
+			Add(Addr _self, TreeNodeId _id, TreeNodeId _parent, bool _isLeaf) : BTree(_self, _id, Operation::add),
+					isLeaf(_isLeaf), parent(_parent){};
 		};
 
-		struct TreeModify : public TreeCache{
-			enum class Operation{
-				add,
-				keyInsert,
-				inodeInsert,
-				keyDelete,
-				remove,
-				commit
-			};
-			Addr mSelf;			//May be zero if not in flash
-			TreeNodeId mId;		//Physical representation in RAM
-			Operation mOp;
-		protected:
-			TreeModify(Addr self, TreeNodeId id, Operation op) : TreeCache(Subtype::treeModify),
-						mSelf(self), mId(id), mOp(op){};
-		public:
-			virtual ~TreeModify(){};
+		struct KeyInsert : public BTree{
+			InodeNo key;
+			Addr value;
+
+			KeyInsert(Addr _self, TreeNodeId _id, InodeNo _key, Addr _value) : BTree(_self, _id, Operation::keyInsert),
+					key(_key), value(_value){};
 		};
 
-		namespace treeModify{
-			struct Add : public TreeModify{
-				bool mIsLeaf;
-				Add(Addr self, TreeNodeId id, bool isLeaf) : TreeModify(self, id, Operation::add),
-						mIsLeaf(isLeaf){};
-			};
+		struct InodeInsert : public BTree{
+			InodeNo key;
+			//Inode will be taken from PAC
+			InodeInsert(Addr _self, TreeNodeId _id, InodeNo _key) : BTree(_self, _id, Operation::inodeInsert),
+					key(_key){};
+		};
 
-			struct KeyInsert : public TreeModify{
-				InodeNo mKey;
-				KeyInsert(Addr self, TreeNodeId id, InodeNo key) : TreeModify(self, id, Operation::keyInsert),
-						mKey(key){};
-			};
-
-			struct InodeInsert : public TreeModify{
-				Inode mInode;
-				InodeInsert(Addr self, TreeNodeId id, Inode inode) : TreeModify(self, id, Operation::inodeInsert),
-						mInode(inode){};
-			};
-
-			struct KeyDelete : public TreeModify{
-				InodeNo mKey;
-				KeyDelete(Addr self, TreeNodeId id, InodeNo key) : TreeModify(self, id, Operation::keyDelete),
-						mKey(key){};
-			};
-
-			struct Remove : public TreeModify{
-				Remove(Addr self, TreeNodeId id) : TreeModify(self, id, Operation::remove){};
-			};
-
-			struct Commit : public TreeModify{
-				Commit(Addr self, TreeNodeId id) : TreeModify(self, id, Operation::commit){};
-			};
+		struct Remove : public BTree{
+			Remove(Addr _self, TreeNodeId _id) : BTree(_self, _id, Operation::remove){};
 		};
 	};
 
@@ -225,15 +201,28 @@ namespace journalEntry{
 					mArea(area), mStatus(status){};
 	};
 
-	struct PAC : public JournalEntry{
+	struct Inode : public JournalEntry{
 		enum class Subtype{
+			add,
 			write,
 			remove
 		};
-		Subtype mSubtype;
+		Subtype subtype;
 		InodeNo inode;
-		//TODO
+	protected:
+		Inode(Subtype _subtype, InodeNo _inode) : JournalEntry(Topic::inode),
+			subtype(_subtype), inode(_inode){};
 	};
+
+	namespace inode
+	{
+		struct Add : public Inode
+		{
+			Add(InodeNo inode) : Inode(Subtype::add, inode){};
+		};
+
+		//... write, remove ... TODO
+	}
 
 };
 }
