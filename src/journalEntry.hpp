@@ -218,7 +218,7 @@ namespace journalEntry{
 	{
 		struct Add : public Inode
 		{
-			Add(InodeNo inode) : Inode(Subtype::add, inode){};
+			Add(InodeNo _inode) : Inode(Subtype::add, _inode){};
 		};
 
 		//... write, remove ... TODO

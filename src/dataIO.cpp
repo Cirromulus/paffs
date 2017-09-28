@@ -218,14 +218,7 @@ Result DataIO::writeTreeNode(TreeNode* node){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "WRITE TREE NODE findWritableArea returned 0");
 		return Result::bug;
 	}
-	if(node->self != 0){
-		//We have to invalidate former position first
-		Result r = dev->sumCache.setPageStatus(extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);
-		if(r != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate old Page! Ignoring Errors to continue...");
-			//return r;
-		}
-	}
+	Addr oldSelf = node->self;
 
 	unsigned int firstFreePage = 0;
 	if(dev->areaMgmt.findFirstFreePage(&firstFreePage, dev->activeArea[AreaType::index]) == Result::nospace){
@@ -235,19 +228,31 @@ Result DataIO::writeTreeNode(TreeNode* node){
 	Addr addr = combineAddress(dev->activeArea[AreaType::index], firstFreePage);
 	node->self = addr;
 
+	Result r = dev->driver->writePage(getPageNumber(node->self, dev), node, sizeof(TreeNode));
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write TreeNode to page");
+		return r;
+	}
+
 	//Mark Page as used
-	Result r = dev->sumCache.setPageStatus(dev->activeArea[AreaType::index], firstFreePage, SummaryEntry::used);
+	r = dev->sumCache.setPageStatus(dev->activeArea[AreaType::index], firstFreePage, SummaryEntry::used);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
 		return r;
 	}
 
-
-	r = dev->driver->writePage(getPageNumber(node->self, dev), node, sizeof(TreeNode));
-	if(r != Result::ok){
-		//TODO: Revert Changes to PageStatus
-		return r;
+	/*
+	 * NOTE: For best space efficiency, this would be done before finding new Area.
+	 * However, this would lead to invalidated valid data if something during write fails.
+	 */
+	if(oldSelf != 0){
+		//invalidate former position
+		r = dev->sumCache.setPageStatus(extractLogicalArea(oldSelf), extractPage(oldSelf), SummaryEntry::dirty);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate old Page! Ignoring Errors to continue...");
+		}
 	}
+
 
 	r = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::index], AreaType::index);
 	if(r != Result::ok)
@@ -379,15 +384,6 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 			return Result::bug;
 		}
 		Addr pageAddress = combineAddress(dev->activeArea[AreaType::data], firstFreePage);
-		res = dev->sumCache.setPageStatus(dev->activeArea[AreaType::data], firstFreePage, SummaryEntry::used);
-		if(res != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[static_cast<int>(res)]);
-		}
-		//this may have filled the flash
-		res = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::data], AreaType::data);
-		if(res != Result::ok)
-			return res;
-
 
 		//Prepare buffer and calculate bytes to write
 		char* buf = &const_cast<char*>(data)[*bytes_written];
@@ -450,7 +446,18 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 			*bytes_written += btw;
 		}
 
-		//if we are overwriting existing data... TODO: doubled code
+		ac.setPage(page+pageFrom, pageAddress);
+		res = dev->driver->writePage(getPageNumber(pageAddress, dev), buf, btw);
+		if(res != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write Page!");
+			return res;
+		}
+		res = dev->sumCache.setPageStatus(dev->activeArea[AreaType::data], firstFreePage, SummaryEntry::used);
+		if(res != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[static_cast<int>(res)]);
+		}
+
+		//if we have overwriting existing data...
 		if(pageAddr != 0	 //not an empty page
 			&& pageAddr != combineAddress(0, unusedMarker)){  //not a skipped page (thus containing no information)
 			//Mark old pages dirty
@@ -464,12 +471,15 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 				PAFFS_DBG_S(PAFFS_TRACE_WRITE, "At pagelistindex %" PRIu32 ", oldArea: %lu, oldPage: %lu", page+pageFrom, oldArea, oldPage);
 			}
 		}else{
-			//or we will add a new page to this file
+			//or we added a new page to this file
 			reservedPages ++;
 		}
 
-		ac.setPage(page+pageFrom, pageAddress);
-		res = dev->driver->writePage(getPageNumber(pageAddress, dev), buf, btw);
+
+		//this may have filled the flash
+		res = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::data], AreaType::data);
+		if(res != Result::ok)
+			return res;
 
 		if(misaligned)
 			delete[] buf;

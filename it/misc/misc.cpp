@@ -25,15 +25,16 @@ int main(int argc, char **argv) {
 	cout << test << endl;
 	cout << rootnode << endl;
 
-	journal.addEvent(journalEntry::Transaction(
+	journal.addEvent(journalEntry::Transaction(JournalEntry::Topic::treeCache,
 			journalEntry::Transaction::Status::start));
+
 	journal.addEvent(journalEntry::btree::Add(0, 0xBEEF, 0xBEEF, true));
 	Inode node;
 	node.type = InodeType::dir;
 	journal.addEvent(journalEntry::inode::Add(node.no));
 
 	journal.addEvent(journalEntry::btree::InodeInsert(0, 0, node.no));
-	journal.addEvent(journalEntry::Transaction(
+	journal.addEvent(journalEntry::Transaction(JournalEntry::Topic::treeCache,
 			journalEntry::Transaction::Status::end));
 	journal.addEvent(rootnode);
 
