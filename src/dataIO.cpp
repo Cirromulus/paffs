@@ -446,7 +446,6 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 			*bytes_written += btw;
 		}
 
-		ac.setPage(page+pageFrom, pageAddress);
 		res = dev->driver->writePage(getPageNumber(pageAddress, dev), buf, btw);
 		if(res != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write Page!");
@@ -456,6 +455,7 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 		if(res != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[static_cast<int>(res)]);
 		}
+		ac.setPage(page+pageFrom, pageAddress);
 
 		//if we have overwriting existing data...
 		if(pageAddr != 0	 //not an empty page
