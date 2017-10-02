@@ -36,7 +36,7 @@ void Superblock::printSuperIndex(SuperIndex* ind){
 	printf("No:\t\t%" PRIu32 "\n", ind->no);
 	printf("Rootnode addr.: \t%u:%u\n",
 			extractLogicalArea(ind->rootNode),
-			extractPage(ind->rootNode));
+			extractPageOffs(ind->rootNode));
 	printf("Used Areas: %" PRIu32 "\n", ind->usedAreas);
 	printf("areaMap:\n");
 	for(AreaPos i = 0; i < areasNo && i < 128; i ++){
@@ -81,7 +81,7 @@ Result Superblock::resolveDirectToLogicalPath(Addr directPath[superChainElems],
 		p = dev->areaMap[i].position;
 		for(d = 0; d < superChainElems; d++){
 			if(p == extractLogicalArea(directPath[d]))
-				outPath[d] = combineAddress(i, extractPage(directPath[d]));
+				outPath[d] = combineAddress(i, extractPageOffs(directPath[d]));
 		}
 	}
 	return Result::ok;
@@ -211,7 +211,7 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 	if(superChainIndexes[jumpPadNo+1] == emptySerial){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Determined Address of last SuperIndex, but its SerialNo was empty!");
 		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Area %" PRIu32 ", page %" PRIu32,
-				extractLogicalArea(pathToSuperIndexDirect[jumpPadNo+1]), extractPage(pathToSuperIndexDirect[jumpPadNo+1]));
+				extractLogicalArea(pathToSuperIndexDirect[jumpPadNo+1]), extractPageOffs(pathToSuperIndexDirect[jumpPadNo+1]));
 		return Result::bug;
 	}
 
@@ -219,7 +219,7 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 	r = readAnchorEntry(pathToSuperIndexDirect[0], &e);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read Anchor Entry at %" PRIu32
-				":%" PRIu32, extractLogicalArea(pathToSuperIndexDirect[0]), extractPage(pathToSuperIndexDirect[0]));
+				":%" PRIu32, extractLogicalArea(pathToSuperIndexDirect[0]), extractPageOffs(pathToSuperIndexDirect[0]));
 		return r;
 	}
 	if(memcmp(&stdParam, &e.param, sizeof(Param)) != 0){
@@ -236,7 +236,7 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 
 	Addr addr = pathToSuperIndexDirect[superChainElems-1];
 
-	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found Super Index at %u:%u\n", extractLogicalArea(addr), extractPage(addr));
+	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found Super Index at %u:%u\n", extractLogicalArea(addr), extractPageOffs(addr));
 
 	r = readSuperPageIndex(addr, index, true);
 	if(r != Result::ok){
@@ -301,7 +301,7 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 	if(index->areaMap[extractLogicalArea(index->rootNode)].type != AreaType::index){
 		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Rootnode address does not point to index area"
 				" (Area %u, page %u)",
-				extractLogicalArea(index->rootNode), extractPage(index->rootNode));
+				extractLogicalArea(index->rootNode), extractPageOffs(index->rootNode));
 		return Result::fail;
 	}
 
@@ -562,7 +562,7 @@ Result Superblock::readAnchorEntry(Addr addr, AnchorEntry* entry){
 		return Result::bug;
 	}
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Reading Anchor entry at phys. area %" PRIu32 " page %" PRIu32,
-			extractLogicalArea(addr), extractPage(addr));
+			extractLogicalArea(addr), extractPageOffs(addr));
 	//No check of areaType because we may not have an AreaMap
 	Result r = dev->driver->readPage(
 			getPageNumberFromDirect(addr), entry, sizeof(AnchorEntry));
@@ -762,14 +762,14 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 	if(entry->areaMap == NULL)
 		return Result::einval;
 
-	if(extractPage(addr) > totalPagesPerArea){
+	if(extractPageOffs(addr) > totalPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Read SuperPage at page %" PRIu32 " of area %" PRIu32 ", "
 				"but an area is only %" PRIu32 " pages wide!",
-				extractPage(addr), extractLogicalArea(addr), totalPagesPerArea);
+				extractPageOffs(addr), extractLogicalArea(addr), totalPagesPerArea);
 	}
 
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Reading SuperIndex at phys. area %" PRIu32 " page %" PRIu32,
-			extractLogicalArea(addr), extractPage(addr));
+			extractLogicalArea(addr), extractPageOffs(addr));
 	//TODO: Just read the appropiate number of area Summaries
 	//when dynamic ASses are allowed.
 
@@ -888,10 +888,10 @@ Result Superblock::handleBlockOverflow(PageAbs newPage, Addr logPrev, SerialNo *
 		//reset serial no if we start a new block
 		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Deleting phys. Area %d, block %d"
 				" (abs: %d, new abs on %d) for chain Entry",
-				extractLogicalArea(logPrev), extractPage(logPrev) / pagesPerBlock,
+				extractLogicalArea(logPrev), extractPageOffs(logPrev) / pagesPerBlock,
 				getBlockNumber(logPrev, dev), newblock);
 		*serial = 0;
-		Result r = deleteSuperBlock(extractLogicalArea(logPrev), extractPage(logPrev) / pagesPerBlock);
+		Result r = deleteSuperBlock(extractLogicalArea(logPrev), extractPageOffs(logPrev) / pagesPerBlock);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete block of chain Entry! BlockAbs: %" PRIu32, getBlockNumber(logPrev, dev));
 			return r;

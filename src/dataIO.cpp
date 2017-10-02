@@ -139,19 +139,19 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 			return r;
 		}
 		unsigned int area = extractLogicalArea(pageAddr);
-		unsigned int relPage = extractPage(pageAddr);
+		unsigned int relPage = extractPageOffs(pageAddr);
 
 		if(dev->areaMap[area].type != AreaType::data){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of invalid area at %d:%d",
 					extractLogicalArea(pageAddr),
-					extractPage(pageAddr));
+					extractPageOffs(pageAddr));
 			return Result::bug;
 		}
 
 		if(dev->sumCache.getPageStatus(area, relPage, &r) == SummaryEntry::dirty){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of outdated (dirty)"
 					" data at %d:%d", extractLogicalArea(pageAddr),
-					extractPage(pageAddr));
+					extractPageOffs(pageAddr));
 			return Result::bug;
 		}
 		if(r != Result::ok){
@@ -247,7 +247,7 @@ Result DataIO::writeTreeNode(TreeNode* node){
 	 */
 	if(oldSelf != 0){
 		//invalidate former position
-		r = dev->sumCache.setPageStatus(extractLogicalArea(oldSelf), extractPage(oldSelf), SummaryEntry::dirty);
+		r = dev->sumCache.setPageStatus(extractLogicalArea(oldSelf), extractPageOffs(oldSelf), SummaryEntry::dirty);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate old Page! Ignoring Errors to continue...");
 		}
@@ -295,21 +295,21 @@ Result DataIO::readTreeNode(Addr addr, TreeNode* node){
 	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::index){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "READ TREE NODE operation on %s Area at %X:%X",
 				areaNames[dev->areaMap[extractLogicalArea(addr)].type],
-				extractLogicalArea(addr), extractPage(addr));
+				extractLogicalArea(addr), extractPageOffs(addr));
 		return Result::bug;
 	}
 
 	Result r;
 	if(traceMask & PAFFS_TRACE_VERIFY_AS){
-		SummaryEntry s = dev->sumCache.getPageStatus(extractLogicalArea(addr), extractPage(addr),&r);
+		SummaryEntry s = dev->sumCache.getPageStatus(extractLogicalArea(addr), extractPageOffs(addr),&r);
 		if(s == SummaryEntry::free){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "READ operation on FREE data at %X:%X",
-					extractLogicalArea(addr), extractPage(addr));
+					extractLogicalArea(addr), extractPageOffs(addr));
 			return Result::bug;
 		}
 		if(s == SummaryEntry::dirty){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "READ operation on DIRTY data at %X:%X",
-					extractLogicalArea(addr), extractPage(addr));
+					extractLogicalArea(addr), extractPageOffs(addr));
 			return Result::bug;
 		}
 		if(r != Result::ok || s == SummaryEntry::error){
@@ -328,7 +328,7 @@ Result DataIO::readTreeNode(Addr addr, TreeNode* node){
 	}
 
 	if(node->self != addr){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Read Treenode at %X:%X, but its content stated that it was on %X:%X", extractLogicalArea(addr), extractPage(addr), extractLogicalArea(node->self), extractPage(node->self));
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Read Treenode at %X:%X, but its content stated that it was on %X:%X", extractLogicalArea(addr), extractPageOffs(addr), extractLogicalArea(node->self), extractPageOffs(node->self));
 		return Result::bug;
 	}
 
@@ -340,7 +340,7 @@ Result DataIO::deleteTreeNode(TreeNode* node){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried deleting something in readOnly mode!");
 		return Result::bug;
 	}
-	return dev->sumCache.setPageStatus(extractLogicalArea(node->self), extractPage(node->self), SummaryEntry::dirty);
+	return dev->sumCache.setPageStatus(extractLogicalArea(node->self), extractPageOffs(node->self), SummaryEntry::dirty);
 }
 
 Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
@@ -463,7 +463,7 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 			//Mark old pages dirty
 			//mark old Page in Areamap
 			unsigned long oldArea = extractLogicalArea(pageAddr);
-			unsigned long oldPage = extractPage(pageAddr);
+			unsigned long oldPage = extractPageOffs(pageAddr);
 
 			res = dev->sumCache.setPageStatus(oldArea, oldPage, SummaryEntry::dirty);
 			if(res != Result::ok){
@@ -530,12 +530,12 @@ Result DataIO::readPageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 			}
 			PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid area at %d:%d",\
 					extractLogicalArea(pageAddr),
-					extractPage(pageAddr));
+					extractPageOffs(pageAddr));
 			return Result::bug;
 		}
 		if(traceMask & PAFFS_TRACE_VERIFY_AS){
 			SummaryEntry e = dev->sumCache.getPageStatus(extractLogicalArea(pageAddr)
-					,extractPage(pageAddr), &r);
+					,extractPageOffs(pageAddr), &r);
 			if(r != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load AreaSummary of area %d for verification!",
 						extractLogicalArea(pageAddr));
@@ -543,14 +543,14 @@ Result DataIO::readPageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 				if(e == SummaryEntry::dirty){
 					PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of outdated (dirty) data at %d:%d",
 							extractLogicalArea(pageAddr),
-							extractPage(pageAddr));
+							extractPageOffs(pageAddr));
 					return Result::bug;
 				}
 
 				if(e == SummaryEntry::free){
 					PAFFS_DBG(PAFFS_TRACE_BUG, "READ INODE operation of invalid (free) data at %d:%d",
 							extractLogicalArea(pageAddr),
-							extractPage(pageAddr));
+							extractPageOffs(pageAddr));
 					return Result::bug;
 				}
 

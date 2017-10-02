@@ -51,6 +51,9 @@ public:
 
 	SummaryCache(Device* mdev);
 
+	//Same as setPageStatus(area, page, state)
+	Result setPageStatus(Addr addr, SummaryEntry state);
+
 	Result setPageStatus(AreaPos area, PageOffs page, SummaryEntry state);
 
 	SummaryEntry getPageStatus(AreaPos area, PageOffs page, Result *result);
