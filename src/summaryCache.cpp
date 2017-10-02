@@ -308,6 +308,10 @@ Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry sta
 	return Result::ok;
 }
 
+SummaryEntry SummaryCache::getPageStatus(Addr addr, Result *result){
+	return getPageStatus(extractLogicalArea(addr), extractPageOffs(addr), result);
+}
+
 SummaryEntry SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result *result){
 	if(page > dataPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to access page out of bounds! (was: %d, should: < %d", page, dataPagesPerArea);

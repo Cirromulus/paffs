@@ -30,6 +30,7 @@ public:
 		fs.setTraceMask(
 			PAFFS_TRACE_VERIFY_TC |
 			PAFFS_TRACE_VERIFY_AS |
+			PAFFS_TRACE_BUG		  |
 			PAFFS_TRACE_ERROR
 		);
 		if(r != paffs::Result::ok)

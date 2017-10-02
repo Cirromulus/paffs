@@ -56,6 +56,9 @@ public:
 
 	Result setPageStatus(AreaPos area, PageOffs page, SummaryEntry state);
 
+	//Same as getPageStatus(area, page, Result)
+	SummaryEntry getPageStatus(Addr addr, Result *result);
+
 	SummaryEntry getPageStatus(AreaPos area, PageOffs page, Result *result);
 
 	Result setSummaryStatus(AreaPos area, SummaryEntry* summary);
