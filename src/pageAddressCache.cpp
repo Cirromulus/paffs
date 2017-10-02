@@ -125,7 +125,7 @@ Result PageAddressCache::setPage(PageNo page, Addr addr){
 
 	if(traceMask & PAFFS_TRACE_VERBOSE){
 		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "SetPage to %" PRIu32 ":%" PRIu32 " at %" PRIu32,
-			extractLogicalArea(addr), extractPage(addr), page);
+			extractLogicalArea(addr), extractPageOffs(addr), page);
 	}
 
 	if(page < directAddrCount){
@@ -301,7 +301,7 @@ Result PageAddressCache::commitPath(Addr& anchor, AddrListCacheElem* path,
 		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Deleting CacheElem referenced by anchor");
 		//invalidate old page.
 		r = dev->sumCache.setPageStatus(extractLogicalArea(anchor),
-				extractPage(anchor), SummaryEntry::dirty);
+				extractPageOffs(anchor), SummaryEntry::dirty);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit invalidate old addresspage!");
 			return r;
@@ -341,7 +341,7 @@ Result PageAddressCache::commitElem(AddrListCacheElem &parent, AddrListCacheElem
 				"parent:%" PRIu32, elem.positionInParent);
 		//invalidate old page.
 		r = dev->sumCache.setPageStatus(extractLogicalArea(parent.cache[elem.positionInParent]),
-				extractPage(parent.cache[elem.positionInParent]), SummaryEntry::dirty);
+				extractPageOffs(parent.cache[elem.positionInParent]), SummaryEntry::dirty);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit invalidate old addresspage!");
 			return r;
@@ -398,11 +398,11 @@ Result PageAddressCache::readAddrList (Addr from, Addr list[addrsPerPage]){
 	if(dev->areaMap[extractLogicalArea(from)].type != AreaType::index){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "READ ADDR LIST operation of invalid area at %d:%d",\
 				extractLogicalArea(from),
-				extractPage(from));
+				extractPageOffs(from));
 		return Result::bug;
 	}
 	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "loadCacheElem from %"
-			PRIu32 ":%" PRIu32, extractLogicalArea(from), extractPage(from));
+			PRIu32 ":%" PRIu32, extractLogicalArea(from), extractPageOffs(from));
 	Result res = dev->driver->readPage(getPageNumber(from, dev),list, addrsPerPage * sizeof(Addr));
 	if(res != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load existing addresses"
@@ -432,15 +432,7 @@ Result PageAddressCache::writeAddrList(Addr &to , Addr list[addrsPerPage]){
 	}
 	dev->lasterr = r;
 
-	if(to != 0){
-		//We have to invalidate former position first
-		r = dev->sumCache.setPageStatus(extractLogicalArea(to),
-				extractPage(to), SummaryEntry::dirty);
-		if(r != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate old Page! "
-					"Ignoring Errors to continue...");
-		}
-	}
+	Addr formerPosition = to;
 
 	unsigned int firstFreePage = 0;
 	if(dev->areaMgmt.findFirstFreePage(&firstFreePage,
@@ -449,14 +441,6 @@ Result PageAddressCache::writeAddrList(Addr &to , Addr list[addrsPerPage]){
 		return dev->lasterr = Result::bug;
 	}
 	to = combineAddress(dev->activeArea[AreaType::index], firstFreePage);
-
-	//Mark Page as used
-	r = dev->sumCache.setPageStatus(dev->activeArea[AreaType::index],
-			firstFreePage, SummaryEntry::used);
-	if(r != Result::ok){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
-		return r;
-	}
 
 	r = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::index], AreaType::index);
 	if(r != Result::ok)
@@ -469,22 +453,39 @@ Result PageAddressCache::writeAddrList(Addr &to , Addr list[addrsPerPage]){
 		return r;
 	}
 
+	//Mark Page as used
+	r = dev->sumCache.setPageStatus(dev->activeArea[AreaType::index],
+			firstFreePage, SummaryEntry::used);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
+		return r;
+	}
+
+	if(formerPosition != 0){
+		//We have to invalidate former position first
+		r = dev->sumCache.setPageStatus(formerPosition, SummaryEntry::dirty);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate old Page! "
+					"Ignoring Errors to continue...");
+		}
+	}
+
 	return Result::ok;
 }
 
 bool PageAddressCache::isAddrListPlausible(Addr* addrList, size_t elems){
 	for(unsigned i = 0; i < elems; i++){
-		if(extractPage(addrList[i]) == unusedMarker)
+		if(extractPageOffs(addrList[i]) == unusedMarker)
 			continue;
 
-		if(extractPage(addrList[i]) > dataPagesPerArea){
+		if(extractPageOffs(addrList[i]) > dataPagesPerArea){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "PageList elem %d Page is higher than possible "
-					"(was %" PRIu32 ", should < %" PRIu32 ")", i, extractPage(addrList[i]), dataPagesPerArea);
+					"(was %" PRIu32 ", should < %" PRIu32 ")", i, extractPageOffs(addrList[i]), dataPagesPerArea);
 			return false;
 		}
-		if(extractLogicalArea(addrList[i]) == 0 && extractPage(addrList[i]) != 0){
+		if(extractLogicalArea(addrList[i]) == 0 && extractPageOffs(addrList[i]) != 0){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "PageList elem %d Area is 0, "
-					"but Page is not (%" PRIu32 ")", i, extractPage(addrList[i]));
+					"but Page is not (%" PRIu32 ")", i, extractPageOffs(addrList[i]));
 			return false;
 		}
 	}

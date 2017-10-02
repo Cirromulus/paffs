@@ -39,7 +39,7 @@ PageAbs getPageNumber(Addr addr, Device* dev){
 	}
 	PageAbs page = dev->areaMap[extractLogicalArea(addr)].position *
 								totalPagesPerArea;
-	page += extractPage(addr);
+	page += extractPageOffs(addr);
 	if(page > areasNo * totalPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "calculated Page number out of range!");
 		return 0;
@@ -50,7 +50,7 @@ PageAbs getPageNumber(Addr addr, Device* dev){
 //Returns the absolute page number from *direct* address
 PageAbs getPageNumberFromDirect(Addr addr){
 	PageAbs page = extractLogicalArea(addr) * totalPagesPerArea;
-	page += extractPage(addr);
+	page += extractPageOffs(addr);
 	if(page > areasNo * totalPagesPerArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "calculated Page number out of range!");
 		return 0;
@@ -60,12 +60,12 @@ PageAbs getPageNumberFromDirect(Addr addr){
 
 //Returns the absolute page number from *logical* address
 BlockAbs getBlockNumber(Addr addr, Device* dev){
-	return dev->areaMap[extractLogicalArea(addr)].position * blocksPerArea + extractPage(addr) / pagesPerBlock;
+	return dev->areaMap[extractLogicalArea(addr)].position * blocksPerArea + extractPageOffs(addr) / pagesPerBlock;
 }
 
 //Returns the absolute page number from *direct* address
 BlockAbs getBlockNumberFromDirect(Addr addr){
-	return extractLogicalArea(addr) * blocksPerArea + extractPage(addr) / pagesPerBlock;
+	return extractLogicalArea(addr) * blocksPerArea + extractPageOffs(addr) / pagesPerBlock;
 }
 
 //Combines the area number with the relative page starting from first page in area
@@ -82,7 +82,7 @@ unsigned int extractLogicalArea(Addr addr){
 	memcpy(&area, &reinterpret_cast<char*>(&addr)[sizeof(AreaPos)], sizeof(PageOffs));
 	return area;
 }
-unsigned int extractPage(Addr addr){
+unsigned int extractPageOffs(Addr addr){
 	unsigned int page = 0;
 	memcpy(&page, &addr, sizeof(PageOffs));
 	return page;

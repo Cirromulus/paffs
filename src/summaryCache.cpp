@@ -247,6 +247,10 @@ int SummaryCache::findNextFreeCacheEntry(){
 	return -1;
 }
 
+Result SummaryCache::setPageStatus(Addr addr, SummaryEntry state){
+	return setPageStatus(extractLogicalArea(addr), extractPageOffs(addr), state);
+}
+
 Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state){
 	if(dev->readOnly){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried setting PageStatus in readOnly mode!");

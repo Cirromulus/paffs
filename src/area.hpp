@@ -25,7 +25,7 @@ BlockAbs getBlockNumberFromDirect(Addr addr);
 //combines two values to one type
 Addr combineAddress(AreaPos logical_area, PageOffs page);
 unsigned int extractLogicalArea(Addr addr);
-unsigned int extractPage(Addr addr);
+unsigned int extractPageOffs(Addr addr);
 
 class AreaManagement{
 
