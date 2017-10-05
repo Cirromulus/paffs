@@ -10,15 +10,17 @@
 #include "commonTypes.hpp"
 #include "bitlist.hpp"
 
+#include <functional>
+
 namespace paffs{
 
 typedef uint32_t PageNo;
 
 struct AddrListCacheElem{
-	Addr   cache[addrsPerPage];
-	PageNo positionInParent:30;
-	bool   dirty:1;
-	bool   active:1;
+	Addr     cache[addrsPerPage];
+	uint16_t positionInParent;
+	bool     dirty:1;
+	bool     active:1;
 	AddrListCacheElem() : positionInParent(0), dirty(false), active(false){};
 	void setAddr(PageNo pos, Addr addr);
 	Addr getAddr(PageNo pos);
@@ -30,6 +32,7 @@ class PageAddressCache{
 	AddrListCacheElem singl;
 	Device *dev;
 	Inode *inode;
+	typedef std::function<void(Addr)> InformJournalFunc;
 public:
 	PageAddressCache(Device *mdev) : dev(mdev), inode(nullptr){};
 	Result setTargetInode(Inode* node);
@@ -47,13 +50,13 @@ private:
 	Result commitPath(Addr& anchor, AddrListCacheElem* path, unsigned char depth);
 	Result commitElem(AddrListCacheElem &parent, AddrListCacheElem &elem);
 	Result loadCacheElem(Addr from, AddrListCacheElem &elem);
-	Result writeCacheElem(Addr &to, AddrListCacheElem &elem);
+	Result writeCacheElem(Addr &source, AddrListCacheElem &elem);
 
 	Result readAddrList (Addr from, Addr list[addrsPerPage]);
 	/**
 	 * @param to should contain former position of page
 	 */
-	Result writeAddrList(Addr &to , Addr list[addrsPerPage]);
+	Result writeAddrList(Addr &source, Addr list[addrsPerPage]);
 	bool isAddrListPlausible(Addr* addrList, size_t elems);
 };
 
