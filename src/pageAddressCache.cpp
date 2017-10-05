@@ -222,6 +222,29 @@ bool PageAddressCache::isDirty(){
 	return false;
 }
 
+uint16_t PageAddressCache::getCacheID(AddrListCacheElem* elem){
+	if(elem == &tripl[2])
+		return 6;
+	if(elem == &tripl[1])
+		return 5;
+	if(elem == &tripl[0])
+		return 4;
+	if(elem == &doubl[1])
+		return 3;
+	if(elem == &doubl[0])
+		return 2;
+	if(elem == &singl)
+		return 1;
+	return 0;
+}
+
+void PageAddressCache::informJournal(uint16_t cacheID, PageNo pos, Addr newAddr){
+	//TODO: Inform Journal
+	(void) cacheID;
+	(void) pos;
+	(void) newAddr;
+}
+
 Result PageAddressCache::loadPath(Addr& anchor, PageNo pageOffs, AddrListCacheElem* start,
 		unsigned char depth, PageNo &addrPos){
 	Result r;
@@ -308,7 +331,7 @@ Result PageAddressCache::commitPath(Addr& anchor, AddrListCacheElem* path,
 		}
 		anchor = 0;
 	}else{
-		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Deleting CacheElem referenced by anchor");
+		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "writing CacheElem referenced by anchor");
 		r = writeCacheElem(anchor, path[0]);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Elem in depth 0!");
@@ -378,8 +401,8 @@ Result  PageAddressCache::loadCacheElem(Addr from, AddrListCacheElem &elem){
 	return Result::ok;
 }
 
-Result PageAddressCache::writeCacheElem(Addr &to, AddrListCacheElem &elem){
-	Result r = writeAddrList(to, elem.cache);
+Result PageAddressCache::writeCacheElem(Addr &source, AddrListCacheElem &elem){
+	Result r = writeAddrList(source, elem.cache);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write Cache Elem");
 		return r;
@@ -418,7 +441,7 @@ Result PageAddressCache::readAddrList (Addr from, Addr list[addrsPerPage]){
 	return res;
 }
 
-Result PageAddressCache::writeAddrList(Addr &to , Addr list[addrsPerPage]){
+Result PageAddressCache::writeAddrList(Addr &source, Addr list[addrsPerPage]){
 	Result r = dev->lasterr;
 	dev->lasterr = Result::ok;
 	dev->activeArea[AreaType::index] = dev->areaMgmt.findWritableArea(AreaType::index);
@@ -432,19 +455,13 @@ Result PageAddressCache::writeAddrList(Addr &to , Addr list[addrsPerPage]){
 	}
 	dev->lasterr = r;
 
-	Addr formerPosition = to;
-
 	unsigned int firstFreePage = 0;
 	if(dev->areaMgmt.findFirstFreePage(&firstFreePage,
 			dev->activeArea[AreaType::index]) == Result::nospace){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::index]);
 		return dev->lasterr = Result::bug;
 	}
-	to = combineAddress(dev->activeArea[AreaType::index], firstFreePage);
-
-	r = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::index], AreaType::index);
-	if(r != Result::ok)
-		return r;
+	Addr to = combineAddress(dev->activeArea[AreaType::index], firstFreePage);
 
 	r = dev->driver->writePage(getPageNumber(to, dev), reinterpret_cast<char*>(list),
 			addrsPerPage * sizeof(Addr));
@@ -461,8 +478,14 @@ Result PageAddressCache::writeAddrList(Addr &to , Addr list[addrsPerPage]){
 		return r;
 	}
 
+	Addr formerPosition = source;
+	source = to;
+
+	r = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::index], AreaType::index);
+	if(r != Result::ok)
+		return r;
+
 	if(formerPosition != 0){
-		//We have to invalidate former position first
 		r = dev->sumCache.setPageStatus(formerPosition, SummaryEntry::dirty);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate old Page! "
