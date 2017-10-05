@@ -29,7 +29,7 @@ TEST_F(TreeTest, handleMoreThanCacheLimit){
 		paffs::Inode test;
 		memset(&test, 0, sizeof(paffs::Inode));
 		test.no = i;
-		r = d->tree.insertInode(&test);
+		r = d->tree.insertInode(test);
 		ASSERT_EQ(paffs::Result::ok, r);
 		if(r != paffs::Result::ok)
 			std::cerr << paffs::err_msg(r) << std::endl;
@@ -38,7 +38,7 @@ TEST_F(TreeTest, handleMoreThanCacheLimit){
 	for(unsigned int i = 1; i < paffs::treeNodeCacheSize * 2; i++){
 		paffs::Inode test;
 		memset(&test, 0, sizeof(paffs::Inode));
-		r = d->tree.getInode(i, &test);
+		r = d->tree.getInode(i, test);
 		ASSERT_EQ(paffs::Result::ok, r);
 		if(r != paffs::Result::ok)
 			std::cerr << paffs::err_msg(r) << std::endl;
@@ -56,7 +56,7 @@ TEST_F(TreeTest, coalesceAndRedistributeTree){
 		paffs::Inode test;
 		memset(&test, 0, sizeof(paffs::Inode));
 		test.no = i;
-		r = d->tree.insertInode(&test);
+		r = d->tree.insertInode(test);
 		if(r != paffs::Result::ok)
 			std::cerr << paffs::err_msg(r) << std::endl;
 		ASSERT_EQ(paffs::Result::ok, r);

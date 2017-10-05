@@ -206,7 +206,7 @@ Result PageAddressCache::commit(){
 		return Result::bug;
 	}
 
-	return dev->tree.updateExistingInode(inode);
+	return dev->tree.updateExistingInode(*inode);
 }
 
 bool PageAddressCache::isDirty(){

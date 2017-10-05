@@ -46,30 +46,30 @@ public:
 	 * This locks specified treeCache node and its path from Rootnode
 	 * To prevent Cache GC from deleting it
 	 */
-	Result lockTreeCacheNode(TreeCacheNode* tcn);
+	Result lockTreeCacheNode(TreeCacheNode& tcn);
 
-	Result unlockTreeCacheNode(TreeCacheNode* tcn);
+	Result unlockTreeCacheNode(TreeCacheNode& tcn);
 
 	/**
 	 * Possible cache flush. Although rootnode should be in cache any time.
 	 */
-	Result getRootNodeFromCache(TreeCacheNode** tcn);
+	Result getRootNodeFromCache(TreeCacheNode* &tcn);
 	/**
 	 * Possible cache flush.
 	 */
 	Result getTreeNodeAtIndexFrom(uint16_t index,
-										TreeCacheNode* parent, TreeCacheNode** child);
+	                              TreeCacheNode& parent, TreeCacheNode* &child);
 
-	Result removeNode(TreeCacheNode* tcn);
+	Result removeNode(TreeCacheNode& tcn);
 
-	Result setRoot(TreeCacheNode* rootTcn);
+	Result setRoot(TreeCacheNode& rootTcn);
 
-	Result addNewCacheNode(TreeCacheNode** newTcn);
+	Result addNewCacheNode(TreeCacheNode* &newTcn);
 
 	/**
 	 * Consistency checkers for Treecache
 	 */
-	bool isSubTreeValid(TreeCacheNode* node, BitList<treeNodeCacheSize> &reachable, InodeNo keyMin, InodeNo keyMax);
+	bool isSubTreeValid(TreeCacheNode& node, BitList<treeNodeCacheSize> &reachable, InodeNo keyMin, InodeNo keyMax);
 	bool isTreeCacheValid();
 
 	//debug
@@ -84,27 +84,27 @@ private:
 	 * returns true if path contains dirty elements
 	 * traverses through all paths and marks them
 	 */
-	bool resolveDirtyPaths(TreeCacheNode* tcn);
-	void markParentPathDirty(TreeCacheNode* tcn);
-	void deleteFromParent(TreeCacheNode* tcn);
-	bool hasNoSiblings(TreeCacheNode* tcn);
-	void deletePathToRoot(TreeCacheNode* tcn);
-	Result tryAddNewCacheNode(TreeCacheNode** newTcn);
-	Result commitNodesRecursively(TreeCacheNode* node);
+	bool resolveDirtyPaths(TreeCacheNode& tcn);
+	void markParentPathDirty(TreeCacheNode& tcn);
+	void deleteFromParent(TreeCacheNode& tcn);
+	bool hasNoSiblings(TreeCacheNode& tcn);
+	void deletePathToRoot(TreeCacheNode& tcn);
+	Result tryAddNewCacheNode(TreeCacheNode* &newTcn);
+	Result commitNodesRecursively(TreeCacheNode& node);
 	void setIndexUsed(uint16_t index);
 	void setIndexFree(uint16_t index);
 	bool isIndexUsed(uint16_t index);
-	void printSubtree(int layer, TreeCacheNode* node);
+	void printSubtree(int layer, TreeCacheNode& node);
 	int16_t findFirstFreeIndex();
-	int16_t getIndexFromPointer(TreeCacheNode* tcn);
-	bool hasLockedChilds(TreeCacheNode* tcn);
-	bool isParentPathClean(TreeCacheNode* tcn);
-	Result updateFlashAddressInParent(TreeCacheNode* node);
+	int16_t getIndexFromPointer(TreeCacheNode& tcn);
+	bool hasLockedChilds(TreeCacheNode& tcn);
+	bool isParentPathClean(TreeCacheNode& tcn);
+	Result updateFlashAddressInParent(TreeCacheNode& node);
 	/**
 	 * returns true if any sibling is dirty
 	 * stops at first occurrence.
 	 */
-	bool areSiblingsClean(TreeCacheNode* tcn);
+	bool areSiblingsClean(TreeCacheNode &tcn);
 	/*
 	 * Just frees clean nodes
 	 */
@@ -114,6 +114,10 @@ private:
 	 */
 	void cleanFreeLeafNodes();
 
+
+	Result writeTreeNode(TreeCacheNode& node);
+	Result readTreeNode(Addr addr, TreeNode& node);
+	Result deleteTreeNode(TreeNode& node);
 };
 
 

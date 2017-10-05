@@ -150,7 +150,7 @@ Result SummaryCache::commitASHard(int &clearedAreaCachePosition){
 	uint16_t cachePos = 0;
 	for(std::pair<AreaPos, uint16_t> it : translation){
 			//found a cached element
-		cachePos = it.second;		//FIXME: WHY IS THIS ASSIGNMENT NOT WORKING?
+		cachePos = it.second;
 		if(summaryCache[cachePos].isDirty() && summaryCache[cachePos].isAsWritten() &&
 			dev->areaMap[it.first].status != AreaStatus::active &&
 			(dev->areaMap[it.first].type == AreaType::data || dev->areaMap[it.first].type == AreaType::index)){
@@ -306,6 +306,10 @@ Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry sta
 		}
 	}
 	return Result::ok;
+}
+
+SummaryEntry SummaryCache::getPageStatus(Addr addr, Result *result){
+	return getPageStatus(extractLogicalArea(addr), extractPageOffs(addr), result);
 }
 
 SummaryEntry SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result *result){
@@ -618,7 +622,6 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 		return commitAndEraseElem(fav);
 	}
 
-	//TODO: Deteremine if non-urgent abort is better here or before GC
 	if(!urgent)
  		return Result::nf;
 

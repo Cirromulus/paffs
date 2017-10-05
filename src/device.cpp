@@ -155,7 +155,7 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "Root Dir has Number != 0!");
 			return Result::bug;
 		}
-		r = tree.insertInode(rootDir);
+		r = tree.insertInode(*rootDir);
 		if(r != Result::ok){
 			destroyDevice();
 			return r;
@@ -531,7 +531,7 @@ Result Device::findOrLoadInode(InodeNo no, SmartInodePtr &target){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get new Inode from pool");
 		return r;
 	}
-	r = tree.getInode(no, target);
+	r = tree.getInode(no, *target);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get Inode of elem (%" PRIu32 ")", no);
 		return r;
@@ -611,7 +611,7 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write %u of %u bytes directory data",
 				contDir->size + direntryl - bytes, contDir->size + direntryl);
 		if(bytes != 0){
-			Result r2 = tree.updateExistingInode(contDir);
+			Result r2 = tree.updateExistingInode(*contDir);
 			if(r2 != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update Inode after unfinished directory insert!"
 						" Ignoring error to continue.");
@@ -620,7 +620,7 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 		return r;
 	}
 
-	return tree.updateExistingInode(contDir);
+	return tree.updateExistingInode(*contDir);
 
 }
 
@@ -721,7 +721,7 @@ Result Device::mkDir(const char* fullPath, Permission mask){
 	Result r = createDirInode(newDir, mask);
 	if(r != Result::ok)
 		return r;
-	r = tree.insertInode(newDir);
+	r = tree.insertInode(*newDir);
 	if(r != Result::ok)
 		return r;
 
@@ -930,7 +930,7 @@ Result Device::createFile(SmartInodePtr &outFile, const char* fullPath, Permissi
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not create fileInode: %s", err_msg(res));
 		return res;
 	}
-	res = tree.insertInode(outFile);
+	res = tree.insertInode(*outFile);
 	if(res != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert Inode into tree: %s", err_msg(res));
 		return res;
@@ -1064,7 +1064,7 @@ Result Device::touch(const char* path){
 		if(r != Result::ok)
 			return r;
 		file->mod = systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
-		r = tree.updateExistingInode(file);
+		r = tree.updateExistingInode(*file);
 		return r;
 	}
 
@@ -1156,7 +1156,7 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write %u of %u bytes",
 				bytes_to_write - *bytes_written, bytes_to_write);
 		if(*bytes_written > 0){
-			Result r2 = tree.updateExistingInode(obj->dirent.node);
+			Result r2 = tree.updateExistingInode(*obj->dirent.node);
 			if(r2 != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "could not update Inode of unsuccessful inode write "
 						"(%s)", err_msg(r2));
@@ -1181,7 +1181,7 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 					"which is OK if we skipped pages");
 		}
 	}
-	return tree.updateExistingInode(obj->dirent.node);
+	return tree.updateExistingInode(*obj->dirent.node);
 }
 
 Result Device::seek(Obj* obj, int m, Seekmode mode){
@@ -1308,7 +1308,7 @@ Result Device::chmod(const char* path, Permission perm){
 		return r;
 	}
 	object->perm = perm;
-	r = tree.updateExistingInode(object);
+	r = tree.updateExistingInode(*object);
 	return r;
 }
 
