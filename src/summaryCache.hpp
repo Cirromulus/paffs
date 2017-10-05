@@ -7,6 +7,7 @@
 
 #pragma once
 #include "commonTypes.hpp"
+#include "journalTopics.hpp"
 #include <unordered_map>
 
 namespace paffs {
@@ -40,7 +41,7 @@ public:
 	AreaPos getArea();
 };
 
-class SummaryCache{
+class SummaryCache : public JournalTopic{
 
 	//excess byte is for dirty- and wasASWritten marker
 	AreaSummaryElem summaryCache[areaSummaryCacheSize];
@@ -91,6 +92,13 @@ public:
 	 * looking for an old one
 	 */
 	Result commitAreaSummaries(bool createNew = false);
+
+	JournalEntry::Topic
+	getTopic() override;
+	void
+	processEntry(JournalEntry& entry) override;
+	void
+	finalize() override;
 
 private:
 	/**

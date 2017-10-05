@@ -538,6 +538,41 @@ Result SummaryCache::commitAreaSummaries(bool createNew){
 	return dev->superblock.commitSuperIndex(&index, someDirty, createNew);
 }
 
+JournalEntry::Topic
+SummaryCache::getTopic(){
+	return JournalEntry::Topic::summaryCache;
+}
+void
+SummaryCache::processEntry(JournalEntry& entry){
+	if(entry.topic != getTopic()){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
+		return;
+	}
+	const journalEntry::SummaryCache* e =
+			static_cast<const journalEntry::SummaryCache*>(&entry);
+	switch(e->subtype){
+	case journalEntry::SummaryCache::Subtype::commit:
+		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Deleting cache "
+				"entry of area %d", summaryCache[e->area].getArea());
+		summaryCache[e->area].setDirty(false);
+		translation.erase(summaryCache[e->area].getArea());
+		summaryCache[e->area].clear();
+		break;
+	case journalEntry::SummaryCache::Subtype::setStatus:
+	{
+		//TODO activate some failsafe that checks for invalid writes during this setPages
+		const journalEntry::summaryCache::SetStatus* s =
+				static_cast<const journalEntry::summaryCache::SetStatus*>(&entry);
+		setPageStatus(s->area, s->page, s->status);
+		break;
+	}
+	}
+}
+void
+SummaryCache::finalize(){
+	//TODO?
+}
+
 Result SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent){
 	Result r = Result::ok;
 	int nextEntry = findNextFreeCacheEntry();

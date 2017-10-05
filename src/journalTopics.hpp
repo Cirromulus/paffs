@@ -60,18 +60,6 @@ public:
 	finalize() override;
 };
 
-class SummaryCache : public JournalTopic
-{
-
-public:
-	virtual JournalEntry::Topic
-	getTopic() override;
-	virtual void
-	processEntry(JournalEntry& entry) override;
-	virtual void
-	finalize() override;
-};
-
 class PageAddressCache : public JournalTopic
 {
 

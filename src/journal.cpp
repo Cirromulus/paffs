@@ -105,6 +105,19 @@ JournalEntry* Journal::deserializeFactory(const JournalEntry& entry){
 			break;
 		}
 		break;
+	case JournalEntry::Topic::summaryCache:
+		switch(static_cast<const journalEntry::SummaryCache*>(&entry)->subtype)
+		{
+		case journalEntry::SummaryCache::Subtype::commit:
+			cout << "Recognized SummaryCache Commit area event." << endl;
+			ret = NEWELEM(journalEntry::summaryCache::Commit, entry);
+			break;
+		case journalEntry::SummaryCache::Subtype::setStatus:
+			cout << "Recognized SummaryCache set Page to Status event." << endl;
+			ret = NEWELEM(journalEntry::summaryCache::SetStatus, entry);
+			break;
+		}
+		break;
 	default:
 		cout << "Did not recognize Event" << endl;
 		break;

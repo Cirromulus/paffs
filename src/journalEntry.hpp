@@ -195,11 +195,29 @@ namespace journalEntry{
 	};
 
 	struct SummaryCache : public JournalEntry{
-		AreaPos mArea;
-		SummaryEntry mStatus;
-		SummaryCache(AreaPos area, SummaryEntry status) : JournalEntry(Topic::summaryCache),
-					mArea(area), mStatus(status){};
+		enum class Subtype{
+			setStatus,
+			commit
+		};
+		AreaPos area;
+		Subtype subtype;
+	protected:
+		SummaryCache(AreaPos _area, Subtype _subtype) : JournalEntry(Topic::summaryCache),
+					area(_area), subtype(_subtype){};
 	};
+
+	namespace summaryCache{
+		struct Commit : public SummaryCache{
+			Commit(AreaPos _area) : SummaryCache(_area, Subtype::commit){};
+		};
+
+		struct SetStatus : public SummaryCache{
+			PageOffs page;
+			SummaryEntry status;
+			SetStatus(AreaPos _area, PageOffs _page, SummaryEntry _status) :
+				SummaryCache(_area, Subtype::setStatus), page(_page), status(_status){};
+		};
+	}
 
 	struct Inode : public JournalEntry{
 		enum class Subtype{
