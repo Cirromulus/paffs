@@ -133,10 +133,11 @@ void fillFlashAndVerify(paffs::Paffs &fs){
 	char filename[50];
 	bool full = false;
 
-	fs.setTraceMask(fs.getTraceMask()
+	fs.setTraceMask(
+			fs.getTraceMask()
 			| PAFFS_WRITE_VERIFY_AS
 			| PAFFS_TRACE_VERIFY_AS
-		);
+	);
 
 	//fill areas
 	for(i = 0; !full; i++){

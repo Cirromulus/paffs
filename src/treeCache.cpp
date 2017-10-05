@@ -828,14 +828,14 @@ Result TreeCache::writeTreeNode(TreeCacheNode& node){
 				dev->areaMap[dev->activeArea[AreaType::index]].position);
 		return Result::bug;
 	}*/
+	if(dev->lasterr != Result::ok){
+		return dev->lasterr;
+	}
 	//Handle Areas
 	if(dev->areaMap[dev->activeArea[AreaType::index]].status == AreaStatus::empty){
 		//We'll have to use a fresh area,
 		//so generate the areaSummary in Memory
 		dev->areaMgmt.initArea(dev->activeArea[AreaType::index]);
-	}
-	if(dev->lasterr != Result::ok){
-		return dev->lasterr;
 	}
 	if(dev->activeArea[AreaType::index] == 0){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "WRITE TREE NODE findWritableArea returned 0");
@@ -844,7 +844,8 @@ Result TreeCache::writeTreeNode(TreeCacheNode& node){
 
 	unsigned int firstFreePage = 0;
 	if(dev->areaMgmt.findFirstFreePage(&firstFreePage, dev->activeArea[AreaType::index]) == Result::nospace){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::index]);
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%" PRIu32 " on %" PRIu32 ").",
+		          dev->activeArea[AreaType::index], dev->areaMap[dev->activeArea[AreaType::index]].position);
 		return dev->lasterr = Result::bug;
 	}
 	Addr addr = combineAddress(dev->activeArea[AreaType::index], firstFreePage);
@@ -856,10 +857,6 @@ Result TreeCache::writeTreeNode(TreeCacheNode& node){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write TreeNode to page");
 		return r;
 	}
-
-	r = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::index], AreaType::index);
-	if(r != Result::ok)
-		return r;
 
 	//Mark Page as used
 	r = dev->sumCache.setPageStatus(dev->activeArea[AreaType::index], firstFreePage, SummaryEntry::used);
@@ -885,6 +882,10 @@ Result TreeCache::writeTreeNode(TreeCacheNode& node){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate old Page! Ignoring Errors to continue...");
 		}
 	}
+
+	r = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::index], AreaType::index);
+	if(r != Result::ok)
+		return r;
 
 	return Result::ok;
 }
