@@ -11,45 +11,39 @@
  */
 
 #include "journalTopics.hpp"
-#include "btree.hpp"
-#include <iostream>
+#include "paffs_trace.hpp"
 
 using namespace paffs;
-using namespace paffs::journalTopic;
 using namespace std;
 
 void
-JournalTopic::setTransactionStatus(journalEntry::Transaction::Status status){
-	switch(status)
+JournalTopic::enqueueEntry(const JournalEntry& entry)
+{
+	if(entry.topic != getTopic() ||
+			(entry.topic == JournalEntry::Topic::transaction &&
+			static_cast<const journalEntry::Transaction*>(&entry)->target != getTopic())){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried enqueueing wrong JournalEntry (%u)", entry.topic);
+		return;
+	}
+	if(buffer.insert(entry) != Result::ok)
 	{
-	case journalEntry::Transaction::Status::start:
-		if(taStatus != journalEntry::Transaction::Status::success)
-		{
-			cout << "Tried starting a new Transaction without stopping old one!" << endl;
-			break;
-		}
-		taStatus = status;
-		break;
-	case journalEntry::Transaction::Status::end:
-		if(taStatus != journalEntry::Transaction::Status::start)
-		{
-			cout << "Tried stopping a nonexisting Transaction !" << endl;
-			break;
-		}
-		taStatus = status;
-		break;
-	case journalEntry::Transaction::Status::success:
-		if(taStatus != journalEntry::Transaction::Status::end)
-		{
-			cout << "Tried finalizing a non-succeeded Transaction !" << endl;
-			break;
-		}
-		taStatus = status;
-		break;
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "JournalEntry Buffer full!");
+	}
+}
+
+void
+JournalTopic::finalize()
+{
+	JournalEntry *entry;
+	buffer.rewind();
+	while((entry = buffer.pop()) != nullptr)
+	{
+		processEntry(*entry);
 	}
 }
 
 
+/*
 JournalEntry::Topic
 journalTopic::SuperBlock::getTopic()
 {
@@ -143,12 +137,7 @@ journalTopic::TreeCache::processEntry(JournalEntry& entry)
 	}
 }
 
-void
-journalTopic::TreeCache::finalize()
-{
-	cout << "Todo: implement finalize for TreeCache" << endl;
-}
-
+*/
 
 
 

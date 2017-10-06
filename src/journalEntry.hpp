@@ -7,7 +7,7 @@
 
 #pragma once
 #include "commonTypes.hpp"
-#include <ostream>
+#include <iostream>
 
 namespace paffs
 {
@@ -34,18 +34,21 @@ public:
 	}
 };
 
-namespace journalEntry{
+namespace journalEntry
+{
 
-	struct Transaction : public JournalEntry{
-		enum class Status{
+	struct Transaction : public JournalEntry
+	{
+		enum class Status
+		{
 			start,
 			end,
 			success,
 		};
-		Topic topic;
+		Topic target;
 		Status status;
-		Transaction(Topic _topic, Status _status) : JournalEntry(Topic::transaction),
-					topic(_topic), status(_status){};
+		Transaction(Topic _target, Status _status) : JournalEntry(Topic::transaction),
+					target(_target), status(_status){};
 	};
 
 	struct Superblock : public JournalEntry{
@@ -101,8 +104,8 @@ namespace journalEntry{
 			}
 		};
 
-		namespace areaMap {
-
+		namespace areaMap
+		{
 			struct Type : public AreaMap{
 				Type(AreaPos _offs, AreaType _type) : AreaMap(_offs, Element::type),
 						type(_type){};
@@ -137,12 +140,24 @@ namespace journalEntry{
 				Position(AreaPos _offs, AreaPos _position) : AreaMap(_offs, Element::position),
 						position(_position){};
 				AreaPos position;
-			friend ostream &operator<<( ostream &output, const Position &in ) {
-				output << static_cast<const AreaMap &>(in) <<
-						" Position: " << in.position;
-				return output;
-			}
+				friend ostream &operator<<( ostream &output, const Position &in ) {
+					output << static_cast<const AreaMap &>(in) <<
+							" Position: " << in.position;
+					return output;
+				}
 			};
+			union Max
+			{
+				Type type;
+				Status status;
+				Erasecount erasecount;
+				Position position;
+			};
+		};
+		union Max
+		{
+			Rootnode rootnode;
+			areaMap::Max areaMap;
 		};
 	};
 
@@ -192,6 +207,13 @@ namespace journalEntry{
 		struct Remove : public BTree{
 			Remove(Addr _self, TreeNodeId _id) : BTree(_self, _id, Operation::remove){};
 		};
+		union Max
+		{
+			Add add;
+			KeyInsert keyInsert;
+			InodeInsert inodeInsert;
+			Remove remove;
+		};
 	};
 
 	struct SummaryCache : public JournalEntry{
@@ -217,6 +239,12 @@ namespace journalEntry{
 			SetStatus(AreaPos _area, PageOffs _page, SummaryEntry _status) :
 				SummaryCache(_area, Subtype::setStatus), page(_page), status(_status){};
 		};
+
+		union Max
+		{
+			Commit commit;
+			SetStatus setStatus;
+		};
 	}
 
 	struct Inode : public JournalEntry{
@@ -240,7 +268,123 @@ namespace journalEntry{
 		};
 
 		//... write, remove ... TODO
+		union Max
+		{
+			Add add;
+		};
 	}
+	union Max
+	{
+		Transaction transaction;
+		superblock::Max superblock;
+		btree::Max btree;
+		summaryCache::Max summaryCache;
+		inode::Max inode;
+		Max()
+		{
+			memset(static_cast<void*>(this), 0, sizeof(Max));
+		};
+		~Max(){};
+		Max(const Max &other)
+		{
+			memcpy(static_cast<void*>(this), static_cast<const void*>(&other), sizeof(Max));
+		}
+	};
+}
 
+template<size_t size> class JournalEntryBuffer
+{
+	template<typename T> class List
+	{
+		T list[size];
+		size_t wm = 0;
+	public:
+		paffs::Result add(T* &elem)
+		{
+			if(wm == size)
+				return paffs::Result::nospace;
+			elem = &list[wm++];
+			return paffs::Result::ok;
+		}
+		T* get(const size_t pos){
+			if(pos >= size)
+				return nullptr;
+			return &list[pos];
+		}
+		void clear()
+		{
+			wm = 0;
+		};
+		size_t getWatermark(){
+			return wm;
+		}
+
+	};
+	List<journalEntry::Max> list;
+	size_t lastCheckpointEnd = 0;
+	size_t curr				 = 0;
+	journalEntry::Transaction::Status taStatus =
+			journalEntry::Transaction::Status::success;
+public:
+	Result insert(const JournalEntry &entry)
+	{
+		if(entry.topic == JournalEntry::Topic::transaction)
+		{
+			journalEntry::Transaction::Status status =
+					static_cast<const journalEntry::Transaction*>(&entry)->status;
+			switch(status)
+			{
+			case journalEntry::Transaction::Status::start:
+				if(taStatus != journalEntry::Transaction::Status::success)
+				{
+					cout << "Tried starting a new Transaction without stopping old one!" << endl;
+					break;
+				}
+				taStatus = status;
+				break;
+			case journalEntry::Transaction::Status::end:
+				if(taStatus != journalEntry::Transaction::Status::start)
+				{
+					cout << "Tried stopping a nonexisting Transaction !" << endl;
+					break;
+				}
+				lastCheckpointEnd = list.getWatermark();
+				taStatus = status;
+				break;
+			case journalEntry::Transaction::Status::success:
+				if(taStatus != journalEntry::Transaction::Status::end)
+				{
+					cout << "Tried finalizing a non-succeeded Transaction !" << endl;
+					break;
+				}
+				list.clear();
+				lastCheckpointEnd = 0;
+				taStatus = status;
+				break;
+			}
+			return Result::ok;
+		}
+
+		journalEntry::Max* n;
+		if(list.add(n) == Result::nospace)
+			return Result::nospace;
+		/*
+		 * Fixme: this reads potential uninitialized memory.
+		 * Anyway, this should not be a problem, b.c. it wont get read again
+		 */
+		memcpy(static_cast<void*>(n), static_cast<const void*>(&entry), sizeof(journalEntry::Max));
+
+		return Result::ok;
+	}
+	void rewind()
+	{
+		curr = 0;
+	}
+	JournalEntry* pop()
+	{
+		if(curr >= lastCheckpointEnd)
+			return nullptr;
+		return reinterpret_cast<JournalEntry*>(list.get(curr++));
+	}
 };
 }

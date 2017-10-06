@@ -568,10 +568,6 @@ SummaryCache::processEntry(JournalEntry& entry){
 	}
 	}
 }
-void
-SummaryCache::finalize(){
-	//TODO?
-}
 
 Result SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent){
 	Result r = Result::ok;

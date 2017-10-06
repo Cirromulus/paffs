@@ -36,7 +36,9 @@ Journal::processBuffer(){
 					static_cast<const journalEntry::Transaction*>(log[e]);
 			for(JournalTopic* topic : topics)
 			{
-				topic->setTransactionStatus(ta->status);
+				if(ta->target == topic->getTopic()){
+					topic->enqueueEntry(*log[e]);
+				}
 			}
 			continue;
 		}
@@ -44,7 +46,7 @@ Journal::processBuffer(){
 		bool found = false;
 		for(JournalTopic* topic : topics){
 			if(log[e]->topic == topic->getTopic()){
-				topic->processEntry(*log[e]);
+				topic->enqueueEntry(*log[e]);
 				found = true;
 				break;
 			}

@@ -12,15 +12,14 @@
 namespace paffs{
 
 class Journal{
-	JournalTopic* topics[2];
+	JournalTopic* topics[1];
 
 	static constexpr unsigned int logSize = 100;
 	JournalEntry* log[logSize];
 	unsigned int pos = 0;
 public:
-	Journal(JournalTopic& superBlock, JournalTopic& treeCache){
-		topics[0] = &superBlock;
-		topics[1] = &treeCache;
+	Journal(JournalTopic& summaryCache){
+		topics[0] = &summaryCache;
 	}
 	void
 	addEvent(const JournalEntry& entry);

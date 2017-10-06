@@ -5,6 +5,8 @@
  *      Author: user
  */
 #include <journal.hpp>
+#include <summaryCache.hpp>
+
 #include <iostream>
 
 using namespace paffs;
@@ -14,14 +16,13 @@ int main(int argc, char **argv) {
 	(void) argc;
 	(void) argv;
 
-	journalTopic::SuperBlock sbt;
-	journalTopic::TreeCache tct;
-
-	Journal journal(sbt, tct);
+	SummaryCache sumCache(nullptr);
+	Journal journal(sumCache);
 
 	journalEntry::superblock::areaMap::Type test(0, AreaType::retired);
 	journalEntry::superblock::Rootnode rootnode(1234);
 
+	cout << "Size of biggest journalEntry: " << sizeof(journalEntry::Max) << " Byte" << endl;
 	cout << test << endl;
 	cout << rootnode << endl;
 

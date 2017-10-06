@@ -14,12 +14,10 @@
 #include "treeCache.hpp"
 #include "treeTypes.hpp"
 #include "treequeue.hpp" //Just for printing debug info in tree
-#include "journalTopics.hpp"
 
 namespace paffs{
 
 class Btree{
-	friend class journalTopic::TreeCache;
 	Device* dev;
 public:
 	TreeCache cache;

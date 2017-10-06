@@ -97,9 +97,6 @@ public:
 	getTopic() override;
 	void
 	processEntry(JournalEntry& entry) override;
-	void
-	finalize() override;
-
 private:
 	/**
 	 * @Brief uses garbageCollection-buffer to swap a whole Area,
