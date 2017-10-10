@@ -28,11 +28,21 @@ unsigned int extractLogicalArea(Addr addr);
 unsigned int extractPageOffs(Addr addr);
 
 class AreaManagement{
-
+	Area map[areasNo];
 	Device *dev;
 public:
 	GarbageCollection gc;
 	AreaManagement(Device *mdev): dev(mdev), gc(mdev){};
+
+	AreaType   getType(AreaPos area);
+	AreaStatus getStatus(AreaPos area);
+	uint32_t   getErasecount(AreaPos area);
+	AreaPos    getPos(AreaPos area);
+
+	void setType(AreaPos area, AreaType type);
+	void setStatus(AreaPos area, AreaStatus status);
+	void setErasecount(AreaPos area, uint32_t erasecount);
+	void setPos(AreaPos area, AreaPos pos);
 
 	/**
 	 * May call garbage collection

@@ -31,7 +31,6 @@ class Device{
 public:
 	Driver& driver;
 	AreaPos activeArea[AreaType::no];
-	Area areaMap[areasNo];
 	AreaPos usedAreas;
 	Result lasterr;
 	bool mounted;
