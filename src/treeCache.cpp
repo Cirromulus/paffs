@@ -355,7 +355,6 @@ void TreeCache::deleteFromParent(TreeCacheNode& tcn){
 	}
 }
 
-
 bool TreeCache::hasNoSiblings(TreeCacheNode& tcn){
 	if(tcn.raw.is_leaf)
 		return true;
@@ -498,7 +497,6 @@ Result TreeCache::commitNodesRecursively(TreeCacheNode& node) {
 /**
  * Commits complete Tree to Flash
  */
-
 Result TreeCache::commitCache(){
 
 	if(traceMask & PAFFS_TRACE_VERIFY_TC && !isTreeCacheValid()){
@@ -524,13 +522,15 @@ Result TreeCache::commitCache(){
 		return r;
 	}
 
-
 	cleanFreeLeafNodes();
 	if(dev->lasterr != Result::ok)
 		return dev->lasterr;
 
 	if(findFirstFreeIndex() < 0)
 		cleanFreeNodes();	//if tree cache did not contain any leaves (unlikely)
+
+	dev->journal.addEvent(journalEntry::Transaction(JournalEntry::Topic::tree,
+	                                                journalEntry::Transaction::Status::success));
 
 	//debug ---->
 	if(traceMask & PAFFS_TRACE_TREECACHE){

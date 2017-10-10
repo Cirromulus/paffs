@@ -11,6 +11,7 @@
 #include "dataIO.hpp"
 #include "superblock.hpp"
 #include "summaryCache.hpp"
+#include "journal.hpp"
 #include <outpost/rtos/clock.h>
 #include <outpost/time/clock.h>
 
@@ -41,6 +42,7 @@ public:
 	AreaManagement areaMgmt;
 	DataIO dataIO;
 	Superblock superblock;
+	Journal journal;
 
 	/*
 	 * Default constructor is for uninitialized Devices only

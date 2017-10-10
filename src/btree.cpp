@@ -14,17 +14,46 @@
 
 namespace paffs{
 
-Result Btree::insertInode(Inode &inode){
-	return insert(inode);
+Result Btree::insertInode(const Inode &inode){
+	TreeCacheNode *node = nullptr;
+	Result r;
+
+	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert Inode n° %d", inode.no);
+
+	r = find_leaf(inode.no, node);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find leaf");
+		return r;
+	}
+
+	if(node->raw.num_keys > 0){
+		for(unsigned i = 0; i < leafOrder; i++){
+			if(node->raw.as.branch.keys[i] == inode.no){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Inode already existing with n° %d", inode.no);
+				return Result::bug;
+			}
+		}
+	}
+
+	dev->journal.addEvent(journalEntry::btree::Insert(inode));
+
+	/* Case: leaf has room for key and pointer.
+	 */
+	if (node->raw.num_keys < leafOrder) {
+		return insert_into_leaf(*node, inode);
+	}
+
+	/* Case:  leaf must be split.
+	 */
+	return insert_into_leaf_after_splitting(*node, inode);
 }
 
 Result Btree::getInode(InodeNo number, Inode &outInode){
 	return find(number, outInode);
 }
 
-Result Btree::updateExistingInode(Inode &inode){
+Result Btree::updateExistingInode(const Inode &inode){
 	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Update existing inode n° %d", inode.no);
-
 	TreeCacheNode *node = nullptr;
 	Result r = find_leaf(inode.no, node);
 	if(r != Result::ok)
@@ -42,6 +71,7 @@ Result Btree::updateExistingInode(Inode &inode){
 		return Result::bug;	//This Key did not exist
 	}
 
+	dev->journal.addEvent(journalEntry::btree::Update(inode));
 	node->raw.as.leaf.pInodes[pos] = inode;
 	node->dirty = true;
 
@@ -60,6 +90,7 @@ Result Btree::deleteInode(InodeNo number){
 	r = find_in_leaf (*key_leaf, number, key);
 	if(r != Result::ok)
 		return r;
+	dev->journal.addEvent(journalEntry::btree::Remove(number));
 	return delete_entry(*key_leaf, number);
 }
 
@@ -88,6 +119,11 @@ Result Btree::commitCache(){
 void Btree::wipeCache(){
 	cache.clear();
 }
+
+JournalEntry::Topic Btree::getTopic(){
+	return JournalEntry::Topic::tree;
+}
+
 /**
  * Compares
  */
@@ -255,25 +291,24 @@ int Btree::get_left_index(TreeCacheNode &parent, TreeCacheNode &left) {
  * key into a leaf when it has enough space free.
  * (No further Tree-action Required)
  */
-Result Btree::insert_into_leaf(TreeCacheNode &leaf, Inode &newInode ) {
+Result Btree::insert_into_leaf(TreeCacheNode &leaf, const Inode &newInode ) {
+	int i, insertion_point;
 
-        int i, insertion_point;
+	insertion_point = 0;
+	while (insertion_point < leaf.raw.num_keys && leaf.raw.as.leaf.keys[insertion_point] < newInode.no)
+			insertion_point++;
 
-        insertion_point = 0;
-        while (insertion_point < leaf.raw.num_keys && leaf.raw.as.leaf.keys[insertion_point] < newInode.no)
-                insertion_point++;
+	for (i = leaf.raw.num_keys; i > insertion_point; i--) {
+			leaf.raw.as.leaf.keys[i] = leaf.raw.as.leaf.keys[i - 1];
+			leaf.raw.as.leaf.pInodes[i] = leaf.raw.as.leaf.pInodes[i - 1];
+	}
+	leaf.raw.as.leaf.keys[insertion_point] = newInode.no;
+	leaf.raw.num_keys++;
+	leaf.raw.as.leaf.pInodes[insertion_point] = newInode;
 
-        for (i = leaf.raw.num_keys; i > insertion_point; i--) {
-                leaf.raw.as.leaf.keys[i] = leaf.raw.as.leaf.keys[i - 1];
-                leaf.raw.as.leaf.pInodes[i] = leaf.raw.as.leaf.pInodes[i - 1];
-        }
-        leaf.raw.as.leaf.keys[insertion_point] = newInode.no;
-        leaf.raw.num_keys++;
-        leaf.raw.as.leaf.pInodes[insertion_point] = newInode;
+	leaf.dirty = true;
 
-        leaf.dirty = true;
-
-        return Result::ok;
+	return Result::ok;
 }
 
 
@@ -282,7 +317,7 @@ Result Btree::insert_into_leaf(TreeCacheNode &leaf, Inode &newInode ) {
  * the tree's order, causing the leaf to be split
  * in half.
  */
-Result Btree::insert_into_leaf_after_splitting(TreeCacheNode &leaf, Inode &newInode) {
+Result Btree::insert_into_leaf_after_splitting(TreeCacheNode &leaf, const Inode &newInode) {
 
 	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert into leaf after splitting");
 	InodeNo temp_keys[leafOrder+1];
@@ -543,52 +578,6 @@ Result Btree::start_new_tree() {
 	new_root->parent = new_root;
     return cache.setRoot(*new_root);
 }
-
-
-
-/* Master insertion function.
- * Inserts a key and an associated value into
- * the B+ tree, causing the tree to be adjusted
- * however necessary to maintain the B+ tree
- * properties.
- */
-Result Btree::insert(Inode &value) {
-
-	TreeCacheNode *node = nullptr;
-	Result r;
-
-	PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert Inode n° %d", value.no);
-
-	r = find_leaf(value.no, node);
-	if(r != Result::ok){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find leaf");
-		return r;
-	}
-
-	if(node->raw.num_keys > 0){
-		for(unsigned i = 0; i < leafOrder; i++){
-			if(node->raw.as.branch.keys[i] == value.no){
-				PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Inode already existing with n° %d", value.no);
-				return Result::bug;
-			}
-		}
-	}
-
-	/* Case: leaf has room for key and pointer.
-	 */
-
-	if (node->raw.num_keys < leafOrder) {
-			return insert_into_leaf(*node, value);
-	}
-
-
-	/* Case:  leaf must be split.
-	 */
-
-	return insert_into_leaf_after_splitting(*node, value);
-}
-
-
 
 // DELETION.
 
@@ -1065,6 +1054,27 @@ void Btree::print_keys(TreeCacheNode &c){
 	*c_copy = c;
 	queue_enqueue(q, c_copy);
 	print_queued_keys_r(q);
+}
+
+void Btree::processEntry(JournalEntry& entry){
+	if(entry.topic != getTopic()){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
+		return;
+	}
+	const journalEntry::BTree* e =
+			static_cast<const journalEntry::BTree*>(&entry);
+	switch(e->op)
+	{
+	case journalEntry::BTree::Operation::insert:
+		insertInode(static_cast<const journalEntry::btree::Insert*>(&entry)->inode);
+		break;
+	case journalEntry::BTree::Operation::update:
+		updateExistingInode(static_cast<const journalEntry::btree::Update*>(&entry)->inode);
+		break;
+	case journalEntry::BTree::Operation::remove:
+		deleteInode(static_cast<const journalEntry::btree::Remove*>(&entry)->no);
+		break;
+	}
 }
 
 }

@@ -23,20 +23,23 @@ int main(int argc, char **argv) {
 	journalEntry::superblock::Rootnode rootnode(1234);
 
 	cout << "Size of biggest journalEntry: " << sizeof(journalEntry::Max) << " Byte" << endl;
-	cout << test << endl;
-	cout << rootnode << endl;
 
-	journal.addEvent(journalEntry::Transaction(JournalEntry::Topic::treeCache,
-			journalEntry::Transaction::Status::start));
+	Inode fil, dir;
+	dir.type = InodeType::dir;
+	dir.no = 0;
+	fil.type = InodeType::file;
+	fil.no = 1;
 
-	journal.addEvent(journalEntry::btree::Add(0, 0xBEEF, 0xBEEF, true));
+	journal.addEvent(journalEntry::btree::Insert(dir));
 	Inode node;
 	node.type = InodeType::dir;
 	journal.addEvent(journalEntry::inode::Add(node.no));
 
-	journal.addEvent(journalEntry::btree::InodeInsert(0, 0, node.no));
-	journal.addEvent(journalEntry::Transaction(JournalEntry::Topic::treeCache,
-			journalEntry::Transaction::Status::end));
+	journal.addEvent(journalEntry::btree::Insert(fil));
+	rootnode.rootnode = 123;
+	journal.addEvent(rootnode);
+	journal.checkpoint();
+	rootnode.rootnode = 456;
 	journal.addEvent(rootnode);
 
 	//whoops, power went out without write (and Status::success misses)

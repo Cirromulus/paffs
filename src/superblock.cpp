@@ -15,11 +15,16 @@
 
 namespace paffs{
 
+JournalEntry::Topic Superblock::getTopic(){
+	return JournalEntry::Topic::superblock;
+}
+
 Result Superblock::registerRootnode(Addr addr){
 	if(addr == 0)
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Tried to set Rootnode to 0");
 	rootnode_addr = addr;
 	rootnode_dirty = true;
+	dev->journal.addEvent(journalEntry::superblock::Rootnode(addr));
 	return Result::ok;
 }
 
@@ -193,6 +198,7 @@ Result Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool cre
 		return Result::bug;
 	}
 
+	dev->journal.addEvent(journalEntry::Transaction(getTopic(), journalEntry::Transaction::Status::success));
 	rootnode_dirty = false;
 	return Result::ok;
 }
@@ -961,5 +967,49 @@ unsigned int Superblock::calculateNeededBytesForSuperIndex(unsigned char numberO
 	if(dataPagesPerArea % 8 != 0)
 		neededBytes++;
 	return neededBytes;
+}
+
+void Superblock::processEntry(JournalEntry& entry){
+	if(entry.topic != getTopic()){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
+		return;
+	}
+	const journalEntry::Superblock* e =
+			static_cast<const journalEntry::Superblock*>(&entry);
+	switch(e->subtype){
+	case journalEntry::Superblock::Subtype::rootnode:
+		registerRootnode(static_cast<const journalEntry::superblock::Rootnode*>(&entry)->rootnode);
+		break;
+	case journalEntry::Superblock::Subtype::areaMap:
+	{
+		const journalEntry::superblock::AreaMap* a =
+				static_cast<const journalEntry::superblock::AreaMap*>(&entry);
+		switch(a->element)
+		{
+		case journalEntry::superblock::AreaMap::Element::type:
+			dev->areaMap[a->offs].type =
+					static_cast<const journalEntry::superblock::areaMap::Type*>(&entry)->type;
+			break;
+		case journalEntry::superblock::AreaMap::Element::status:
+			dev->areaMap[a->offs].status =
+					static_cast<const journalEntry::superblock::areaMap::Status*>(&entry)->status;
+			break;
+		case journalEntry::superblock::AreaMap::Element::erasecount:
+			dev->areaMap[a->offs].erasecount =
+					static_cast<const journalEntry::superblock::areaMap::Erasecount*>(&entry)->erasecount;
+			break;
+		case journalEntry::superblock::AreaMap::Element::position:
+			dev->areaMap[a->offs].position =
+					static_cast<const journalEntry::superblock::areaMap::Position*>(&entry)->position;
+			break;
+		}
+		break;
+	}
+	}
+}
+
+void Superblock::processUnsucceededEntry(JournalEntry& entry){
+	//TODO: More caution and plausibility checks
+	processEntry(entry);
 }
 }

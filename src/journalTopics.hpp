@@ -13,13 +13,13 @@
 namespace paffs
 {
 	class JournalTopic{
-	private:
+	protected:
 		JournalEntryBuffer<100> buffer;
 	public:
 		virtual
 		~JournalTopic(){};
-		virtual
-		JournalEntry::Topic getTopic() = 0;
+		virtual JournalEntry::Topic
+		getTopic() = 0;
 		void
 		enqueueEntry(const JournalEntry& entry);
 		void
@@ -27,5 +27,7 @@ namespace paffs
 	protected:
 		virtual void
 		processEntry(JournalEntry& entry) = 0;
+		virtual void
+		processUnsucceededEntry(JournalEntry&){};
 	};
 }

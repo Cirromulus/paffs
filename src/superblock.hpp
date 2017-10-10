@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include "commonTypes.hpp"
+#include "journalTopics.hpp"
 
 namespace paffs{
 
@@ -47,7 +48,7 @@ struct SuperIndex{
 	SummaryEntry* areaSummary[2];
 };
 
-class Superblock{
+class Superblock : public JournalTopic{
 	Device* dev;
 	Addr rootnode_addr = 0;
 	bool rootnode_dirty = 0;
@@ -58,6 +59,8 @@ public:
 	Superblock(Device *mdev) : dev(mdev){};
 	Result registerRootnode(Addr addr);
 	Addr getRootnodeAddr();
+
+	JournalEntry::Topic getTopic() override;
 
 	//returns PAFFS_NF if no superindex is in flash
 	Result readSuperIndex(SuperIndex* index);
@@ -135,6 +138,11 @@ private:
 	 */
 	AreaPos findBestNextFreeArea(AreaPos logPrev);
 	unsigned int calculateNeededBytesForSuperIndex(unsigned char numberOfAreaSummaries = 2);
+
+	void
+	processEntry(JournalEntry& entry) override;
+	void
+	processUnsucceededEntry(JournalEntry& entry) override;
 };
 
 }

@@ -278,6 +278,8 @@ Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry sta
 		return Result::bug;
 	}
 
+	dev->journal.addEvent(journalEntry::summaryCache::SetStatus(area,page,state));
+
 	summaryCache[translation[area]].setStatus(page, state);
 	if(state == SummaryEntry::dirty){
 		if(traceMask & PAFFS_WRITE_VERIFY_AS){
@@ -393,6 +395,9 @@ Result SummaryCache::deleteSummary(AreaPos area){
 		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Tried to delete nonexisting Area %d", area);
 		return Result::ok;
 	}
+
+	dev->journal.addEvent(journalEntry::summaryCache::Remove(area));
+
 	summaryCache[translation[area]].setDirty(false);
 	summaryCache[translation[area]].clear();
 	translation.erase(area);
@@ -535,13 +540,23 @@ Result SummaryCache::commitAreaSummaries(bool createNew){
 
 	translation.clear();
 
-	return dev->superblock.commitSuperIndex(&index, someDirty, createNew);
+	r = dev->superblock.commitSuperIndex(&index, someDirty, createNew);
+	if(r != Result::ok)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit superindex");
+		return r;
+	}
+	dev->journal.addEvent(journalEntry::Transaction(JournalEntry::Topic::summaryCache,
+	                                                journalEntry::Transaction::Status::success));
+	return Result::ok;
 }
 
 JournalEntry::Topic
 SummaryCache::getTopic(){
 	return JournalEntry::Topic::summaryCache;
 }
+
+
 void
 SummaryCache::processEntry(JournalEntry& entry){
 	if(entry.topic != getTopic()){
@@ -552,6 +567,7 @@ SummaryCache::processEntry(JournalEntry& entry){
 			static_cast<const journalEntry::SummaryCache*>(&entry);
 	switch(e->subtype){
 	case journalEntry::SummaryCache::Subtype::commit:
+	case journalEntry::SummaryCache::Subtype::remove:
 		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Deleting cache "
 				"entry of area %d", summaryCache[e->area].getArea());
 		summaryCache[e->area].setDirty(false);
@@ -564,6 +580,32 @@ SummaryCache::processEntry(JournalEntry& entry){
 		const journalEntry::summaryCache::SetStatus* s =
 				static_cast<const journalEntry::summaryCache::SetStatus*>(&entry);
 		setPageStatus(s->area, s->page, s->status);
+		break;
+	}
+	}
+}
+
+void
+SummaryCache::processUnsucceededEntry(JournalEntry& entry){
+	if(entry.topic != getTopic()){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
+		return;
+	}
+	const journalEntry::SummaryCache* e =
+			static_cast<const journalEntry::SummaryCache*>(&entry);
+	switch(e->subtype){
+	case journalEntry::SummaryCache::Subtype::commit:
+	case journalEntry::SummaryCache::Subtype::remove:
+		//TODO: Is it Ok if nothing happens here?
+		//B.c. we are overwriting 'used' pages
+		break;
+	case journalEntry::SummaryCache::Subtype::setStatus:
+	{
+		//TODO activate some failsafe that checks for invalid writes during this setPages
+		const journalEntry::summaryCache::SetStatus* s =
+				static_cast<const journalEntry::summaryCache::SetStatus*>(&entry);
+		setPageStatus(s->area, s->page, s->status == SummaryEntry::used ?
+										SummaryEntry::dirty : s->status);
 		break;
 	}
 	}
@@ -639,7 +681,7 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 
 	//Look for the least probable Area to be used that has no committed AS
 	uint32_t maxDirtyPages = 0;
- 	for(int i = 0; i < areaSummaryCacheSize; i++){
+	for(int i = 0; i < areaSummaryCacheSize; i++){
 		if(summaryCache[i].isUsed() && !summaryCache[i].isAsWritten() &&
 				dev->areaMap[summaryCache[i].getArea()].status != AreaStatus::active){
 			PageOffs tmp = countUnusedPages(i);
@@ -654,7 +696,7 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 	}
 
 	if(!urgent)
- 		return Result::nf;
+		return Result::nf;
 
 	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "freeNextBestCache found no uncommitted Area, activating Garbage collection");
 	Result r = dev->areaMgmt.gc.collectGarbage(AreaType::unset);
@@ -669,9 +711,9 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 	//GC may have relocated an Area, deleting the committed AS
 	//Look for the least probable Area to be used that has no committed AS
 	maxDirtyPages = 0;
- 	for(int i = 0; i < areaSummaryCacheSize; i++){
- 		if(summaryCache[i].isUsed() && !summaryCache[i].isAsWritten() &&
- 						dev->areaMap[summaryCache[i].getArea()].status != AreaStatus::active){
+	for(int i = 0; i < areaSummaryCacheSize; i++){
+		if(summaryCache[i].isUsed() && !summaryCache[i].isAsWritten() &&
+						dev->areaMap[summaryCache[i].getArea()].status != AreaStatus::active){
 			PageOffs tmp = countUnusedPages(i);
 			if(tmp >= maxDirtyPages){
 				fav = i;
@@ -806,6 +848,7 @@ Result SummaryCache::writeAreasummary(uint16_t pos){
 
 		pointer += btw;
 	}
+	dev->journal.addEvent(journalEntry::summaryCache::Commit(summaryCache[pos].getArea()));
 	summaryCache[pos].setAsWritten();
 	summaryCache[pos].setDirty(false);
 	return Result::ok;

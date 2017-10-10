@@ -6,7 +6,7 @@
  */
 
 #include "journal.hpp"
-#include <iostream>
+#include "paffs_trace.hpp"
 
 using namespace paffs;
 using namespace std;
@@ -17,7 +17,7 @@ using namespace std;
 void
 Journal::addEvent(const JournalEntry& entry){
 	if(pos + 1 == logSize){
-		cout << "Log full. should be flushed." << endl;
+		PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Log full. should be flushed.");
 		return;
 	}
 	JournalEntry* tba = deserializeFactory(entry);
@@ -25,6 +25,22 @@ Journal::addEvent(const JournalEntry& entry){
 		return;
 	log[pos] = tba;
 	pos ++;
+}
+
+void
+Journal::checkpoint()
+{
+	for(JournalTopic* topic : topics)
+	{
+		addEvent(journalEntry::Transaction(topic->getTopic(), journalEntry::Transaction::Status::end));
+	}
+}
+
+void
+Journal::clear()
+{
+	//TODO: Actually delete buffer
+	pos = 0;
 }
 
 void
@@ -53,7 +69,7 @@ Journal::processBuffer(){
 		}
 		if(!found)
 		{
-			cout << "Unknown JournalEntry Topic" << endl;
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Unknown JournalEntry Topic");
 		}else
 		{
 			delete log[e];
@@ -71,57 +87,58 @@ JournalEntry* Journal::deserializeFactory(const JournalEntry& entry){
 	switch(entry.topic)
 	{
 	case JournalEntry::Topic::transaction:
-		cout << "Recognized trasaction event." << endl;
+		PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized trasaction event.");
 		ret = NEWELEM(journalEntry::Transaction, entry);
 		break;
 	case JournalEntry::Topic::superblock:
 		switch(static_cast<const journalEntry::Superblock*>(&entry)->subtype)
 		{
 		case journalEntry::Superblock::Subtype::rootnode:
-			cout << "Recognized rootnode change event." << endl;
+			PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized rootnode change event.");
 			ret = NEWELEM(journalEntry::superblock::Rootnode, entry);
 			break;
 		default:
-			cout << "Did not Recognize Superblock Event" << endl;
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Did not Recognize Superblock Event");
 			break;
 		}
 		break;
-	case JournalEntry::Topic::treeCache:
+	case JournalEntry::Topic::tree:
 		switch(static_cast<const journalEntry::BTree*>(&entry)->op)
 		{
-		case journalEntry::BTree::Operation::add:
-			cout << "Recognized Treenode Modify ADD event." << endl;
-			ret = NEWELEM(journalEntry::btree::Add, entry);
+		case journalEntry::BTree::Operation::insert:
+			PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized Treenode insert event.");
+			ret = NEWELEM(journalEntry::btree::Insert, entry);
 			break;
-		case journalEntry::BTree::Operation::keyInsert:
-			cout << "Recognized Treenode Modify keyInsert event." << endl;
-			ret = NEWELEM(journalEntry::btree::KeyInsert, entry);
-			break;
-		case journalEntry::BTree::Operation::inodeInsert:
-			cout << "Recognized Treenode Modify InodeInsert event." << endl;
-			ret = NEWELEM(journalEntry::btree::InodeInsert, entry);
+		case journalEntry::BTree::Operation::update:
+			PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized Treenode udpate event.");
+			ret = NEWELEM(journalEntry::btree::Update, entry);
 			break;
 		case journalEntry::BTree::Operation::remove:
-			cout << "Recognized Treenode Modify remove event." << endl;
-			ret = NEWELEM(journalEntry::btree::InodeInsert, entry);
+			PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized Treenode remove event.");
+			ret = NEWELEM(journalEntry::btree::Remove, entry);
 			break;
+		break;
 		}
 		break;
 	case JournalEntry::Topic::summaryCache:
 		switch(static_cast<const journalEntry::SummaryCache*>(&entry)->subtype)
 		{
 		case journalEntry::SummaryCache::Subtype::commit:
-			cout << "Recognized SummaryCache Commit area event." << endl;
+			PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized SummaryCache Commit area event.");
 			ret = NEWELEM(journalEntry::summaryCache::Commit, entry);
 			break;
+		case journalEntry::SummaryCache::Subtype::remove:
+			PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized SummaryCache Remove area event.");
+			ret = NEWELEM(journalEntry::summaryCache::Remove, entry);
+			break;
 		case journalEntry::SummaryCache::Subtype::setStatus:
-			cout << "Recognized SummaryCache set Page to Status event." << endl;
+			PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized SummaryCache set Page to Status event.");
 			ret = NEWELEM(journalEntry::summaryCache::SetStatus, entry);
 			break;
 		}
 		break;
 	default:
-		cout << "Did not recognize Event" << endl;
+		PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Did not recognize Event");
 		break;
 	}
 	return ret;

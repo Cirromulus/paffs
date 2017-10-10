@@ -19,7 +19,7 @@ struct JournalEntry{
 	enum class Topic{
 		transaction,
 		superblock,
-		treeCache,
+		tree,
 		summaryCache,
 		inode,
 	};
@@ -28,10 +28,6 @@ protected:
 	JournalEntry(Topic _topic) : topic(_topic){};
 public:
 	virtual ~JournalEntry(){};
-	friend ostream &operator<<( ostream &output, const JournalEntry &in ) {
-		output << "Type: " << static_cast<unsigned int>(in.topic);
-		return output;
-	}
 };
 
 namespace journalEntry
@@ -41,7 +37,6 @@ namespace journalEntry
 	{
 		enum class Status
 		{
-			start,
 			end,
 			success,
 		};
@@ -62,11 +57,6 @@ namespace journalEntry
 				subtype(_subtype){};
 	public:
 		virtual ~Superblock(){};
-		friend ostream &operator<<( ostream &output, const Superblock &in ) {
-			output << static_cast<const JournalEntry &>(in) <<
-					" Subtype: " << static_cast<unsigned int>(in.subtype);
-			return output;
-		}
 	};
 
 	namespace superblock{
@@ -75,11 +65,6 @@ namespace journalEntry
 			Rootnode(Addr _rootnode) : Superblock(Subtype::rootnode),
 					rootnode(_rootnode){};
 			Addr rootnode;
-			friend ostream &operator<<( ostream &output, const Rootnode &in ) {
-				output << static_cast<const Superblock &>(in) <<
-						" Addr: " << in.rootnode;
-				return output;
-			}
 		};
 
 		struct AreaMap : public Superblock{
@@ -96,12 +81,6 @@ namespace journalEntry
 					offs(_offs), element(_element){};
 		public:
 			virtual ~AreaMap(){};
-			friend ostream &operator<<( ostream &output, const AreaMap &in ) {
-				output << static_cast<const Superblock &>(in) <<
-						" Pos: " << in.offs << " Element: " <<
-						static_cast<unsigned int>(in.element);
-				return output;
-			}
 		};
 
 		namespace areaMap
@@ -110,41 +89,21 @@ namespace journalEntry
 				Type(AreaPos _offs, AreaType _type) : AreaMap(_offs, Element::type),
 						type(_type){};
 				AreaType type;
-				friend ostream &operator<<( ostream &output, const Type &in ) {
-					output << static_cast<const AreaMap &>(in) <<
-							" AreaType: " << in.type;
-					return output;
-				}
 			};
 			struct Status : public AreaMap{
 				Status(AreaPos _offs, AreaStatus _status) : AreaMap(_offs, Element::status),
 						status(_status){};
 				AreaStatus status;
-				friend ostream &operator<<( ostream &output, const Status &in ) {
-					output << static_cast<const AreaMap &>(in) <<
-							" AreaStatus: " << in.status;
-					return output;
-				}
 			};
 			struct Erasecount : public AreaMap{
 				Erasecount(AreaPos _offs, uint32_t _erasecount) : AreaMap(_offs, Element::erasecount),
 						erasecount(_erasecount){};
 				uint32_t erasecount;
-				friend ostream &operator<<( ostream &output, const Erasecount &in ) {
-					output << static_cast<const AreaMap &>(in) <<
-							" Erasecount: " << in.erasecount;
-					return output;
-				}
 			};
 			struct Position : public AreaMap{
 				Position(AreaPos _offs, AreaPos _position) : AreaMap(_offs, Element::position),
 						position(_position){};
 				AreaPos position;
-				friend ostream &operator<<( ostream &output, const Position &in ) {
-					output << static_cast<const AreaMap &>(in) <<
-							" Position: " << in.position;
-					return output;
-				}
 			};
 			union Max
 			{
@@ -163,63 +122,45 @@ namespace journalEntry
 
 	struct BTree : public JournalEntry{
 		enum class Operation{
-			add,
-			keyInsert,
-			inodeInsert,
+			insert,
+			update,
 			remove,
-			//TODO:
-			//Move all from pos X to the right
-			//delete all from pos X to Y (without removing from cache)
 		};
 		Operation op;
-		Addr self;			//May be zero if not in flash
-		TreeNodeId id;		//Physical representation in RAM
 	protected:
-		BTree(Addr _self, TreeNodeId _id, Operation _operation) : JournalEntry(Topic::treeCache),
-				op(_operation), self(_self), id(_id){};
+		BTree(Operation _operation) : JournalEntry(Topic::tree),
+				op(_operation){};
 	public:
 		~BTree(){};
 	};
 
 	namespace btree{
-		struct Add : public BTree{
-			bool isLeaf;
-			TreeNodeId parent;
-			Add(Addr _self, TreeNodeId _id, TreeNodeId _parent, bool _isLeaf) : BTree(_self, _id, Operation::add),
-					isLeaf(_isLeaf), parent(_parent){};
+		struct Insert : public BTree{
+			Inode inode;
+			Insert(Inode _inode): BTree(Operation::insert), inode(_inode){};
 		};
-
-		struct KeyInsert : public BTree{
-			InodeNo key;
-			Addr value;
-
-			KeyInsert(Addr _self, TreeNodeId _id, InodeNo _key, Addr _value) : BTree(_self, _id, Operation::keyInsert),
-					key(_key), value(_value){};
+		struct Update : public BTree{
+			Inode inode;
+			Update(Inode _inode): BTree(Operation::update), inode(_inode){};
 		};
-
-		struct InodeInsert : public BTree{
-			InodeNo key;
-			//Inode will be taken from PAC
-			InodeInsert(Addr _self, TreeNodeId _id, InodeNo _key) : BTree(_self, _id, Operation::inodeInsert),
-					key(_key){};
-		};
-
 		struct Remove : public BTree{
-			Remove(Addr _self, TreeNodeId _id) : BTree(_self, _id, Operation::remove){};
+			InodeNo no;
+			Remove(InodeNo _no): BTree(Operation::insert), no(_no){};
 		};
+
 		union Max
 		{
-			Add add;
-			KeyInsert keyInsert;
-			InodeInsert inodeInsert;
+			Insert insert;
+			Update update;
 			Remove remove;
 		};
 	};
 
 	struct SummaryCache : public JournalEntry{
 		enum class Subtype{
+			commit,
+			remove,
 			setStatus,
-			commit
 		};
 		AreaPos area;
 		Subtype subtype;
@@ -231,6 +172,10 @@ namespace journalEntry
 	namespace summaryCache{
 		struct Commit : public SummaryCache{
 			Commit(AreaPos _area) : SummaryCache(_area, Subtype::commit){};
+		};
+
+		struct Remove : public SummaryCache{
+			Remove(AreaPos _area) : SummaryCache(_area, Subtype::remove){};
 		};
 
 		struct SetStatus : public SummaryCache{
@@ -334,20 +279,7 @@ public:
 					static_cast<const journalEntry::Transaction*>(&entry)->status;
 			switch(status)
 			{
-			case journalEntry::Transaction::Status::start:
-				if(taStatus != journalEntry::Transaction::Status::success)
-				{
-					cout << "Tried starting a new Transaction without stopping old one!" << endl;
-					break;
-				}
-				taStatus = status;
-				break;
 			case journalEntry::Transaction::Status::end:
-				if(taStatus != journalEntry::Transaction::Status::start)
-				{
-					cout << "Tried stopping a nonexisting Transaction !" << endl;
-					break;
-				}
 				lastCheckpointEnd = list.getWatermark();
 				taStatus = status;
 				break;
@@ -380,9 +312,19 @@ public:
 	{
 		curr = 0;
 	}
+	void rewindToUnsucceeded()
+	{
+		curr = lastCheckpointEnd;
+	}
 	JournalEntry* pop()
 	{
 		if(curr >= lastCheckpointEnd)
+			return nullptr;
+		return reinterpret_cast<JournalEntry*>(list.get(curr++));
+	}
+	JournalEntry* popInvalid()
+	{
+		if(curr >= list.getWatermark())
 			return nullptr;
 		return reinterpret_cast<JournalEntry*>(list.get(curr++));
 	}
