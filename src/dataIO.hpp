@@ -20,15 +20,15 @@ class DataIO{
 public:
 	PageAddressCache pac;
 
-	DataIO(Device *mdev) : dev(mdev), pac(mdev){};
+	DataIO(Device *mdev) : dev(mdev), pac(*mdev){};
 	//Updates changes to treeCache as well
-	Result writeInodeData(Inode* inode,
+	Result writeInodeData(Inode& inode,
 						unsigned int offs, unsigned int bytes,unsigned int *bytes_written,
 						const char* data);
-	Result readInodeData(Inode* inode,
+	Result readInodeData(Inode& inode,
 						unsigned int offs, unsigned int bytes, unsigned int *bytes_read,
 						char* data);
-	Result deleteInodeData(Inode* inode, unsigned int offs);
+	Result deleteInodeData(Inode& inode, unsigned int offs);
 
 private:
 	/**

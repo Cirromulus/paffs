@@ -379,7 +379,7 @@ Result Superblock::findFirstFreeEntryInBlock(AreaPos area, uint8_t block,
 	for(unsigned int i = 0; i < pagesPerBlock; i++) {
 		PageAbs page = i + pageOffs;
 		SerialNo no;
-		Result r = dev->driver->readPage(page, &no, sizeof(SerialNo));
+		Result r = dev->driver.readPage(page, &no, sizeof(SerialNo));
 		//Ignore corrected bits b.c. This function is used to write new Entry
 		if(r != Result::ok && r != Result::biterrorCorrected)
 			return r;
@@ -478,7 +478,7 @@ Result Superblock::readMostRecentEntryInBlock(AreaPos area, uint8_t block,
 	for(unsigned int i = 0; i < pagesPerBlock; i++) {
 		PageAbs page = i + page_offs;
 		char buf[sizeof(SerialNo) + sizeof(AreaPos) + sizeof(AreaPos)];
-		Result r = dev->driver->readPage(page, buf,
+		Result r = dev->driver.readPage(page, buf,
 				sizeof(SerialNo) + sizeof(AreaPos) + sizeof(AreaPos));
 		if(r != Result::ok){
 			if(r == Result::biterrorCorrected){
@@ -547,7 +547,7 @@ Result Superblock::insertNewAnchorEntry(Addr logPrev, AreaPos *directArea, Ancho
 	}
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Writing Anchor to phys. Area %" PRIu32 ", "
 			"page %" PRIu32 " pointing to area %" PRIu32, *directArea, page, entry->jumpPadArea);
-	return dev->driver->writePage(*directArea * totalPagesPerArea+ page, entry, sizeof(AnchorEntry));
+	return dev->driver.writePage(*directArea * totalPagesPerArea+ page, entry, sizeof(AnchorEntry));
 }
 
 Result Superblock::readAnchorEntry(Addr addr, AnchorEntry* entry){
@@ -564,7 +564,7 @@ Result Superblock::readAnchorEntry(Addr addr, AnchorEntry* entry){
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Reading Anchor entry at phys. area %" PRIu32 " page %" PRIu32,
 			extractLogicalArea(addr), extractPageOffs(addr));
 	//No check of areaType because we may not have an AreaMap
-	Result r = dev->driver->readPage(
+	Result r = dev->driver.readPage(
 			getPageNumberFromDirect(addr), entry, sizeof(AnchorEntry));
 
 	if(r == Result::biterrorCorrected){
@@ -620,7 +620,7 @@ Result Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos *directArea, Jump
 	}
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Writing jumpPad to phys. Area %" PRIu32 ", "
 			"page %" PRIu32 " pointing to area %" PRIu32, *directArea, page, entry->nextArea);
-	return dev->driver->writePage(*directArea * totalPagesPerArea + page, entry, sizeof(JumpPadEntry));
+	return dev->driver.writePage(*directArea * totalPagesPerArea + page, entry, sizeof(JumpPadEntry));
 }
 
 Result Superblock::insertNewSuperIndex(Addr logPrev, AreaPos *directArea, SuperIndex* entry){
@@ -738,7 +738,7 @@ Result Superblock::writeSuperPageIndex(PageAbs pageStart, SuperIndex* entry){
 		//This inserts the serial number at the first Bytes in every page
 		memcpy(pagebuf, &entry->no, sizeof(SerialNo));
 		memcpy(&pagebuf[sizeof(SerialNo)], &buf[pointer], btw);
-		r = dev->driver->writePage(pageStart + page, pagebuf, btw + sizeof(SerialNo));
+		r = dev->driver.writePage(pageStart + page, pagebuf, btw + sizeof(SerialNo));
 		if(r != Result::ok)
 			return r;
 		pointer += btw;
@@ -750,7 +750,7 @@ Result Superblock::writeSuperPageIndex(PageAbs pageStart, SuperIndex* entry){
 Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap){
 	Result r;
 	if(!withAreaMap){
-		r = dev->driver->readPage(
+		r = dev->driver.readPage(
 				 getPageNumberFromDirect(addr), entry, sizeof(SerialNo) + sizeof(Addr));
 		if(r == Result::biterrorCorrected){
 			//TODO trigger SB rewrite. AS may be invalid at this point.
@@ -789,7 +789,7 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 		unsigned int btr =
 				pointer + dataBytesPerPage - sizeof(SerialNo) < needed_bytes ?
 				dataBytesPerPage - sizeof(SerialNo) : needed_bytes - pointer;
-		r = dev->driver->readPage(pageBase + page, pagebuf, btr + sizeof(SerialNo));
+		r = dev->driver.readPage(pageBase + page, pagebuf, btr + sizeof(SerialNo));
 		if(r != Result::ok){
 			if(r == Result::biterrorCorrected){
 				//TODO trigger SB rewrite. AS may be invalid at this point.
@@ -847,7 +847,7 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 			if(buf[pointer + j/8] & 1 << j%8){
 				//TODO: Normally, we would check in the OOB for a Checksum or so, which is present all the time
 				Addr tmp = combineAddress(entry->areaMap[entry->asPositions[i]].position, j);
-				r = dev->driver->readPage(getPageNumberFromDirect(tmp), pagebuf, dataBytesPerPage);
+				r = dev->driver.readPage(getPageNumberFromDirect(tmp), pagebuf, dataBytesPerPage);
 				if(r != Result::ok){
 					if(r == Result::biterrorCorrected){
 						//TODO trigger SB rewrite. AS may be invalid at this point.
@@ -884,16 +884,16 @@ Result Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAre
 
 Result Superblock::handleBlockOverflow(PageAbs newPage, Addr logPrev, SerialNo *serial){
 	BlockAbs newblock = newPage / pagesPerBlock;
-	if(newblock != getBlockNumber(logPrev, dev)){
+	if(newblock != getBlockNumber(logPrev, *dev)){
 		//reset serial no if we start a new block
 		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Deleting phys. Area %d, block %d"
 				" (abs: %d, new abs on %d) for chain Entry",
 				extractLogicalArea(logPrev), extractPageOffs(logPrev) / pagesPerBlock,
-				getBlockNumber(logPrev, dev), newblock);
+				getBlockNumber(logPrev, *dev), newblock);
 		*serial = 0;
 		Result r = deleteSuperBlock(extractLogicalArea(logPrev), extractPageOffs(logPrev) / pagesPerBlock);
 		if(r != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete block of chain Entry! BlockAbs: %" PRIu32, getBlockNumber(logPrev, dev));
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete block of chain Entry! BlockAbs: %" PRIu32, getBlockNumber(logPrev, *dev));
 			return r;
 		}
 	}
@@ -915,7 +915,7 @@ Result Superblock::deleteSuperBlock(AreaPos area, uint8_t block) {
 	}
 
 	BlockAbs block_offs = dev->areaMap[area].position * blocksPerArea;
-	return dev->driver->eraseBlock(block_offs + block);
+	return dev->driver.eraseBlock(block_offs + block);
 }
 
 AreaPos Superblock::findBestNextFreeArea(AreaPos logPrev){

@@ -30,8 +30,8 @@ Addr AddrListCacheElem::getAddr(PageNo pos){
 	return cache[pos];
 }
 
-Result PageAddressCache::setTargetInode(Inode* node){
-	if(node == inode){
+Result PageAddressCache::setTargetInode(Inode& node){
+	if(&node == inode){
 		return Result::ok;
 	}
 	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Set new target inode");
@@ -50,7 +50,7 @@ Result PageAddressCache::setTargetInode(Inode* node){
 		elem.active = false;
 	}
 	singl.active = false;
-	inode = node;
+	inode = &node;
 	return Result::ok;
 }
 
@@ -118,7 +118,7 @@ Result PageAddressCache::setPage(PageNo page, Addr addr){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
 		return Result::bug;
 	}
-	if(dev->readOnly){
+	if(dev.readOnly){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried setting PageAddress in readOnly mode!");
 		return Result::bug;
 	}
@@ -206,7 +206,7 @@ Result PageAddressCache::commit(){
 		return Result::bug;
 	}
 
-	return dev->tree.updateExistingInode(*inode);
+	return dev.tree.updateExistingInode(*inode);
 }
 
 bool PageAddressCache::isDirty(){
@@ -323,7 +323,7 @@ Result PageAddressCache::commitPath(Addr& anchor, AddrListCacheElem* path,
 	if(!validEntries){
 		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Deleting CacheElem referenced by anchor");
 		//invalidate old page.
-		r = dev->sumCache.setPageStatus(extractLogicalArea(anchor),
+		r = dev.sumCache.setPageStatus(extractLogicalArea(anchor),
 				extractPageOffs(anchor), SummaryEntry::dirty);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit invalidate old addresspage!");
@@ -363,7 +363,7 @@ Result PageAddressCache::commitElem(AddrListCacheElem &parent, AddrListCacheElem
 		PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Deleting CacheElem referenced by "
 				"parent:%" PRIu32, elem.positionInParent);
 		//invalidate old page.
-		r = dev->sumCache.setPageStatus(extractLogicalArea(parent.cache[elem.positionInParent]),
+		r = dev.sumCache.setPageStatus(extractLogicalArea(parent.cache[elem.positionInParent]),
 				extractPageOffs(parent.cache[elem.positionInParent]), SummaryEntry::dirty);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit invalidate old addresspage!");
@@ -418,7 +418,7 @@ Result PageAddressCache::readAddrList (Addr from, Addr list[addrsPerPage]){
 		memset(list, 0, addrsPerPage * sizeof(Addr));
 		return Result::ok;
 	}
-	if(dev->areaMap[extractLogicalArea(from)].type != AreaType::index){
+	if(dev.areaMap[extractLogicalArea(from)].type != AreaType::index){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "READ ADDR LIST operation of invalid area at %d:%d",\
 				extractLogicalArea(from),
 				extractPageOffs(from));
@@ -426,7 +426,7 @@ Result PageAddressCache::readAddrList (Addr from, Addr list[addrsPerPage]){
 	}
 	PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "loadCacheElem from %"
 			PRIu32 ":%" PRIu32, extractLogicalArea(from), extractPageOffs(from));
-	Result res = dev->driver->readPage(getPageNumber(from, dev),list, addrsPerPage * sizeof(Addr));
+	Result res = dev.driver.readPage(getPageNumber(from, dev),list, addrsPerPage * sizeof(Addr));
 	if(res != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load existing addresses"
 			" of first indirection layer");
@@ -442,28 +442,28 @@ Result PageAddressCache::readAddrList (Addr from, Addr list[addrsPerPage]){
 }
 
 Result PageAddressCache::writeAddrList(Addr &source, Addr list[addrsPerPage]){
-	Result r = dev->lasterr;
-	dev->lasterr = Result::ok;
-	dev->activeArea[AreaType::index] = dev->areaMgmt.findWritableArea(AreaType::index);
-	if(dev->lasterr != Result::ok){
+	Result r = dev.lasterr;
+	dev.lasterr = Result::ok;
+	dev.activeArea[AreaType::index] = dev.areaMgmt.findWritableArea(AreaType::index);
+	if(dev.lasterr != Result::ok){
 		//TODO: Reset former pagestatus, so that FS will be in a safe state
-		return dev->lasterr;
+		return dev.lasterr;
 	}
-	if(dev->activeArea[AreaType::index] == 0){
+	if(dev.activeArea[AreaType::index] == 0){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "findWritableArea returned 0");
 		return Result::bug;
 	}
-	dev->lasterr = r;
+	dev.lasterr = r;
 
 	unsigned int firstFreePage = 0;
-	if(dev->areaMgmt.findFirstFreePage(&firstFreePage,
-			dev->activeArea[AreaType::index]) == Result::nospace){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::index]);
-		return dev->lasterr = Result::bug;
+	if(dev.areaMgmt.findFirstFreePage(&firstFreePage,
+			dev.activeArea[AreaType::index]) == Result::nospace){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev.activeArea[AreaType::index]);
+		return dev.lasterr = Result::bug;
 	}
-	Addr to = combineAddress(dev->activeArea[AreaType::index], firstFreePage);
+	Addr to = combineAddress(dev.activeArea[AreaType::index], firstFreePage);
 
-	r = dev->driver->writePage(getPageNumber(to, dev), reinterpret_cast<char*>(list),
+	r = dev.driver.writePage(getPageNumber(to, dev), reinterpret_cast<char*>(list),
 			addrsPerPage * sizeof(Addr));
 	if(r != Result::ok){
 		//TODO: Revert Changes to PageStatus
@@ -471,7 +471,7 @@ Result PageAddressCache::writeAddrList(Addr &source, Addr list[addrsPerPage]){
 	}
 
 	//Mark Page as used
-	r = dev->sumCache.setPageStatus(dev->activeArea[AreaType::index],
+	r = dev.sumCache.setPageStatus(dev.activeArea[AreaType::index],
 			firstFreePage, SummaryEntry::used);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
@@ -481,12 +481,12 @@ Result PageAddressCache::writeAddrList(Addr &source, Addr list[addrsPerPage]){
 	Addr formerPosition = source;
 	source = to;
 
-	r = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::index], AreaType::index);
+	r = dev.areaMgmt.manageActiveAreaFull(&dev.activeArea[AreaType::index], AreaType::index);
 	if(r != Result::ok)
 		return r;
 
 	if(formerPosition != 0){
-		r = dev->sumCache.setPageStatus(formerPosition, SummaryEntry::dirty);
+		r = dev.sumCache.setPageStatus(formerPosition, SummaryEntry::dirty);
 		if(r != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate old Page! "
 					"Ignoring Errors to continue...");

@@ -25,11 +25,11 @@ TEST_F(SuperBlock, multipleRemounts){
 	ASSERT_NE(fil, nullptr);
 	fs.resetLastErr();
 
-	r = fs.write(fil, txt, strlen(txt), &bw);
+	r = fs.write(*fil, txt, strlen(txt), &bw);
 	EXPECT_EQ(bw, strlen(txt));
 	ASSERT_EQ(r, paffs::Result::ok);
 
-	r = fs.close(fil);
+	r = fs.close(*fil);
 	ASSERT_EQ(r, paffs::Result::ok);
 
 	r = fs.mkDir("/a", paffs::R | paffs::W);
@@ -54,7 +54,7 @@ TEST_F(SuperBlock, multipleRemounts){
 		}
 		ASSERT_NE(fil, nullptr);
 
-		r = fs.read(fil, buf, strlen(txt), &bw);
+		r = fs.read(*fil, buf, strlen(txt), &bw);
 		ASSERT_EQ(r, paffs::Result::ok);
 		ASSERT_EQ(bw, strlen(txt));
 		ASSERT_TRUE(ArraysMatch(buf, txt, strlen(txt)));
@@ -62,7 +62,7 @@ TEST_F(SuperBlock, multipleRemounts){
 		r = fs.touch("/a");
 		ASSERT_EQ(r, paffs::Result::ok);
 
-		r = fs.close(fil);
+		r = fs.close(*fil);
 		ASSERT_EQ(r, paffs::Result::ok);
 
 		dir = fs.openDir("/a");

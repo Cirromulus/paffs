@@ -15,11 +15,11 @@ extern const char* areaStatusNames[];
 
 //Helper functions
 //Translates indirect Addr to physical page number in respect to the Area mapping
-PageAbs getPageNumber(Addr addr, Device *dev);
+PageAbs getPageNumber(Addr addr, Device &dev);
 //Translates direct Addr to physical page number ignoring AreaMap
 PageAbs getPageNumberFromDirect(Addr addr);
 //Returns the absolute page number from *logical* address
-BlockAbs getBlockNumber(Addr addr, Device* dev);
+BlockAbs getBlockNumber(Addr addr, Device& dev);
 //Translates direct Addr to physical Block number ignoring AreaMap
 BlockAbs getBlockNumberFromDirect(Addr addr);
 //combines two values to one type

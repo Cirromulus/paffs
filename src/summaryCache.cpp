@@ -285,7 +285,7 @@ Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry sta
 			memset(buf, 0xFF, dataBytesPerPage);
 			memset(&buf[dataBytesPerPage], 0x0A, oobBytesPerPage);
 			Addr addr = combineAddress(area, page);
-			dev->driver->writePage(getPageNumber(addr, dev), buf, totalBytesPerPage);
+			dev->driver.writePage(getPageNumber(addr, *dev), buf, totalBytesPerPage);
 		}
 
 		if(traceMask & PAFFS_TRACE_VERIFY_AS){
@@ -462,9 +462,9 @@ Result SummaryCache::loadAreaSummaries(){
 			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Checking for an AS at area %" PRIu32 " (phys. %" PRIu32 ", "
 					"abs. page %" PRIu64 ")",
 					index.asPositions[i], dev->areaMap[index.asPositions[i]].position,
-					getPageNumber(combineAddress(index.asPositions[i], dataPagesPerArea), dev));
-			r = dev->driver->readPage(getPageNumber(
-					combineAddress(index.asPositions[i], dataPagesPerArea), dev),
+					getPageNumber(combineAddress(index.asPositions[i], dataPagesPerArea), *dev));
+			r = dev->driver.readPage(getPageNumber(
+					combineAddress(index.asPositions[i], dataPagesPerArea), *dev),
 					as, totalBytesPerPage);
 			if(r != Result::ok && r != Result::biterrorCorrected){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not check if AS was already written on "
@@ -783,14 +783,14 @@ Result SummaryCache::writeAreasummary(uint16_t pos){
 
 	uint32_t pointer = 0;
 	uint64_t page_offs = getPageNumber(
-			combineAddress(summaryCache[pos].getArea(), dataPagesPerArea), dev);
+			combineAddress(summaryCache[pos].getArea(), dataPagesPerArea), *dev);
 	Result r;
 	for(unsigned int page = 0; page < needed_pages; page++){
 		unsigned int btw = pointer + dataBytesPerPage < areaSummarySize ? dataBytesPerPage
 							: areaSummarySize - pointer;
 		if(traceMask & PAFFS_TRACE_VERIFY_AS){
 			unsigned char readbuf[totalBytesPerPage];
-			r = dev->driver->readPage(page_offs + page, readbuf, totalBytesPerPage);
+			r = dev->driver.readPage(page_offs + page, readbuf, totalBytesPerPage);
 			for(unsigned int i = 0; i < totalBytesPerPage; i++){
 				if(readbuf[i] != 0xFF){
 					PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write AreaSummary over an existing one at "
@@ -800,7 +800,7 @@ Result SummaryCache::writeAreasummary(uint16_t pos){
 			}
 
 		}
-		r = dev->driver->writePage(page_offs + page, &buf[pointer], btw);
+		r = dev->driver.writePage(page_offs + page, &buf[pointer], btw);
 		if(r != Result::ok)
 			return r;
 
@@ -823,12 +823,12 @@ Result SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bo
 	}
 	bool bitErrorWasCorrected = false;
 	uint32_t pointer = 0;
-	uint64_t page_offs = getPageNumber(combineAddress(area, dataPagesPerArea), dev);
+	uint64_t page_offs = getPageNumber(combineAddress(area, dataPagesPerArea), *dev);
 	Result r;
 	for(unsigned int page = 0; page < needed_pages; page++){
 		unsigned int btr = pointer + dataBytesPerPage < areaSummarySize ? dataBytesPerPage
 							: areaSummarySize - pointer;
-		r = dev->driver->readPage(page_offs + page, &buf[pointer], btr);
+		r = dev->driver.readPage(page_offs + page, &buf[pointer], btr);
 		if(r != Result::ok){
 			if(r == Result::biterrorCorrected){
 				bitErrorWasCorrected = true;
@@ -854,7 +854,7 @@ Result SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bo
 			if(complete){
 				unsigned char pagebuf[totalBytesPerPage];
 				Addr tmp = combineAddress(area, j);
-				r = dev->driver->readPage(getPageNumber(tmp, dev), pagebuf, totalBytesPerPage);
+				r = dev->driver.readPage(getPageNumber(tmp, *dev), pagebuf, totalBytesPerPage);
 				if(r != Result::ok){
 					if(r == Result::biterrorCorrected){
 						bitErrorWasCorrected = true;

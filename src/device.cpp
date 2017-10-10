@@ -14,15 +14,13 @@ namespace paffs{
 
 outpost::rtos::SystemClock systemClock;
 
-Device::Device(Driver* mdriver) : driver(mdriver),
+Device::Device(Driver& mdriver) : driver(mdriver),
 		usedAreas(0), lasterr(Result::ok), mounted(false), readOnly(false),
 		tree(Btree(this)), sumCache(SummaryCache(this)),
 		areaMgmt(this), dataIO(this), superblock(this){
 };
 
 Device::~Device(){
-	if(driver == nullptr)
-		return;
 	if(mounted){
 		fprintf(stderr, "Destroyed Device-Object without unmouning! "
 				"This will most likely destroy "
@@ -32,21 +30,16 @@ Device::~Device(){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not (gracefully) destroy Device!");
 		}
 	}
-	delete driver;
 }
 
 Result Device::format(const BadBlockList &badBlockList, bool complete){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
 	if(mounted)
 		return Result::alrMounted;
 
 	Result r = initializeDevice();
 	if(r != Result::ok)
 		return r;
-	r = driver->initializeNand();
+	r = driver.initializeNand();
 	if(r != Result::ok)
 		return r;
 
@@ -72,7 +65,7 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Bad block in reserved first Area!");
 			return Result::fail;
 		}
-		driver->markBad(badBlockList[block]);
+		driver.markBad(badBlockList[block]);
 		areaMap[area].type = AreaType::retired;
 	}
 
@@ -87,7 +80,7 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 
 		bool anyBlockInAreaBad = false;
 		for(unsigned block = 0; block < blocksPerArea; block++){
-			if(driver->checkBad(area * blocksPerArea + block) != Result::ok){
+			if(driver.checkBad(area * blocksPerArea + block) != Result::ok){
 				PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
 						"Found marked bad block %" PRIu32 " during formatting, "
 						"retiring area %" PRIu32, area * blocksPerArea + block, area);
@@ -105,7 +98,7 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 				1 << AreaType::garbageBuffer) ||
 				complete){
 			for(unsigned int p = 0; p < blocksPerArea; p++){
-				r = driver->eraseBlock(p + area * blocksPerArea);
+				r = driver.eraseBlock(p + area * blocksPerArea);
 				if(r != Result::ok){
 					PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
 							"Found non-marked bad block %u during formatting, "
@@ -172,16 +165,13 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 		return r;
 	}
 	destroyDevice();
-	driver->deInitializeNand();
+	driver.deInitializeNand();
 	return Result::ok;
 }
 
 Result Device::mnt(bool readOnlyMode){
 	readOnly = readOnlyMode;
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
+
 
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "mount with valid driver");
 
@@ -195,7 +185,7 @@ Result Device::mnt(bool readOnlyMode){
 	if(r != Result::ok)
 		return r;
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Inited Device");
-	r = driver->initializeNand();
+	r = driver.initializeNand();
 	if(r != Result::ok)
 		return r;
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Inited Driver");
@@ -234,10 +224,7 @@ Result Device::mnt(bool readOnlyMode){
 	return r;
 }
 Result Device::unmnt(){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
+
 	if(!mounted)
 		return Result::notMounted;
 	Result r;
@@ -249,7 +236,7 @@ Result Device::unmnt(){
 			PAFFS_DBG_S(PAFFS_TRACE_ALWAYS, "Close Inode %" PRIu32 " with %u references",
 					it->first, it->second.second);
 			//TODO: Later, we would choose the actual pac instance (or the PAC will choose the actual Inode...
-			r = dataIO.pac.setTargetInode(it->second.first);
+			r = dataIO.pac.setTargetInode(*it->second.first);
 			if(r != Result::ok){
 				//we ignore Result, because we unmount.
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load pac of an open file");
@@ -260,7 +247,7 @@ Result Device::unmnt(){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit pac of an open file");
 			}
 
-			inodePool.pool.freeObject(it->second.first);
+			inodePool.pool.freeObject(*it->second.first);
 			it = inodePool.map.erase(it);
 		}
 	}
@@ -293,7 +280,7 @@ Result Device::unmnt(){
 	}
 
 	destroyDevice();
-	driver->deInitializeNand();
+	driver.deInitializeNand();
 	//just for cleanup & tests
 	tree.wipeCache();
 	mounted = false;
@@ -301,10 +288,7 @@ Result Device::unmnt(){
 }
 
 Result Device::createInode(SmartInodePtr &outInode, Permission mask){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
+
 
 	//FIXME: is this the best way to find a new number?
 	InodeNo no;
@@ -330,10 +314,7 @@ Result Device::createInode(SmartInodePtr &outInode, Permission mask){
  * creates DirInode ONLY IN RAM
  */
 Result Device::createDirInode(SmartInodePtr &outInode, Permission mask){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
+
 	if(createInode(outInode, mask) != Result::ok)
 		return Result::bug;
 	outInode->type = InodeType::dir;
@@ -346,10 +327,7 @@ Result Device::createDirInode(SmartInodePtr &outInode, Permission mask){
  * creates FilInode ONLY IN RAM
  */
 Result Device::createFilInode(SmartInodePtr &outInode, Permission mask){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
+
 	if(createInode(outInode, mask) != Result::ok){
 		return Result::bug;
 	}
@@ -357,21 +335,8 @@ Result Device::createFilInode(SmartInodePtr &outInode, Permission mask){
 	return Result::ok;
 }
 
-void Device::destroyInode(Inode* node){
-	printf("HELLO?\n");
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return;
-	}
-	dataIO.deleteInodeData(node, 0);
-	delete node;
-}
-
 Result Device::getParentDir(const char* fullPath, SmartInodePtr &parDir, unsigned int *lastSlash){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
+
 	if(fullPath[0] == 0){
 		lasterr = Result::einval;
 		return Result::einval;
@@ -398,48 +363,39 @@ Result Device::getParentDir(const char* fullPath, SmartInodePtr &parDir, unsigne
 }
 
 //Currently Linearer Aufwand
-Result Device::getInodeNoInDir(InodeNo* inode, Inode* folder, const char* name){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
-	if(folder == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Folder Inode pointer invalid!");
+Result Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name){
+	if(folder.type != InodeType::dir){
 		return Result::bug;
 	}
-
-	if(folder->type != InodeType::dir){
-		return Result::bug;
-	}
-	if(folder->size <= sizeof(DirEntryCount)){
+	if(folder.size <= sizeof(DirEntryCount)){
 		//Just contains a zero for "No entrys"
 		return Result::nf;
 	}
 
-	char* buf = new char[folder->size];
+	char* buf = new char[folder.size];
 	unsigned int bytes_read = 0;
-	Result r = dataIO.readInodeData(folder, 0, folder->size, &bytes_read, buf);
-	if(r != Result::ok || bytes_read != folder->size){
+	Result r = dataIO.readInodeData(folder, 0, folder.size, &bytes_read, buf);
+	if(r != Result::ok || bytes_read != folder.size){
 		delete[] buf;
 		return r == Result::ok ? Result::bug : r;
 	}
 
 	unsigned int p = sizeof(DirEntryCount);		//skip directory entry count
-	while(p < folder->size){
+	while(p < folder.size){
 			DirEntryLength direntryl = buf[p];
 			if(direntryl < sizeof(DirEntryLength) + sizeof(InodeNo)){
-				PAFFS_DBG(PAFFS_TRACE_BUG, "Directory entry size of Folder %u is unplausible! (was: %d, should: >%lu)", folder->no, direntryl, sizeof(DirEntryLength) + sizeof(InodeNo));
+				PAFFS_DBG(PAFFS_TRACE_BUG, "Directory entry size of Folder %u is unplausible! (was: %d, should: >%lu)", folder.no, direntryl, sizeof(DirEntryLength) + sizeof(InodeNo));
 				delete[] buf;
 				return Result::bug;
 			}
-			if(direntryl > folder->size){
-				PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: direntry length of Folder %u not plausible (was: %d, should: >%d)!", folder->no, direntryl, folder->size);
+			if(direntryl > folder.size){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: direntry length of Folder %u not plausible (was: %d, should: >%d)!", folder.no, direntryl, folder.size);
 				delete[] buf;
 				return Result::bug;
 			}
 			unsigned int dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
-			if(dirnamel > folder->size){
-				PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: dirname length of Inode %u not plausible (was: %d, should: >%d)!", folder->no, folder->size, p + dirnamel);
+			if(dirnamel > folder.size){
+				PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: dirname length of Inode %u not plausible (was: %d, should: >%d)!", folder.no, folder.size, p + dirnamel);
 				delete[] buf;
 				return Result::bug;
 			}
@@ -453,7 +409,7 @@ Result Device::getInodeNoInDir(InodeNo* inode, Inode* folder, const char* name){
 			p += dirnamel;
 			if(strcmp(name, tmpname) == 0){
 				//Eintrag gefunden
-				*inode = tmp_no;
+				outInode = tmp_no;
 				delete[] tmpname;
 				delete[] buf;
 				return Result::ok;
@@ -466,10 +422,6 @@ Result Device::getInodeNoInDir(InodeNo* inode, Inode* folder, const char* name){
 }
 
 Result Device::getInodeOfElem(SmartInodePtr &outInode, const char* fullPath){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
 	SmartInodePtr curr;
 	if(findOrLoadInode(0, curr) != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get rootInode! (%s)",
@@ -498,7 +450,7 @@ Result Device::getInodeOfElem(SmartInodePtr &outInode, const char* fullPath){
 
 		Result r;
 		InodeNo next;
-		if((r = getInodeNoInDir(&next, curr, fnP)) != Result::ok){
+		if((r = getInodeNoInDir(next, *curr, fnP)) != Result::ok){
 			delete[] fullPathC;
 			//this may be a NotFound
 			return r;
@@ -540,16 +492,7 @@ Result Device::findOrLoadInode(InodeNo no, SmartInodePtr &target){
 }
 
 
-Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Device has no driver set!");
-		return Result::fail;
-	}
-	if(contDir == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Container Directory was null!");
-		return Result::bug;
-	}
-
+Result Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem){
 	unsigned int elemNameL = strlen(name);
 	if(name[elemNameL-1] == '/'){
 		elemNameL--;
@@ -567,30 +510,30 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 
 	unsigned char *buf = new unsigned char [direntryl];
 	buf[0] = direntryl;
-	memcpy(&buf[sizeof(DirEntryLength)], &newElem->no, sizeof(InodeNo));
+	memcpy(&buf[sizeof(DirEntryLength)], &newElem.no, sizeof(InodeNo));
 
 	memcpy(&buf[sizeof(DirEntryLength) + sizeof(InodeNo)], name, elemNameL);
 
-	if(contDir->size == 0)
-		contDir->size = sizeof(DirEntryCount); //To hold the Number of Entries
+	if(contDir.size == 0)
+		contDir.size = sizeof(DirEntryCount); //To hold the Number of Entries
 
-	char* dirData = new char[contDir->size + direntryl];
+	char* dirData = new char[contDir.size + direntryl];
 	unsigned int bytes = 0;
 	Result r;
-	if(contDir->reservedPages > 0){		//if Directory is not empty
-		r = dataIO.readInodeData(contDir, 0, contDir->size, &bytes, dirData);
-		if(r != Result::ok || bytes != contDir->size){
+	if(contDir.reservedPages > 0){		//if Directory is not empty
+		r = dataIO.readInodeData(contDir, 0, contDir.size, &bytes, dirData);
+		if(r != Result::ok || bytes != contDir.size){
 			lasterr = r;
 			delete[] dirData;
 			delete[] buf;
 			return r;
 		}
 	}else{
-		memset(dirData, 0, contDir->size);	//Wipe directory-entry-count area
+		memset(dirData, 0, contDir.size);	//Wipe directory-entry-count area
 	}
 
 	//append record
-	memcpy (&dirData[contDir->size], buf, direntryl);
+	memcpy (&dirData[contDir.size], buf, direntryl);
 
 	DirEntryCount directoryEntryCount = 0;
 	memcpy (&directoryEntryCount, dirData, sizeof(DirEntryCount));
@@ -599,19 +542,19 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 
 	//TODO: If write more than one page, split in start and end page to reduce
 	//unnecessary writes on intermediate pages.
-	r = dataIO.writeInodeData(contDir, 0, contDir->size + direntryl, &bytes, dirData);
+	r = dataIO.writeInodeData(contDir, 0, contDir.size + direntryl, &bytes, dirData);
 	delete[] dirData;
 	delete[] buf;
-	if(bytes != contDir->size && r == Result::ok){
+	if(bytes != contDir.size && r == Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "writeInodeData wrote different bytes than requested"
 				", but returned OK");
 	}
 	if(r != Result::ok){
 		//Ouch, during directory write
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write %u of %u bytes directory data",
-				contDir->size + direntryl - bytes, contDir->size + direntryl);
+				contDir.size + direntryl - bytes, contDir.size + direntryl);
 		if(bytes != 0){
-			Result r2 = tree.updateExistingInode(*contDir);
+			Result r2 = tree.updateExistingInode(contDir);
 			if(r2 != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update Inode after unfinished directory insert!"
 						" Ignoring error to continue.");
@@ -620,27 +563,19 @@ Result Device::insertInodeInDir(const char* name, Inode* contDir, Inode* newElem
 		return r;
 	}
 
-	return tree.updateExistingInode(*contDir);
+	return tree.updateExistingInode(contDir);
 
 }
 
 
 //TODO: mark deleted treeCacheNodes as dirty
-Result Device::removeInodeFromDir(Inode* contDir, InodeNo elem){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
-	if(contDir == nullptr){
-		return Result::bug;
-	}
-
-	char* dirData = new char[contDir->size];
+Result Device::removeInodeFromDir(Inode& contDir, InodeNo elem){
+	char* dirData = new char[contDir.size];
 	unsigned int bytes = 0;
 	Result r;
-	if(contDir->reservedPages > 0){		//if Directory is not empty
-		r = dataIO.readInodeData(contDir, 0, contDir->size, &bytes, dirData);
-		if(r != Result::ok || bytes != contDir->size){
+	if(contDir.reservedPages > 0){		//if Directory is not empty
+		r = dataIO.readInodeData(contDir, 0, contDir.size, &bytes, dirData);
+		if(r != Result::ok || bytes != contDir.size){
 			lasterr = r;
 			delete[] dirData;
 			return r;
@@ -653,11 +588,11 @@ Result Device::removeInodeFromDir(Inode* contDir, InodeNo elem){
 
 	DirEntryCount *entries = reinterpret_cast<DirEntryCount*> (&dirData[0]);
 	FileSize pointer = sizeof(DirEntryCount);
-	while(pointer < contDir->size){
+	while(pointer < contDir.size){
 		DirEntryLength entryl = static_cast<DirEntryLength> (dirData[pointer]);
 		if(memcmp(&dirData[pointer + sizeof(DirEntryLength)], &elem, sizeof(InodeNo)) == 0){
 			//Found
-			unsigned int newSize = contDir->size - entryl;
+			unsigned int newSize = contDir.size - entryl;
 			unsigned int restByte = newSize - pointer;
 			if(newSize == sizeof(DirEntryCount))
 				newSize = 0;
@@ -695,10 +630,6 @@ Result Device::removeInodeFromDir(Inode* contDir, InodeNo elem){
 }
 
 Result Device::mkDir(const char* fullPath, Permission mask){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
 	if(!mounted)
 		return Result::notMounted;
 	if(readOnly)
@@ -725,16 +656,11 @@ Result Device::mkDir(const char* fullPath, Permission mask){
 	if(r != Result::ok)
 		return r;
 
-	r = insertInodeInDir(&fullPath[lastSlash], parDir, newDir);
+	r = insertInodeInDir(&fullPath[lastSlash], *parDir, *newDir);
 	return r;
 }
 
 Dir* Device::openDir(const char* path){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		lasterr = Result::fail;
-		return nullptr;
-	}
 	if(!mounted){
 		lasterr = Result::notMounted;
 		return nullptr;
@@ -757,7 +683,7 @@ Dir* Device::openDir(const char* path){
 	char* dirData = new char[dirPinode->size];
 	unsigned int br = 0;
 	if(dirPinode->reservedPages > 0){
-		r = dataIO.readInodeData(dirPinode, 0, dirPinode->size, &br, dirData);
+		r = dataIO.readInodeData(*dirPinode, 0, dirPinode->size, &br, dirData);
 		if(r != Result::ok || br != dirPinode->size){
 			lasterr = r;
 			return nullptr;
@@ -814,10 +740,6 @@ Dir* Device::openDir(const char* path){
 }
 
 Result Device::closeDir(Dir* &dir){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
 	if(!mounted)
 		return Result::notMounted;
 	if(dir->childs == nullptr)
@@ -836,77 +758,51 @@ Result Device::closeDir(Dir* &dir){
 /**
  * TODO: What happens if dir is changed after opendir?
  */
-Dirent* Device::readDir(Dir* dir){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		lasterr = Result::fail;
-		return nullptr;
-	}
+Dirent* Device::readDir(Dir& dir){
 	if(!mounted){
 		lasterr = Result::notMounted;
 		return nullptr;
 	}
-	if(dir->no_entries == 0)
+	if(dir.no_entries == 0)
 		return nullptr;
 
-	if(dir->pos == dir->no_entries){
+	if(dir.pos == dir.no_entries){
 		return nullptr;
 	}
 
-/*	if(dir->childs == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ DIR on dir with nullptr dirents");
-		lasterr = Result::bug;
-		return nullptr;
-	}*/
-
-	if(dir->pos > dir->no_entries){
+	if(dir.pos > dir.no_entries){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ DIR on dir that points further than its contents");
 		lasterr = Result::bug;
 		return nullptr;
 	}
 
-	/*if(dir->childs[dir->pos] == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "READ DIR on dir with nullptr Dirent no. %d", dir->pos);
-		lasterr = Result::bug;
-		return nullptr;
-	}*/
-
-	if(dir->childs[dir->pos].node != nullptr){
-		return &dir->childs[dir->pos++];
+	if(dir.childs[dir.pos].node != nullptr){
+		return &dir.childs[dir.pos++];
 	}
-	Result r = findOrLoadInode(dir->childs[dir->pos].no, dir->childs[dir->pos].node);
+	Result r = findOrLoadInode(dir.childs[dir.pos].no, dir.childs[dir.pos].node);
 	if(r != Result::ok){
 	   lasterr = Result::bug;
 	   return nullptr;
 	}
-	if((dir->childs[dir->pos].node->perm & R) == 0){
+	if((dir.childs[dir.pos].node->perm & R) == 0){
 		lasterr = Result::noperm;
-		dir->pos++;
+		dir.pos++;
 		return nullptr;
 	}
 
-	if(dir->childs[dir->pos].node->type == InodeType::dir){
-		int namel = strlen(dir->childs[dir->pos].name);
-		dir->childs[dir->pos].name[namel] = '/';
-		dir->childs[dir->pos].name[namel+1] = 0;
+	if(dir.childs[dir.pos].node->type == InodeType::dir){
+		int namel = strlen(dir.childs[dir.pos].name);
+		dir.childs[dir.pos].name[namel] = '/';
+		dir.childs[dir.pos].name[namel+1] = 0;
 	}
-	return &dir->childs[dir->pos++];
+	return &dir.childs[dir.pos++];
 }
 
-void Device::rewindDir(Dir* dir){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		lasterr = Result::fail;
-		return;
-	}
-    dir->pos = 0;
+void Device::rewindDir(Dir& dir){
+    dir.pos = 0;
 }
 
 Result Device::createFile(SmartInodePtr &outFile, const char* fullPath, Permission mask){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
 	if(!mounted)
 		return Result::notMounted;
 	if(readOnly)
@@ -930,22 +826,19 @@ Result Device::createFile(SmartInodePtr &outFile, const char* fullPath, Permissi
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not create fileInode: %s", err_msg(res));
 		return res;
 	}
+	//======= todo
 	res = tree.insertInode(*outFile);
 	if(res != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert Inode into tree: %s", err_msg(res));
 		return res;
 	}
 
-	res = insertInodeInDir(&fullPath[lastSlash], parDir, outFile);
+	res = insertInodeInDir(&fullPath[lastSlash], *parDir, *outFile);
+	//=======
 	return res;
 }
 
 Obj* Device::open(const char* path, Fileopenmask mask){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		lasterr = Result::fail;
-		return nullptr;
-	}
 	if(!mounted){
 		lasterr = Result::notMounted;
 		return nullptr;
@@ -1017,32 +910,20 @@ Obj* Device::open(const char* path, Fileopenmask mask){
 	return obj;
 }
 
-Result Device::close(Obj* obj){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
+Result Device::close(Obj& obj){
 	if(!mounted)
 		return Result::notMounted;
-	if(obj == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Obj was null!");
-		return Result::einval;
-	}
 	Result r = flush(obj);
 	if(r != Result::ok){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not flush obj %" PRIu32, obj->dirent.no);
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not flush obj %" PRIu32, obj.dirent.no);
 	}
 
-	delete[] obj->dirent.name;
+	delete[] obj.dirent.name;
 	filesPool.freeObject(obj);
 	return r;
 }
 
 Result Device::touch(const char* path){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
 	if(!mounted)
 		return Result::notMounted;
 	if(readOnly)
@@ -1071,11 +952,7 @@ Result Device::touch(const char* path){
 }
 
 
-Result Device::getObjInfo(const char *fullPath, ObjInfo* nfo){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
+Result Device::getObjInfo(const char *fullPath, ObjInfo& nfo){
 	if(!mounted)
 		return Result::notMounted;
 	Result r;
@@ -1083,80 +960,67 @@ Result Device::getObjInfo(const char *fullPath, ObjInfo* nfo){
 	if((r = getInodeOfElem(object, fullPath)) != Result::ok){
 		return lasterr = r;
 	}
-	nfo->created = outpost::time::GpsTime::afterEpoch(outpost::time::Milliseconds(object->crea));
-	nfo->modified = outpost::time::GpsTime::afterEpoch(outpost::time::Milliseconds(object->crea));;
-	nfo->perm = object->perm;
-	nfo->size = object->size;
-	nfo->isDir = object->type == InodeType::dir;
+	nfo.created = outpost::time::GpsTime::afterEpoch(outpost::time::Milliseconds(object->crea));
+	nfo.modified = outpost::time::GpsTime::afterEpoch(outpost::time::Milliseconds(object->crea));;
+	nfo.perm = object->perm;
+	nfo.size = object->size;
+	nfo.isDir = object->type == InodeType::dir;
 	return Result::ok;
 }
 
-Result Device::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
+Result Device::read(Obj& obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read){
 	if(!mounted)
 		return Result::notMounted;
-	if(obj == nullptr)
-		return lasterr = Result::einval;
-
-	if(obj->dirent.node->type == InodeType::dir){
+	if(obj.dirent.node->type == InodeType::dir){
 		return lasterr = Result::einval;
 	}
-	if(obj->dirent.node->type == InodeType::lnk){
+	if(obj.dirent.node->type == InodeType::lnk){
 		return lasterr = Result::nimpl;
 	}
-	if((obj->dirent.node->perm & R) == 0)
+	if((obj.dirent.node->perm & R) == 0)
 		return Result::noperm;
 
-	if(obj->dirent.node->size == 0){
+	if(obj.dirent.node->size == 0){
 		*bytes_read = 0;
 		return Result::ok;
 	}
 
-	Result r = dataIO.readInodeData(obj->dirent.node, obj->fp, bytes_to_read, bytes_read, buf);
+	Result r = dataIO.readInodeData(*obj.dirent.node, obj.fp, bytes_to_read, bytes_read, buf);
 	if(r != Result::ok){
 		return r;
 	}
 
 	//*bytes_read = bytes_to_read;
-	obj->fp += *bytes_read;
+	obj.fp += *bytes_read;
 	return Result::ok;
 }
 
-Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
+Result Device::write(Obj& obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written){
 	*bytes_written = 0;
 	if(!mounted)
 		return Result::notMounted;
-	if(obj == nullptr)
-		return Result::einval;
 	if(readOnly)
 		return Result::readonly;
 	if(usedAreas > areasNo - minFreeAreas)
 		return Result::nospace;
-	if(obj->dirent.node == nullptr){
+	if(obj.dirent.node == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Objects dirent.node is invalid!");
 		return Result::bug;
 	}
 
-	if(obj->dirent.node->type == InodeType::dir)
+	if(obj.dirent.node->type == InodeType::dir)
 		return Result::einval;
-	if(obj->dirent.node->type == InodeType::lnk)
+	if(obj.dirent.node->type == InodeType::lnk)
 		return Result::nimpl;
-	if((obj->dirent.node->perm & W) == 0)
+	if((obj.dirent.node->perm & W) == 0)
 		return Result::noperm;
 
-	Result r = dataIO.writeInodeData(obj->dirent.node, obj->fp, bytes_to_write, bytes_written, buf);
+	Result r = dataIO.writeInodeData(*obj.dirent.node, obj.fp, bytes_to_write, bytes_written, buf);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write %u of %u bytes",
 				bytes_to_write - *bytes_written, bytes_to_write);
 		if(*bytes_written > 0){
-			Result r2 = tree.updateExistingInode(*obj->dirent.node);
+			Result r2 = tree.updateExistingInode(*obj.dirent.node);
 			if(r2 != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "could not update Inode of unsuccessful inode write "
 						"(%s)", err_msg(r2));
@@ -1171,41 +1035,37 @@ Result Device::write(Obj* obj, const char* buf, unsigned int bytes_to_write, uns
 		return Result::fail;
 	}
 
-	obj->dirent.node->mod = systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
+	obj.dirent.node->mod = systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
 
-	obj->fp += *bytes_written;
-	if(obj->fp > obj->dirent.node->size){
+	obj.fp += *bytes_written;
+	if(obj.fp > obj.dirent.node->size){
 		//size was increased
-		if(obj->dirent.node->reservedPages * dataBytesPerPage < obj->fp){
+		if(obj.dirent.node->reservedPages * dataBytesPerPage < obj.fp){
 			PAFFS_DBG(PAFFS_TRACE_WRITE, "Reserved size is smaller than actual size "
 					"which is OK if we skipped pages");
 		}
 	}
-	return tree.updateExistingInode(*obj->dirent.node);
+	return tree.updateExistingInode(*obj.dirent.node);
 }
 
-Result Device::seek(Obj* obj, int m, Seekmode mode){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
+Result Device::seek(Obj& obj, int m, Seekmode mode){
 	if(!mounted)
 		return Result::notMounted;
 	switch(mode){
 	case Seekmode::set :
 		if(m < 0)
 			return lasterr = Result::einval;
-		obj->fp = m;
+		obj.fp = m;
 		break;
 	case Seekmode::end :
-		if(-m > static_cast<int>(obj->dirent.node->size))
+		if(-m > static_cast<int>(obj.dirent.node->size))
 			return Result::einval;
-		obj->fp = obj->dirent.node->size + m;
+		obj.fp = obj.dirent.node->size + m;
 		break;
 	case Seekmode::cur :
-		if(static_cast<int>(obj->fp) + m < 0)
+		if(static_cast<int>(obj.fp) + m < 0)
 			return Result::einval;
-		obj->fp += m;
+		obj.fp += m;
 		break;
 	}
 
@@ -1213,18 +1073,14 @@ Result Device::seek(Obj* obj, int m, Seekmode mode){
 }
 
 
-Result Device::flush(Obj* obj){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
+Result Device::flush(Obj& obj){
 	if(!mounted)
 		return Result::notMounted;
 	if(readOnly)
 		return Result::ok;
 
 	//TODO: When Inodes get Link to its PAC, this would be more elegant
-	Result r = dataIO.pac.setTargetInode(obj->dirent.node);
+	Result r = dataIO.pac.setTargetInode(*obj.dirent.node);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Target Inode!");
 		return r;
@@ -1238,10 +1094,6 @@ Result Device::flush(Obj* obj){
 }
 
 Result Device::truncate(const char* path, unsigned int newLength){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
 	if(!mounted)
 		return Result::notMounted;
 	if(readOnly)
@@ -1264,7 +1116,7 @@ Result Device::truncate(const char* path, unsigned int newLength){
 		}
 	}
 
-	r = dataIO.deleteInodeData(object, newLength);
+	r = dataIO.deleteInodeData(*object, newLength);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete Inode Data");
 		return r;
@@ -1294,7 +1146,7 @@ Result Device::remove(const char* path){
 	if((r = getParentDir(path, parentDir, &lastSlash)) != Result::ok)
 		return r;
 
-	if((r = removeInodeFromDir(parentDir, object->no)) != Result::ok)
+	if((r = removeInodeFromDir(*parentDir, object->no)) != Result::ok)
 		return r;
 	return tree.deleteInode(object->no);
 }
@@ -1331,11 +1183,6 @@ uint8_t Device::getNumberOfOpenInodes(){
 }
 
 Result Device::initializeDevice(){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
-	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Device has driver set");
 	if(mounted)
 		return Result::alrMounted;
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Device is not yet mounted");
@@ -1374,10 +1221,7 @@ Result Device::initializeDevice(){
 }
 
 Result Device::destroyDevice(){
-	if(driver == nullptr){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device has no driver set!");
-		return Result::fail;
-	}
+
 	memset(activeArea, 0, sizeof(AreaPos)*AreaType::no);
 	inodePool.clear();
 	filesPool.clear();

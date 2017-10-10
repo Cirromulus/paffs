@@ -36,7 +36,7 @@ public:
 						((paffs::areasNo - 1) * paffs::blocksPerArea))
 						+ paffs::blocksPerArea;
 				if(block >= numberOfNotifiedBlocks){
-					fs.getDevice(device)->driver->markBad(allBadBlocks[device][block]);
+					fs.getDevice(device)->driver.markBad(allBadBlocks[device][block]);
 				}
 			}
 			printf("Device %u:\n\tListed, but not marked blocks:", device);
@@ -55,7 +55,7 @@ public:
 	void assertBadBlocksAsUnused(){
 		for(unsigned device = 0; device < paffs::maxNumberOfDevices; device++){
 			paffs::Device* dev = fs.getDevice(device);
-			paffs::SimuDriver* drv = static_cast<paffs::SimuDriver*>(dev->driver);
+			paffs::SimuDriver* drv = static_cast<paffs::SimuDriver*>(&dev->driver);
 			FlashDebugInterface* dbg = drv->getDebugInterface();
 			for(unsigned block = 0; block < numberOfBadBlocks; block++){
 				AccessValues v = dbg->getAccessValues(
@@ -158,7 +158,7 @@ void fillFlashAndVerify(paffs::Paffs &fs){
 			}
 			ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
 
-			r = fs.write(fil, txt, strlen(txt), &bw);
+			r = fs.write(*fil, txt, strlen(txt), &bw);
 			if(r == paffs::Result::nospace){
 				full = true;
 				break;
@@ -166,7 +166,7 @@ void fillFlashAndVerify(paffs::Paffs &fs){
 			ASSERT_EQ(r, paffs::Result::ok);
 			EXPECT_EQ(bw, strlen(txt));
 
-			r = fs.close(fil);
+			r = fs.close(*fil);
 			ASSERT_EQ(r, paffs::Result::ok);
 			ASSERT_EQ(fs.getDevice(0)->tree.cache.isTreeCacheValid(), true);
 		}
@@ -179,12 +179,12 @@ void fillFlashAndVerify(paffs::Paffs &fs){
 			fil = fs.open(filename, paffs::FC);
 			ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
 
-			r = fs.read(fil, buf, strlen(txt), &bw);
+			r = fs.read(*fil, buf, strlen(txt), &bw);
 			EXPECT_EQ(bw, strlen(txt));
 			ASSERT_EQ(r, paffs::Result::ok);
 			ASSERT_TRUE(ArraysMatch(txt, buf, strlen(txt)));
 
-			r = fs.close(fil);
+			r = fs.close(*fil);
 			ASSERT_EQ(r, paffs::Result::ok);
 		}
 		j = 100;
@@ -213,12 +213,12 @@ void fillFlashAndVerify(paffs::Paffs &fs){
 			fil = fs.open(filename, paffs::FC);
 			ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
 
-			r = fs.read(fil, buf, strlen(txt), &bw);
+			r = fs.read(*fil, buf, strlen(txt), &bw);
 			EXPECT_EQ(bw, strlen(txt));
 			ASSERT_EQ(r, paffs::Result::ok);
 			ASSERT_TRUE(ArraysMatch(txt, buf, strlen(txt)));
 
-			r = fs.close(fil);
+			r = fs.close(*fil);
 			ASSERT_EQ(r, paffs::Result::ok);
 		}
 		j = 100;

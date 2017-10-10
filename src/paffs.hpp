@@ -41,19 +41,19 @@ public:
 	//Directory
 	Result mkDir(const char* fullPath, Permission mask = R | W | X);
 	Dir* openDir(const char* path);
-	Dirent* readDir(Dir* dir);
-	Result closeDir(Dir* dir);
-	void rewindDir(Dir* dir);
+	Dirent* readDir(Dir& dir);
+	Result closeDir(Dir* &dir);
+	void rewindDir(Dir& dir);
 
 	//File
 	Obj* open(const char* path, Fileopenmask mask);
-	Result close(Obj* obj);
+	Result close(Obj& obj);
 	Result touch(const char* path);
-	Result getObjInfo(const char *fullPath, ObjInfo* nfo);
-	Result read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read);
-	Result write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written);
-	Result seek(Obj* obj, int m, Seekmode mode = Seekmode::set);
-	Result flush(Obj* obj);
+	Result getObjInfo(const char *fullPath, ObjInfo& nfo);
+	Result read(Obj& obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read);
+	Result write(Obj& obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written);
+	Result seek(Obj& obj, int m, Seekmode mode = Seekmode::set);
+	Result flush(Obj& obj);
 	Result truncate(const char* path, unsigned int newLength);
 
 	Result chmod(const char* path, Permission perm);

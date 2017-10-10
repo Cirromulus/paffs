@@ -24,22 +24,22 @@ template<size_t size, typename T> struct ObjectPool{
 		outObj = &objects[objOffs];
 		return Result::ok;
 	}
-	Result freeObject(T* obj){
+	Result freeObject(T& obj){
 		if(!isFromPool(obj)){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "Tried freeing an Object out of range!");
 			return Result::einval;
 		}
-		if(!activeObjects.getBit(obj - objects)){
+		if(!activeObjects.getBit(&obj - objects)){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "Tried freeing an unused Object!");
 			return Result::bug;
 		}
-		activeObjects.resetBit(obj - objects);
-		obj->~T();
+		activeObjects.resetBit(&obj - objects);
+		obj.~T();
 		return Result::ok;
 	}
-	bool isFromPool(T* obj){
-		return (obj - objects >= 0 &&
-				static_cast<unsigned int>(obj - objects) < size );
+	bool isFromPool(T& obj){
+		return (&obj - objects >= 0 &&
+				static_cast<unsigned int>(&obj - objects) < size );
 	}
 	size_t getUsage(){
 		uint8_t usedObjects = 0;
@@ -114,7 +114,7 @@ template<size_t size> struct InodePool : InodePoolBase{
 		it->second.second--;			//Inode refcount
 		//printf("Changed Refcount of %u to %u\n", no, it->second.second);
 		if(it->second.second == 0){
-			Result r = pool.freeObject(it->second.first);	//Inode
+			Result r = pool.freeObject(*it->second.first);	//Inode
 			if(r != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not free Inode from Pool in Openlist!");
 			}

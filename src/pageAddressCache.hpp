@@ -30,12 +30,12 @@ class PageAddressCache{
 	AddrListCacheElem tripl[3];
 	AddrListCacheElem doubl[2];	//name clash with double
 	AddrListCacheElem singl;
-	Device *dev;
+	Device& dev;
 	Inode *inode;
 	typedef std::function<void(Addr)> InformJournalFunc;
 public:
-	PageAddressCache(Device *mdev) : dev(mdev), inode(nullptr){};
-	Result setTargetInode(Inode* node);
+	PageAddressCache(Device& mdev) : dev(mdev), inode(nullptr){};
+	Result setTargetInode(Inode& node);
 	Result getPage(PageNo page, Addr *addr);
 	Result setPage(PageNo page, Addr  addr);
 	Result commit();

@@ -134,14 +134,17 @@ Paffs::Paffs(std::vector<Driver*> &deviceDrivers){
 			break;
 		}
 		validDevices[i] = true;
-		devices[i] = new Device(*it);
+		devices[i] = new Device(**it);
 	}
 	printCacheSizes();
 }
 Paffs::~Paffs(){
 	for(int i = 0; i < maxNumberOfDevices; i++){
-		if(devices[i] != nullptr)
+		if(devices[i] != nullptr){
+			Driver* drv = &devices[i]->driver;
 			delete devices[i];
+			delete drv;
+		}
 	}
 };
 
@@ -241,18 +244,18 @@ Dir* Paffs::openDir(const char* path){
 	return devices[0]->openDir(path);
 }
 
-Result Paffs::closeDir(Dir* dir){
+Result Paffs::closeDir(Dir* &dir){
 	//TODO: Handle multiple positions
 	return devices[0]->closeDir(dir);
 }
 
 
-Dirent* Paffs::readDir(Dir* dir){
+Dirent* Paffs::readDir(Dir& dir){
 	//TODO: Handle multiple positions
 	return devices[0]->readDir(dir);
 }
 
-void Paffs::rewindDir(Dir* dir){
+void Paffs::rewindDir(Dir& dir){
 	//TODO: Handle multiple positions
 	devices[0]->rewindDir(dir);
 }
@@ -262,7 +265,7 @@ Obj* Paffs::open(const char* path, Fileopenmask mask){
 	return devices[0]->open(path, mask);
 }
 
-Result Paffs::close(Obj* obj){
+Result Paffs::close(Obj& obj){
 	return devices[0]->close(obj);
 }
 
@@ -270,23 +273,23 @@ Result Paffs::touch(const char* path){
 	return devices[0]->touch(path);
 }
 
-Result Paffs::getObjInfo(const char *fullPath, ObjInfo* nfo){
+Result Paffs::getObjInfo(const char *fullPath, ObjInfo& nfo){
 	return devices[0]->getObjInfo(fullPath, nfo);
 }
 
-Result Paffs::read(Obj* obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read){
+Result Paffs::read(Obj& obj, char* buf, unsigned int bytes_to_read, unsigned int *bytes_read){
 	return devices[0]->read(obj, buf, bytes_to_read, bytes_read);
 }
 
-Result Paffs::write(Obj* obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written){
+Result Paffs::write(Obj& obj, const char* buf, unsigned int bytes_to_write, unsigned int *bytes_written){
 	return devices[0]->write(obj, buf, bytes_to_write, bytes_written);
 }
 
-Result Paffs::seek(Obj* obj, int m, Seekmode mode){
+Result Paffs::seek(Obj& obj, int m, Seekmode mode){
 	return devices[0]->seek(obj, m, mode);
 }
 
-Result Paffs::flush(Obj* obj){
+Result Paffs::flush(Obj& obj){
 	return devices[0]->flush(obj);
 }
 

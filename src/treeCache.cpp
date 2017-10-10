@@ -852,7 +852,7 @@ Result TreeCache::writeTreeNode(TreeCacheNode& node){
 	Addr oldSelf = node.raw.self;
 	node.raw.self = addr;
 
-	Result r = dev->driver->writePage(getPageNumber(node.raw.self, dev), &node, sizeof(TreeNode));
+	Result r = dev->driver.writePage(getPageNumber(node.raw.self, *dev), &node, sizeof(TreeNode));
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write TreeNode to page");
 		return r;
@@ -942,7 +942,7 @@ Result TreeCache::readTreeNode(Addr addr, TreeNode &node){
 		}
 	}
 
-	r = dev->driver->readPage(getPageNumber(addr, dev), &node, sizeof(TreeNode));
+	r = dev->driver.readPage(getPageNumber(addr, *dev), &node, sizeof(TreeNode));
 	if(r != Result::ok){
 		if(r == Result::biterrorCorrected){
 			PAFFS_DBG(PAFFS_TRACE_INFO, "Corrected biterror");

@@ -28,7 +28,7 @@ class Device{
 	ObjectPool<maxNumberOfFiles, Obj> filesPool;
 
 public:
-	Driver *driver;
+	Driver& driver;
 	AreaPos activeArea[AreaType::no];
 	Area areaMap[areasNo];
 	AreaPos usedAreas;
@@ -46,7 +46,7 @@ public:
 	 * Default constructor is for uninitialized Devices only
 	 */
 	//Device();
-	Device(Driver* driver);
+	Device(Driver& driver);
 	~Device();
 
 	/**
@@ -63,21 +63,21 @@ public:
 	//Directory
 	Result mkDir(const char* fullPath, Permission mask);
 	Dir* openDir(const char* path);
-	Dirent* readDir(Dir* dir);
 	Result closeDir(Dir* &dir);
-	void rewindDir(Dir* dir);
+	Dirent* readDir(Dir& dir);
+	void rewindDir(Dir& dir);
 
 	//File
 	Obj* open(const char* path, Fileopenmask mask);
-	Result close(Obj* obj);
+	Result close(Obj& obj);
 	Result touch(const char* path);
-	Result getObjInfo(const char *fullPath, ObjInfo* nfo);
-	Result read(Obj* obj, char* buf, unsigned int bytes_to_read,
+	Result getObjInfo(const char *fullPath, ObjInfo& nfo);
+	Result read(Obj& obj, char* buf, unsigned int bytes_to_read,
 			unsigned int *bytes_read);
-	Result write(Obj* obj, const char* buf, unsigned int bytes_to_write,
+	Result write(Obj& obj, const char* buf, unsigned int bytes_to_write,
 			unsigned int *bytes_written);
-	Result seek(Obj* obj, int m, Seekmode mode);
-	Result flush(Obj* obj);
+	Result seek(Obj& obj, int m, Seekmode mode);
+	Result flush(Obj& obj);
 	Result truncate(const char* path, unsigned int newLength);
 	Result remove(const char* path);
 	Result chmod(const char* path, Permission perm);
@@ -93,10 +93,9 @@ private:
 	Result createInode(SmartInodePtr &outInode, Permission mask);
 	Result createDirInode(SmartInodePtr &outInode, Permission mask);
 	Result createFilInode(SmartInodePtr &outInode, Permission mask);
-	void   destroyInode(Inode* node);
 	Result getParentDir(const char* fullPath, SmartInodePtr &parDir,
 			unsigned int *lastSlash);
-	Result getInodeNoInDir( InodeNo *inode, Inode* folder, const char* name);
+	Result getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name);
 	/**
 	 * @param outInode has to point to an Inode, it is used as a buffer!
 	 */
@@ -110,9 +109,9 @@ private:
 	Result findOrLoadInode(InodeNo no, SmartInodePtr &target);
 
 	//newElem should be already inserted in Tree
-	Result insertInodeInDir(const char* name, Inode* contDir, Inode* newElem);
-	Result removeInodeFromDir(Inode* contDir, InodeNo elem);
-	Result createFile(SmartInodePtr &outFile, const char* fullPath, Permission mask);
+	Result insertInodeInDir(const char* name, Inode& contDir, Inode& newElem);
+	Result removeInodeFromDir(Inode& contDir, InodeNo elem);
+	Result createFile(SmartInodePtr& outFile, const char* fullPath, Permission mask);
 };
 
 }  // namespace paffs

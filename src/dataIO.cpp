@@ -17,7 +17,7 @@
 namespace paffs{
 
 //modifies inode->size and inode->reserved size as well
-Result DataIO::writeInodeData(Inode* inode,
+Result DataIO::writeInodeData(Inode& inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_written,
 					const char* data){
 	if(dev->readOnly){
@@ -42,10 +42,10 @@ Result DataIO::writeInodeData(Inode* inode,
 		return res;
 	}
 
-	if(pageFrom > inode->size / dataBytesPerPage){
+	if(pageFrom > inode.size / dataBytesPerPage){
 		//We are skipping unused pages
-		PageOffs lastUsedPage = inode->size / dataBytesPerPage;
-		if(inode->size % dataBytesPerPage > 0)
+		PageOffs lastUsedPage = inode.size / dataBytesPerPage;
+		if(inode.size % dataBytesPerPage > 0)
 			lastUsedPage++;
 
 		for(unsigned i = lastUsedPage; i < pageFrom; i++){
@@ -55,17 +55,17 @@ Result DataIO::writeInodeData(Inode* inode,
 
 	unsigned pageoffs = offs % dataBytesPerPage;
 	res = writePageData(pageFrom, toPage, pageoffs, bytes, data,
-			pac, bytes_written, inode->size, inode->reservedPages);
+			pac, bytes_written, inode.size, inode.reservedPages);
 
-	if(inode->size < *bytes_written + offs)
-		inode->size = *bytes_written + offs;
+	if(inode.size < *bytes_written + offs)
+		inode.size = *bytes_written + offs;
 
 	//the Tree UpdateExistingInode has to be done by high level functions,
 	//bc they may modify it by themselves
 	return res;
 }
 
-Result DataIO::readInodeData(Inode* inode,
+Result DataIO::readInodeData(Inode& inode,
 					unsigned int offs, unsigned int bytes, unsigned int *bytes_read,
 					char* data){
 
@@ -74,9 +74,9 @@ Result DataIO::readInodeData(Inode* inode,
 		return dev->lasterr = Result::einval;
 	}
 
-	if(offs + bytes > inode->size){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read bigger than size of object! (was: %d, max: %lu)", offs+bytes, static_cast<long unsigned>(inode->size));
-		bytes = inode->size - offs;
+	if(offs + bytes > inode.size){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read bigger than size of object! (was: %d, max: %lu)", offs+bytes, static_cast<long unsigned>(inode.size));
+		bytes = inode.size - offs;
 	}
 
 	*bytes_read = 0;
@@ -96,31 +96,31 @@ Result DataIO::readInodeData(Inode* inode,
 }
 
 //inode->size and inode->reservedSize is altered.
-Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
+Result DataIO::deleteInodeData(Inode& inode, unsigned int offs){
 	if(dev->readOnly){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried deleting InodeData in readOnly mode!");
 		return Result::bug;
 	}
 
 	unsigned int pageFrom = offs/dataBytesPerPage;
-	unsigned int toPage = inode->size / dataBytesPerPage;
+	unsigned int toPage = inode.size / dataBytesPerPage;
 	if(offs % dataBytesPerPage != 0){
 		pageFrom++;
 	}
-	if(inode->size % dataBytesPerPage == 0){
+	if(inode.size % dataBytesPerPage == 0){
 		toPage--;
 	}
 	if(pageFrom > toPage){
 		//We are deleting just some bytes on the same page
-		inode->size = offs;
+		inode.size = offs;
 		return Result::ok;
 	}
-	if(inode->reservedPages == 0){
-		inode->size = offs;
+	if(inode.reservedPages == 0){
+		inode.size = offs;
 		return Result::ok;
 	}
 
-	if(inode->size < offs){
+	if(inode.size < offs){
 		//Offset bigger than actual filesize
 		return Result::einval;
 	}
@@ -174,10 +174,10 @@ Result DataIO::deleteInodeData(Inode* inode, unsigned int offs){
 			return r;
 		}
 
-		inode->reservedPages--;
+		inode.reservedPages--;
 	}
 
-	inode->size = offs;
+	inode.size = offs;
 	return Result::ok;
 }
 
@@ -284,7 +284,7 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 			*bytes_written += btw;
 		}
 
-		res = dev->driver->writePage(getPageNumber(pageAddress, dev), buf, btw);
+		res = dev->driver.writePage(getPageNumber(pageAddress, *dev), buf, btw);
 		if(res != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write Page!");
 			return res;
@@ -323,9 +323,9 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 		if(misaligned)
 			delete[] buf;
 
-		PAFFS_DBG_S(PAFFS_TRACE_WRITE, "write r.P: %d/%d, phy.P: %llu", page+1, toPage+1, static_cast<long long unsigned int> (getPageNumber(pageAddress, dev)));
+		PAFFS_DBG_S(PAFFS_TRACE_WRITE, "write r.P: %d/%d, phy.P: %llu", page+1, toPage+1, static_cast<long long unsigned int> (getPageNumber(pageAddress, *dev)));
 		if(res != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "ERR: write returned FAIL at phy.P: %llu", static_cast<long long unsigned int> (getPageNumber(pageAddress, dev)));
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "ERR: write returned FAIL at phy.P: %llu", static_cast<long long unsigned int> (getPageNumber(pageAddress, *dev)));
 			return Result::fail;
 		}
 	}
@@ -400,8 +400,8 @@ Result DataIO::readPageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 			}
 		}
 
-		PageAbs addr = getPageNumber(pageAddr, dev);
-		r = dev->driver->readPage(addr, buf, btr);
+		PageAbs addr = getPageNumber(pageAddr, *dev);
+		r = dev->driver.readPage(addr, buf, btr);
 		if(r != Result::ok){
 			if(r == Result::biterrorCorrected){
 				//TODO rewrite page
@@ -416,7 +416,6 @@ Result DataIO::readPageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 		*bytes_read += btr;
 
 	}
-
 	if(misaligned) {
 		memcpy(data, &wrap[offs], bytes);
 		*bytes_read -= offs;

@@ -94,13 +94,13 @@ Result GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstAre
 			uint64_t dst = dev->areaMap[dstArea].position * totalPagesPerArea + page;
 
 			char buf[totalBytesPerPage];
-			Result r = dev->driver->readPage(src, buf, totalBytesPerPage);
+			Result r = dev->driver.readPage(src, buf, totalBytesPerPage);
 			//Any Biterror gets corrected here by being moved
 			if(r != Result::ok && r != Result::biterrorCorrected){
 				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not read page n° %lu!", static_cast<long unsigned> (src));
 				return r;
 			}
-			r = dev->driver->writePage(dst, buf, totalBytesPerPage);
+			r = dev->driver.writePage(dst, buf, totalBytesPerPage);
 			if(r != Result::ok){
 				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not write page n° %lu!", static_cast<long unsigned> (dst));
 				return Result::badflash;
@@ -129,7 +129,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 		unsigned char buf[totalBytesPerPage];
 		for(unsigned i = 0; i < totalPagesPerArea; i++){
 			Addr addr = combineAddress(dev->activeArea[AreaType::garbageBuffer], i);
-			dev->driver->readPage(getPageNumber(addr, dev), buf, totalBytesPerPage);
+			dev->driver.readPage(getPageNumber(addr, *dev), buf, totalBytesPerPage);
 			for(unsigned j = 0; j < totalBytesPerPage; j++){
 				if(buf[j] != 0xFF){
 					PAFFS_DBG(PAFFS_TRACE_BUG, "Garbage buffer "

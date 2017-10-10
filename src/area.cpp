@@ -31,13 +31,13 @@ const char* areaStatusNames[] = {
 };
 
 //Returns the absolute page number from *indirect* address
-PageAbs getPageNumber(Addr addr, Device* dev){
+PageAbs getPageNumber(Addr addr, Device& dev){
 	if(extractLogicalArea(addr) >= areasNo){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried accessing area %" PRIu32 ", but we have only %" PRIu32,
 				extractLogicalArea(addr), areasNo);
 		return 0;
 	}
-	PageAbs page = dev->areaMap[extractLogicalArea(addr)].position *
+	PageAbs page = dev.areaMap[extractLogicalArea(addr)].position *
 								totalPagesPerArea;
 	page += extractPageOffs(addr);
 	if(page > areasNo * totalPagesPerArea){
@@ -59,8 +59,8 @@ PageAbs getPageNumberFromDirect(Addr addr){
 }
 
 //Returns the absolute page number from *logical* address
-BlockAbs getBlockNumber(Addr addr, Device* dev){
-	return dev->areaMap[extractLogicalArea(addr)].position * blocksPerArea + extractPageOffs(addr) / pagesPerBlock;
+BlockAbs getBlockNumber(Addr addr, Device& dev){
+	return dev.areaMap[extractLogicalArea(addr)].position * blocksPerArea + extractPageOffs(addr) / pagesPerBlock;
 }
 
 //Returns the absolute page number from *direct* address
@@ -213,7 +213,7 @@ void AreaManagement::retireArea(AreaPos area){
 	dev->areaMap[area].status = AreaStatus::closed;
 	dev->areaMap[area].type = AreaType::retired;
 	for(unsigned block = 0; block < blocksPerArea; block++)
-			dev->driver->markBad(dev->areaMap[area].position * blocksPerArea + block);
+			dev->driver.markBad(dev->areaMap[area].position * blocksPerArea + block);
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %u at pos. %u.", area, dev->areaMap[area].position);
 }
 
@@ -236,7 +236,7 @@ Result AreaManagement::deleteAreaContents(AreaPos area){
 	Result r = Result::ok;
 
 	for(unsigned int i = 0; i < blocksPerArea; i++){
-		r = dev->driver->eraseBlock(dev->areaMap[area].position*blocksPerArea + i);
+		r = dev->driver.eraseBlock(dev->areaMap[area].position*blocksPerArea + i);
 		if(r != Result::ok){
 			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block n° %u (Area %u)!", dev->areaMap[area].position*blocksPerArea + i, area);
 			dev->areaMgmt.retireArea(area);
