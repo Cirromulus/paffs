@@ -238,16 +238,16 @@ TEST_F(FileTest, maxFilesize){
 	paffs::Result r;
 	char txt[] = "Hallo";
 	unsigned int bw;
-	unsigned int wordsize = sizeof(txt) - 1;
+	unsigned int wordsize = sizeof(txt);
 	unsigned int blocksize = paffs::dataBytesPerPage*1.5;
 	char block[blocksize];
 	char blockcopy[blocksize];
 	unsigned int i = 0, maxFileSize = 0;
-	for(;i < blocksize; i += wordsize){
+	for(;i + wordsize < blocksize; i += wordsize){
 		memcpy(&block[i], txt, wordsize);
 	}
-	if(i-wordsize < blocksize)
-		memcpy(&block[i-wordsize], txt,  blocksize - (i - wordsize));
+	if(blocksize - i > 0)
+		memcpy(&block[i], txt,  blocksize - i);
 
 	fil = fs.open("/file", paffs::FW | paffs::FC);
 	if(fs.getLastErr() != paffs::Result::ok)
