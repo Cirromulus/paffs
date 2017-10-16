@@ -72,7 +72,8 @@ namespace journalEntry
 				type,
 				status,
 				erasecount,
-				position
+				position,
+				swap,
 			};
 			AreaPos offs;
 			Element element;
@@ -104,6 +105,11 @@ namespace journalEntry
 				Position(AreaPos _offs, AreaPos _position) : AreaMap(_offs, Element::position),
 						position(_position){};
 				AreaPos position;
+			};
+			struct Swap : public AreaMap{
+				AreaPos b;
+				Swap(AreaPos _a, AreaPos _b) : AreaMap(_a, Element::swap),
+						b(_b){};
 			};
 			union Max
 			{
@@ -207,12 +213,22 @@ namespace journalEntry
 
 	namespace inode
 	{
+		//TODO
 		struct Add : public Inode
 		{
 			Add(InodeNo _inode) : Inode(Subtype::add, _inode){};
 		};
 
-		//... write, remove ... TODO
+		struct Write : public Inode
+		{
+			Write(InodeNo _inode) : Inode(Subtype::write, _inode){};
+		};
+
+		struct Remove : public Inode
+		{
+			Remove(InodeNo _inode) : Inode(Subtype::remove, _inode){};
+		};
+
 		union Max
 		{
 			Add add;

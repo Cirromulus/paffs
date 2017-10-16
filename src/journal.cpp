@@ -99,8 +99,30 @@ JournalEntry* Journal::deserializeFactory(const JournalEntry& entry){
 			PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized rootnode change event.");
 			ret = NEWELEM(journalEntry::superblock::Rootnode, entry);
 			break;
-		default:
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Did not Recognize Superblock Event");
+		case journalEntry::Superblock::Subtype::areaMap:
+			switch(static_cast<const journalEntry::superblock::AreaMap*>(&entry)->element)
+			{
+			case journalEntry::superblock::AreaMap::Element::type:
+				PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized AreaMap set Type event.");
+				ret = NEWELEM(journalEntry::superblock::areaMap::Type, entry);
+				break;
+			case journalEntry::superblock::AreaMap::Element::status:
+				PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized AreaMap set Status event.");
+				ret = NEWELEM(journalEntry::superblock::areaMap::Status, entry);
+				break;
+			case journalEntry::superblock::AreaMap::Element::erasecount:
+				PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized AreaMap set Erasecount event.");
+				ret = NEWELEM(journalEntry::superblock::areaMap::Erasecount, entry);
+				break;
+			case journalEntry::superblock::AreaMap::Element::position:
+				PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized AreaMap set Position event.");
+				ret = NEWELEM(journalEntry::superblock::areaMap::Type, entry);
+				break;
+			case journalEntry::superblock::AreaMap::Element::swap:
+				PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized AreaMap Swap event.");
+				ret = NEWELEM(journalEntry::superblock::areaMap::Swap, entry);
+				break;
+			}
 			break;
 		}
 		break;
@@ -139,9 +161,22 @@ JournalEntry* Journal::deserializeFactory(const JournalEntry& entry){
 			break;
 		}
 		break;
-	default:
-		PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Did not recognize Event");
-		break;
+	case JournalEntry::Topic::inode:
+		switch(static_cast<const journalEntry::Inode*>(&entry)->subtype)
+		{
+		case journalEntry::Inode::Subtype::add:
+			PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized Inode add event.");
+			ret = NEWELEM(journalEntry::inode::Add, entry);
+			break;
+		case journalEntry::Inode::Subtype::write:
+			PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized Inode write event.");
+			ret = NEWELEM(journalEntry::inode::Write, entry);
+			break;
+		case journalEntry::Inode::Subtype::remove:
+			PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Recognized Inode remove event.");
+			ret = NEWELEM(journalEntry::inode::Remove, entry);
+			break;
+		}
 	}
 	return ret;
 }

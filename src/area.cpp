@@ -127,6 +127,7 @@ void AreaManagement::setType(AreaPos area, AreaType type){
 				"(%" PRIu32 " >= %" PRIu32 ")", area, areasNo);
 		return;
 	}
+	dev->journal.addEvent(journalEntry::superblock::areaMap::Type(area, type));
 	map[area].type = type;
 }
 void AreaManagement::setStatus(AreaPos area, AreaStatus status){
@@ -135,15 +136,11 @@ void AreaManagement::setStatus(AreaPos area, AreaStatus status){
 				"(%" PRIu32 " >= %" PRIu32 ")", area, areasNo);
 		return;
 	}
+	dev->journal.addEvent(journalEntry::superblock::areaMap::Status(area, status));
 	map[area].status = status;
 }
 void AreaManagement::increaseErasecount(AreaPos area){
-	if(area >= areasNo){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to increase AreaMap Erasecount out of bounds! "
-				"(%" PRIu32 " >= %" PRIu32 ")", area, areasNo);
-		return;
-	}
-	map[area].erasecount++;
+	setErasecount(area, getErasecount(area) + 1);
 }
 void AreaManagement::setErasecount(AreaPos area, uint32_t erasecount){
 	if(area >= areasNo){
@@ -151,6 +148,7 @@ void AreaManagement::setErasecount(AreaPos area, uint32_t erasecount){
 				"(%" PRIu32 " >= %" PRIu32 ")", area, areasNo);
 		return;
 	}
+	dev->journal.addEvent(journalEntry::superblock::areaMap::Erasecount(area, erasecount));
 	map[area].erasecount = erasecount;
 }
 void AreaManagement::setPos(AreaPos area, AreaPos pos){
@@ -159,6 +157,7 @@ void AreaManagement::setPos(AreaPos area, AreaPos pos){
 				"(%" PRIu32 " >= %" PRIu32 ")", area, areasNo);
 		return;
 	}
+	dev->journal.addEvent(journalEntry::superblock::areaMap::Position(area, pos));
 	map[area].position = pos;
 }
 
@@ -173,6 +172,8 @@ void AreaManagement::swapAreaPosition(AreaPos a, AreaPos b){
 				"(%" PRIu32 " >= %" PRIu32 ")", b, areasNo);
 		return;
 	}
+	dev->journal.addEvent(journalEntry::superblock::areaMap::Swap(a, b));
+
 	AreaPos tmp1 = map[a].position;
 	uint32_t tmp2 = map[a].erasecount;
 

@@ -1002,6 +1002,10 @@ void Superblock::processEntry(JournalEntry& entry){
 			dev->areaMgmt.setPos(a->offs,
 					static_cast<const journalEntry::superblock::areaMap::Position*>(&entry)->position);
 			break;
+		case journalEntry::superblock::AreaMap::Element::swap:
+			dev->areaMgmt.swapAreaPosition(a->offs,
+					static_cast<const journalEntry::superblock::areaMap::Swap*>(&entry)->b);
+			break;
 		}
 		break;
 	}
