@@ -17,15 +17,26 @@ using namespace paffs;
 using namespace std;
 
 void
+JournalTopic::setJournalBuffer(JournalEntryBuffer<journalTopicLogSize> *buf)
+{
+	buffer = buf;
+}
+
+void
 JournalTopic::enqueueEntry(const JournalEntry& entry)
 {
-	if(entry.topic != getTopic() ||
-			(entry.topic == JournalEntry::Topic::transaction &&
-			static_cast<const journalEntry::Transaction*>(&entry)->target != getTopic())){
+	if(buffer == nullptr)
+	{
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Enqueue Entry without proper journal Buffer!");
+		return;
+	}
+	if(entry.topic != getTopic() &&
+			!(entry.topic == JournalEntry::Topic::transaction &&
+			static_cast<const journalEntry::Transaction*>(&entry)->target == getTopic())){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried enqueueing wrong JournalEntry (%u)", entry.topic);
 		return;
 	}
-	if(buffer.insert(entry) != Result::ok)
+	if(buffer->insert(entry) != Result::ok)
 	{
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "JournalEntry Buffer full!");
 	}
@@ -35,13 +46,13 @@ void
 JournalTopic::finalize()
 {
 	JournalEntry *entry;
-	buffer.rewind();
-	while((entry = buffer.pop()) != nullptr)
+	buffer->rewind();
+	while((entry = buffer->pop()) != nullptr)
 	{
 		processEntry(*entry);
 	}
-	buffer.rewindToUnsucceeded();
-	while((entry = buffer.pop()) != nullptr)
+	buffer->rewindToUnsucceeded();
+	while((entry = buffer->pop()) != nullptr)
 	{
 		processUnsucceededEntry(*entry);
 	}

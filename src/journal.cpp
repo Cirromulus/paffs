@@ -16,7 +16,7 @@ using namespace std;
 
 void
 Journal::addEvent(const JournalEntry& entry){
-	if(pos + 1 == logSize){
+	if(pos >= journalTopicLogSize){
 		PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Log full. should be flushed.");
 		return;
 	}
@@ -32,7 +32,8 @@ Journal::checkpoint()
 {
 	for(JournalTopic* topic : topics)
 	{
-		addEvent(journalEntry::Transaction(topic->getTopic(), journalEntry::Transaction::Status::end));
+		if(topic != nullptr)
+			addEvent(journalEntry::Transaction(topic->getTopic(), journalEntry::Transaction::Status::end));
 	}
 }
 
@@ -47,39 +48,44 @@ Journal::clear()
 
 void
 Journal::processBuffer(){
-	for(unsigned e = 0; e < pos; e++){
-		if(log[e]->topic == JournalEntry::Topic::transaction)
-		{
-			const journalEntry::Transaction* ta =
-					static_cast<const journalEntry::Transaction*>(log[e]);
-			for(JournalTopic* topic : topics)
-			{
-				if(ta->target == topic->getTopic()){
-					topic->enqueueEntry(*log[e]);
-				}
-			}
-			continue;
+	for(JournalTopic* topic : topics){
+		if(topic == nullptr){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "Topic is null");
+			break;
 		}
 
-		bool found = false;
-		for(JournalTopic* topic : topics){
+		topic->setJournalBuffer(&buffer);
+
+		for(unsigned e = 0; e < pos; e++){
+			if(log[e] == nullptr){
+				continue;
+			}
+
+			bool found = false;
+
 			if(log[e]->topic == topic->getTopic()){
 				topic->enqueueEntry(*log[e]);
 				found = true;
-				break;
+			}
+
+			if(log[e]->topic == JournalEntry::Topic::transaction)
+			{
+				const journalEntry::Transaction* ta =
+						static_cast<const journalEntry::Transaction*>(log[e]);
+				if(ta->target == topic->getTopic()){
+					topic->enqueueEntry(*log[e]);
+				}
+				found = true;
+			}
+
+			if(found)
+			{
+				delete log[e];
+				log[e] = nullptr;
 			}
 		}
-		if(!found)
-		{
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Unknown JournalEntry Topic");
-		}else
-		{
-			delete log[e];
-		}
-	}
-
-	for(JournalTopic* topic : topics){
 		topic->finalize();
+		buffer.clear();
 	}
 }
 

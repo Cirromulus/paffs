@@ -14,4 +14,6 @@ namespace paffs{
 	static constexpr uint16_t addrsPerPage = dataBytesPerPage / sizeof(Addr);
 	static constexpr uint16_t minFreeAreas = 1;
 
+	static constexpr uint16_t internalLogSize = 1000;
+	static constexpr uint16_t journalTopicLogSize = 500;
 }

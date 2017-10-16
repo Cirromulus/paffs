@@ -6,8 +6,9 @@
  */
 
 #pragma once
-#include "journalEntry.hpp"
+#include "commonTypes.hpp"
 #include "journalTopics.hpp"
+#include "journalEntry.hpp"
 
 namespace paffs{
 
@@ -15,8 +16,8 @@ class Journal{
 	JournalTopic* topics[3];
 	//Driver& driver;
 
-	static constexpr unsigned int logSize = 100;
-	JournalEntry* log[logSize];
+	JournalEntry* log[internalLogSize];
+	JournalEntryBuffer<journalTopicLogSize> buffer;
 	unsigned int pos = 0;
 public:
 	Journal(JournalTopic& superblock, JournalTopic& summaryCache,
@@ -24,13 +25,6 @@ public:
 		topics[0] = &superblock;
 		topics[1] = &summaryCache;
 		topics[2] = &tree;
-	}
-	/*
-	 * \warn for testing only
-	 */
-	Journal(JournalTopic& summaryCache)
-	{
-		topics[0] = &summaryCache;
 	}
 
 	void
