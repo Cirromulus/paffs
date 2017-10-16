@@ -418,7 +418,7 @@ Result PageAddressCache::readAddrList (Addr from, Addr list[addrsPerPage]){
 		memset(list, 0, addrsPerPage * sizeof(Addr));
 		return Result::ok;
 	}
-	if(dev.areaMap[extractLogicalArea(from)].type != AreaType::index){
+	if(dev.areaMgmt.getType(extractLogicalArea(from)) != AreaType::index){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "READ ADDR LIST operation of invalid area at %d:%d",\
 				extractLogicalArea(from),
 				extractPageOffs(from));

@@ -39,7 +39,9 @@ Journal::checkpoint()
 void
 Journal::clear()
 {
-	//TODO: Actually delete buffer
+	for(unsigned i = 0; i < pos; i++){
+		delete log[i];
+	}
 	pos = 0;
 }
 

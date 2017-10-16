@@ -32,7 +32,10 @@ class AreaManagement{
 	Device *dev;
 public:
 	GarbageCollection gc;
-	AreaManagement(Device *mdev): dev(mdev), gc(mdev){};
+	AreaManagement(Device *mdev): dev(mdev), gc(mdev){
+		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Cleared %zu Byte in Areamap", sizeof(Area) * areasNo);
+		memset(map, 0, areasNo * sizeof(Area));
+	};
 
 	AreaType   getType(AreaPos area);
 	AreaStatus getStatus(AreaPos area);
@@ -41,8 +44,13 @@ public:
 
 	void setType(AreaPos area, AreaType type);
 	void setStatus(AreaPos area, AreaStatus status);
+	void increaseErasecount(AreaPos area);
 	void setErasecount(AreaPos area, uint32_t erasecount);
 	void setPos(AreaPos area, AreaPos pos);
+
+	void swapAreaPosition(AreaPos a, AreaPos b);
+	//Only for serializing areMap in Superblock
+	Area* getMap();
 
 	/**
 	 * May call garbage collection

@@ -152,8 +152,8 @@ Result SummaryCache::commitASHard(int &clearedAreaCachePosition){
 			//found a cached element
 		cachePos = it.second;
 		if(summaryCache[cachePos].isDirty() && summaryCache[cachePos].isAsWritten() &&
-			dev->areaMap[it.first].status != AreaStatus::active &&
-			(dev->areaMap[it.first].type == AreaType::data || dev->areaMap[it.first].type == AreaType::index)){
+			dev->areaMgmt.getStatus(it.first) != AreaStatus::active &&
+			(dev->areaMgmt.getType(it.first) == AreaType::data || dev->areaMgmt.getType(it.first) == AreaType::index)){
 
 			PageOffs dirtyPages = countDirtyPages(cachePos);
 			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Checking Area %" PRIu32 " "
@@ -172,10 +172,10 @@ Result SummaryCache::commitASHard(int &clearedAreaCachePosition){
 			if(!summaryCache[cachePos].isAsWritten()){
 				PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "\tnot AS written");
 			}
-			if(dev->areaMap[it.first].status == AreaStatus::active){
-				PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "\tis active (%s)", areaNames[dev->areaMap[it.first].type]);
+			if(dev->areaMgmt.getStatus(it.first) ==AreaStatus::active){
+				PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "\tis active (%s)", areaNames[dev->areaMgmt.getType(it.first)]);
 			}
-			if(dev->areaMap[it.first].type != AreaType::data && dev->areaMap[it.first].type != AreaType::index){
+			if(dev->areaMgmt.getType(it.first) != AreaType::data && dev->areaMgmt.getType(it.first) != AreaType::index){
 				PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "\tnot data/index");
 			}
 
@@ -196,8 +196,8 @@ Result SummaryCache::commitASHard(int &clearedAreaCachePosition){
 
 	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Commit Hard swaps GC Area %" PRIu32 " (on %" PRIu32 ")"
 			" from %" PRIu32 " (on %" PRIu32 ")",
-			dev->activeArea[AreaType::garbageBuffer], dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].position,
-			favouriteArea, dev->areaMap[favouriteArea].position);
+			dev->activeArea[AreaType::garbageBuffer], dev->areaMgmt.getPos(dev->activeArea[AreaType::garbageBuffer]),
+			favouriteArea, dev->areaMgmt.getPos(favouriteArea));
 
 	SummaryEntry summary[dataPagesPerArea];
 	unpackStatusArray(cachePos, summary);
@@ -212,14 +212,7 @@ Result SummaryCache::commitASHard(int &clearedAreaCachePosition){
 	}
 	dev->areaMgmt.deleteArea(favouriteArea);
 	//swap logical position of areas to keep addresses valid
-	AreaPos tmp = dev->areaMap[favouriteArea].position;
-	dev->areaMap[favouriteArea].position = dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].position;
-	dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].position = tmp;
-	//swap erasecounts to let them point to the correct physical position
-	PageOffs tmp2 = dev->areaMap[favouriteArea].erasecount;
-	dev->areaMap[favouriteArea].erasecount = dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].erasecount;
-	dev->areaMap[dev->activeArea[AreaType::garbageBuffer]].erasecount = tmp2;
-
+	dev->areaMgmt.swapAreaPosition(favouriteArea, dev->activeArea[AreaType::garbageBuffer]);
 	packStatusArray(cachePos, summary);
 	//AsWritten gets reset in delete Area, and dont set dirty bc now the AS is not committed, soley in RAM
 
@@ -271,10 +264,10 @@ Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry sta
 			return r;
 		}
 	}
-	if(dev->areaMap[area].type == AreaType::unset){
+	if(dev->areaMgmt.getType(area) == AreaType::unset){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried setting Pagestatus on UNSET area "
 				"%" PRIu32 " (on %" PRIu32 ", status %d)",
-				area, dev->areaMap[area].position, dev->areaMap[area].status);
+				area, dev->areaMgmt.getPos(area), dev->areaMgmt.getStatus(area));
 		return Result::bug;
 	}
 
@@ -295,7 +288,7 @@ Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry sta
 			if(dirtyPagesCheck != summaryCache[translation[area]].getDirtyPages()){
 				PAFFS_DBG(PAFFS_TRACE_BUG, "DirtyPages differ from actual count! "
 						"(Area %" PRIu32 " on %" PRIu32 " was: %" PRIu32 ", thought %" PRIu32 ")",
-						area, dev->areaMap[area].position, dirtyPagesCheck,
+						area, dev->areaMgmt.getPos(area), dirtyPagesCheck,
 						summaryCache[translation[area]].getDirtyPages());
 				return Result::fail;
 			}
@@ -413,7 +406,7 @@ bool SummaryCache::isCached(AreaPos area){
 //For Garbage collection to consider committed AS-Areas before others
 bool SummaryCache::wasASWritten(AreaPos area){
 	if(translation.find(area) == translation.end()){
-		if(dev->areaMap[area].status == AreaStatus::empty)
+		if(dev->areaMgmt.getStatus(area) ==AreaStatus::empty)
 			return false;
 		//If it is not empty, and not in Cache, it has to be containing Data and is not active.
 		//It has to have an AS written.
@@ -441,7 +434,7 @@ Result SummaryCache::loadAreaSummaries(){
 	SummaryEntry tmp[2][dataPagesPerArea];			//High Stack usage, FIXME?
 	SuperIndex index;
 	memset(&index, 0, sizeof(SuperIndex));
-	index.areaMap = dev->areaMap;
+	index.areaMap = dev->areaMgmt.getMap();
 	index.areaSummary[0] = tmp[0];
 	index.areaSummary[1] = tmp[1];
 
@@ -466,7 +459,7 @@ Result SummaryCache::loadAreaSummaries(){
 			unsigned char as[totalBytesPerPage];
 			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Checking for an AS at area %" PRIu32 " (phys. %" PRIu32 ", "
 					"abs. page %" PRIu64 ")",
-					index.asPositions[i], dev->areaMap[index.asPositions[i]].position,
+					index.asPositions[i], dev->areaMgmt.getPos(index.asPositions[i]),
 					getPageNumber(combineAddress(index.asPositions[i], dataPagesPerArea), *dev));
 			r = dev->driver.readPage(getPageNumber(
 					combineAddress(index.asPositions[i], dataPagesPerArea), *dev),
@@ -482,10 +475,10 @@ Result SummaryCache::loadAreaSummaries(){
 					break;
 				}
 			}
-			if(dev->areaMap[index.asPositions[i]].status == AreaStatus::active){
-				dev->activeArea[dev->areaMap[index.asPositions[i]].type] = index.asPositions[i];
+			if(dev->areaMgmt.getStatus(index.asPositions[i]) ==AreaStatus::active){
+				dev->activeArea[dev->areaMgmt.getType(index.asPositions[i])] = index.asPositions[i];
 			}
-			PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Loaded area summary %d on %d", index.asPositions[i], dev->areaMap[index.asPositions[i]].position);
+			PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Loaded area summary %d on %d", index.asPositions[i], dev->areaMgmt.getPos(index.asPositions[i]));
 		}
 	}
 
@@ -511,7 +504,7 @@ Result SummaryCache::commitAreaSummaries(bool createNew){
 	SummaryEntry tmp[2][dataPagesPerArea]; //FIXME high Stack usage
 	SuperIndex index;
 	memset(&index, 0, sizeof(SuperIndex));
-	index.areaMap = dev->areaMap;
+	index.areaMap = dev->areaMgmt.getMap();
 	index.areaSummary[0] = tmp[0];
 	index.areaSummary[1] = tmp[1];
 	index.usedAreas = dev->usedAreas;
@@ -659,12 +652,12 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 	for(int i = 0; i < areaSummaryCacheSize; i++){
 		if(summaryCache[i].isUsed()){
 			if(!summaryCache[i].isDirty() ||
-					dev->areaMap[summaryCache[i].getArea()].status == AreaStatus::empty){
-				if(summaryCache[i].isDirty() && dev->areaMap[summaryCache[i].getArea()].status == AreaStatus::empty){
+					dev->areaMgmt.getStatus(summaryCache[i].getArea()) ==AreaStatus::empty){
+				if(summaryCache[i].isDirty() && dev->areaMgmt.getStatus(summaryCache[i].getArea()) ==AreaStatus::empty){
 					//Dirty, but it was not properly deleted?
 					PAFFS_DBG(PAFFS_TRACE_BUG, "Area %" PRIu32 " is dirty, but was "
 							"not set to an status (Type %s)", summaryCache[i].getArea(),
-							areaNames[dev->areaMap[summaryCache[i].getArea()].type]);
+							areaNames[dev->areaMgmt.getType(summaryCache[i].getArea())]);
 				}
 				PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Deleted non-dirty cache entry "
 						"of area %" PRIu32, summaryCache[i].getArea());
@@ -683,7 +676,7 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 	uint32_t maxDirtyPages = 0;
 	for(int i = 0; i < areaSummaryCacheSize; i++){
 		if(summaryCache[i].isUsed() && !summaryCache[i].isAsWritten() &&
-				dev->areaMap[summaryCache[i].getArea()].status != AreaStatus::active){
+				dev->areaMgmt.getStatus(summaryCache[i].getArea()) != AreaStatus::active){
 			PageOffs tmp = countUnusedPages(i);
 			if(tmp >= maxDirtyPages){
 				fav = i;
@@ -713,7 +706,7 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 	maxDirtyPages = 0;
 	for(int i = 0; i < areaSummaryCacheSize; i++){
 		if(summaryCache[i].isUsed() && !summaryCache[i].isAsWritten() &&
-						dev->areaMap[summaryCache[i].getArea()].status != AreaStatus::active){
+						dev->areaMgmt.getStatus(summaryCache[i].getArea()) != AreaStatus::active){
 			PageOffs tmp = countUnusedPages(i);
 			if(tmp >= maxDirtyPages){
 				fav = i;
@@ -738,8 +731,8 @@ Result SummaryCache::freeNextBestSummaryCacheEntry(bool urgent){
 		//check for bugs in usage of Garbage collection
 		unsigned activeAreas = 0;
 		for(AreaPos i = 0; i < areasNo; i++){
-			if(dev->areaMap[i].status == AreaStatus::active &&
-					(dev->areaMap[i].type == AreaType::data || dev->areaMap[i].type == AreaType::index)){
+			if(dev->areaMgmt.getStatus(i) ==AreaStatus::active &&
+					(dev->areaMgmt.getType(i) == AreaType::data || dev->areaMgmt.getType(i) == AreaType::index)){
 				activeAreas++;
 			}
 		}

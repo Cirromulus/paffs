@@ -141,7 +141,7 @@ Result DataIO::deleteInodeData(Inode& inode, unsigned int offs){
 		unsigned int area = extractLogicalArea(pageAddr);
 		unsigned int relPage = extractPageOffs(pageAddr);
 
-		if(dev->areaMap[area].type != AreaType::data){
+		if(dev->areaMgmt.getType(area) != AreaType::data){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "DELETE INODE operation of invalid area at %d:%d",
 					extractLogicalArea(pageAddr),
 					extractPageOffs(pageAddr));
@@ -209,7 +209,7 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 		dev->lasterr = rBuf;
 
 		//Handle Areas
-		if(dev->areaMap[dev->activeArea[AreaType::data]].status == AreaStatus::empty){
+		if(dev->areaMgmt.getStatus(dev->activeArea[AreaType::data]) ==AreaStatus::empty){
 			//We'll have to use a fresh area,
 			//so generate the areaSummary in Memory
 			dev->areaMgmt.initArea(dev->activeArea[AreaType::data]);
@@ -359,7 +359,7 @@ Result DataIO::readPageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 		}
 
 		AreaPos area = extractLogicalArea(pageAddr);
-		if(dev->areaMap[area].type != AreaType::data){
+		if(dev->areaMgmt.getType(area) != AreaType::data){
 			if(pageAddr == combineAddress(0, unusedMarker)){
 				//This Page is currently not written to flash
 				//because it contains just empty space

@@ -65,15 +65,15 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 			return Result::fail;
 		}
 		driver.markBad(badBlockList[block]);
-		areaMap[area].type = AreaType::retired;
+		areaMgmt.setType(area, AreaType::retired);
 	}
 
 	for(unsigned int area = 0; area < areasNo; area++){
-		areaMap[area].status = AreaStatus::empty;
-		areaMap[area].erasecount = 0;
-		areaMap[area].position = area;
+		areaMgmt.setStatus(area, AreaStatus::empty);
+		areaMgmt.setErasecount(area, 0);
+		areaMgmt.setPos(area, area);
 
-		if(areaMap[area].type == AreaType::retired){
+		if(areaMgmt.getType(area) == AreaType::retired){
 			continue;
 		}
 
@@ -87,7 +87,7 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 			}
 		}
 		if(anyBlockInAreaBad){
-			areaMap[area].type = AreaType::retired;
+			areaMgmt.setType(area, AreaType::retired);
 			continue;
 		}
 
@@ -102,20 +102,20 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 					PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
 							"Found non-marked bad block %u during formatting, "
 							"retiring area %" PRIu32, p + area * blocksPerArea, area);
-					areaMap[area].type = AreaType::retired;
+					areaMgmt.setType(area, AreaType::retired);
 					break;
 				}
 			}
-			areaMap[area].erasecount++;
+			areaMgmt.increaseErasecount(area);
 
-			if(areaMap[area].type == AreaType::retired){
+			if(areaMgmt.getType(area) == AreaType::retired){
 				continue;
 			}
 		}
 
 		if(!(hadAreaType & 1 << AreaType::superblock)){
 			activeArea[AreaType::superblock] = area;
-			areaMap[area].type = AreaType::superblock;
+			areaMgmt.setType(area, AreaType::superblock);
 			areaMgmt.initArea(area);
 			if(++hadSuperblocks == superChainElems)
 				hadAreaType |= 1 << AreaType::superblock;
@@ -124,13 +124,13 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 
 		if(!(hadAreaType & 1 << AreaType::garbageBuffer)){
 			activeArea[AreaType::garbageBuffer] = area;
-			areaMap[area].type = AreaType::garbageBuffer;
+			areaMgmt.setType(area, AreaType::garbageBuffer);
 			areaMgmt.initArea(area);
 			hadAreaType |= 1 << AreaType::garbageBuffer;
 			continue;
 		}
 
-		areaMap[area].type = AreaType::unset;
+		areaMgmt.setType(area, AreaType::unset);
 	}
 
 	r = tree.start_new_tree();
@@ -206,7 +206,7 @@ Result Device::mnt(bool readOnlyMode){
 
 	//FIXME: This is O(n), save aactive Area in SuperIndex
 	for(AreaPos i = 0; i < areasNo; i++){
-		if(areaMap[i].type == AreaType::garbageBuffer){
+		if(areaMgmt.getType(i) == AreaType::garbageBuffer){
 			activeArea[AreaType::garbageBuffer] = i;
 		}
 		//Superblock does not need an active Area,
@@ -268,9 +268,9 @@ Result Device::unmnt(){
 		printf("Info: \n\t%" PRIu32 " used Areas\n", usedAreas);
 		for(unsigned int i = 0; i < areasNo; i++){
 			printf("\tArea %03d on %03u as %10s from page %4d %s\n"
-					, i, areaMap[i].position, areaNames[areaMap[i].type]
-					, areaMap[i].position*blocksPerArea*pagesPerBlock
-					, areaStatusNames[areaMap[i].status]);
+					, i, areaMgmt.getPos(i), areaNames[areaMgmt.getType(i)]
+					, areaMgmt.getPos(i)*blocksPerArea*pagesPerBlock
+					, areaStatusNames[areaMgmt.getStatus(i)]);
 			if(i > 128){
 				printf("\n -- truncated 128-%u Areas.\n", areasNo);
 				break;
@@ -1223,9 +1223,6 @@ Result Device::initializeDevice(){
 	if(mounted)
 		return Result::alrMounted;
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Device is not yet mounted");
-
-	memset(areaMap, 0, sizeof(Area) * areasNo);
-	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Cleared %zu Byte in Areamap", sizeof(Area) * areasNo);
 
 	activeArea[AreaType::superblock] = 0;
 	activeArea[AreaType::index] = 0;

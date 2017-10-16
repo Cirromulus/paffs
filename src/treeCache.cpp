@@ -822,17 +822,17 @@ Result TreeCache::writeTreeNode(TreeCacheNode& node){
 
 	dev->lasterr = Result::ok;
 	dev->activeArea[AreaType::index] = dev->areaMgmt.findWritableArea(AreaType::index);
-/*	if(dev->areaMap[dev->activeArea[AreaType::index]].status != AreaStatus::active){
+/*	if(dev->areaMgmt.getStatus(dev->activeArea[AreaType::index]) != AreaStatus::active){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "findWritableArea returned an inactive area "
 				"(%" PRIu32 " on %" PRIu32 ")!", dev->activeArea[AreaType::index],
-				dev->areaMap[dev->activeArea[AreaType::index]].position);
+				dev->areaMgmt.getPos(dev->activeArea[AreaType::index]));
 		return Result::bug;
 	}*/
 	if(dev->lasterr != Result::ok){
 		return dev->lasterr;
 	}
 	//Handle Areas
-	if(dev->areaMap[dev->activeArea[AreaType::index]].status == AreaStatus::empty){
+	if(dev->areaMgmt.getStatus(dev->activeArea[AreaType::index]) ==AreaStatus::empty){
 		//We'll have to use a fresh area,
 		//so generate the areaSummary in Memory
 		dev->areaMgmt.initArea(dev->activeArea[AreaType::index]);
@@ -845,7 +845,7 @@ Result TreeCache::writeTreeNode(TreeCacheNode& node){
 	unsigned int firstFreePage = 0;
 	if(dev->areaMgmt.findFirstFreePage(&firstFreePage, dev->activeArea[AreaType::index]) == Result::nospace){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%" PRIu32 " on %" PRIu32 ").",
-		          dev->activeArea[AreaType::index], dev->areaMap[dev->activeArea[AreaType::index]].position);
+		          dev->activeArea[AreaType::index], dev->areaMgmt.getPos(dev->activeArea[AreaType::index]));
 		return dev->lasterr = Result::bug;
 	}
 	Addr addr = combineAddress(dev->activeArea[AreaType::index], firstFreePage);
@@ -896,14 +896,14 @@ Result TreeCache::readTreeNode(Addr addr, TreeNode &node){
 		return Result::bug;
 	}
 
-	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::index){
+	if(dev->areaMgmt.getType(extractLogicalArea(addr)) != AreaType::index){
 		if(traceMask & PAFFS_TRACE_AREA){
 			printf("Info: \n\t%" PRIu32 " used Areas\n", dev->usedAreas);
 			for(unsigned int i = 0; i < areasNo; i++){
 				printf("\tArea %03d on %03u as %10s from page %4d %s\n"
-						, i, dev->areaMap[i].position, areaNames[dev->areaMap[i].type]
-						, dev->areaMap[i].position*blocksPerArea*pagesPerBlock
-						, areaStatusNames[dev->areaMap[i].status]);
+						, i, dev->areaMgmt.getPos(i), areaNames[dev->areaMgmt.getType(i)]
+						, dev->areaMgmt.getPos(i)*blocksPerArea*pagesPerBlock
+						, areaStatusNames[dev->areaMgmt.getStatus(i)]);
 				if(i > 128){
 					printf("\n -- truncated 128-%u Areas.\n", areasNo);
 					break;
@@ -912,14 +912,14 @@ Result TreeCache::readTreeNode(Addr addr, TreeNode &node){
 			printf("\t----------------------\n");
 		}
 		PAFFS_DBG(PAFFS_TRACE_BUG, "READ TREEENODE operation on %s (Area %" PRIu32 ", pos %" PRIu32 "!"
-				, areaNames[dev->areaMap[extractLogicalArea(addr)].type], extractLogicalArea(addr),
-				dev->areaMap[extractLogicalArea(addr)].position);
+				, areaNames[dev->areaMgmt.getType(extractLogicalArea(addr))], extractLogicalArea(addr),
+				dev->areaMgmt.getPos(extractLogicalArea(addr)));
 		return Result::bug;
 	}
 
-	if(dev->areaMap[extractLogicalArea(addr)].type != AreaType::index){
+	if(dev->areaMgmt.getType(extractLogicalArea(addr)) != AreaType::index){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "READ TREE NODE operation on %s Area at %X:%X",
-				areaNames[dev->areaMap[extractLogicalArea(addr)].type],
+				areaNames[dev->areaMgmt.getType(extractLogicalArea(addr))],
 				extractLogicalArea(addr), extractPageOffs(addr));
 		return Result::bug;
 	}

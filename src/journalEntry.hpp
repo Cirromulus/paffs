@@ -145,7 +145,7 @@ namespace journalEntry
 		};
 		struct Remove : public BTree{
 			InodeNo no;
-			Remove(InodeNo _no): BTree(Operation::insert), no(_no){};
+			Remove(InodeNo _no): BTree(Operation::remove), no(_no){};
 		};
 
 		union Max

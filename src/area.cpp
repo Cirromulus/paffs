@@ -37,7 +37,7 @@ PageAbs getPageNumber(Addr addr, Device& dev){
 				extractLogicalArea(addr), areasNo);
 		return 0;
 	}
-	PageAbs page = dev.areaMap[extractLogicalArea(addr)].position *
+	PageAbs page = dev.areaMgmt.getPos(extractLogicalArea(addr)) *
 								totalPagesPerArea;
 	page += extractPageOffs(addr);
 	if(page > areasNo * totalPagesPerArea){
@@ -60,7 +60,7 @@ PageAbs getPageNumberFromDirect(Addr addr){
 
 //Returns the absolute page number from *logical* address
 BlockAbs getBlockNumber(Addr addr, Device& dev){
-	return dev.areaMap[extractLogicalArea(addr)].position * blocksPerArea + extractPageOffs(addr) / pagesPerBlock;
+	return dev.areaMgmt.getPos(extractLogicalArea(addr)) * blocksPerArea + extractPageOffs(addr) / pagesPerBlock;
 }
 
 //Returns the absolute page number from *direct* address
@@ -88,21 +88,120 @@ unsigned int extractPageOffs(Addr addr){
 	return page;
 }
 
+AreaType   AreaManagement::getType(AreaPos area){
+	if(area >= areasNo){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Type out of bounds! "
+				"(%" PRIu32 " >= %" PRIu32 ")", area, areasNo);
+		return AreaType::no;
+	}
+	return map[area].type;
+}
+AreaStatus AreaManagement::getStatus(AreaPos area){
+	if(area >= areasNo){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Status out of bounds! "
+				"(%" PRIu32 " >= %" PRIu32 ")", area, areasNo);
+		return AreaStatus::active;
+	}
+	return map[area].status;
+}
+uint32_t   AreaManagement::getErasecount(AreaPos area){
+	if(area >= areasNo){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Erasecount out of bounds! "
+				"(%" PRIu32 " >= %" PRIu32 ")", area, areasNo);
+		return 0;
+	}
+	return map[area].erasecount;
+}
+AreaPos    AreaManagement::getPos(AreaPos area){
+	if(area >= areasNo){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Position out of bounds! "
+				"(%" PRIu32 " >= %" PRIu32 ")", area, areasNo);
+		return 0;
+	}
+	return map[area].position;
+}
+
+void AreaManagement::setType(AreaPos area, AreaType type){
+	if(area >= areasNo){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set AreaMap Type out of bounds! "
+				"(%" PRIu32 " >= %" PRIu32 ")", area, areasNo);
+		return;
+	}
+	map[area].type = type;
+}
+void AreaManagement::setStatus(AreaPos area, AreaStatus status){
+	if(area >= areasNo){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set AreaMap Status out of bounds! "
+				"(%" PRIu32 " >= %" PRIu32 ")", area, areasNo);
+		return;
+	}
+	map[area].status = status;
+}
+void AreaManagement::increaseErasecount(AreaPos area){
+	if(area >= areasNo){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to increase AreaMap Erasecount out of bounds! "
+				"(%" PRIu32 " >= %" PRIu32 ")", area, areasNo);
+		return;
+	}
+	map[area].erasecount++;
+}
+void AreaManagement::setErasecount(AreaPos area, uint32_t erasecount){
+	if(area >= areasNo){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set AreaMap Erasecount out of bounds! "
+				"(%" PRIu32 " >= %" PRIu32 ")", area, areasNo);
+		return;
+	}
+	map[area].erasecount = erasecount;
+}
+void AreaManagement::setPos(AreaPos area, AreaPos pos){
+	if(area >= areasNo){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set AreaMap position out of bounds! "
+				"(%" PRIu32 " >= %" PRIu32 ")", area, areasNo);
+		return;
+	}
+	map[area].position = pos;
+}
+
+void AreaManagement::swapAreaPosition(AreaPos a, AreaPos b){
+	if(a >= areasNo){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to swap AreaMap a out of bounds! "
+				"(%" PRIu32 " >= %" PRIu32 ")", a, areasNo);
+		return;
+	}
+	if(b >= areasNo){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to swap AreaMap b out of bounds! "
+				"(%" PRIu32 " >= %" PRIu32 ")", b, areasNo);
+		return;
+	}
+	AreaPos tmp1 = map[a].position;
+	uint32_t tmp2 = map[a].erasecount;
+
+	map[a].position = map[b].position;
+	map[a].erasecount = map[b].erasecount;
+
+	map[b].position = tmp1;
+	map[b].erasecount = tmp2;
+}
+//Only for serializing areMap in Superblock
+Area* AreaManagement::getMap(){
+	return map;
+}
+
 unsigned int AreaManagement::findWritableArea(AreaType areaType){
 	if(dev->activeArea[areaType] != 0){
-		if(dev->areaMap[dev->activeArea[areaType]].status != AreaStatus::active){
+		if(getStatus(dev->activeArea[areaType]) != AreaStatus::active){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "ActiveArea of %s not active "
 					"(%s, %" PRIu32 " on %" PRIu32 ")",
 					areaNames[areaType],
-					areaStatusNames[dev->areaMap[dev->activeArea[areaType]].status],
+					areaStatusNames[getStatus(dev->activeArea[areaType])],
 					dev->activeArea[areaType],
-					dev->areaMap[dev->activeArea[areaType]].position);
+					getPos(dev->activeArea[areaType]));
 		}
 		//current Area has still space left
-		if(dev->areaMap[dev->activeArea[areaType]].type != areaType){
+		if(getType(dev->activeArea[areaType]) != areaType){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "ActiveArea does not contain correct "
 					"areaType! (Should %s, was %s)", areaNames[areaType],
-					areaNames[dev->areaMap[dev->activeArea[areaType]].type]);
+					areaNames[getType(dev->activeArea[areaType])]);
 		}
 		return dev->activeArea[areaType];
 	}
@@ -113,9 +212,9 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 		 * If some day we support data cache, this would be allowed to use this pool as well.
 		**/
 		for(unsigned int area = 0; area < areasNo; area++){
-			if(dev->areaMap[area].status == AreaStatus::empty &&
-					dev->areaMap[area].type != AreaType::retired){
-				dev->areaMap[area].type = areaType;
+			if(getStatus(area) ==AreaStatus::empty &&
+					getType(area) != AreaType::retired){
+				setType(area, areaType);
 				initArea(area);
 				PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found empty Area %u for %s", area, areaNames[areaType]);
 				return area;
@@ -131,8 +230,8 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 		return 0;
 	}
 
-	if(dev->areaMap[dev->activeArea[areaType]].status > AreaStatus::empty){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "garbage Collection returned invalid Status! (was %d, should <%d)",dev->areaMap[dev->activeArea[areaType]].status, AreaStatus::empty);
+	if(getStatus(dev->activeArea[areaType]) > AreaStatus::empty){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "garbage Collection returned invalid Status! (was %d, should <%d)",getStatus(dev->activeArea[areaType]), AreaStatus::empty);
 		dev->lasterr = Result::bug;
 		return 0;
 	}
@@ -140,10 +239,10 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 	if(dev->activeArea[areaType] != 0){
 		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found GC'ed Area %u for %s",
 				dev->activeArea[areaType], areaNames[areaType]);
-		if(dev->areaMap[dev->activeArea[areaType]].status != AreaStatus::active){
+		if(getStatus(dev->activeArea[areaType]) != AreaStatus::active){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "An Active Area is not active after GC!"
 					" (Area %" PRIu32 " on %" PRIu32 ")", dev->activeArea[areaType],
-					dev->areaMap[dev->activeArea[areaType]].position);
+					getPos(dev->activeArea[areaType]));
 			dev->lasterr = Result::bug;
 			return 0;
 		}
@@ -183,38 +282,38 @@ Result AreaManagement::manageActiveAreaFull(AreaPos *area, AreaType areaType){
 }
 
 
-//TODO: Add initAreaAs(...) to handle typical areaMap[abc].type = def; initArea(...);
+//TODO: Add initAreaAs(...) to handle typical areaMgmt.setType(abc, def; initArea(...));
 void AreaManagement::initArea(AreaPos area){
-	if(dev->areaMap[area].type == AreaType::unset){
+	if(getType(area) == AreaType::unset){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Initing Area with invalid type!");
 	}
-	if(dev->activeArea[dev->areaMap[area].type] != 0 &&
-			dev->activeArea[dev->areaMap[area].type] != area){
+	if(dev->activeArea[getType(area)] != 0 &&
+			dev->activeArea[getType(area)] != area){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Activating area %" PRIu32 " while different Area "
 				"(%" PRIu32 " on %" PRIu32 ") still active!",
-				area, dev->activeArea[dev->areaMap[area].type],
-				dev->areaMap[dev->activeArea[dev->areaMap[area].type]].position);
+				area, dev->activeArea[getType(area)],
+				getPos(dev->activeArea[getType(area)]));
 	}
-	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %u (pos %u) as %s.", static_cast<unsigned int>(area), static_cast<unsigned int>(dev->areaMap[area].position), areaNames[dev->areaMap[area].type]);
-	if(dev->areaMap[area].status == AreaStatus::empty){
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %u (pos %u) as %s.", static_cast<unsigned int>(area), static_cast<unsigned int>(getPos(area)), areaNames[getType(area)]);
+	if(getStatus(area) ==AreaStatus::empty){
 		dev->usedAreas++;
 	}
-	dev->areaMap[area].status = AreaStatus::active;
+	setStatus(area, AreaStatus::active);
 }
 
 Result AreaManagement::closeArea(AreaPos area){
-	dev->areaMap[area].status = AreaStatus::closed;
-	dev->activeArea[dev->areaMap[area].type] = 0;
-	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Closed %s Area %u at pos. %u.", areaNames[dev->areaMap[area].type], area, dev->areaMap[area].position);
+	setStatus(area, AreaStatus::closed);
+	dev->activeArea[getType(area)] = 0;
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Closed %s Area %u at pos. %u.", areaNames[getType(area)], area, getPos(area));
 	return Result::ok;
 }
 
 void AreaManagement::retireArea(AreaPos area){
-	dev->areaMap[area].status = AreaStatus::closed;
-	dev->areaMap[area].type = AreaType::retired;
+	setStatus(area, AreaStatus::closed);
+	setType(area, AreaType::retired);
 	for(unsigned block = 0; block < blocksPerArea; block++)
-			dev->driver.markBad(dev->areaMap[area].position * blocksPerArea + block);
-	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %u at pos. %u.", area, dev->areaMap[area].position);
+			dev->driver.markBad(getPos(area) * blocksPerArea + block);
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %u at pos. %u.", area, getPos(area));
 }
 
 Result AreaManagement::deleteAreaContents(AreaPos area){
@@ -223,9 +322,9 @@ Result AreaManagement::deleteAreaContents(AreaPos area){
 				"Was %" PRIu32 ", should < %" PRIu32, area, areasNo);
 		return Result::bug;
 	}
-	if(dev->areaMap[area].type == AreaType::retired){
+	if(getType(area) == AreaType::retired){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried deleting a retired area contents! %"
-				PRIu32 " on %" PRIu32, area, dev->areaMap[area].position);
+				PRIu32 " on %" PRIu32, area, getPos(area));
 		return Result::bug;
 	}
 	if(area == dev->activeArea[AreaType::data] ||
@@ -236,31 +335,31 @@ Result AreaManagement::deleteAreaContents(AreaPos area){
 	Result r = Result::ok;
 
 	for(unsigned int i = 0; i < blocksPerArea; i++){
-		r = dev->driver.eraseBlock(dev->areaMap[area].position*blocksPerArea + i);
+		r = dev->driver.eraseBlock(getPos(area)*blocksPerArea + i);
 		if(r != Result::ok){
-			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block n° %u (Area %u)!", dev->areaMap[area].position*blocksPerArea + i, area);
-			dev->areaMgmt.retireArea(area);
+			PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block n° %u (Area %u)!", getPos(area)*blocksPerArea + i, area);
+			retireArea(area);
 			r = Result::badflash;
 			break;
 		}
 	}
-	dev->areaMap[area].erasecount++;
+	increaseErasecount(area);
 	if(dev->sumCache.isCached(area))
 		dev->sumCache.resetASWritten(area);
 
 	if(r == Result::badflash){
 		PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not delete block in area %u "
-				"on position %u! Retired Area.", area, dev->areaMap[area].position);
+				"on position %u! Retired Area.", area, getPos(area));
 		if(traceMask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL)){
 			printf("Info: \n");
 			for(unsigned int i = 0; i < areasNo; i++){
 				printf("\tArea %d on %u as %10s with %3u erases\n", i,
-						dev->areaMap[i].position, areaNames[dev->areaMap[i].type],
-						dev->areaMap[i].erasecount);
+						getPos(i), areaNames[getType(i)],
+						getErasecount(i));
 			}
 		}
 	}
-	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Deleted Area %u Contents at pos. %u.", area, dev->areaMap[area].position);
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Deleted Area %u Contents at pos. %u.", area, getPos(area));
 	dev->sumCache.deleteSummary(area);
 	return r;
 }
@@ -271,9 +370,9 @@ Result AreaManagement::deleteArea(AreaPos area){
 				"Was %" PRIu32 ", should < %" PRIu32, area, areasNo);
 		return Result::bug;
 	}
-	if(dev->areaMap[area].type == AreaType::retired){
+	if(getType(area) == AreaType::retired){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried deleting a retired area! %"
-				PRIu32 " on %" PRIu32, area, dev->areaMap[area].position);
+				PRIu32 " on %" PRIu32, area, getPos(area));
 		return Result::bug;
 	}
 	if(area == dev->activeArea[AreaType::data] ||
@@ -284,10 +383,10 @@ Result AreaManagement::deleteArea(AreaPos area){
 
 	Result r = deleteAreaContents(area);
 
-	dev->areaMap[area].status = AreaStatus::empty;
-	dev->areaMap[area].type = AreaType::unset;
+	setStatus(area, AreaStatus::empty);
+	setType(area, AreaType::unset);
 	dev->usedAreas--;
-	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Area %u at pos. %u.", area, dev->areaMap[area].position);
+	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Area %u at pos. %u.", area, getPos(area));
 	return r;
 }
 

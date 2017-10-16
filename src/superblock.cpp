@@ -83,7 +83,7 @@ Result Superblock::resolveDirectToLogicalPath(Addr directPath[superChainElems],
 	AreaPos p = 0;
 	int d = 0;
 	for(AreaPos i = 0; i < areasNo; i++){
-		p = dev->areaMap[i].position;
+		p = dev->areaMgmt.getPos(i);
 		for(d = 0; d < superChainElems; d++){
 			if(p == extractLogicalArea(directPath[d]))
 				outPath[d] = combineAddress(i, extractPageOffs(directPath[d]));
@@ -95,8 +95,8 @@ Result Superblock::resolveDirectToLogicalPath(Addr directPath[superChainElems],
 Result Superblock::fillPathWithFirstSuperblockAreas(Addr directPath[superChainElems]){
 	int foundElems = 0;
 	for(AreaPos i = 0; i < areasNo && foundElems <= superChainElems; i++){
-		if(dev->areaMap[i].type == AreaType::superblock){
-			directPath[foundElems++] = combineAddress(dev->areaMap[i].position, 0);
+		if(dev->areaMgmt.getType(i) == AreaType::superblock){
+			directPath[foundElems++] = combineAddress(dev->areaMgmt.getPos(i), 0);
 			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found new superblock area for chain %d", foundElems);
 		}
 	}
@@ -129,7 +129,7 @@ Result Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool cre
 	//Get index of last chain elem (SuperEntry) and increase
 	newIndex->no = superChainIndexes[jumpPadNo+1]+1;
 	newIndex->rootNode = rootnode_addr;
-	newIndex->areaMap = dev->areaMap;	//This should already be done in cachefunction
+	newIndex->areaMap = dev->areaMgmt.getMap();	//This should already be done in cachefunction
 
 	if(traceMask & PAFFS_TRACE_VERBOSE){
 		printf("write Super Index:\n");
@@ -519,14 +519,14 @@ Result Superblock::readMostRecentEntryInBlock(AreaPos area, uint8_t block,
  * This assumes that the area of the Anchor entry does not change.
  */
 Result Superblock::insertNewAnchorEntry(Addr logPrev, AreaPos *directArea, AnchorEntry* entry){
-	if(dev->areaMap[extractLogicalArea(logPrev)].position != *directArea){
+	if(dev->areaMgmt.getPos(extractLogicalArea(logPrev)) != *directArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Logical (log: %d->%d) and direct Address (%d) differ!",
-				extractLogicalArea(logPrev), dev->areaMap[extractLogicalArea(logPrev)].position,
+				extractLogicalArea(logPrev), dev->areaMgmt.getPos(extractLogicalArea(logPrev)),
 				*directArea);
 		return Result::bug;
 	}
 
-	if(dev->areaMap[extractLogicalArea(logPrev)].type != AreaType::superblock){
+	if(dev->areaMgmt.getType(extractLogicalArea(logPrev)) != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
 		return Result::bug;
 	}
@@ -582,9 +582,9 @@ Result Superblock::readAnchorEntry(Addr addr, AnchorEntry* entry){
 }
 
 Result Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos *directArea, JumpPadEntry* entry){
-	if(dev->areaMap[extractLogicalArea(logPrev)].position != *directArea){
+	if(dev->areaMgmt.getPos(extractLogicalArea(logPrev)) != *directArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Logical (log: %d->%d) and direct Address (%d) differ!",
-				extractLogicalArea(logPrev), dev->areaMap[extractLogicalArea(logPrev)].position,
+				extractLogicalArea(logPrev), dev->areaMgmt.getPos(extractLogicalArea(logPrev)),
 				*directArea);
 		return Result::bug;
 	}
@@ -592,7 +592,7 @@ Result Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos *directArea, Jump
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write not-anchor chain Elem to area 0!");
 		return Result::bug;
 	}
-	if(dev->areaMap[extractLogicalArea(logPrev)].type != AreaType::superblock){
+	if(dev->areaMgmt.getType(extractLogicalArea(logPrev)) != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
 		return Result::bug;
 	}
@@ -609,7 +609,7 @@ Result Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos *directArea, Jump
 			entry->logPrev = extractLogicalArea(logPrev);
 			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Moving JumpPad area from "
 					"log. %" PRIu32 " to log. %" PRIu32, entry->logPrev, p);
-			*directArea = dev->areaMap[p].position;
+			*directArea = dev->areaMgmt.getPos(p);
 		}else{
 			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Warning: reusing JumpPad area.");
 		}
@@ -630,14 +630,14 @@ Result Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos *directArea, Jump
 }
 
 Result Superblock::insertNewSuperIndex(Addr logPrev, AreaPos *directArea, SuperIndex* entry){
-	if(dev->areaMap[extractLogicalArea(logPrev)].position != *directArea){
+	if(dev->areaMgmt.getPos(extractLogicalArea(logPrev)) != *directArea){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Logical (log: %d->%d) and direct Address (%d) differ!",
-				extractLogicalArea(logPrev), dev->areaMap[extractLogicalArea(logPrev)].position,
+				extractLogicalArea(logPrev), dev->areaMgmt.getPos(extractLogicalArea(logPrev)),
 				*directArea);
 		return Result::bug;
 	}
 
-	if(dev->areaMap[extractLogicalArea(logPrev)].type != AreaType::superblock){
+	if(dev->areaMgmt.getType(extractLogicalArea(logPrev)) != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
 		return Result::bug;
 	}
@@ -664,7 +664,7 @@ Result Superblock::insertNewSuperIndex(Addr logPrev, AreaPos *directArea, SuperI
 			entry->logPrev = extractLogicalArea(logPrev);
 			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Moving Superindex area from "
 					"log. %" PRIu32 " to log. %" PRIu32, entry->logPrev, p);
-			*directArea = dev->areaMap[p].position;
+			*directArea = dev->areaMgmt.getPos(p);
 		}else{
 			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Warning: reusing SuperIndex area.");
 		}
@@ -907,30 +907,30 @@ Result Superblock::handleBlockOverflow(PageAbs newPage, Addr logPrev, SerialNo *
 }
 
 Result Superblock::deleteSuperBlock(AreaPos area, uint8_t block) {
-	if(dev->areaMap[area].type != AreaType::superblock){
+	if(dev->areaMgmt.getType(area) != AreaType::superblock){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete Block outside of SUPERBLOCK area");
 		return Result::bug;
 	}
 	//blocks are deleted sequentially, erasecount is for whole area erases
 	if(block == blocksPerArea){
-		dev->areaMap[area].erasecount++;
-		dev->areaMap[area].status = AreaStatus::empty;
-		dev->areaMap[area].type = AreaType::unset;
+		dev->areaMgmt.increaseErasecount(area);
+		dev->areaMgmt.setStatus(area, AreaStatus::empty);
+		dev->areaMgmt.setType(area, AreaType::unset);
 		dev->usedAreas--;
-		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Superblock Area %u at pos. %u.", area, dev->areaMap[area].position);
+		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Superblock Area %u at pos. %u.", area, dev->areaMgmt.getPos(area));
 	}
 
-	BlockAbs block_offs = dev->areaMap[area].position * blocksPerArea;
+	BlockAbs block_offs = dev->areaMgmt.getPos(area) * blocksPerArea;
 	return dev->driver.eraseBlock(block_offs + block);
 }
 
 AreaPos Superblock::findBestNextFreeArea(AreaPos logPrev){
 	PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "log. Area %" PRIu32 " is full, finding new one...", logPrev);
 	for(AreaPos i = 1; i < areasNo; i++){
-		if(dev->areaMap[i].status == AreaStatus::empty){
+		if(dev->areaMgmt.getStatus(i) ==AreaStatus::empty){
 			// Following changes to areaMap may not be persistent if SuperIndex was already written
-			dev->areaMap[i].status = AreaStatus::active;
-			dev->areaMap[i].type = AreaType::superblock;
+			dev->areaMgmt.setStatus(i, AreaStatus::active);
+			dev->areaMgmt.setType(i, AreaType::superblock);
 			/**
 			 * The area will be empty after the next handleBlockOverflow
 			 * This allows other SuperIndex areas to switch to this one if flushed in same commit.
@@ -938,7 +938,7 @@ AreaPos Superblock::findBestNextFreeArea(AreaPos logPrev){
 			 * and that the replacing Area will be a higher order and
 			 * thus less frequently written to.
 			 */
-			dev->areaMap[logPrev].status = AreaStatus::empty;
+			dev->areaMgmt.setStatus(logPrev, AreaStatus::empty);
 			//Unset is postponed till actual deletion
 
 
@@ -987,20 +987,20 @@ void Superblock::processEntry(JournalEntry& entry){
 		switch(a->element)
 		{
 		case journalEntry::superblock::AreaMap::Element::type:
-			dev->areaMap[a->offs].type =
-					static_cast<const journalEntry::superblock::areaMap::Type*>(&entry)->type;
+			dev->areaMgmt.setType(a->offs,
+					static_cast<const journalEntry::superblock::areaMap::Type*>(&entry)->type);
 			break;
 		case journalEntry::superblock::AreaMap::Element::status:
-			dev->areaMap[a->offs].status =
-					static_cast<const journalEntry::superblock::areaMap::Status*>(&entry)->status;
+			dev->areaMgmt.setStatus(a->offs,
+					static_cast<const journalEntry::superblock::areaMap::Status*>(&entry)->status);
 			break;
 		case journalEntry::superblock::AreaMap::Element::erasecount:
-			dev->areaMap[a->offs].erasecount =
-					static_cast<const journalEntry::superblock::areaMap::Erasecount*>(&entry)->erasecount;
+			dev->areaMgmt.setErasecount(a->offs,
+					static_cast<const journalEntry::superblock::areaMap::Erasecount*>(&entry)->erasecount);
 			break;
 		case journalEntry::superblock::AreaMap::Element::position:
-			dev->areaMap[a->offs].position =
-					static_cast<const journalEntry::superblock::areaMap::Position*>(&entry)->position;
+			dev->areaMgmt.setPos(a->offs,
+					static_cast<const journalEntry::superblock::areaMap::Position*>(&entry)->position);
 			break;
 		}
 		break;
