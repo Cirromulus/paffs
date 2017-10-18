@@ -30,8 +30,15 @@ const char* areaStatusNames[] = {
 		"EMPTY"
 };
 
+const char* summaryEntryNames[] = {
+		"FREE",
+		"USED",
+		"DIRTY",
+		"ERROR",
+};
+
 //Returns the absolute page number from *indirect* address
-PageAbs getPageNumber(Addr addr, Device& dev){
+PageAbs getPageNumber(const Addr addr, Device& dev){
 	if(extractLogicalArea(addr) >= areasNo){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried accessing area %" PRIu32 ", but we have only %" PRIu32,
 				extractLogicalArea(addr), areasNo);
@@ -48,7 +55,7 @@ PageAbs getPageNumber(Addr addr, Device& dev){
 }
 
 //Returns the absolute page number from *direct* address
-PageAbs getPageNumberFromDirect(Addr addr){
+PageAbs getPageNumberFromDirect(const Addr addr){
 	PageAbs page = extractLogicalArea(addr) * totalPagesPerArea;
 	page += extractPageOffs(addr);
 	if(page > areasNo * totalPagesPerArea){
@@ -59,30 +66,29 @@ PageAbs getPageNumberFromDirect(Addr addr){
 }
 
 //Returns the absolute page number from *logical* address
-BlockAbs getBlockNumber(Addr addr, Device& dev){
+BlockAbs getBlockNumber(const Addr addr, Device& dev){
 	return dev.areaMgmt.getPos(extractLogicalArea(addr)) * blocksPerArea + extractPageOffs(addr) / pagesPerBlock;
 }
 
 //Returns the absolute page number from *direct* address
-BlockAbs getBlockNumberFromDirect(Addr addr){
+BlockAbs getBlockNumberFromDirect(const Addr addr){
 	return extractLogicalArea(addr) * blocksPerArea + extractPageOffs(addr) / pagesPerBlock;
 }
 
 //Combines the area number with the relative page starting from first page in area
-Addr combineAddress(AreaPos logical_area, PageOffs page){
+Addr combineAddress(const AreaPos logical_area, const PageOffs page){
 	Addr addr = 0;
 	memcpy(&addr, &page, sizeof(uint32_t));
 	memcpy(&reinterpret_cast<char*>(&addr)[sizeof(AreaPos)], &logical_area, sizeof(PageOffs));
-
 	return addr;
 }
 
-unsigned int extractLogicalArea(Addr addr){
+unsigned int extractLogicalArea(const Addr addr){
 	unsigned int area = 0;
-	memcpy(&area, &reinterpret_cast<char*>(&addr)[sizeof(AreaPos)], sizeof(PageOffs));
+	memcpy(&area, &reinterpret_cast<const char*>(&addr)[sizeof(AreaPos)], sizeof(PageOffs));
 	return area;
 }
-unsigned int extractPageOffs(Addr addr){
+unsigned int extractPageOffs(const Addr addr){
 	unsigned int page = 0;
 	memcpy(&page, &addr, sizeof(PageOffs));
 	return page;

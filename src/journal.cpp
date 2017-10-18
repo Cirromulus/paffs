@@ -7,6 +7,8 @@
 
 #include "journal.hpp"
 #include "paffs_trace.hpp"
+#include "inttypes.h"
+#include "area.hpp"
 
 using namespace paffs;
 using namespace std;
@@ -16,8 +18,9 @@ using namespace std;
 
 void
 Journal::addEvent(const JournalEntry& entry){
-	if(pos >= journalTopicLogSize){
+	if(pos >= internalLogSize){
 		PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Log full. should be flushed.");
+		clear(); //Just for debug. Actually, flush or (better) reorder
 		return;
 	}
 	JournalEntry* tba = deserializeFactory(entry);
@@ -33,7 +36,7 @@ Journal::checkpoint()
 	for(JournalTopic* topic : topics)
 	{
 		if(topic != nullptr)
-			addEvent(journalEntry::Transaction(topic->getTopic(), journalEntry::Transaction::Status::end));
+			addEvent(journalEntry::Transaction(topic->getTopic(), journalEntry::Transaction::Status::checkpoint));
 	}
 }
 
@@ -41,6 +44,8 @@ void
 Journal::clear()
 {
 	for(unsigned i = 0; i < pos; i++){
+		if(traceMask & PAFFS_TRACE_JOURNAL)
+			printMeaning(*log[i]);
 		delete log[i];
 	}
 	pos = 0;
@@ -185,4 +190,104 @@ JournalEntry* Journal::deserializeFactory(const JournalEntry& entry){
 		}
 	}
 	return ret;
+}
+
+void
+Journal::printMeaning(const JournalEntry& entry)
+{
+	//printf("Recognized ");
+	switch(entry.topic)
+	{
+	case JournalEntry::Topic::transaction:
+	{
+		const journalEntry::Transaction* ta = static_cast<const journalEntry::Transaction*>(&entry);
+		printf("\ttransaction %s %s", JournalEntry::topicNames[static_cast<unsigned>(ta->target)],
+				journalEntry::Transaction::statusNames[static_cast<unsigned>(ta->status)]);
+		break;
+	}
+	case JournalEntry::Topic::superblock:
+		switch(static_cast<const journalEntry::Superblock*>(&entry)->subtype)
+		{
+		case journalEntry::Superblock::Subtype::rootnode:
+			printf("rootnode change to %X:%X",
+					extractLogicalArea(static_cast<const journalEntry::superblock::Rootnode*>(&entry)->rootnode),
+					extractPageOffs(static_cast<const journalEntry::superblock::Rootnode*>(&entry)->rootnode));
+			break;
+		case journalEntry::Superblock::Subtype::areaMap:
+			printf("AreaMap %" PRIu32 " ", static_cast<const journalEntry::superblock::AreaMap*>(&entry)->offs);
+			switch(static_cast<const journalEntry::superblock::AreaMap*>(&entry)->element)
+			{
+			case journalEntry::superblock::AreaMap::Element::type:
+				printf("set Type to %s",
+						areaNames[static_cast<const journalEntry::superblock::areaMap::Type*>(&entry)->type]);
+				break;
+			case journalEntry::superblock::AreaMap::Element::status:
+				printf("set Status to %s",
+						areaStatusNames[static_cast<const journalEntry::superblock::areaMap::Status*>(&entry)->status]);
+				break;
+			case journalEntry::superblock::AreaMap::Element::erasecount:
+				printf("set Erasecount");
+				break;
+			case journalEntry::superblock::AreaMap::Element::position:
+				printf("set Position to %X:%X",
+						extractLogicalArea(static_cast<const journalEntry::superblock::areaMap::Position*>(&entry)->position),
+						extractPageOffs(static_cast<const journalEntry::superblock::areaMap::Position*>(&entry)->position));
+				break;
+			case journalEntry::superblock::AreaMap::Element::swap:
+				printf("Swap");
+				break;
+			}
+			break;
+		}
+		break;
+	case JournalEntry::Topic::tree:
+		printf("Treenode ");
+		switch(static_cast<const journalEntry::BTree*>(&entry)->op)
+		{
+		case journalEntry::BTree::Operation::insert:
+			printf("insert %" PRIu32, static_cast<const journalEntry::btree::Insert*>(&entry)->inode.no);
+			break;
+		case journalEntry::BTree::Operation::update:
+			printf("update %" PRIu32, static_cast<const journalEntry::btree::Update*>(&entry)->inode.no);
+			break;
+		case journalEntry::BTree::Operation::remove:
+			printf("remove %" PRIu32, static_cast<const journalEntry::btree::Remove*>(&entry)->no);
+			break;
+		break;
+		}
+		break;
+	case JournalEntry::Topic::summaryCache:
+		printf("SummaryCache Area %" PRIu32 " ", static_cast<const journalEntry::SummaryCache*>(&entry)->area);
+		switch(static_cast<const journalEntry::SummaryCache*>(&entry)->subtype)
+		{
+		case journalEntry::SummaryCache::Subtype::commit:
+			printf("Commit");
+			break;
+		case journalEntry::SummaryCache::Subtype::remove:
+			printf("Remove");
+			break;
+		case journalEntry::SummaryCache::Subtype::setStatus:
+			printf("set Page %" PRIu32 " to %s",
+					static_cast<const journalEntry::summaryCache::SetStatus*>(&entry)->page,
+					summaryEntryNames[static_cast<unsigned>(
+							static_cast<const journalEntry::summaryCache::SetStatus*>(&entry)->status)]
+					);
+			break;
+		}
+		break;
+	case JournalEntry::Topic::inode:
+		switch(static_cast<const journalEntry::Inode*>(&entry)->subtype)
+		{
+		case journalEntry::Inode::Subtype::add:
+			printf("Inode add");
+			break;
+		case journalEntry::Inode::Subtype::write:
+			printf("Inode write");
+			break;
+		case journalEntry::Inode::Subtype::remove:
+			printf("Inode remove");
+			break;
+		}
+	}
+	printf(" event.\n");
 }

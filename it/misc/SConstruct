@@ -56,7 +56,7 @@ envGlobal.Append(CPPPATH=[
 
 envGlobal.SConscript([
     os.path.join(rootpath, 'src/SConscript'),
-	os.path.join(rootpath, 'src/driver/SConscript.simudriver'),
+    os.path.join(rootpath, 'src/driver/SConscript.simudriver'),
     #os.path.join(outpost_core_path, 'modules/SConscript.test'),
     ],
 	exports='envGlobal'
@@ -64,7 +64,7 @@ envGlobal.SConscript([
 
 
 env = envGlobal.Clone()
-#print("Libs of unittests: ")
+#print("Libs of misc test: ")
 #for l in env['LIBS']:
 #	print ("\t" + str(l))
 #print("CPPPATH of unittests: ")

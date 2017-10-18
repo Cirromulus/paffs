@@ -58,14 +58,14 @@ public:
 					static_cast<const journalEntry::Transaction*>(&entry)->status;
 			switch(status)
 			{
-			case journalEntry::Transaction::Status::end:
+			case journalEntry::Transaction::Status::checkpoint:
 				lastCheckpointEnd = list.getWatermark();
 				taStatus = status;
 				break;
 			case journalEntry::Transaction::Status::success:
-				if(taStatus != journalEntry::Transaction::Status::end)
+				if(taStatus != journalEntry::Transaction::Status::checkpoint)
 				{
-					cout << "Tried finalizing a non-succeeded Transaction !" << endl;
+					PAFFS_DBG(PAFFS_TRACE_BUG, "Tried finalizing a non-succeeded Transaction !");
 					break;
 				}
 				list.clear();

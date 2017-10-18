@@ -44,9 +44,10 @@ enum class Result : uint8_t{
 	num_result
 };
 
-extern const char* areaNames[];		  //Initialized in area.cpp
-extern const char* areaStatusNames[]; //Initialized in area.cpp
-extern const char* resultMsg[];		  //Initialized in paffs.cpp
+extern const char* areaNames[];		    //Initialized in area.cpp
+extern const char* areaStatusNames[];   //Initialized in area.cpp
+extern const char* summaryEntryNames[]; //Initialized in area.cpp
+extern const char* resultMsg[];		    //Initialized in paffs.cpp
 
 typedef uint8_t Permission;
 

@@ -22,9 +22,11 @@ class Journal{
 public:
 	Journal(JournalTopic& superblock, JournalTopic& summaryCache,
 	        JournalTopic& tree){
+		//This Order is important, as tree should only be replayed after areaMap is sane
 		topics[0] = &superblock;
 		topics[1] = &summaryCache;
 		topics[2] = &tree;
+		//TODO Inode
 	}
 
 	void
@@ -35,6 +37,8 @@ public:
 	clear();
 	void
 	processBuffer();
+	void
+	printMeaning(const JournalEntry& entry);
 private:
 	JournalEntry*
 	deserializeFactory(const JournalEntry& entry);

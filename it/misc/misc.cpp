@@ -20,10 +20,7 @@ int main(int argc, char **argv) {
 	Paffs fs(drv);
 	Device* dev = fs.getDevice(0);
 
-	journalEntry::superblock::areaMap::Type test(0, AreaType::retired);
-	journalEntry::superblock::Rootnode rootnode(1234);
 
-	cout << "Size of biggest journalEntry: " << sizeof(journalEntry::Max) << " Byte" << endl;
 
 	Inode fil, dir;
 	dir.type = InodeType::dir;
@@ -37,14 +34,14 @@ int main(int argc, char **argv) {
 	dev->journal.addEvent(journalEntry::inode::Add(node.no));
 
 	dev->journal.addEvent(journalEntry::btree::Insert(fil));
-	rootnode.rootnode = 123;
-	dev->journal.addEvent(rootnode);
+	dev->journal.addEvent(journalEntry::superblock::Rootnode(1234));
 	dev->journal.checkpoint();
-	rootnode.rootnode = 456;
-	dev->journal.addEvent(rootnode);
+	dev->journal.addEvent(journalEntry::superblock::Rootnode(5678));
 
 	//whoops, power went out without write (and Status::success misses)
 	dev->journal.processBuffer();
+
+	printf("Rootnode Addr: %lu\n", dev->superblock.getRootnodeAddr());
 
 }
 

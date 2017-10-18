@@ -16,17 +16,17 @@ extern const char* areaStatusNames[];
 
 //Helper functions
 //Translates indirect Addr to physical page number in respect to the Area mapping
-PageAbs getPageNumber(Addr addr, Device &dev);
+PageAbs getPageNumber(const Addr addr, Device &dev);
 //Translates direct Addr to physical page number ignoring AreaMap
-PageAbs getPageNumberFromDirect(Addr addr);
+PageAbs getPageNumberFromDirect(const Addr addr);
 //Returns the absolute page number from *logical* address
-BlockAbs getBlockNumber(Addr addr, Device& dev);
+BlockAbs getBlockNumber(const Addr addr, Device& dev);
 //Translates direct Addr to physical Block number ignoring AreaMap
-BlockAbs getBlockNumberFromDirect(Addr addr);
+BlockAbs getBlockNumberFromDirect(const Addr addr);
 //combines two values to one type
-Addr combineAddress(AreaPos logical_area, PageOffs page);
-unsigned int extractLogicalArea(Addr addr);
-unsigned int extractPageOffs(Addr addr);
+Addr combineAddress(const AreaPos logical_area, const PageOffs page);
+unsigned int extractLogicalArea(const Addr addr);
+unsigned int extractPageOffs(const Addr addr);
 
 class AreaManagement{
 	Area map[areasNo];

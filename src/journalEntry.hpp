@@ -11,9 +11,6 @@
 
 namespace paffs
 {
-using namespace std;
-
-typedef uint32_t TreeNodeId;
 
 struct JournalEntry{
 	enum class Topic{
@@ -22,6 +19,13 @@ struct JournalEntry{
 		tree,
 		summaryCache,
 		inode,
+	};
+	static constexpr const char* topicNames[] = {
+		"TRANSACTON",
+		"SUPERBLOCK",
+		"TREE",
+		"SUMMARY CACHE",
+		"INODE",
 	};
 	Topic topic;
 protected:
@@ -32,13 +36,16 @@ public:
 
 namespace journalEntry
 {
-
 	struct Transaction : public JournalEntry
 	{
 		enum class Status
 		{
-			end,
+			checkpoint,
 			success,
+		};
+		static constexpr const char* statusNames[] = {
+			"CHECKPOINT",
+			"SUCCESS",
 		};
 		Topic target;
 		Status status;
@@ -142,11 +149,11 @@ namespace journalEntry
 
 	namespace btree{
 		struct Insert : public BTree{
-			Inode inode;
+			paffs::Inode inode;
 			Insert(Inode _inode): BTree(Operation::insert), inode(_inode){};
 		};
 		struct Update : public BTree{
-			Inode inode;
+			paffs::Inode inode;
 			Update(Inode _inode): BTree(Operation::update), inode(_inode){};
 		};
 		struct Remove : public BTree{

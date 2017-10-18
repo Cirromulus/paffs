@@ -279,6 +279,7 @@ Result Device::unmnt(){
 		printf("\t----------------------\n");
 	}
 
+	journal.checkpoint();
 	journal.clear();
 
 	destroyDevice();
