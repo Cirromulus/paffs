@@ -28,7 +28,7 @@ public:
 	virtual Result checkBad (BlockAbs blockNo) = 0;
 
 	virtual Result writeMRAM(PageAbs startByte,
-	                         void* const data, unsigned int dataLen){
+	                         const void* data, unsigned int dataLen){
 		(void) startByte;
 		(void) data;
 		(void) dataLen;

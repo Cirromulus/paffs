@@ -14,6 +14,7 @@ namespace paffs
 
 struct JournalEntry{
 	enum class Topic{
+		empty,
 		transaction,
 		superblock,
 		tree,
@@ -21,6 +22,7 @@ struct JournalEntry{
 		inode,
 	};
 	static constexpr const char* topicNames[] = {
+		"EMPTY",
 		"TRANSACTON",
 		"SUPERBLOCK",
 		"TREE",
@@ -129,7 +131,8 @@ namespace journalEntry
 		union Max
 		{
 			Rootnode rootnode;
-			areaMap::Max areaMap;
+			AreaMap areaMap;
+			areaMap::Max areaMap_;
 		};
 	};
 
@@ -238,16 +241,25 @@ namespace journalEntry
 
 		union Max
 		{
+			Inode inode;
+
 			Add add;
+			//TODO: Rest
 		};
 	}
 	union Max
 	{
+		JournalEntry base;		//Not nice?
+
 		Transaction transaction;
-		superblock::Max superblock;
-		btree::Max btree;
-		summaryCache::Max summaryCache;
-		inode::Max inode;
+		Superblock superblock;
+		superblock::Max superblock_;
+		BTree btree;
+		btree::Max btree_;
+		SummaryCache summaryCache;
+		summaryCache::Max summaryCache_;
+		Inode inode;
+		inode::Max inode_;
 		Max()
 		{
 			memset(static_cast<void*>(this), 0, sizeof(Max));

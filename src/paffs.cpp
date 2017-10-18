@@ -123,14 +123,6 @@ void Paffs::printCacheSizes(){
 	);
 
 	PAFFS_DBG_S(PAFFS_TRACE_INFO,
-			"-- To be moved into MRAM -- \n"
-			"Size of biggest Journal Entry: %zu. Number of cached Entries: %u.\n"
-			"\tOverall MRAM Journal Entry Buffer Size: %zu Byte",
-			sizeof(JournalEntry*), internalLogSize,
-			internalLogSize * sizeof(JournalEntry*)
-	);
-
-	PAFFS_DBG_S(PAFFS_TRACE_INFO,
 			"Size of Device: %zu. Number of Devices: %u.\n"
 			"\tOverall Devices Size: %zu Byte",
 			sizeof(Device), maxNumberOfDevices,

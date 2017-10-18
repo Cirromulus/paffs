@@ -23,11 +23,11 @@ public:
 	SimuDriver(){
 		selfLoaded = true;
 		cell = new FlashCell();
-		mram = new Mram(4096 * 512);
+		mram = new Mram(mramSize);
 	}
 	SimuDriver(void *c){
 		cell = static_cast<FlashCell*>(c);
-		mram = new Mram(4096 * 512);
+		mram = new Mram(mramSize);
 	};
 
 	~SimuDriver(){
@@ -49,7 +49,7 @@ public:
 	Result markBad(uint32_t block_no) override;
 	Result checkBad(uint32_t block_no) override;
 	Result writeMRAM(PageAbs startByte,
-	                 void* const data, unsigned int dataLen) override;
+	                 const void* data, unsigned int dataLen) override;
 	Result readMRAM(PageAbs startByte,
 	                void* data, unsigned int dataLen) override;
 private:

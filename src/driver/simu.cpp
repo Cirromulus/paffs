@@ -124,8 +124,8 @@ Result SimuDriver::checkBad(uint32_t block_no){
 }
 
 Result SimuDriver::writeMRAM(PageAbs startByte,
-                             void* const data, unsigned int dataLen){
-	unsigned char* const tmp = static_cast<unsigned char* const>(data);
+                             const void* data, unsigned int dataLen){
+	unsigned const char* tmp = static_cast<unsigned const char*>(data);
 	for(unsigned int i = 0; i < dataLen; i++){
 		mram->setByte(startByte + i, tmp[i]);
 	}

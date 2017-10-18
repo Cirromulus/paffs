@@ -5,15 +5,14 @@
  *      Author: user
  */
 #include <paffs.hpp>
-
 #include <iostream>
 
 using namespace paffs;
 using namespace std;
 
-int main(int argc, char **argv) {
-	(void) argc;
-	(void) argv;
+
+void smallTest()
+{
 	std::vector<paffs::Driver*> drv;
 	drv.push_back(paffs::getDriver(0));
 
@@ -42,6 +41,22 @@ int main(int argc, char **argv) {
 	dev->journal.processBuffer();
 
 	printf("Rootnode Addr: %lu\n", dev->superblock.getRootnodeAddr());
+}
+
+
+void visualizeLog()
+{
+	std::vector<paffs::Driver*> drv;
+	drv.push_back(paffs::getDriver(0));
+
+	Paffs fs(drv);
+	Device* dev = fs.getDevice(0);
+}
+
+int main(int argc, char **argv) {
+	(void) argc;
+	(void) argv;
+
 
 }
 
