@@ -26,7 +26,7 @@ public:
 		topics[1] = &summaryCache;
 		topics[2] = &tree;
 		//TODO Inode
-		pos = 0;
+		pos = sizeof(PageAbs);
 	}
 
 	void
@@ -43,8 +43,12 @@ private:
 	void
 	writeEntry(PageAbs &pointer, const JournalEntry& entry);
 	void
-	readNextEntry(PageAbs &pointer, journalEntry::Max* entry);
+	readNextEntry(PageAbs &pointer, journalEntry::Max& entry);
 	JournalEntry*
 	deserializeFactory(const JournalEntry& entry);
+	PageAbs
+	getSizeFromMax(const journalEntry::Max &entry);
+	void
+	convertIntoEmpty(journalEntry::Max &entry);
 };
 };

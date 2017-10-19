@@ -28,6 +28,7 @@ Journal::addEvent(const JournalEntry& entry){
 		return;
 	}
 	writeEntry(pos, entry);
+	driver.writeMRAM(0, &pos, sizeof(PageAbs));
 }
 
 void
@@ -43,17 +44,15 @@ Journal::checkpoint()
 void
 Journal::clear()
 {
-	/*
-	TODO: overwrite log with zeroes
-	for(unsigned i = 0; i < pos; i++){
-		if(traceMask & PAFFS_TRACE_JOURNAL)
-			printMeaning(*log[i]);
-	}*/
-	pos = 0;
+	pos = sizeof(PageAbs);
+	driver.writeMRAM(0, &pos, sizeof(PageAbs));
 }
 
 void
 Journal::processBuffer(){
+	PageAbs hwm;
+	driver.readMRAM(0, &hwm, sizeof(PageAbs));
+
 	for(JournalTopic* topic : topics){
 		if(topic == nullptr){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "Topic is null");
@@ -61,34 +60,34 @@ Journal::processBuffer(){
 		}
 
 		topic->setJournalBuffer(&buffer);
-
-		for(unsigned e = 0; e < pos; e++){
-/*			if(log[e] == nullptr){
+		PageAbs pointer = 0;
+		while(pointer < hwm){
+			journalEntry::Max elem;
+			readNextEntry(pointer, elem);
+			if(elem.base.topic == JournalEntry::Topic::empty){
 				continue;
 			}
 
 			bool found = false;
 
-			if(log[e]->topic == topic->getTopic()){
-				topic->enqueueEntry(*log[e]);
+			if(elem.base.topic== topic->getTopic()){
+				topic->enqueueEntry(elem.base);
 				found = true;
 			}
 
-			if(log[e]->topic == JournalEntry::Topic::transaction)
+			if(elem.base.topic == JournalEntry::Topic::transaction)
 			{
-				const journalEntry::Transaction* ta =
-						static_cast<const journalEntry::Transaction*>(log[e]);
-				if(ta->target == topic->getTopic()){
-					topic->enqueueEntry(*log[e]);
+				if(elem.transaction.target == topic->getTopic()){
+					topic->enqueueEntry(elem.base);
 				}
 				found = true;
 			}
 
 			if(found)
 			{
-				delete log[e];
-				log[e] = nullptr;
-			}*/
+				convertIntoEmpty(elem);
+				writeEntry(pointer, elem.base);
+			}
 		}
 		topic->finalize();
 		buffer.clear();
@@ -100,7 +99,12 @@ void Journal::writeEntry(PageAbs &pointer, const JournalEntry& entry){
 	{
 	case JournalEntry::Topic::empty:
 	{
-		WRITEELEM(journalEntry::Max, entry, pointer);
+		const journalEntry::Empty* e = static_cast<const journalEntry::Empty*>(&entry);
+		char empty[e->size];
+		memset(empty, 0, e->size);
+		memcpy(empty, e, sizeof(journalEntry::Empty));
+		driver.writeMRAM(pointer, empty, e->size);
+		pointer += e->size;
 		break;
 	}
 	case JournalEntry::Topic::transaction:
@@ -180,88 +184,9 @@ void Journal::writeEntry(PageAbs &pointer, const JournalEntry& entry){
 }
 
 
-void Journal::readNextEntry(PageAbs &pointer, journalEntry::Max* entry){
-	driver.readMRAM(pointer, entry, sizeof(journalEntry::Max));
-
-	switch(entry->base.topic)
-	{
-	case JournalEntry::Topic::empty:
-		pointer += sizeof(journalEntry::Max);
-		break;
-	case JournalEntry::Topic::transaction:
-		pointer += sizeof(journalEntry::Transaction);
-		break;
-	case JournalEntry::Topic::superblock:
-		switch(entry->superblock.subtype)
-		{
-		case journalEntry::Superblock::Subtype::rootnode:
-			pointer += sizeof(journalEntry::superblock::Rootnode);
-			break;
-		case journalEntry::Superblock::Subtype::areaMap:
-			switch(entry->superblock_.areaMap.element)
-			{
-			case journalEntry::superblock::AreaMap::Element::type:
-				pointer += sizeof(journalEntry::superblock::areaMap::Type);
-				break;
-			case journalEntry::superblock::AreaMap::Element::status:
-				pointer += sizeof(journalEntry::superblock::areaMap::Status);
-				break;
-			case journalEntry::superblock::AreaMap::Element::erasecount:
-				pointer += sizeof(journalEntry::superblock::areaMap::Erasecount);
-				break;
-			case journalEntry::superblock::AreaMap::Element::position:
-				pointer += sizeof(journalEntry::superblock::areaMap::Type);
-				break;
-			case journalEntry::superblock::AreaMap::Element::swap:
-				pointer += sizeof(journalEntry::superblock::areaMap::Swap);
-				break;
-			}
-			break;
-		}
-		break;
-	case JournalEntry::Topic::tree:
-		switch(entry->btree.op)
-		{
-		case journalEntry::BTree::Operation::insert:
-			pointer += sizeof(journalEntry::btree::Insert);
-			break;
-		case journalEntry::BTree::Operation::update:
-			pointer += sizeof(journalEntry::btree::Update);
-			break;
-		case journalEntry::BTree::Operation::remove:
-			pointer += sizeof(journalEntry::btree::Remove);
-			break;
-		break;
-		}
-		break;
-	case JournalEntry::Topic::summaryCache:
-		switch(entry->summaryCache.subtype)
-		{
-		case journalEntry::SummaryCache::Subtype::commit:
-			pointer += sizeof(journalEntry::summaryCache::Commit);
-			break;
-		case journalEntry::SummaryCache::Subtype::remove:
-			pointer += sizeof(journalEntry::summaryCache::Remove);
-			break;
-		case journalEntry::SummaryCache::Subtype::setStatus:
-			pointer += sizeof(journalEntry::summaryCache::SetStatus);
-			break;
-		}
-		break;
-	case JournalEntry::Topic::inode:
-		switch(entry->inode.subtype)
-		{
-		case journalEntry::Inode::Subtype::add:
-			pointer += sizeof(journalEntry::inode::Add);
-			break;
-		case journalEntry::Inode::Subtype::write:
-			pointer += sizeof(journalEntry::inode::Write);
-			break;
-		case journalEntry::Inode::Subtype::remove:
-			pointer += sizeof(journalEntry::inode::Remove);
-			break;
-		}
-	}
+void Journal::readNextEntry(PageAbs &pointer, journalEntry::Max& entry){
+	driver.readMRAM(pointer, &entry, sizeof(journalEntry::Max));
+	pointer += getSizeFromMax(entry);
 }
 
 JournalEntry* Journal::deserializeFactory(const JournalEntry& entry){
@@ -363,6 +288,101 @@ JournalEntry* Journal::deserializeFactory(const JournalEntry& entry){
 		}
 	}
 	return ret;
+}
+
+PageAbs
+Journal::getSizeFromMax(const journalEntry::Max &entry)
+{
+	PageAbs size = 0;
+	switch(entry.base.topic)
+	{
+	case JournalEntry::Topic::empty:
+		size = entry.empty.size;
+		break;
+	case JournalEntry::Topic::transaction:
+		size = sizeof(journalEntry::Transaction);
+		break;
+	case JournalEntry::Topic::superblock:
+		switch(entry.superblock.subtype)
+		{
+		case journalEntry::Superblock::Subtype::rootnode:
+			size = sizeof(journalEntry::superblock::Rootnode);
+			break;
+		case journalEntry::Superblock::Subtype::areaMap:
+			switch(entry.superblock_.areaMap.element)
+			{
+			case journalEntry::superblock::AreaMap::Element::type:
+				size = sizeof(journalEntry::superblock::areaMap::Type);
+				break;
+			case journalEntry::superblock::AreaMap::Element::status:
+				size = sizeof(journalEntry::superblock::areaMap::Status);
+				break;
+			case journalEntry::superblock::AreaMap::Element::erasecount:
+				size = sizeof(journalEntry::superblock::areaMap::Erasecount);
+				break;
+			case journalEntry::superblock::AreaMap::Element::position:
+				size = sizeof(journalEntry::superblock::areaMap::Type);
+				break;
+			case journalEntry::superblock::AreaMap::Element::swap:
+				size = sizeof(journalEntry::superblock::areaMap::Swap);
+				break;
+			}
+			break;
+		}
+		break;
+	case JournalEntry::Topic::tree:
+		switch(entry.btree.op)
+		{
+		case journalEntry::BTree::Operation::insert:
+			size = sizeof(journalEntry::btree::Insert);
+			break;
+		case journalEntry::BTree::Operation::update:
+			size = sizeof(journalEntry::btree::Update);
+			break;
+		case journalEntry::BTree::Operation::remove:
+			size = sizeof(journalEntry::btree::Remove);
+			break;
+		break;
+		}
+		break;
+	case JournalEntry::Topic::summaryCache:
+		switch(entry.summaryCache.subtype)
+		{
+		case journalEntry::SummaryCache::Subtype::commit:
+			size = sizeof(journalEntry::summaryCache::Commit);
+			break;
+		case journalEntry::SummaryCache::Subtype::remove:
+			size = sizeof(journalEntry::summaryCache::Remove);
+			break;
+		case journalEntry::SummaryCache::Subtype::setStatus:
+			size = sizeof(journalEntry::summaryCache::SetStatus);
+			break;
+		}
+		break;
+	case JournalEntry::Topic::inode:
+		switch(entry.inode.subtype)
+		{
+		case journalEntry::Inode::Subtype::add:
+			size = sizeof(journalEntry::inode::Add);
+			break;
+		case journalEntry::Inode::Subtype::write:
+			size = sizeof(journalEntry::inode::Write);
+			break;
+		case journalEntry::Inode::Subtype::remove:
+			size = sizeof(journalEntry::inode::Remove);
+			break;
+		}
+	}
+	return size;
+}
+
+void
+Journal::convertIntoEmpty(journalEntry::Max &entry)
+{
+	PageAbs size = getSizeFromMax(entry);
+	memset(&entry, 0, sizeof(journalEntry::Max));
+	journalEntry::Empty empty(size);
+	memcpy(&entry, &empty, sizeof(journalEntry::Empty));
 }
 
 void

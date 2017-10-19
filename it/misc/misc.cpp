@@ -11,6 +11,17 @@ using namespace paffs;
 using namespace std;
 
 
+void smallTest();
+
+void exportLog();
+
+int main(int argc, char **argv) {
+	(void) argc;
+	(void) argv;
+
+	exportLog();
+}
+
 void smallTest()
 {
 	std::vector<paffs::Driver*> drv;
@@ -44,20 +55,41 @@ void smallTest()
 }
 
 
-void visualizeLog()
+void exportLog()
 {
 	std::vector<paffs::Driver*> drv;
 	drv.push_back(paffs::getDriver(0));
 
 	Paffs fs(drv);
 	Device* dev = fs.getDevice(0);
+
+	BadBlockList bbl[maxNumberOfDevices];
+	fs.format(bbl);
+	fs.setTraceMask(fs.getTraceMask() |
+	                PAFFS_TRACE_ERROR |
+	                PAFFS_TRACE_BUG   |
+	                PAFFS_TRACE_INFO  );
+
+	fs.mount();
+
+	Obj* fil = fs.open("/a.txt", paffs::FW | paffs::FC);
+	if(fil == nullptr)
+	{
+		cout << "File could not be opened" << endl;
+		return;
+	}
+	char text[] = "Das Pferd frisst keinen Gurkensalat";
+	unsigned int bw = 0;
+	Result r = fs.write(*fil, text, sizeof(text), &bw);
+	if(r != Result::ok)
+	{
+		cout << "File could not be written" << endl;
+		return;
+	}
+
+	//---- Whoops, power went out! ----//
+
+	cout << "END" << endl;
+
+	//TODO: Export
 }
-
-int main(int argc, char **argv) {
-	(void) argc;
-	(void) argv;
-
-
-}
-
-
