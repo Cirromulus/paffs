@@ -5,7 +5,10 @@
  *      Author: user
  */
 #include <paffs.hpp>
+#include <simu/flashCell.h>
+#include <simu/mram.hpp>
 #include <iostream>
+#include <fstream>
 
 using namespace paffs;
 using namespace std;
@@ -15,11 +18,16 @@ void smallTest();
 
 void exportLog();
 
+void import();
+
 int main(int argc, char **argv) {
 	(void) argc;
 	(void) argv;
 
-	exportLog();
+	if(argc > 1)
+		exportLog();
+	else
+		import();
 }
 
 void smallTest()
@@ -54,14 +62,68 @@ void smallTest()
 	printf("Rootnode Addr: %lu\n", dev->superblock.getRootnodeAddr());
 }
 
+void import()
+{
+	std::vector<paffs::Driver*> drv;
+	FlashCell* fc = new FlashCell();
+	Mram* mram = new Mram(mramSize);
+	drv.push_back(paffs::getDriverSpecial(0, fc, mram));
+
+	//Deserialize
+	ifstream in("flashCell_export", ios::in | ios::binary);
+	if(!in.is_open())
+	{
+		cout << "Serialized flash could not be opened" << endl;
+		return;
+	}
+	fc->getDebugInterface()->deserialize(in);
+	in.close();
+
+	Paffs fs(drv);
+	Result r = fs.mount();
+	if(r != Result::ok)
+	{
+		cout << "Could not mount filesystem!" << endl;
+		return;
+	}
+
+	ObjInfo info;
+	r = fs.getObjInfo("/a.txt", info);
+	if(r != paffs::Result::ok)
+	{
+		cout << "could not get Info of file!" << endl;
+	}
+	Obj* fil = fs.open("/a.txt", paffs::FR);
+	if(fil == nullptr)
+	{
+		cout << "File could not be opened" << endl;
+		return;
+	}
+	char text[info.size+1];
+	unsigned int br;
+	r = fs.read(*fil, text, info.size, &br);
+	if(r != paffs::Result::ok)
+	{
+		cout << "File could not be read!" << endl;
+		return;
+	}
+	text[info.size] = 0;
+
+	cout << "File contents:" << endl << text << endl;
+
+	fs.close(*fil);
+	fs.unmount();
+
+}
 
 void exportLog()
 {
 	std::vector<paffs::Driver*> drv;
-	drv.push_back(paffs::getDriver(0));
+	FlashCell* fc = new FlashCell();
+	Mram* mram = new Mram(mramSize);
+	drv.push_back(paffs::getDriverSpecial(0, fc, mram));
 
 	Paffs fs(drv);
-	Device* dev = fs.getDevice(0);
 
 	BadBlockList bbl[maxNumberOfDevices];
 	fs.format(bbl);
@@ -87,9 +149,18 @@ void exportLog()
 		return;
 	}
 
+	//For debug
+	fs.close(*fil);
+	fs.unmount();
+
 	//---- Whoops, power went out! ----//
 
-	cout << "END" << endl;
+
+	ofstream out("flashCell_export", ios::out | ios::binary);
+	fc->getDebugInterface()->serialize(out);
+	out.close();
 
 	//TODO: Export
+	delete fc;
+	delete mram;
 }

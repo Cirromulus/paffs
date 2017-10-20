@@ -17,15 +17,18 @@ namespace paffs{
 class SimuDriver : public Driver{
 	FlashCell *cell;
 	Mram *mram;
-	bool selfLoaded = false;
+	bool selfLoadedFlash = false;
+	bool selfLoadedMRAM = false;
 	unsigned char buf[totalBytesPerPage];
 public:
 	SimuDriver(){
-		selfLoaded = true;
+		selfLoadedFlash = true;
+		selfLoadedMRAM = true;
 		cell = new FlashCell();
 		mram = new Mram(mramSize);
 	}
 	SimuDriver(void *c){
+		selfLoadedMRAM = true;
 		cell = static_cast<FlashCell*>(c);
 		mram = new Mram(mramSize);
 	};
@@ -35,9 +38,10 @@ public:
 	};
 
 	~SimuDriver(){
-		if(selfLoaded)
+		if(selfLoadedFlash)
 			delete cell;
-		delete mram;
+		if(selfLoadedMRAM)
+			delete mram;
 	}
 
 	//DEBUG
