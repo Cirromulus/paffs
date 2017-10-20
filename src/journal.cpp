@@ -59,18 +59,22 @@ Journal::processBuffer(){
 			break;
 		}
 
+		printf("Topic %s:\n", JournalEntry::topicNames[static_cast<unsigned>(topic->getTopic())]);
+
 		topic->setJournalBuffer(&buffer);
-		PageAbs pointer = 0;
+		PageAbs pointer = sizeof(PageAbs);
 		while(pointer < hwm){
 			journalEntry::Max elem;
+			printf("At pos. %" PRIu64 ": ", pointer);
 			readNextEntry(pointer, elem);
+			printMeaning(elem.base);
 			if(elem.base.topic == JournalEntry::Topic::empty){
 				continue;
 			}
 
 			bool found = false;
 
-			if(elem.base.topic== topic->getTopic()){
+			if(elem.base.topic == topic->getTopic()){
 				topic->enqueueEntry(elem.base);
 				found = true;
 			}
@@ -79,12 +83,13 @@ Journal::processBuffer(){
 			{
 				if(elem.transaction.target == topic->getTopic()){
 					topic->enqueueEntry(elem.base);
+					found = true;
 				}
-				found = true;
 			}
 
 			if(found)
 			{
+				pointer -= getSizeFromMax(elem);
 				convertIntoEmpty(elem);
 				writeEntry(pointer, elem.base);
 			}
@@ -388,17 +393,19 @@ Journal::convertIntoEmpty(journalEntry::Max &entry)
 void
 Journal::printMeaning(const JournalEntry& entry)
 {
-	//printf("Recognized ");
+	bool found = false;
 	switch(entry.topic)
 	{
 	case JournalEntry::Topic::empty:
 		printf("empty");
+		found = true;
 		break;
 	case JournalEntry::Topic::transaction:
 	{
 		const journalEntry::Transaction* ta = static_cast<const journalEntry::Transaction*>(&entry);
 		printf("\ttransaction %s %s", JournalEntry::topicNames[static_cast<unsigned>(ta->target)],
 				journalEntry::Transaction::statusNames[static_cast<unsigned>(ta->status)]);
+		found = true;
 		break;
 	}
 	case JournalEntry::Topic::superblock:
@@ -408,6 +415,7 @@ Journal::printMeaning(const JournalEntry& entry)
 			printf("rootnode change to %X:%X",
 					extractLogicalArea(static_cast<const journalEntry::superblock::Rootnode*>(&entry)->rootnode),
 					extractPageOffs(static_cast<const journalEntry::superblock::Rootnode*>(&entry)->rootnode));
+			found = true;
 			break;
 		case journalEntry::Superblock::Subtype::areaMap:
 			printf("AreaMap %" PRIu32 " ", static_cast<const journalEntry::superblock::AreaMap*>(&entry)->offs);
@@ -416,21 +424,26 @@ Journal::printMeaning(const JournalEntry& entry)
 			case journalEntry::superblock::AreaMap::Element::type:
 				printf("set Type to %s",
 						areaNames[static_cast<const journalEntry::superblock::areaMap::Type*>(&entry)->type]);
+				found = true;
 				break;
 			case journalEntry::superblock::AreaMap::Element::status:
 				printf("set Status to %s",
 						areaStatusNames[static_cast<const journalEntry::superblock::areaMap::Status*>(&entry)->status]);
+				found = true;
 				break;
 			case journalEntry::superblock::AreaMap::Element::erasecount:
 				printf("set Erasecount");
+				found = true;
 				break;
 			case journalEntry::superblock::AreaMap::Element::position:
 				printf("set Position to %X:%X",
 						extractLogicalArea(static_cast<const journalEntry::superblock::areaMap::Position*>(&entry)->position),
 						extractPageOffs(static_cast<const journalEntry::superblock::areaMap::Position*>(&entry)->position));
+				found = true;
 				break;
 			case journalEntry::superblock::AreaMap::Element::swap:
 				printf("Swap");
+				found = true;
 				break;
 			}
 			break;
@@ -442,12 +455,15 @@ Journal::printMeaning(const JournalEntry& entry)
 		{
 		case journalEntry::BTree::Operation::insert:
 			printf("insert %" PRIu32, static_cast<const journalEntry::btree::Insert*>(&entry)->inode.no);
+			found = true;
 			break;
 		case journalEntry::BTree::Operation::update:
 			printf("update %" PRIu32, static_cast<const journalEntry::btree::Update*>(&entry)->inode.no);
+			found = true;
 			break;
 		case journalEntry::BTree::Operation::remove:
 			printf("remove %" PRIu32, static_cast<const journalEntry::btree::Remove*>(&entry)->no);
+			found = true;
 			break;
 		break;
 		}
@@ -458,9 +474,11 @@ Journal::printMeaning(const JournalEntry& entry)
 		{
 		case journalEntry::SummaryCache::Subtype::commit:
 			printf("Commit");
+			found = true;
 			break;
 		case journalEntry::SummaryCache::Subtype::remove:
 			printf("Remove");
+			found = true;
 			break;
 		case journalEntry::SummaryCache::Subtype::setStatus:
 			printf("set Page %" PRIu32 " to %s",
@@ -468,6 +486,7 @@ Journal::printMeaning(const JournalEntry& entry)
 					summaryEntryNames[static_cast<unsigned>(
 							static_cast<const journalEntry::summaryCache::SetStatus*>(&entry)->status)]
 					);
+			found = true;
 			break;
 		}
 		break;
@@ -476,14 +495,19 @@ Journal::printMeaning(const JournalEntry& entry)
 		{
 		case journalEntry::Inode::Subtype::add:
 			printf("Inode add");
+			found = true;
 			break;
 		case journalEntry::Inode::Subtype::write:
 			printf("Inode write");
+			found = true;
 			break;
 		case journalEntry::Inode::Subtype::remove:
 			printf("Inode remove");
+			found = true;
 			break;
 		}
 	}
+	if(!found)
+		printf("Unrecognized");
 	printf(" event.\n");
 }

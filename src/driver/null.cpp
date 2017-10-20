@@ -17,9 +17,10 @@ Driver* getDriver(const uint8_t deviceId){
 	return out;
 }
 
-Driver* getDriverSpecial(const uint8_t deviceId, void* fc){
+Driver* getDriverSpecial(const uint8_t deviceId, void* fc, void* mram){
 	(void) deviceId;
 	(void) fc;
+	(void) mram;
 	Driver* out = new NullDriver();
 	return out;
 }

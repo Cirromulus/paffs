@@ -20,13 +20,17 @@ Driver* getDriver(const uint8_t deviceId){
 	return out;
 }
 
-Driver* getDriverSpecial(const uint8_t deviceId, void* fc){
+Driver* getDriverSpecial(const uint8_t deviceId, void* fc, void *mram){
 	(void) deviceId;
 	if(fc == NULL){
 		std::cerr << "Invalid flashCell pointer given!" << std::endl;
 		return NULL;
 	}
-	Driver* out = new SimuDriver(fc);
+	Driver* out;
+	if(mram == nullptr)
+		out = new SimuDriver(fc);
+	else
+		out = new SimuDriver(fc, mram);
 	return out;
 }
 

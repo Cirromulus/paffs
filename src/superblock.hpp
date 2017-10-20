@@ -142,7 +142,7 @@ private:
 	void
 	processEntry(JournalEntry& entry) override;
 	void
-	processUnsucceededEntry(JournalEntry& entry) override;
+	processUncheckpointedEntry(JournalEntry& entry) override;
 };
 
 }

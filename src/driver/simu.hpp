@@ -29,6 +29,10 @@ public:
 		cell = static_cast<FlashCell*>(c);
 		mram = new Mram(mramSize);
 	};
+	SimuDriver(void *c, void *m){
+		cell = static_cast<FlashCell*>(c);
+		mram = static_cast<Mram*>(m);
+	};
 
 	~SimuDriver(){
 		if(selfLoaded)

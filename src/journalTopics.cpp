@@ -51,9 +51,9 @@ JournalTopic::finalize()
 	{
 		processEntry(*entry);
 	}
-	buffer->rewindToUnsucceeded();
-	while((entry = buffer->pop()) != nullptr)
+	buffer->rewindToUncheckpointed();
+	while((entry = buffer->popUncheckpointed()) != nullptr)
 	{
-		processUnsucceededEntry(*entry);
+		processUncheckpointedEntry(*entry);
 	}
 }

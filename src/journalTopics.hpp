@@ -91,7 +91,7 @@ public:
 	{
 		curr = 0;
 	}
-	void rewindToUnsucceeded()
+	void rewindToUncheckpointed()
 	{
 		curr = lastCheckpointEnd;
 	}
@@ -101,7 +101,7 @@ public:
 			return nullptr;
 		return reinterpret_cast<JournalEntry*>(list.get(curr++));
 	}
-	JournalEntry* popInvalid()
+	JournalEntry* popUncheckpointed()
 	{
 		if(curr >= list.getWatermark())
 			return nullptr;
@@ -134,6 +134,6 @@ protected:
 	virtual void
 	processEntry(JournalEntry& entry) = 0;
 	virtual void
-	processUnsucceededEntry(JournalEntry&){};
+	processUncheckpointedEntry(JournalEntry&){};
 };
 }

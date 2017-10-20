@@ -98,7 +98,7 @@ public:
 	void
 	processEntry(JournalEntry& entry) override;
 	void
-	processUnsucceededEntry(JournalEntry& entry) override;
+	processUncheckpointedEntry(JournalEntry& entry) override;
 private:
 	/**
 	 * @Brief uses garbageCollection-buffer to swap a whole Area,

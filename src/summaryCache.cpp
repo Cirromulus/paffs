@@ -579,7 +579,7 @@ SummaryCache::processEntry(JournalEntry& entry){
 }
 
 void
-SummaryCache::processUnsucceededEntry(JournalEntry& entry){
+SummaryCache::processUncheckpointedEntry(JournalEntry& entry){
 	if(entry.topic != getTopic()){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
 		return;

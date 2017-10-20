@@ -1012,8 +1012,17 @@ void Superblock::processEntry(JournalEntry& entry){
 	}
 }
 
-void Superblock::processUnsucceededEntry(JournalEntry& entry){
-	//TODO: More caution and plausibility checks
-	processEntry(entry);
+void Superblock::processUncheckpointedEntry(JournalEntry& entry){
+	if(entry.topic != getTopic()){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
+		return;
+	}
+	//TODO: Is this really good to suppress this write?
+	// Question: Should type changes be persistent without being checkpointed?
+	if(static_cast<journalEntry::Superblock*>(&entry)->subtype ==
+			journalEntry::Superblock::Subtype::areaMap)
+	{
+		processEntry(entry);
+	}
 }
 }

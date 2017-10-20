@@ -45,5 +45,5 @@ public:
 
 Driver* getDriver(const uint8_t deviceId);
 
-Driver* getDriverSpecial(const uint8_t deviceId, void* fc);
+Driver* getDriverSpecial(const uint8_t deviceId, void* fc, void* mram = nullptr);
 }
