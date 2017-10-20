@@ -53,6 +53,13 @@ Journal::processBuffer(){
 	PageAbs hwm;
 	driver.readMRAM(0, &hwm, sizeof(PageAbs));
 
+	if(hwm == sizeof(PageAbs))
+	{
+		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "No Replay of Journal needed");
+		return;
+	}
+	PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Replay of Journal needed!");
+
 	for(JournalTopic* topic : topics){
 		if(topic == nullptr){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "Topic is null");

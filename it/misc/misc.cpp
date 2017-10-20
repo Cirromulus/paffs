@@ -13,6 +13,9 @@
 using namespace paffs;
 using namespace std;
 
+char filename[] = "/a.txt";
+char exportFlash[] = "export_flash.bin";
+char exportMram[] = "export_mram.bin";
 
 void smallTest();
 
@@ -70,14 +73,22 @@ void import()
 	drv.push_back(paffs::getDriverSpecial(0, fc, mram));
 
 	//Deserialize
-	ifstream in("flashCell_export", ios::in | ios::binary);
-	if(!in.is_open())
+	ifstream inf(exportFlash, ios::in | ios::binary);
+	if(!inf.is_open())
 	{
 		cout << "Serialized flash could not be opened" << endl;
 		return;
 	}
-	fc->getDebugInterface()->deserialize(in);
-	in.close();
+	fc->getDebugInterface()->deserialize(inf);
+	inf.close();
+	ifstream inm(exportMram, ios::in | ios::binary);
+	if(!inm.is_open())
+	{
+		cout << "Serialized flash could not be opened" << endl;
+		return;
+	}
+	mram->deserialize(inm);
+	inm.close();
 
 	Paffs fs(drv);
 	Result r = fs.mount();
@@ -88,12 +99,12 @@ void import()
 	}
 
 	ObjInfo info;
-	r = fs.getObjInfo("/a.txt", info);
+	r = fs.getObjInfo(filename, info);
 	if(r != paffs::Result::ok)
 	{
 		cout << "could not get Info of file!" << endl;
 	}
-	Obj* fil = fs.open("/a.txt", paffs::FR);
+	Obj* fil = fs.open(filename, paffs::FR);
 	if(fil == nullptr)
 	{
 		cout << "File could not be opened" << endl;
@@ -134,7 +145,7 @@ void exportLog()
 
 	fs.mount();
 
-	Obj* fil = fs.open("/a.txt", paffs::FW | paffs::FC);
+	Obj* fil = fs.open(filename, paffs::FW | paffs::FC);
 	if(fil == nullptr)
 	{
 		cout << "File could not be opened" << endl;
@@ -150,15 +161,18 @@ void exportLog()
 	}
 
 	//For debug
-	fs.close(*fil);
-	fs.unmount();
+	//fs.close(*fil);
+	//fs.unmount();
 
 	//---- Whoops, power went out! ----//
 
 
-	ofstream out("flashCell_export", ios::out | ios::binary);
-	fc->getDebugInterface()->serialize(out);
-	out.close();
+	ofstream ef(exportFlash, ios::out | ios::binary);
+	fc->getDebugInterface()->serialize(ef);
+	ef.close();
+	ofstream em(exportMram, ios::out | ios::binary);
+	mram->serialize(em);
+	em.close();
 
 	//TODO: Export
 	delete fc;
