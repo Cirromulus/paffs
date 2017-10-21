@@ -539,8 +539,7 @@ Result SummaryCache::commitAreaSummaries(bool createNew){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit superindex");
 		return r;
 	}
-	dev->journal.addEvent(journalEntry::Transaction(JournalEntry::Topic::summaryCache,
-	                                                journalEntry::Transaction::Status::success));
+	dev->journal.addEvent(journalEntry::Success(JournalEntry::Topic::summaryCache));
 	return Result::ok;
 }
 

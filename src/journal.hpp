@@ -16,7 +16,6 @@ class Journal{
 	JournalTopic* topics[3];
 	Driver& driver;
 
-	JournalEntryBuffer<journalTopicLogSize> buffer;
 	PageAbs pos;
 public:
 	Journal(Driver& _driver, JournalTopic& superblock, JournalTopic& summaryCache,
@@ -41,14 +40,15 @@ public:
 	printMeaning(const JournalEntry& entry);
 private:
 	void
-	writeEntry(PageAbs &pointer, const JournalEntry& entry);
+	applyCheckpointedJournalEntries(PageAbs from, PageAbs to,
+			PageAbs firstUnsuccededEntry[JournalEntry::numberOfTopics]);
 	void
-	readNextEntry(PageAbs &pointer, journalEntry::Max& entry);
-	JournalEntry*
-	deserializeFactory(const JournalEntry& entry);
+	applyUncheckpointedJournalEntries(PageAbs from, PageAbs to);
+	void
+	writeEntry(PageAbs& pointer, const JournalEntry& entry);
+	void
+	readNextEntry(PageAbs& pointer, journalEntry::Max& entry);
 	PageAbs
 	getSizeFromMax(const journalEntry::Max &entry);
-	void
-	convertIntoEmpty(journalEntry::Max &entry);
 };
 };

@@ -19,6 +19,64 @@ JournalEntry::Topic Superblock::getTopic(){
 	return JournalEntry::Topic::superblock;
 }
 
+
+void Superblock::processEntry(JournalEntry& entry){
+	if(entry.topic != getTopic()){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
+		return;
+	}
+	const journalEntry::Superblock* e =
+			static_cast<const journalEntry::Superblock*>(&entry);
+	switch(e->type){
+	case journalEntry::Superblock::Type::rootnode:
+		registerRootnode(static_cast<const journalEntry::superblock::Rootnode*>(&entry)->rootnode);
+		break;
+	case journalEntry::Superblock::Type::areaMap:
+	{
+		const journalEntry::superblock::AreaMap* a =
+				static_cast<const journalEntry::superblock::AreaMap*>(&entry);
+		switch(a->operation)
+		{
+		case journalEntry::superblock::AreaMap::Operation::type:
+			dev->areaMgmt.setType(a->offs,
+					static_cast<const journalEntry::superblock::areaMap::Type*>(&entry)->type);
+			break;
+		case journalEntry::superblock::AreaMap::Operation::status:
+			dev->areaMgmt.setStatus(a->offs,
+					static_cast<const journalEntry::superblock::areaMap::Status*>(&entry)->status);
+			break;
+		case journalEntry::superblock::AreaMap::Operation::erasecount:
+			dev->areaMgmt.setErasecount(a->offs,
+					static_cast<const journalEntry::superblock::areaMap::Erasecount*>(&entry)->erasecount);
+			break;
+		case journalEntry::superblock::AreaMap::Operation::position:
+			dev->areaMgmt.setPos(a->offs,
+					static_cast<const journalEntry::superblock::areaMap::Position*>(&entry)->position);
+			break;
+		case journalEntry::superblock::AreaMap::Operation::swap:
+			dev->areaMgmt.swapAreaPosition(a->offs,
+					static_cast<const journalEntry::superblock::areaMap::Swap*>(&entry)->b);
+			break;
+		}
+		break;
+	}
+	}
+}
+
+void Superblock::processUncheckpointedEntry(JournalEntry& entry){
+	if(entry.topic != getTopic()){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
+		return;
+	}
+	//TODO: Is this really good to suppress this write?
+	// Question: Should type changes be persistent without being checkpointed?
+	if(static_cast<journalEntry::Superblock*>(&entry)->type ==
+			journalEntry::Superblock::Type::areaMap)
+	{
+		processEntry(entry);
+	}
+}
+
 Result Superblock::registerRootnode(Addr addr){
 	if(addr == 0)
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Tried to set Rootnode to 0");
@@ -198,7 +256,7 @@ Result Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool cre
 		return Result::bug;
 	}
 
-	dev->journal.addEvent(journalEntry::Transaction(getTopic(), journalEntry::Transaction::Status::success));
+	dev->journal.addEvent(journalEntry::Success(getTopic()));
 	rootnode_dirty = false;
 	return Result::ok;
 }
@@ -967,62 +1025,5 @@ unsigned int Superblock::calculateNeededBytesForSuperIndex(unsigned char numberO
 	if(dataPagesPerArea % 8 != 0)
 		neededBytes++;
 	return neededBytes;
-}
-
-void Superblock::processEntry(JournalEntry& entry){
-	if(entry.topic != getTopic()){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
-		return;
-	}
-	const journalEntry::Superblock* e =
-			static_cast<const journalEntry::Superblock*>(&entry);
-	switch(e->subtype){
-	case journalEntry::Superblock::Subtype::rootnode:
-		registerRootnode(static_cast<const journalEntry::superblock::Rootnode*>(&entry)->rootnode);
-		break;
-	case journalEntry::Superblock::Subtype::areaMap:
-	{
-		const journalEntry::superblock::AreaMap* a =
-				static_cast<const journalEntry::superblock::AreaMap*>(&entry);
-		switch(a->element)
-		{
-		case journalEntry::superblock::AreaMap::Element::type:
-			dev->areaMgmt.setType(a->offs,
-					static_cast<const journalEntry::superblock::areaMap::Type*>(&entry)->type);
-			break;
-		case journalEntry::superblock::AreaMap::Element::status:
-			dev->areaMgmt.setStatus(a->offs,
-					static_cast<const journalEntry::superblock::areaMap::Status*>(&entry)->status);
-			break;
-		case journalEntry::superblock::AreaMap::Element::erasecount:
-			dev->areaMgmt.setErasecount(a->offs,
-					static_cast<const journalEntry::superblock::areaMap::Erasecount*>(&entry)->erasecount);
-			break;
-		case journalEntry::superblock::AreaMap::Element::position:
-			dev->areaMgmt.setPos(a->offs,
-					static_cast<const journalEntry::superblock::areaMap::Position*>(&entry)->position);
-			break;
-		case journalEntry::superblock::AreaMap::Element::swap:
-			dev->areaMgmt.swapAreaPosition(a->offs,
-					static_cast<const journalEntry::superblock::areaMap::Swap*>(&entry)->b);
-			break;
-		}
-		break;
-	}
-	}
-}
-
-void Superblock::processUncheckpointedEntry(JournalEntry& entry){
-	if(entry.topic != getTopic()){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
-		return;
-	}
-	//TODO: Is this really good to suppress this write?
-	// Question: Should type changes be persistent without being checkpointed?
-	if(static_cast<journalEntry::Superblock*>(&entry)->subtype ==
-			journalEntry::Superblock::Subtype::areaMap)
-	{
-		processEntry(entry);
-	}
 }
 }

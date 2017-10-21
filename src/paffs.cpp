@@ -114,15 +114,6 @@ void Paffs::printCacheSizes(){
 	);
 
 	PAFFS_DBG_S(PAFFS_TRACE_INFO,
-			"Size of Journal Entry ptr: %zu. Number of cached Entries: %u.\n"
-			"Journal Entry Buffer Size: %zu Byte\n"
-			"\tOverall Journal Size: %zu Byte",
-			sizeof(journalEntry::Max), journalTopicLogSize,
-			sizeof(JournalEntryBuffer<journalTopicLogSize>),
-			sizeof(Journal)
-	);
-
-	PAFFS_DBG_S(PAFFS_TRACE_INFO,
 			"Size of Device: %zu. Number of Devices: %u.\n"
 			"\tOverall Devices Size: %zu Byte",
 			sizeof(Device), maxNumberOfDevices,

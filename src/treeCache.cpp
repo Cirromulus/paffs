@@ -529,8 +529,7 @@ Result TreeCache::commitCache(){
 	if(findFirstFreeIndex() < 0)
 		cleanFreeNodes();	//if tree cache did not contain any leaves (unlikely)
 
-	dev->journal.addEvent(journalEntry::Transaction(JournalEntry::Topic::tree,
-	                                                journalEntry::Transaction::Status::success));
+	dev->journal.addEvent(journalEntry::Success(JournalEntry::Topic::tree));
 
 	//debug ---->
 	if(traceMask & PAFFS_TRACE_TREECACHE){

@@ -60,7 +60,12 @@ public:
 	Result registerRootnode(Addr addr);
 	Addr getRootnodeAddr();
 
-	JournalEntry::Topic getTopic() override;
+	JournalEntry::Topic
+	getTopic() override;
+	void
+	processEntry(JournalEntry& entry) override;
+	void
+	processUncheckpointedEntry(JournalEntry& entry) override;
 
 	//returns PAFFS_NF if no superindex is in flash
 	Result readSuperIndex(SuperIndex* index);
@@ -138,11 +143,6 @@ private:
 	 */
 	AreaPos findBestNextFreeArea(AreaPos logPrev);
 	unsigned int calculateNeededBytesForSuperIndex(unsigned char numberOfAreaSummaries = 2);
-
-	void
-	processEntry(JournalEntry& entry) override;
-	void
-	processUncheckpointedEntry(JournalEntry& entry) override;
 };
 
 }

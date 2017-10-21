@@ -124,6 +124,27 @@ JournalEntry::Topic Btree::getTopic(){
 	return JournalEntry::Topic::tree;
 }
 
+void Btree::processEntry(JournalEntry& entry){
+	if(entry.topic != getTopic()){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
+		return;
+	}
+	const journalEntry::BTree* e =
+			static_cast<const journalEntry::BTree*>(&entry);
+	switch(e->op)
+	{
+	case journalEntry::BTree::Operation::insert:
+		insertInode(static_cast<const journalEntry::btree::Insert*>(&entry)->inode);
+		break;
+	case journalEntry::BTree::Operation::update:
+		updateExistingInode(static_cast<const journalEntry::btree::Update*>(&entry)->inode);
+		break;
+	case journalEntry::BTree::Operation::remove:
+		deleteInode(static_cast<const journalEntry::btree::Remove*>(&entry)->no);
+		break;
+	}
+}
+
 /**
  * Compares
  */
@@ -1054,27 +1075,6 @@ void Btree::print_keys(TreeCacheNode &c){
 	*c_copy = c;
 	queue_enqueue(q, c_copy);
 	print_queued_keys_r(q);
-}
-
-void Btree::processEntry(JournalEntry& entry){
-	if(entry.topic != getTopic()){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
-		return;
-	}
-	const journalEntry::BTree* e =
-			static_cast<const journalEntry::BTree*>(&entry);
-	switch(e->op)
-	{
-	case journalEntry::BTree::Operation::insert:
-		insertInode(static_cast<const journalEntry::btree::Insert*>(&entry)->inode);
-		break;
-	case journalEntry::BTree::Operation::update:
-		updateExistingInode(static_cast<const journalEntry::btree::Update*>(&entry)->inode);
-		break;
-	case journalEntry::BTree::Operation::remove:
-		deleteInode(static_cast<const journalEntry::btree::Remove*>(&entry)->no);
-		break;
-	}
 }
 
 }

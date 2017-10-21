@@ -11,6 +11,5 @@
 namespace paffs
 {
 constexpr const char* JournalEntry::topicNames[];
-constexpr const char* journalEntry::Transaction::statusNames[];
 }
 

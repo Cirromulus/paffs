@@ -7,103 +7,79 @@
 
 #pragma once
 #include "commonTypes.hpp"
-#include <iostream>
+#include <type_traits>
 
 namespace paffs
 {
 
+template <typename E>
+constexpr typename std::underlying_type<E>::type to_underlying(E e) noexcept {
+    return static_cast<typename std::underlying_type<E>::type>(e);
+}
+
 struct JournalEntry{
 	enum class Topic{
-		empty,
-		transaction,
+		checkpoint,
+		success,
 		superblock,
 		tree,
 		summaryCache,
 		inode,
 	};
 	static constexpr const char* topicNames[] = {
-		"EMPTY",
-		"TRANSACTON",
+		"CHECKPOINT",
+		"SUCCEED",
 		"SUPERBLOCK",
 		"TREE",
 		"SUMMARY CACHE",
 		"INODE",
 	};
+	static constexpr const unsigned char numberOfTopics = 6;
 	Topic topic;
 protected:
 	JournalEntry(Topic _topic) : topic(_topic){};
 public:
-	virtual PageAbs getSize()
-	{
-		return sizeof(JournalEntry);
-	}
 	virtual ~JournalEntry(){};
 };
 
 namespace journalEntry
 {
-	struct Empty : public JournalEntry
+	struct Checkpoint : public JournalEntry
 	{
-		uint16_t size;
-		Empty(uint16_t _size) : JournalEntry(Topic::empty), size(_size){};
-		PageAbs getSize() override
-		{
-			return size;
-		}
+		Checkpoint() : JournalEntry(Topic::checkpoint){};
 	};
 
-	struct Transaction : public JournalEntry
+	struct Success : public JournalEntry
 	{
-		enum class Status
-		{
-			checkpoint,
-			success,
-		};
-		static constexpr const char* statusNames[] = {
-			"CHECKPOINT",
-			"SUCCESS",
-		};
+		//Target should only be Superblock and Tree.
 		Topic target;
-		Status status;
-		Transaction(Topic _target, Status _status) : JournalEntry(Topic::transaction),
-					target(_target), status(_status){};
-		PageAbs getSize() override
-		{
-			return sizeof(Transaction);
-		}
+		Success(Topic _target) : JournalEntry(Topic::success), target(_target){};
 	};
 
 	struct Superblock : public JournalEntry{
-		enum class Subtype{
+		enum class Type{
 			rootnode,
 			areaMap,
 		};
-		Subtype subtype;
+		Type type;
 	protected:
-		Superblock(Subtype _subtype) : JournalEntry(Topic::superblock),
-				subtype(_subtype){};
+		Superblock(Type _type) : JournalEntry(Topic::superblock),
+				type(_type){};
 	public:
-		virtual PageAbs getSize() override
-		{
-			return sizeof(Superblock);
-		}
 		virtual ~Superblock(){};
 	};
 
 	namespace superblock{
 
-		struct Rootnode : public Superblock{
+		struct Rootnode : public Superblock
+		{
 			Addr rootnode;
-			Rootnode(Addr _rootnode) : Superblock(Subtype::rootnode),
+			Rootnode(Addr _rootnode) : Superblock(Type::rootnode),
 					rootnode(_rootnode){};
-			PageAbs getSize() override
-			{
-				return sizeof(Rootnode);
-			}
 		};
 
 		struct AreaMap : public Superblock{
-			enum class Element{
+			enum class Operation{
 				type,
 				status,
 				erasecount,
@@ -111,64 +87,40 @@ namespace journalEntry
 				swap,
 			};
 			AreaPos offs;
-			Element element;
+			Operation operation;
 		protected:
-			AreaMap(AreaPos _offs, Element _element) : Superblock(Superblock::Subtype::areaMap),
-					offs(_offs), element(_element){};
+			AreaMap(AreaPos _offs, Operation _operation) : Superblock(Superblock::Type::areaMap),
+					offs(_offs), operation(_operation){};
 		public:
-			virtual PageAbs getSize() override
-			{
-				return sizeof(AreaMap);
-			}
 			virtual ~AreaMap(){};
 		};
 
 		namespace areaMap
 		{
 			struct Type : public AreaMap{
-				Type(AreaPos _offs, AreaType _type) : AreaMap(_offs, Element::type),
+				Type(AreaPos _offs, AreaType _type) : AreaMap(_offs, Operation::type),
 						type(_type){};
 				AreaType type;
-				virtual PageAbs getSize() override
-				{
-					return sizeof(Type);
-				}
 			};
 			struct Status : public AreaMap{
-				Status(AreaPos _offs, AreaStatus _status) : AreaMap(_offs, Element::status),
+				Status(AreaPos _offs, AreaStatus _status) : AreaMap(_offs, Operation::status),
 						status(_status){};
 				AreaStatus status;
-				virtual PageAbs getSize() override
-				{
-					return sizeof(Status);
-				}
 			};
 			struct Erasecount : public AreaMap{
-				Erasecount(AreaPos _offs, uint32_t _erasecount) : AreaMap(_offs, Element::erasecount),
+				Erasecount(AreaPos _offs, uint32_t _erasecount) : AreaMap(_offs, Operation::erasecount),
 						erasecount(_erasecount){};
 				uint32_t erasecount;
-				virtual PageAbs getSize() override
-				{
-					return sizeof(Erasecount);
-				}
 			};
 			struct Position : public AreaMap{
-				Position(AreaPos _offs, AreaPos _position) : AreaMap(_offs, Element::position),
+				Position(AreaPos _offs, AreaPos _position) : AreaMap(_offs, Operation::position),
 						position(_position){};
 				AreaPos position;
-				virtual PageAbs getSize() override
-				{
-					return sizeof(Position);
-				}
 			};
 			struct Swap : public AreaMap{
 				AreaPos b;
-				Swap(AreaPos _a, AreaPos _b) : AreaMap(_a, Element::swap),
+				Swap(AreaPos _a, AreaPos _b) : AreaMap(_a, Operation::swap),
 						b(_b){};
-				virtual PageAbs getSize() override
-				{
-					return sizeof(Swap);
-				}
 			};
 			union Max
 			{
@@ -178,6 +130,7 @@ namespace journalEntry
 				Position position;
 			};
 		};
+
 		union Max
 		{
 			Rootnode rootnode;
@@ -204,26 +157,14 @@ namespace journalEntry
 		struct Insert : public BTree{
 			paffs::Inode inode;
 			Insert(Inode _inode): BTree(Operation::insert), inode(_inode){};
-			virtual PageAbs getSize() override
-			{
-				return sizeof(Insert);
-			}
 		};
 		struct Update : public BTree{
 			paffs::Inode inode;
 			Update(Inode _inode): BTree(Operation::update), inode(_inode){};
-			virtual PageAbs getSize() override
-			{
-				return sizeof(Update);
-			}
 		};
 		struct Remove : public BTree{
 			InodeNo no;
 			Remove(InodeNo _no): BTree(Operation::remove), no(_no){};
-			virtual PageAbs getSize() override
-			{
-				return sizeof(Remove);
-			}
 		};
 
 		union Max
@@ -247,27 +188,15 @@ namespace journalEntry
 					area(_area), subtype(_subtype){};
 	public:
 		~SummaryCache(){};
-		virtual PageAbs getSize() override
-		{
-			return sizeof(SummaryCache);
-		}
 	};
 
 	namespace summaryCache{
 		struct Commit : public SummaryCache{
 			Commit(AreaPos _area) : SummaryCache(_area, Subtype::commit){};
-			virtual PageAbs getSize() override
-			{
-				return sizeof(Commit);
-			}
 		};
 
 		struct Remove : public SummaryCache{
 			Remove(AreaPos _area) : SummaryCache(_area, Subtype::remove){};
-			virtual PageAbs getSize() override
-			{
-				return sizeof(Remove);
-			}
 		};
 
 		struct SetStatus : public SummaryCache{
@@ -275,10 +204,6 @@ namespace journalEntry
 			SummaryEntry status;
 			SetStatus(AreaPos _area, PageOffs _page, SummaryEntry _status) :
 				SummaryCache(_area, Subtype::setStatus), page(_page), status(_status){};
-			virtual PageAbs getSize() override
-			{
-				return sizeof(SetStatus);
-			}
 		};
 
 		union Max
@@ -289,22 +214,19 @@ namespace journalEntry
 	}
 
 	struct Inode : public JournalEntry{
-		enum class Subtype{
+		enum class Operation{
 			add,
 			write,
-			remove
+			remove,
+			commit
 		};
-		Subtype subtype;
+		Operation operation;
 		InodeNo inode;
 	protected:
-		Inode(Subtype _subtype, InodeNo _inode) : JournalEntry(Topic::inode),
-			subtype(_subtype), inode(_inode){};
+		Inode(Operation _operation, InodeNo _inode) : JournalEntry(Topic::inode),
+			operation(_operation), inode(_inode){};
 	public:
 		virtual ~Inode(){};
-		virtual PageAbs getSize() override
-		{
-			return sizeof(Inode);
-		}
 	};
 
 	namespace inode
@@ -312,53 +234,46 @@ namespace journalEntry
 		//TODO
 		struct Add : public Inode
 		{
-			Add(InodeNo _inode) : Inode(Subtype::add, _inode){};
-			virtual PageAbs getSize() override
-			{
-				return sizeof(Add);
-			}
+			Add(InodeNo _inode) : Inode(Operation::add, _inode){};
 		};
 
 		struct Write : public Inode
 		{
-			Write(InodeNo _inode) : Inode(Subtype::write, _inode){};
-			virtual PageAbs getSize() override
-			{
-				return sizeof(Write);
-			}
+			Write(InodeNo _inode) : Inode(Operation::write, _inode){};
 		};
 
 		struct Remove : public Inode
 		{
-			Remove(InodeNo _inode) : Inode(Subtype::remove, _inode){};
-			virtual PageAbs getSize() override
-			{
-				return sizeof(Remove);
-			}
+			Remove(InodeNo _inode) : Inode(Operation::remove, _inode){};
 		};
+		struct Commit : public Inode
+		{
+			Commit(InodeNo _inode) : Inode(Operation::commit, _inode){};
+		};
+
 
 		union Max
 		{
-			Inode inode;
-
 			Add add;
-			//TODO: Rest
+			Write write;
+			Remove remove;
+			Commit commit;
 		};
 	}
 	union Max
 	{
-		JournalEntry base;		//Not nice?
+		JournalEntry      base;		//Not nice?
 
-		Empty empty;
-		Transaction transaction;
-		Superblock superblock;
-		superblock::Max superblock_;
-		BTree btree;
-		btree::Max btree_;
-		SummaryCache summaryCache;
+		Checkpoint        checkpoint;
+		Success           success;
+		Superblock        superblock;
+		superblock::Max   superblock_;
+		BTree             btree;
+		btree::Max        btree_;
+		SummaryCache      summaryCache;
 		summaryCache::Max summaryCache_;
-		Inode inode;
-		inode::Max inode_;
+		Inode             inode;
+		inode::Max        inode_;
 		Max()
 		{
 			memset(static_cast<void*>(this), 0, sizeof(Max));

@@ -30,6 +30,9 @@ TEST(Journal, WriteAndReadMRAM){
 	dev->sumCache.setPageStatus(0, 1, SummaryEntry::used);
 
 	//whoops, power went out (No Checkpoint)
+	/*fs.setTraceMask(fs.getTraceMask() |
+			PAFFS_TRACE_JOURNAL |
+			PAFFS_TRACE_VERBOSE);*/
 	dev->journal.processBuffer();
 
 	ASSERT_EQ(dev->superblock.getRootnodeAddr(), journalEntry::superblock::Rootnode(5678).rootnode);

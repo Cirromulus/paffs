@@ -34,7 +34,10 @@ public:
 	Result start_new_tree();
 	Result commitCache();
 	void wipeCache();
-	JournalEntry::Topic getTopic() override;
+	JournalEntry::Topic
+	getTopic() override;
+	void
+	processEntry(JournalEntry& entry) override;
 private:
 	void print_leaves(TreeCacheNode &c);
 	void print_queued_keys_r(queue_s* q);
@@ -78,9 +81,6 @@ private:
 					unsigned int k_prime_index, unsigned int k_prime);
 	Result delete_entry(TreeCacheNode &n, InodeNo key);
 	Result remove_entry_from_node(TreeCacheNode &n, InodeNo key);
-
-	void
-	processEntry(JournalEntry& entry) override;
 
 };
 }

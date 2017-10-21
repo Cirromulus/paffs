@@ -219,6 +219,11 @@ struct Area{	//TODO: Maybe packed? Slow, but less RAM
 
 const char* err_msg(Result pr);	//implemented in paffs.cpp
 
+template<typename T, size_t N> constexpr size_t
+size(T(&)[N]){
+	return N;
+}
+
 class Device;
 class Driver;
 
