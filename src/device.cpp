@@ -208,7 +208,7 @@ Result Device::mnt(bool readOnlyMode){
 
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Replayed Journal if needed");
 
-	//FIXME: This is O(n), save aactive Area in SuperIndex
+	//FIXME: This is O(n), save active Area in SuperIndex
 	for(AreaPos i = 0; i < areasNo; i++){
 		if(areaMgmt.getType(i) == AreaType::garbageBuffer){
 			activeArea[AreaType::garbageBuffer] = i;

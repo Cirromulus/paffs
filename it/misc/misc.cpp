@@ -91,12 +91,14 @@ void import()
 	inm.close();
 
 	Paffs fs(drv);
+	fs.setTraceMask(fs.getTraceMask() | PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE);
 	Result r = fs.mount();
 	if(r != Result::ok)
 	{
 		cout << "Could not mount filesystem!" << endl;
 		return;
 	}
+	fs.setTraceMask(fs.getTraceMask() & ~(PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE));
 
 	ObjInfo info;
 	r = fs.getObjInfo(filename, info);

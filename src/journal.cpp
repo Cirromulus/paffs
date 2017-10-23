@@ -60,7 +60,7 @@ Journal::processBuffer(){
 	PageAbs curr = sizeof(PageAbs);
 
 	//Scan for success messages
-	while(curr <= hwm)
+	while(curr < hwm)
 	{
 		journalEntry::Max entry;
 		readNextEntry(curr, entry);
@@ -82,7 +82,7 @@ Journal::processBuffer(){
 
 	PageAbs lastUnprocessedEntry = sizeof(PageAbs);
 	curr = lastUnprocessedEntry;
-	while(curr <= hwm)
+	while(curr < hwm)
 	{
 		journalEntry::Max entry;
 		readNextEntry(curr, entry);
