@@ -17,7 +17,8 @@ outpost::rtos::SystemClock systemClock;
 Device::Device(Driver& _driver) : driver(_driver),
 		usedAreas(0), lasterr(Result::ok), mounted(false), readOnly(false),
 		tree(this), sumCache(this), areaMgmt(this), dataIO(this), superblock(this),
-		journal(_driver, superblock, sumCache, tree){};
+		journalPersistence(driver),
+		journal(journalPersistence, superblock, sumCache, tree){};
 
 Device::~Device(){
 	if(mounted){
@@ -94,6 +95,7 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 
 		if(hadAreaType &
 				(1 << AreaType::superblock |
+				1 << AreaType::journal |
 				1 << AreaType::garbageBuffer) ||
 				complete){
 			for(unsigned int p = 0; p < blocksPerArea; p++){
@@ -119,6 +121,14 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 			areaMgmt.initArea(area);
 			if(++hadSuperblocks == superChainElems)
 				hadAreaType |= 1 << AreaType::superblock;
+			continue;
+		}
+
+		if(!(hadAreaType & 1 << AreaType::journal)){
+			activeArea[AreaType::journal] = area;
+			areaMgmt.setType(area, AreaType::journal);
+			areaMgmt.initArea(area);
+			hadAreaType |= 1 << AreaType::journal;
 			continue;
 		}
 

@@ -188,6 +188,7 @@ struct ObjInfo{
 enum AreaType : uint8_t{
 	unset = 0,
 	superblock,
+	journal,
 	index,
 	data,
 	garbageBuffer,

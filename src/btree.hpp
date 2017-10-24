@@ -11,10 +11,10 @@
 
 #include "paffs_trace.hpp"
 #include "commonTypes.hpp"
+#include "journalTopic.hpp"
 #include "treeCache.hpp"
 #include "treeTypes.hpp"
 #include "treequeue.hpp" //Just for printing debug info in tree
-#include "journalTopics.hpp"
 
 namespace paffs{
 

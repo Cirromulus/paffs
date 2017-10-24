@@ -14,18 +14,17 @@
 using namespace paffs;
 using namespace std;
 
-#define WRITEELEM(type, obj, ptr) \
-		driver.writeMRAM(ptr, &obj, sizeof(type)); \
-		ptr += sizeof(type);
-
 void
 Journal::addEvent(const JournalEntry& entry){
-	if(pos + sizeof(journalEntry::Max) > mramSize){
+	Result r = persistence.appendEntry(entry);
+	if(r == Result::nospace){
 		PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Log full. should be flushed.");
 		return;
 	}
-	writeEntry(pos, entry);
-	driver.writeMRAM(0, &pos, sizeof(PageAbs));
+	if(r != Result::ok)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not append Entry to persistence");
+	}
 }
 
 void
@@ -37,17 +36,14 @@ Journal::checkpoint()
 void
 Journal::clear()
 {
-	pos = sizeof(PageAbs);
-	driver.writeMRAM(0, &pos, sizeof(PageAbs));
+	persistence.clear();
 }
 
 void
 Journal::processBuffer(){
-	PageAbs hwm;
-	driver.readMRAM(0, &hwm, sizeof(PageAbs));
 
-
-	if(hwm == sizeof(PageAbs))
+	journalEntry::Max entry;
+	if(persistence.readNextElem(entry) != Result::ok)
 	{
 		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "No Replay of Journal needed");
 		return;
@@ -55,84 +51,90 @@ Journal::processBuffer(){
 
 	PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Replay of Journal needed");
 
-	PageAbs firstUnsuccededEntry[JournalEntry::numberOfTopics];
-	memset(&firstUnsuccededEntry, 0, sizeof(firstUnsuccededEntry));
-	PageAbs curr = sizeof(PageAbs);
+	EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics];
 
 	//Scan for success messages
-	while(curr < hwm)
+	do
 	{
-		journalEntry::Max entry;
-		readNextEntry(curr, entry);
 		if(entry.base.topic == JournalEntry::Topic::success)
 		{
-			firstUnsuccededEntry[static_cast<unsigned>(entry.success.target)] = curr;
+			firstUnsuccededEntry[static_cast<unsigned>(entry.success.target)] = persistence.tell();
 		}
-	}
+	}while(persistence.readNextElem(entry) == Result::ok);
 
 	if(traceMask & (PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE))
 	{
 		printf("FirstUnsucceededEntry:\n");
 		for(unsigned i = 0; i < JournalEntry::numberOfTopics; i++)
 		{
-			printf("\t%s: %" PRIu64 "\n", JournalEntry::topicNames[i], firstUnsuccededEntry[i]);
+			printf("\t%s: %" PRIu64 ".%" PRIu16 "\n", JournalEntry::topicNames[i],
+					firstUnsuccededEntry[i].page, firstUnsuccededEntry[i].offs);
 		}
 	}
 	PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE), "Scanning for checkpoints...");
 
-	PageAbs lastUnprocessedEntry = sizeof(PageAbs);
-	curr = lastUnprocessedEntry;
-	while(curr < hwm)
+	persistence.rewind();
+	EntryIdentifier firstUnprocessedEntry = persistence.tell();
+
+	while(persistence.readNextElem(entry) == Result::ok)
 	{
-		journalEntry::Max entry;
-		readNextEntry(curr, entry);
 		if(entry.base.topic == JournalEntry::Topic::checkpoint)
 		{
-			applyCheckpointedJournalEntries(lastUnprocessedEntry, curr, firstUnsuccededEntry);
-			lastUnprocessedEntry = curr;
+			EntryIdentifier curr = persistence.tell();
+			applyCheckpointedJournalEntries(firstUnprocessedEntry, curr, firstUnsuccededEntry);
+			firstUnprocessedEntry = curr;
 		}
 	}
-	if(lastUnprocessedEntry != hwm)
+	if(firstUnprocessedEntry != persistence.tell())
 	{
 		PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Uncheckpointed Entries exist");
-		applyUncheckpointedJournalEntries(lastUnprocessedEntry, hwm);
+		applyUncheckpointedJournalEntries(firstUnprocessedEntry);
 	}
 }
 
 void
-Journal::applyCheckpointedJournalEntries(PageAbs from, PageAbs to,
-		PageAbs firstUnsuccededEntry[JournalEntry::numberOfTopics])
+Journal::applyCheckpointedJournalEntries(EntryIdentifier& from, EntryIdentifier& to,
+		EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics])
 {
 	PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Applying Checkpointed Entries "
 			"from %" PRIu64 " to %" PRIu64, from, to);
-	PageAbs curr = from;
-	while(curr < to)
+	EntryIdentifier restore = persistence.tell();
+	persistence.seek(from);
+	while(true)
 	{
 		journalEntry::Max entry;
-		readNextEntry(curr, entry);
+		if(persistence.readNextElem(entry) != Result::ok)
+		{
+			PAFFS_DBG(PAFFS_TRACE_BUG, "Could not read journal to target end");
+			break;
+		}
+		if(persistence.tell() >= to)
+			break;
+
 		for(JournalTopic* worker : topics)
 		{
 			if(entry.base.topic == worker->getTopic())
 			{
-				if(curr >= firstUnsuccededEntry[to_underlying(worker->getTopic())])
+				if(persistence.tell() >= firstUnsuccededEntry[to_underlying(worker->getTopic())])
 				{
 					worker->processEntry(entry.base);
 				}
 			}
 		}
 	}
+	persistence.seek(restore);
 }
 
 void
-Journal::applyUncheckpointedJournalEntries(PageAbs from, PageAbs to)
+Journal::applyUncheckpointedJournalEntries(EntryIdentifier& from)
 {
 	PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Applying UNcheckpointed Entries "
-			"from %" PRIu64 " to %" PRIu64, from, to);
-	PageAbs curr = from;
-	while(curr <= to)
+			"from %" PRIu64, from);
+	EntryIdentifier restore = persistence.tell();
+	persistence.seek(from);
+	journalEntry::Max entry;
+	while(persistence.readNextElem(entry) == Result::ok)
 	{
-		journalEntry::Max entry;
-		readNextEntry(curr, entry);
 		for(JournalTopic* worker : topics)
 		{
 			if(entry.base.topic == worker->getTopic())
@@ -141,190 +143,6 @@ Journal::applyUncheckpointedJournalEntries(PageAbs from, PageAbs to)
 			}
 		}
 	}
-}
-
-void
-Journal::writeEntry(PageAbs &pointer, const JournalEntry& entry){
-	switch(entry.topic)
-	{
-	case JournalEntry::Topic::checkpoint:
-		WRITEELEM(journalEntry::Checkpoint, entry, pointer);
-		break;
-	case JournalEntry::Topic::success:
-		WRITEELEM(journalEntry::Success, entry, pointer);
-		break;
-	case JournalEntry::Topic::superblock:
-		switch(static_cast<const journalEntry::Superblock*>(&entry)->type)
-		{
-		case journalEntry::Superblock::Type::rootnode:
-			WRITEELEM(journalEntry::superblock::Rootnode, entry, pointer);
-			break;
-		case journalEntry::Superblock::Type::areaMap:
-			switch(static_cast<const journalEntry::superblock::AreaMap*>(&entry)->operation)
-			{
-			case journalEntry::superblock::AreaMap::Operation::type:
-				WRITEELEM(journalEntry::superblock::areaMap::Type, entry, pointer);
-				break;
-			case journalEntry::superblock::AreaMap::Operation::status:
-				WRITEELEM(journalEntry::superblock::areaMap::Status, entry, pointer);
-				break;
-			case journalEntry::superblock::AreaMap::Operation::erasecount:
-				WRITEELEM(journalEntry::superblock::areaMap::Erasecount, entry, pointer);
-				break;
-			case journalEntry::superblock::AreaMap::Operation::position:
-				WRITEELEM(journalEntry::superblock::areaMap::Type, entry, pointer);
-				break;
-			case journalEntry::superblock::AreaMap::Operation::swap:
-				WRITEELEM(journalEntry::superblock::areaMap::Swap, entry, pointer);
-				break;
-			}
-			break;
-		}
-		break;
-	case JournalEntry::Topic::tree:
-		switch(static_cast<const journalEntry::BTree*>(&entry)->op)
-		{
-		case journalEntry::BTree::Operation::insert:
-			WRITEELEM(journalEntry::btree::Insert, entry, pointer);
-			break;
-		case journalEntry::BTree::Operation::update:
-			WRITEELEM(journalEntry::btree::Update, entry, pointer);
-			break;
-		case journalEntry::BTree::Operation::remove:
-			WRITEELEM(journalEntry::btree::Remove, entry, pointer);
-			break;
-		}
-		break;
-	case JournalEntry::Topic::summaryCache:
-		switch(static_cast<const journalEntry::SummaryCache*>(&entry)->subtype)
-		{
-		case journalEntry::SummaryCache::Subtype::commit:
-			WRITEELEM(journalEntry::summaryCache::Commit, entry, pointer);
-			break;
-		case journalEntry::SummaryCache::Subtype::remove:
-			WRITEELEM(journalEntry::summaryCache::Remove, entry, pointer);
-			break;
-		case journalEntry::SummaryCache::Subtype::setStatus:
-			WRITEELEM(journalEntry::summaryCache::SetStatus, entry, pointer);
-			break;
-		}
-		break;
-	case JournalEntry::Topic::inode:
-		switch(static_cast<const journalEntry::Inode*>(&entry)->operation)
-		{
-		case journalEntry::Inode::Operation::add:
-			WRITEELEM(journalEntry::inode::Add, entry, pointer);
-			break;
-		case journalEntry::Inode::Operation::write:
-			WRITEELEM(journalEntry::inode::Write, entry, pointer);
-			break;
-		case journalEntry::Inode::Operation::remove:
-			WRITEELEM(journalEntry::inode::Remove, entry, pointer);
-			break;
-		case journalEntry::Inode::Operation::commit:
-			WRITEELEM(journalEntry::inode::Commit, entry, pointer);
-			break;
-		}
-	}
-}
-
-void
-Journal::readNextEntry(PageAbs& pointer, journalEntry::Max& entry){
-	driver.readMRAM(pointer, &entry, sizeof(journalEntry::Max));
-	if(traceMask & (PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE))
-	{
-		printf("Read entry at %" PRIu64 ":\n\t", pointer);
-		printMeaning(entry.base);
-	}
-	pointer += getSizeFromMax(entry);
-}
-
-PageAbs
-Journal::getSizeFromMax(const journalEntry::Max &entry)
-{
-	PageAbs size = 0;
-	switch(entry.base.topic)
-	{
-	case JournalEntry::Topic::checkpoint:
-		size = sizeof(journalEntry::Checkpoint);
-		break;
-	case JournalEntry::Topic::success:
-		size = sizeof(journalEntry::Success);
-		break;
-	case JournalEntry::Topic::superblock:
-		switch(entry.superblock.type)
-		{
-		case journalEntry::Superblock::Type::rootnode:
-			size = sizeof(journalEntry::superblock::Rootnode);
-			break;
-		case journalEntry::Superblock::Type::areaMap:
-			switch(entry.superblock_.areaMap.operation)
-			{
-			case journalEntry::superblock::AreaMap::Operation::type:
-				size = sizeof(journalEntry::superblock::areaMap::Type);
-				break;
-			case journalEntry::superblock::AreaMap::Operation::status:
-				size = sizeof(journalEntry::superblock::areaMap::Status);
-				break;
-			case journalEntry::superblock::AreaMap::Operation::erasecount:
-				size = sizeof(journalEntry::superblock::areaMap::Erasecount);
-				break;
-			case journalEntry::superblock::AreaMap::Operation::position:
-				size = sizeof(journalEntry::superblock::areaMap::Type);
-				break;
-			case journalEntry::superblock::AreaMap::Operation::swap:
-				size = sizeof(journalEntry::superblock::areaMap::Swap);
-				break;
-			}
-			break;
-		}
-		break;
-	case JournalEntry::Topic::tree:
-		switch(entry.btree.op)
-		{
-		case journalEntry::BTree::Operation::insert:
-			size = sizeof(journalEntry::btree::Insert);
-			break;
-		case journalEntry::BTree::Operation::update:
-			size = sizeof(journalEntry::btree::Update);
-			break;
-		case journalEntry::BTree::Operation::remove:
-			size = sizeof(journalEntry::btree::Remove);
-			break;
-		}
-		break;
-	case JournalEntry::Topic::summaryCache:
-		switch(entry.summaryCache.subtype)
-		{
-		case journalEntry::SummaryCache::Subtype::commit:
-			size = sizeof(journalEntry::summaryCache::Commit);
-			break;
-		case journalEntry::SummaryCache::Subtype::remove:
-			size = sizeof(journalEntry::summaryCache::Remove);
-			break;
-		case journalEntry::SummaryCache::Subtype::setStatus:
-			size = sizeof(journalEntry::summaryCache::SetStatus);
-			break;
-		}
-		break;
-	case JournalEntry::Topic::inode:
-		switch(entry.inode.operation)
-		{
-		case journalEntry::Inode::Operation::add:
-			size = sizeof(journalEntry::inode::Add);
-			break;
-		case journalEntry::Inode::Operation::write:
-			size = sizeof(journalEntry::inode::Write);
-			break;
-		case journalEntry::Inode::Operation::remove:
-			size = sizeof(journalEntry::inode::Remove);
-			break;
-		case journalEntry::Inode::Operation::commit:
-			size = sizeof(journalEntry::inode::Commit);
-			break;
-		}
-	}
-	return size;
 }
 
 void

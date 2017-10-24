@@ -7,8 +7,8 @@
 
 #pragma once
 #include "commonTypes.hpp"
-#include "journalTopics.hpp"
 #include <unordered_map>
+#include "journalTopic.hpp"
 
 namespace paffs {
 

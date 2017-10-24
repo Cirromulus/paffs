@@ -19,7 +19,7 @@ constexpr typename std::underlying_type<E>::type to_underlying(E e) noexcept {
 
 struct JournalEntry{
 	enum class Topic{
-		checkpoint,
+		checkpoint = 1,
 		success,
 		superblock,
 		tree,

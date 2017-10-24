@@ -6,26 +6,25 @@
  */
 
 #pragma once
-#include "commonTypes.hpp"
-#include "journalTopics.hpp"
 #include "journalEntry.hpp"
+#include "journalPersistence.hpp"
+#include "journalTopic.hpp"
 
 namespace paffs{
 
 class Journal{
 	JournalTopic* topics[3];
-	Driver& driver;
 
-	PageAbs pos;
+	JournalPersistence& persistence;
 public:
-	Journal(Driver& _driver, JournalTopic& superblock, JournalTopic& summaryCache,
-	        JournalTopic& tree): driver(_driver){
-		//This Order is important, as tree should only be replayed after areaMap is sane
+	Journal(JournalPersistence& _persistence, JournalTopic& superblock, JournalTopic& summaryCache,
+	        JournalTopic& tree): persistence(_persistence){
+
 		topics[0] = &superblock;
 		topics[1] = &summaryCache;
 		topics[2] = &tree;
 		//TODO Inode
-		pos = sizeof(PageAbs);
+
 	}
 
 	void
@@ -40,14 +39,10 @@ public:
 	printMeaning(const JournalEntry& entry);
 private:
 	void
-	applyCheckpointedJournalEntries(PageAbs from, PageAbs to,
-			PageAbs firstUnsuccededEntry[JournalEntry::numberOfTopics]);
+	applyCheckpointedJournalEntries(EntryIdentifier& from, EntryIdentifier& to,
+			EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics]);
 	void
-	applyUncheckpointedJournalEntries(PageAbs from, PageAbs to);
-	void
-	writeEntry(PageAbs& pointer, const JournalEntry& entry);
-	void
-	readNextEntry(PageAbs& pointer, journalEntry::Max& entry);
+	applyUncheckpointedJournalEntries(EntryIdentifier& from);
 	PageAbs
 	getSizeFromMax(const journalEntry::Max &entry);
 };

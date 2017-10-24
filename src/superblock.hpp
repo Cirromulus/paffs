@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 #include "commonTypes.hpp"
-#include "journalTopics.hpp"
+#include "journalTopic.hpp"
 
 namespace paffs{
 

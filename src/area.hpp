@@ -6,8 +6,8 @@
  */
 #pragma once
 #include "commonTypes.hpp"
-#include "journalTopics.hpp"
 #include "garbage_collection.hpp"
+#include "journalTopic.hpp"
 
 namespace paffs {
 

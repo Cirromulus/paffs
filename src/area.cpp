@@ -17,6 +17,7 @@ namespace paffs {
 const char* areaNames[] = {
 		"UNSET",
 		"SUPERBLOCK",
+		"JOURNAL",
 		"INDEX",
 		"DATA",
 		"GC_BUFFER",
