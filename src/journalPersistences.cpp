@@ -8,6 +8,7 @@
 
 #include "journalPersistence.hpp"
 #include "driver/driver.hpp"
+#include <inttypes.h>
 
 namespace paffs
 {
@@ -131,14 +132,17 @@ MramPersistence::appendEntry(const JournalEntry& entry)
 		return Result::nospace;
 	uint16_t size = getSizeFromJE(entry);
 	driver.writeMRAM(curr, &entry, size);
+	PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE),
+			"Wrote Entry to %" PRIu64 "-%" PRIu64, curr, curr + size);
 	curr += size;
+	driver.writeMRAM(0, &curr, sizeof(PageAbs));
 	return Result::ok;
 }
 
 Result
 MramPersistence::clear()
 {
-	curr = 0;
+	curr = sizeof(PageAbs);
 	driver.writeMRAM(0, &curr, sizeof(PageAbs));
 	return Result::ok;
 }
@@ -148,16 +152,19 @@ MramPersistence::readNextElem(journalEntry::Max& entry)
 {
 	PageAbs hwm;
 	driver.readMRAM(0, &hwm, sizeof(PageAbs));
-	if(hwm == sizeof(PageAbs))
+	if(curr >= hwm)
 		return Result::nf;
 
 	driver.readMRAM(curr, &entry, sizeof(journalEntry::Max));
-	if(traceMask & (PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE))
+	uint16_t size = getSizeFromMax(entry);
+	PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE),
+			"Read entry at %" PRIu64 "-%" PRIu64, curr, curr + size);
+	if(size == 0)
 	{
-		printf("Read entry at %" PRIu64 ":\n", curr);
-		//printMeaning(entry.base);
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Read unknown entry!");
+		return Result::fail;
 	}
-	curr += getSizeFromMax(entry);
+	curr += size;
 	return Result::ok;
 }
 };

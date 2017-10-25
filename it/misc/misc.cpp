@@ -143,7 +143,8 @@ void exportLog()
 	fs.setTraceMask(fs.getTraceMask() |
 	                PAFFS_TRACE_ERROR |
 	                PAFFS_TRACE_BUG   |
-	                PAFFS_TRACE_INFO  );
+	                PAFFS_TRACE_INFO  |
+	                PAFFS_TRACE_JOURNAL);
 
 	fs.mount();
 
@@ -162,12 +163,7 @@ void exportLog()
 		return;
 	}
 
-	//For debug
-	//fs.close(*fil);
-	//fs.unmount();
-
 	//---- Whoops, power went out! ----//
-
 
 	ofstream ef(exportFlash, ios::out | ios::binary);
 	fc->getDebugInterface()->serialize(ef);
@@ -176,7 +172,9 @@ void exportLog()
 	mram->serialize(em);
 	em.close();
 
-	//TODO: Export
+	//fs.close(*fil);
+	//fs.unmount();
+
 	delete fc;
 	delete mram;
 }

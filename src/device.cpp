@@ -586,7 +586,6 @@ Result Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update Inode after directory insert!");
 		return r;
 	}
-	journal.checkpoint();
 	return r;
 }
 

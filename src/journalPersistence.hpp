@@ -19,7 +19,7 @@ struct EntryIdentifier
 	uint16_t offs;
 	EntryIdentifier() : page(0), offs(0){};
 	EntryIdentifier(PageAbs _page, uint16_t _offs): page(_page), offs(_offs){};
-	bool operator<(EntryIdentifier& other)
+	bool operator<(const EntryIdentifier& other)
 	{
 		if(page == other.page)
 		{
@@ -27,15 +27,15 @@ struct EntryIdentifier
 		}
 		return page < other.page;
 	}
-	bool operator==(const EntryIdentifier other)
+	bool operator==(const EntryIdentifier& other)
 	{
 		return page == other.page && offs == other.offs;
 	}
-	bool operator !=(const EntryIdentifier other)
+	bool operator !=(const EntryIdentifier& other)
 	{
 		return !(*this == other);
 	}
-	bool operator>=(const EntryIdentifier other)
+	bool operator>=(const EntryIdentifier& other)
 	{
 		return !(*this < other);
 	}

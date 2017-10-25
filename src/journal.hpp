@@ -16,6 +16,7 @@ class Journal{
 	JournalTopic* topics[3];
 
 	JournalPersistence& persistence;
+	bool recovery;
 public:
 	Journal(JournalPersistence& _persistence, JournalTopic& superblock, JournalTopic& summaryCache,
 	        JournalTopic& tree): persistence(_persistence){
@@ -25,6 +26,7 @@ public:
 		topics[2] = &tree;
 		//TODO Inode
 
+		recovery = false;
 	}
 
 	void
@@ -36,7 +38,7 @@ public:
 	void
 	processBuffer();
 	void
-	printMeaning(const JournalEntry& entry);
+	printMeaning(const JournalEntry& entry, bool withNewLine = true);
 private:
 	void
 	applyCheckpointedJournalEntries(EntryIdentifier& from, EntryIdentifier& to,

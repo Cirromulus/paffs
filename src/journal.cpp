@@ -16,6 +16,11 @@ using namespace std;
 
 void
 Journal::addEvent(const JournalEntry& entry){
+	if(recovery)
+	{
+		//Skipping, because we are currently replaying a buffer
+		return;
+	}
 	Result r = persistence.appendEntry(entry);
 	if(r == Result::nospace){
 		PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Log full. should be flushed.");
@@ -24,6 +29,10 @@ Journal::addEvent(const JournalEntry& entry){
 	if(r != Result::ok)
 	{
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not append Entry to persistence");
+	}
+	if(traceMask & (PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE))
+	{
+		printMeaning(entry);
 	}
 }
 
@@ -43,19 +52,28 @@ void
 Journal::processBuffer(){
 
 	journalEntry::Max entry;
+	EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics];
+	for(EntryIdentifier& id : firstUnsuccededEntry)
+	{
+		id = persistence.tell();
+	}
+
 	if(persistence.readNextElem(entry) != Result::ok)
 	{
 		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "No Replay of Journal needed");
 		return;
 	}
 
+	recovery = true;
 	PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Replay of Journal needed");
+	PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE), "Scanning for success entries...");
 
-	EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics];
-
-	//Scan for success messages
 	do
 	{
+		if(traceMask & (PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE))
+		{
+			printMeaning(entry.base);
+		}
 		if(entry.base.topic == JournalEntry::Topic::success)
 		{
 			firstUnsuccededEntry[static_cast<unsigned>(entry.success.target)] = persistence.tell();
@@ -90,6 +108,7 @@ Journal::processBuffer(){
 		PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Uncheckpointed Entries exist");
 		applyUncheckpointedJournalEntries(firstUnprocessedEntry);
 	}
+	recovery = false;
 }
 
 void
@@ -97,7 +116,8 @@ Journal::applyCheckpointedJournalEntries(EntryIdentifier& from, EntryIdentifier&
 		EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics])
 {
 	PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Applying Checkpointed Entries "
-			"from %" PRIu64 " to %" PRIu64, from, to);
+			"from %" PRIu64 ".%" PRIu16 " to %" PRIu64 ".%" PRIu16,
+			from.page, from.offs, to.page, to.offs);
 	EntryIdentifier restore = persistence.tell();
 	persistence.seek(from);
 	while(true)
@@ -108,7 +128,7 @@ Journal::applyCheckpointedJournalEntries(EntryIdentifier& from, EntryIdentifier&
 			PAFFS_DBG(PAFFS_TRACE_BUG, "Could not read journal to target end");
 			break;
 		}
-		if(persistence.tell() >= to)
+		if(persistence.tell() == to)
 			break;
 
 		for(JournalTopic* worker : topics)
@@ -117,6 +137,12 @@ Journal::applyCheckpointedJournalEntries(EntryIdentifier& from, EntryIdentifier&
 			{
 				if(persistence.tell() >= firstUnsuccededEntry[to_underlying(worker->getTopic())])
 				{
+					if(traceMask & (PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE))
+					{
+						printf("Processing entry ");
+						printMeaning(entry.base, false);
+						printf(" by %s\n", JournalEntry::topicNames[to_underlying(worker->getTopic())]);
+					}
 					worker->processEntry(entry.base);
 				}
 			}
@@ -129,7 +155,7 @@ void
 Journal::applyUncheckpointedJournalEntries(EntryIdentifier& from)
 {
 	PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Applying UNcheckpointed Entries "
-			"from %" PRIu64, from);
+			"from %" PRIu64 ".%" PRIu16, from.page, from.offs);
 	EntryIdentifier restore = persistence.tell();
 	persistence.seek(from);
 	journalEntry::Max entry;
@@ -143,10 +169,11 @@ Journal::applyUncheckpointedJournalEntries(EntryIdentifier& from)
 			}
 		}
 	}
+	persistence.seek(restore);
 }
 
 void
-Journal::printMeaning(const JournalEntry& entry)
+Journal::printMeaning(const JournalEntry& entry, bool withNewline)
 {
 	bool found = false;
 	switch(entry.topic)
@@ -265,5 +292,7 @@ Journal::printMeaning(const JournalEntry& entry)
 	}
 	if(!found)
 		printf("Unrecognized");
-	printf(" event.\n");
+	printf(" event");
+	if(withNewline)
+		printf(".\n");
 }
