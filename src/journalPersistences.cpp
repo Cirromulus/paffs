@@ -105,7 +105,8 @@ uint16_t
 JournalPersistence::getSizeFromJE(const JournalEntry& entry)
 {
 	journalEntry::Max max;
-	memcpy(&max, &entry, sizeof(journalEntry::Max));
+	//TODO: copy only getSizeFromJournalEntry bytes
+	memcpy(static_cast<void*>(&max), static_cast<void*>(&entry), sizeof(journalEntry::Max));
 	return getSizeFromMax(max);
 }
 
