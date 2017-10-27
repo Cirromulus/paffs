@@ -35,6 +35,8 @@ public:
 	 */
 	Result commitCache();
 
+	Result freeNodes(uint16_t neededCleanNodes = treeNodeCacheSize);
+
 	//--------------------------------------
 
 	/**
@@ -87,8 +89,9 @@ private:
 	bool resolveDirtyPaths(TreeCacheNode& tcn);
 	void markParentPathDirty(TreeCacheNode& tcn);
 	void deleteFromParent(TreeCacheNode& tcn);
-	bool hasNoSiblings(TreeCacheNode& tcn);
-	void deletePathToRoot(TreeCacheNode& tcn);
+	bool hasNoChilds(TreeCacheNode& tcn);
+	//! \return number of deleted Nodes
+	uint16_t deletePathToRoot(TreeCacheNode& tcn);
 	Result tryAddNewCacheNode(TreeCacheNode* &newTcn);
 	Result commitNodesRecursively(TreeCacheNode& node);
 	void setIndexUsed(uint16_t index);
@@ -106,14 +109,16 @@ private:
 	 */
 	bool areSiblingsClean(TreeCacheNode &tcn);
 	/*
-	 * Just frees clean nodes
+	 * \brief Just frees clean leaf nodes, so cache still contains branches...
+	 * \param neededCleanNodes will be decreased if some nodes were cleaned
 	 */
-	void cleanFreeNodes();
-	/*
-	 * Just frees clean leaf nodes, so cache still contains branches...
-	 */
-	void cleanFreeLeafNodes();
+	Result cleanFreeLeafNodes(uint16_t& neededCleanNodes);
 
+	/*
+	 * \brief Frees clean nodes
+	 * \param neededCleanNodes will be decreased if some nodes were cleaned
+	 */
+	Result cleanFreeNodes(uint16_t& neededCleanNodes);
 
 	Result writeTreeNode(TreeCacheNode& node);
 	Result readTreeNode(Addr addr, TreeNode& node);

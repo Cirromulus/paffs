@@ -50,7 +50,7 @@ Journal::clear()
 
 void
 Journal::processBuffer(){
-
+	persistence.rewind();
 	journalEntry::Max entry;
 	EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics];
 	for(EntryIdentifier& id : firstUnsuccededEntry)

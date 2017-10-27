@@ -35,6 +35,21 @@ Result Btree::insertInode(const Inode &inode){
 		}
 	}
 
+	cache.lockTreeCacheNode(*node);	//prevents own node from clear
+	TreeCacheNode* c;
+	r = cache.getRootNodeFromCache(c);
+	if(r != Result::ok)
+		return r;
+
+	//This prevents the cache from a commit inside invalid state
+	r = cache.freeNodes(height(*c));
+	if(r != Result::ok)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not reserve enough nodes in treecache!");
+		return r;
+	}
+	cache.unlockTreeCacheNode(*node);
+
 	dev->journal.addEvent(journalEntry::btree::Insert(inode));
 
 	/* Case: leaf has room for key and pointer.
@@ -72,6 +87,7 @@ Result Btree::updateExistingInode(const Inode &inode){
 	}
 
 	dev->journal.addEvent(journalEntry::btree::Update(inode));
+
 	node->raw.as.leaf.pInodes[pos] = inode;
 	node->dirty = true;
 
@@ -90,6 +106,7 @@ Result Btree::deleteInode(InodeNo number){
 	r = find_in_leaf (*key_leaf, number, key);
 	if(r != Result::ok)
 		return r;
+
 	dev->journal.addEvent(journalEntry::btree::Remove(number));
 	return delete_entry(*key_leaf, number);
 }

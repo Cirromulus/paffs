@@ -144,6 +144,18 @@ SummaryCache::SummaryCache(Device* mdev) : dev(mdev){
 	translation.reserve(areaSummaryCacheSize);
 }
 
+SummaryCache::~SummaryCache()
+{
+	for(unsigned i = 0; i < areaSummaryCacheSize; i++)
+	{
+		if(summaryCache[i].isDirty())
+		{
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Clearing Summary cache with uncommitted elem!");
+			summaryCache[i].setDirty(0);
+		}
+	}
+}
+
 Result SummaryCache::commitASHard(int &clearedAreaCachePosition){
 	PageOffs favDirtyPages = 0;
 	AreaPos favouriteArea = 0;
@@ -596,8 +608,14 @@ SummaryCache::processUncheckpointedEntry(JournalEntry& entry){
 		//TODO activate some failsafe that checks for invalid writes during this setPages
 		const journalEntry::summaryCache::SetStatus* s =
 				static_cast<const journalEntry::summaryCache::SetStatus*>(&entry);
-		setPageStatus(s->area, s->page, s->status == SummaryEntry::used ?
-										SummaryEntry::dirty : s->status);
+		if(s->status == SummaryEntry::used)
+		{
+			setPageStatus(s->area, s->page, SummaryEntry::dirty);
+		}
+		if(s->status == SummaryEntry::dirty)
+		{
+			setPageStatus(s->area, s->page, SummaryEntry::used);
+		}
 		break;
 	}
 	}

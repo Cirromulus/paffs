@@ -51,6 +51,7 @@ class SummaryCache : public JournalTopic{
 public:
 
 	SummaryCache(Device* mdev);
+	~SummaryCache();
 
 	//Same as setPageStatus(area, page, state)
 	Result setPageStatus(Addr addr, SummaryEntry state);
