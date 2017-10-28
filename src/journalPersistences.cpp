@@ -14,10 +14,10 @@ namespace paffs
 {
 
 uint16_t
-JournalPersistence::getSizeFromMax(const journalEntry::Max &entry)
+JournalPersistence::getSizeFromJE(const JournalEntry& entry)
 {
 	uint16_t size = 0;
-	switch(entry.base.topic)
+	switch(entry.topic)
 	{
 	case JournalEntry::Topic::checkpoint:
 		size = sizeof(journalEntry::Checkpoint);
@@ -26,13 +26,13 @@ JournalPersistence::getSizeFromMax(const journalEntry::Max &entry)
 		size = sizeof(journalEntry::Success);
 		break;
 	case JournalEntry::Topic::superblock:
-		switch(entry.superblock.type)
+		switch(static_cast<const journalEntry::Superblock*>(&entry)->type)
 		{
 		case journalEntry::Superblock::Type::rootnode:
 			size = sizeof(journalEntry::superblock::Rootnode);
 			break;
 		case journalEntry::Superblock::Type::areaMap:
-			switch(entry.superblock_.areaMap.operation)
+			switch(static_cast<const journalEntry::superblock::AreaMap*>(&entry)->operation)
 			{
 			case journalEntry::superblock::AreaMap::Operation::type:
 				size = sizeof(journalEntry::superblock::areaMap::Type);
@@ -54,7 +54,7 @@ JournalPersistence::getSizeFromMax(const journalEntry::Max &entry)
 		}
 		break;
 	case JournalEntry::Topic::tree:
-		switch(entry.btree.op)
+		switch(static_cast<const journalEntry::BTree*>(&entry)->op)
 		{
 		case journalEntry::BTree::Operation::insert:
 			size = sizeof(journalEntry::btree::Insert);
@@ -68,7 +68,7 @@ JournalPersistence::getSizeFromMax(const journalEntry::Max &entry)
 		}
 		break;
 	case JournalEntry::Topic::summaryCache:
-		switch(entry.summaryCache.subtype)
+		switch(static_cast<const journalEntry::SummaryCache*>(&entry)->subtype)
 		{
 		case journalEntry::SummaryCache::Subtype::commit:
 			size = sizeof(journalEntry::summaryCache::Commit);
@@ -82,7 +82,7 @@ JournalPersistence::getSizeFromMax(const journalEntry::Max &entry)
 		}
 		break;
 	case JournalEntry::Topic::inode:
-		switch(entry.inode.operation)
+		switch(static_cast<const journalEntry::Inode*>(&entry)->operation)
 		{
 		case journalEntry::Inode::Operation::add:
 			size = sizeof(journalEntry::inode::Add);
@@ -102,12 +102,9 @@ JournalPersistence::getSizeFromMax(const journalEntry::Max &entry)
 }
 
 uint16_t
-JournalPersistence::getSizeFromJE(const JournalEntry& entry)
+JournalPersistence::getSizeFromMax(const journalEntry::Max &entry)
 {
-	journalEntry::Max max;
-	//TODO: copy only getSizeFromJournalEntry bytes
-	memcpy(static_cast<void*>(&max), static_cast<void*>(&entry), sizeof(journalEntry::Max));
-	return getSizeFromMax(max);
+	return getSizeFromJE(entry.base);
 }
 
 //======= MRAM ========
