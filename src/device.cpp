@@ -17,7 +17,7 @@ outpost::rtos::SystemClock systemClock;
 Device::Device(Driver& _driver) : driver(_driver),
 		usedAreas(0), lasterr(Result::ok), mounted(false), readOnly(false),
 		tree(this), sumCache(this), areaMgmt(this), dataIO(this), superblock(this),
-		journalPersistence(driver),
+		journalPersistence(this),
 		journal(journalPersistence, superblock, sumCache, tree){};
 
 Device::~Device(){

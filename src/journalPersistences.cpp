@@ -7,7 +7,7 @@
 
 
 #include "journalPersistence.hpp"
-#include "driver/driver.hpp"
+#include "device.hpp"
 #include <inttypes.h>
 
 namespace paffs
@@ -113,27 +113,30 @@ MramPersistence::rewind()
 {
 	curr = sizeof(PageAbs);
 }
+
 void
 MramPersistence::seek(EntryIdentifier& addr)
 {
-	curr = addr.page;
+	curr = addr.mram.offs;
 }
+
 EntryIdentifier
 MramPersistence::tell()
 {
-	return EntryIdentifier(curr, 0);
+	return EntryIdentifier(curr);
 }
+
 Result
 MramPersistence::appendEntry(const JournalEntry& entry)
 {
 	if(curr + sizeof(journalEntry::Max) > mramSize)
 		return Result::nospace;
 	uint16_t size = getSizeFromJE(entry);
-	driver.writeMRAM(curr, &entry, size);
+	device->driver.writeMRAM(curr, &entry, size);
 	PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE),
 			"Wrote Entry to %" PRIu64 "-%" PRIu64, curr, curr + size);
 	curr += size;
-	driver.writeMRAM(0, &curr, sizeof(PageAbs));
+	device->driver.writeMRAM(0, &curr, sizeof(PageAbs));
 	return Result::ok;
 }
 
@@ -141,7 +144,7 @@ Result
 MramPersistence::clear()
 {
 	curr = sizeof(PageAbs);
-	driver.writeMRAM(0, &curr, sizeof(PageAbs));
+	device->driver.writeMRAM(0, &curr, sizeof(PageAbs));
 	return Result::ok;
 }
 
@@ -149,11 +152,11 @@ Result
 MramPersistence::readNextElem(journalEntry::Max& entry)
 {
 	PageAbs hwm;
-	driver.readMRAM(0, &hwm, sizeof(PageAbs));
+	device->driver.readMRAM(0, &hwm, sizeof(PageAbs));
 	if(curr >= hwm)
 		return Result::nf;
 
-	driver.readMRAM(curr, &entry, sizeof(journalEntry::Max));
+	device->driver.readMRAM(curr, &entry, sizeof(journalEntry::Max));
 	uint16_t size = getSizeFromMax(entry);
 	PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE),
 			"Read entry at %" PRIu64 "-%" PRIu64, curr, curr + size);
@@ -165,5 +168,190 @@ MramPersistence::readNextElem(journalEntry::Max& entry)
 	curr += size;
 	return Result::ok;
 }
-};
 
+//======= FLASH =======
+
+//FIXME: no revert of changes of uncheckpointed entries if it is buffered.
+
+void
+FlashPersistence::rewind()
+{
+	//TODO: ActiveArea has to be consistent even after a remount
+	//TODO: Save AA in Superpage
+	curr.addr = combineAddress(device->activeArea[AreaType::journal], 0);
+	curr.offs = 0;
+}
+void
+FlashPersistence::seek(EntryIdentifier& addr)
+{
+	if(buf.dirty)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Skipping a journal Commit in seek!");
+		return;
+	}
+	curr = addr.flash;
+	Result r = loadCurrentPage();
+	if(r != Result::ok)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load a page in journal!");
+	}
+}
+EntryIdentifier
+FlashPersistence::tell()
+{
+	return EntryIdentifier(curr);
+}
+Result
+FlashPersistence::appendEntry(const JournalEntry& entry)
+{
+	//YEAH.
+	//Keep in mind that a page cant be written twice for wiederaufnahme des loggings nach replay
+	uint16_t size = getSizeFromJE(entry);
+	Result r;
+	if(curr.offs + size > dataBytesPerPage)
+	{
+		//Commit is needed
+		r = commitBuf();
+		if(r != Result::ok)
+		{
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit buffer");
+			//Maybe try other?
+			return r;
+		}
+		r = findNextPos();
+		if(r != Result::ok)
+		{
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find next Pos for JournalEntry");
+			return r;
+		}
+		//just init current page b.c. we assume free pages after last page
+		loadCurrentPage(false);
+	}
+	memcpy(&buf.data[curr.offs], &entry, size);
+	curr.offs = size;
+
+	if(entry.topic == JournalEntry::Topic::checkpoint)
+	{
+		//Flush buffer because we have a checkpoint
+		r = commitBuf();
+		if(r != Result::ok)
+		{
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit buffer");
+			//Maybe try other?
+			return r;
+		}
+		r = findNextPos(true);
+		if(r != Result::ok)
+		{
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find next Pos for JournalEntry");
+			return r;
+		}
+		//just init current page b.c. we assume free pages after last page
+		loadCurrentPage(false);
+	}
+	return Result::ok;
+}
+Result
+FlashPersistence::clear()
+{
+	//TODO: Change Area with garbage collection
+	return Result::nimpl;
+}
+
+Result
+FlashPersistence::readNextElem(journalEntry::Max& entry)
+{
+	if(buf.data[curr.offs] == 0)
+	{
+		//Reached end of buf
+		Result r = findNextPos();
+		if(r != Result::ok)
+			return Result::nf;
+		loadCurrentPage();
+	}
+	memcpy(&entry, , )
+}
+
+Result
+FlashPersistence::commitBuf()
+{
+	if(buf.readOnly)
+	{
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried commiting a buffer that was already written!");
+		return Result::bug;
+	}
+	if(!buf.dirty)
+	{
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried commiting a buffer that was not modified!");
+		return Result::bug;
+	}
+
+	Result r = device->driver.writePage(buf.page, buf.data, dataBytesPerPage);
+	if(r != Result::ok)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write Page for Journal commit");
+		return r;
+	}
+	buf.dirty = false;
+	buf.readOnly = true;
+	return Result::ok;
+}
+
+Result
+FlashPersistence::findNextPos(bool forACheckpoint)
+{
+	if(buf.dirty)
+	{
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to switch to new Position without commiting old one");
+		return Result::bug;
+	}
+	if(forACheckpoint)
+	{
+		//Check if we are in reserved space inside area
+		//TODO: Commit everything if in safespace
+	}
+	if(extractPageOffs(curr.addr) == totalPagesPerArea)
+	{
+		//Ouch, we dont want to reach this
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find a free page in journal!");
+		return Result::nospace;
+	}
+	curr = EntryIdentifier::Flash(combineAddress(extractLogicalArea(curr.addr), extractPageOffs(curr.addr) + 1), 0);
+	return Result::ok;
+}
+
+Result
+FlashPersistence::loadCurrentPage(bool readPage)
+{
+	if(buf.dirty)
+	{
+		PAFFS_DBG(PAFFS_TRACE_BUG, "loading page with dirty buf!");
+		return Result::bug;
+	}
+
+	if(readPage)
+	{
+		Result r = device->driver.readPage(getPageNumber(curr.addr, *device), buf.data, dataBytesPerPage);
+		if(r != Result::ok)
+		{
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read a page for journal!");
+			return r;
+		}
+	}else
+	{
+		memset(buf.data, 0, dataBytesPerPage);
+	}
+	buf.page = getPageNumber(curr.addr, *device);
+	if(buf.data[0] == 0xFF)
+	{
+		buf.readOnly = false;
+		memset(buf.data, 0, dataBytesPerPage);
+	}else
+	{
+		buf.readOnly = true;
+	}
+	buf.dirty = false;
+	return Result::ok;
+}
+
+};

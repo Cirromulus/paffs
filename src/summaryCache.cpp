@@ -283,6 +283,12 @@ Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry sta
 		return Result::bug;
 	}
 
+	if(summaryCache[translation[area]].getStatus(page) == state)
+	{
+		PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Skipping set status b.c. status is the same");
+		return Result::ok;
+	}
+
 	dev->journal.addEvent(journalEntry::summaryCache::SetStatus(area,page,state));
 
 	summaryCache[translation[area]].setStatus(page, state);
