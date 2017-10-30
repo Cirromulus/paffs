@@ -30,13 +30,16 @@ unsigned int extractPageOffs(const Addr addr);
 
 class AreaManagement{
 	Area map[areasNo];
+	AreaPos activeArea[AreaType::no];
+	AreaPos usedAreas;
 	Device *dev;
 public:
 	GarbageCollection gc;
 	AreaManagement(Device *mdev): dev(mdev), gc(mdev){
-		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Cleared %zu Byte in Areamap", sizeof(Area) * areasNo);
-		memset(map, 0, areasNo * sizeof(Area));
+		clear();
 	};
+
+	void clear();
 
 	AreaType   getType(AreaPos area);
 	AreaStatus getStatus(AreaPos area);
@@ -49,6 +52,14 @@ public:
 	void setErasecount(AreaPos area, uint32_t erasecount);
 	void setPos(AreaPos area, AreaPos pos);
 
+	AreaPos getActiveArea(AreaType type);
+	void setActiveArea(AreaType type, AreaPos pos);
+
+	AreaPos getUsedAreas();
+	void setUsedAreas(AreaPos num);
+	void increaseUsedAreas();
+	void decreaseUsedAreas();
+
 	void swapAreaPosition(AreaPos a, AreaPos b);
 	//Only for serializing areMap in Superblock
 	Area* getMap();
@@ -57,12 +68,13 @@ public:
 	 * May call garbage collection
 	 * May return an empty or active area
 	 * Returns same area if there is still writable space left
+	 *\warn modifies active area if area was inited
 	 */
 	unsigned int findWritableArea(AreaType areaType);
 
 	Result findFirstFreePage(unsigned int* p_out, unsigned int area);
 
-	Result manageActiveAreaFull(AreaPos *area, AreaType areaType);
+	Result manageActiveAreaFull(AreaType areaType);
 
 	void initArea(AreaPos area);
 	Result closeArea(AreaPos area);

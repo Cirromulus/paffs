@@ -95,6 +95,14 @@ unsigned int extractPageOffs(const Addr addr){
 	return page;
 }
 
+void AreaManagement::clear()
+{
+	memset(map, 0, areasNo * sizeof(Area));
+	memset(activeArea, 0, AreaType::no * sizeof(AreaPos));
+	usedAreas = 0;
+	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Cleared Areamap, active Area and used Areas");
+}
+
 AreaType   AreaManagement::getType(AreaPos area){
 	if(area >= areasNo){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Type out of bounds! "
@@ -168,6 +176,45 @@ void AreaManagement::setPos(AreaPos area, AreaPos pos){
 	map[area].position = pos;
 }
 
+AreaPos AreaManagement::getActiveArea(AreaType type)
+{
+	if(type >= AreaType::no)
+	{
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get ActiveArea of invalid Type!");
+		return 0;
+	}
+	return activeArea[type];
+}
+void AreaManagement::setActiveArea(AreaType type, AreaPos pos)
+{
+	if(type >= AreaType::no)
+	{
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set ActiveArea of invalid Type!");
+		return;
+	}
+	dev->journal.addEvent(journalEntry::superblock::ActiveArea(type, pos));
+	activeArea[type] = pos;
+}
+
+AreaPos AreaManagement::getUsedAreas()
+{
+	return usedAreas;
+}
+void AreaManagement::setUsedAreas(AreaPos num)
+{
+	dev->journal.addEvent(journalEntry::superblock::UsedAreas(num));
+	usedAreas = num;
+}
+void AreaManagement::increaseUsedAreas()
+{
+	setUsedAreas(usedAreas + 1);
+}
+void AreaManagement::decreaseUsedAreas()
+{
+	setUsedAreas(usedAreas - 1);
+}
+
+
 void AreaManagement::swapAreaPosition(AreaPos a, AreaPos b){
 	if(a >= areasNo){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to swap AreaMap a out of bounds! "
@@ -196,25 +243,25 @@ Area* AreaManagement::getMap(){
 }
 
 unsigned int AreaManagement::findWritableArea(AreaType areaType){
-	if(dev->activeArea[areaType] != 0){
-		if(getStatus(dev->activeArea[areaType]) != AreaStatus::active){
+	if(getActiveArea(areaType) != 0){
+		if(getStatus(getActiveArea(areaType)) != AreaStatus::active){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "ActiveArea of %s not active "
 					"(%s, %" PRIu32 " on %" PRIu32 ")",
 					areaNames[areaType],
-					areaStatusNames[getStatus(dev->activeArea[areaType])],
-					dev->activeArea[areaType],
-					getPos(dev->activeArea[areaType]));
+					areaStatusNames[getStatus(getActiveArea(areaType))],
+					getActiveArea(areaType),
+					getPos(getActiveArea(areaType)));
 		}
 		//current Area has still space left
-		if(getType(dev->activeArea[areaType]) != areaType){
+		if(getType(getActiveArea(areaType)) != areaType){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "ActiveArea does not contain correct "
 					"areaType! (Should %s, was %s)", areaNames[areaType],
-					areaNames[getType(dev->activeArea[areaType])]);
+					areaNames[getType(getActiveArea(areaType))]);
 		}
-		return dev->activeArea[areaType];
+		return getActiveArea(areaType);
 	}
 
-	if(dev->usedAreas < areasNo - minFreeAreas || areaType == AreaType::index){
+	if(getUsedAreas() < areasNo - minFreeAreas || areaType == AreaType::index){
 		/**We only take new areas, if we dont hit the reserved pool.
 		 * The exeption is Index area, which is needed for committing caches.
 		 * If some day we support data cache, this would be allowed to use this pool as well.
@@ -228,7 +275,7 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 				return area;
 			}
 		}
-	}else if(dev->usedAreas < areasNo){
+	}else if(getUsedAreas() < areasNo){
 		PAFFS_DBG_S(PAFFS_TRACE_AREA, "FindWritableArea ignored reserved area");
 	}
 
@@ -238,23 +285,23 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 		return 0;
 	}
 
-	if(getStatus(dev->activeArea[areaType]) > AreaStatus::empty){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "garbage Collection returned invalid Status! (was %d, should <%d)",getStatus(dev->activeArea[areaType]), AreaStatus::empty);
+	if(getStatus(dev->areaMgmt.getActiveArea(areaType)) > AreaStatus::empty){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "garbage Collection returned invalid Status! (was %d, should <%d)",getStatus(dev->areaMgmt.getActiveArea(areaType)), AreaStatus::empty);
 		dev->lasterr = Result::bug;
 		return 0;
 	}
 
-	if(dev->activeArea[areaType] != 0){
+	if(dev->areaMgmt.getActiveArea(areaType) != 0){
 		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found GC'ed Area %u for %s",
-				dev->activeArea[areaType], areaNames[areaType]);
-		if(getStatus(dev->activeArea[areaType]) != AreaStatus::active){
+				dev->areaMgmt.getActiveArea(areaType), areaNames[areaType]);
+		if(getStatus(dev->areaMgmt.getActiveArea(areaType)) != AreaStatus::active){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "An Active Area is not active after GC!"
-					" (Area %" PRIu32 " on %" PRIu32 ")", dev->activeArea[areaType],
-					getPos(dev->activeArea[areaType]));
+					" (Area %" PRIu32 " on %" PRIu32 ")", dev->areaMgmt.getActiveArea(areaType),
+					getPos(dev->areaMgmt.getActiveArea(areaType)));
 			dev->lasterr = Result::bug;
 			return 0;
 		}
-		return dev->activeArea[areaType];
+		return dev->areaMgmt.getActiveArea(areaType);
 	}
 
 	//If we arrive here, something buggy must have happened
@@ -276,12 +323,13 @@ Result AreaManagement::findFirstFreePage(unsigned int* p_out, unsigned int area)
 	return Result::nospace;
 }
 
-Result AreaManagement::manageActiveAreaFull(AreaPos *area, AreaType areaType){
+Result AreaManagement::manageActiveAreaFull(AreaType areaType){
 	unsigned int ffp;
-	if(findFirstFreePage(&ffp, *area) != Result::ok){
-		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Area %u (Type %s) full.", *area, areaNames[areaType]);
+	AreaPos area = getActiveArea(areaType);
+	if(findFirstFreePage(&ffp, area) != Result::ok){
+		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Area %u (Type %s) full.", area, areaNames[areaType]);
 		//Current Area is full!
-		closeArea(*area);
+		closeArea(area);
 	}else{
 		//PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Area %u still page %u free.", *area, ffp);
 	}
@@ -295,23 +343,24 @@ void AreaManagement::initArea(AreaPos area){
 	if(getType(area) == AreaType::unset){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Initing Area with invalid type!");
 	}
-	if(dev->activeArea[getType(area)] != 0 &&
-			dev->activeArea[getType(area)] != area){
+	if(getActiveArea(getType(area)) != 0 &&
+			getActiveArea(getType(area)) != area){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Activating area %" PRIu32 " while different Area "
 				"(%" PRIu32 " on %" PRIu32 ") still active!",
-				area, dev->activeArea[getType(area)],
-				getPos(dev->activeArea[getType(area)]));
+				area, getActiveArea(getType(area)),
+				getPos(getActiveArea(getType(area))));
 	}
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Init Area %u (pos %u) as %s.", static_cast<unsigned int>(area), static_cast<unsigned int>(getPos(area)), areaNames[getType(area)]);
 	if(getStatus(area) ==AreaStatus::empty){
-		dev->usedAreas++;
+		increaseUsedAreas();
 	}
 	setStatus(area, AreaStatus::active);
+	setActiveArea(getType(area), area);
 }
 
 Result AreaManagement::closeArea(AreaPos area){
 	setStatus(area, AreaStatus::closed);
-	dev->activeArea[getType(area)] = 0;
+	setActiveArea(getType(area), 0);
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Closed %s Area %u at pos. %u.", areaNames[getType(area)], area, getPos(area));
 	return Result::ok;
 }
@@ -335,8 +384,8 @@ Result AreaManagement::deleteAreaContents(AreaPos area){
 				PRIu32 " on %" PRIu32, area, getPos(area));
 		return Result::bug;
 	}
-	if(area == dev->activeArea[AreaType::data] ||
-		area == dev->activeArea[AreaType::index]){
+	if(area == dev->areaMgmt.getActiveArea(AreaType::data) ||
+		area == dev->areaMgmt.getActiveArea(AreaType::index)){
 		PAFFS_DBG(PAFFS_TRACE_BUG,
 				"deleted content of active area %" PRIu32 ", is this OK?", area);
 	}
@@ -383,8 +432,8 @@ Result AreaManagement::deleteArea(AreaPos area){
 				PRIu32 " on %" PRIu32, area, getPos(area));
 		return Result::bug;
 	}
-	if(area == dev->activeArea[AreaType::data] ||
-		area == dev->activeArea[AreaType::index]){
+	if(area == dev->areaMgmt.getActiveArea(AreaType::data) ||
+		area == dev->areaMgmt.getActiveArea(AreaType::index)){
 		PAFFS_DBG(PAFFS_TRACE_BUG,
 				"deleted active area %" PRIu32 ", is this OK?", area);
 	}
@@ -393,7 +442,7 @@ Result AreaManagement::deleteArea(AreaPos area){
 
 	setStatus(area, AreaStatus::empty);
 	setType(area, AreaType::unset);
-	dev->usedAreas--;
+	decreaseUsedAreas();
 	PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Area %u at pos. %u.", area, getPos(area));
 	return r;
 }

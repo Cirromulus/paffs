@@ -208,14 +208,14 @@ Result SummaryCache::commitASHard(int &clearedAreaCachePosition){
 
 	PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Commit Hard swaps GC Area %" PRIu32 " (on %" PRIu32 ")"
 			" from %" PRIu32 " (on %" PRIu32 ")",
-			dev->activeArea[AreaType::garbageBuffer], dev->areaMgmt.getPos(dev->activeArea[AreaType::garbageBuffer]),
+			dev->areaMgmt.getActiveArea(AreaType::garbageBuffer), dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(AreaType::garbageBuffer)),
 			favouriteArea, dev->areaMgmt.getPos(favouriteArea));
 
 	SummaryEntry summary[dataPagesPerArea];
 	unpackStatusArray(cachePos, summary);
 
 	Result r = dev->areaMgmt.gc.moveValidDataToNewArea(
-			favouriteArea, dev->activeArea[AreaType::garbageBuffer], summary);
+			favouriteArea, dev->areaMgmt.getActiveArea(AreaType::garbageBuffer), summary);
 
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not move Data for AS commit!");
@@ -224,7 +224,7 @@ Result SummaryCache::commitASHard(int &clearedAreaCachePosition){
 	}
 	dev->areaMgmt.deleteArea(favouriteArea);
 	//swap logical position of areas to keep addresses valid
-	dev->areaMgmt.swapAreaPosition(favouriteArea, dev->activeArea[AreaType::garbageBuffer]);
+	dev->areaMgmt.swapAreaPosition(favouriteArea, dev->areaMgmt.getActiveArea(AreaType::garbageBuffer));
 	packStatusArray(cachePos, summary);
 	//AsWritten gets reset in delete Area, and dont set dirty bc now the AS is not committed, soley in RAM
 
@@ -463,7 +463,7 @@ Result SummaryCache::loadAreaSummaries(){
 		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "failed to load Area Summaries!");
 		return r;
 	}
-	dev->usedAreas = index.usedAreas;
+	dev->areaMgmt.setUsedAreas(index.usedAreas);
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "read superIndex successfully");
 
 	for(int i = 0; i < 2; i++){
@@ -494,7 +494,7 @@ Result SummaryCache::loadAreaSummaries(){
 				}
 			}
 			if(dev->areaMgmt.getStatus(index.asPositions[i]) ==AreaStatus::active){
-				dev->activeArea[dev->areaMgmt.getType(index.asPositions[i])] = index.asPositions[i];
+				dev->areaMgmt.setActiveArea(dev->areaMgmt.getType(index.asPositions[i]), index.asPositions[i]);
 			}
 			PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Loaded area summary %d on %d", index.asPositions[i], dev->areaMgmt.getPos(index.asPositions[i]));
 		}
@@ -525,7 +525,7 @@ Result SummaryCache::commitAreaSummaries(bool createNew){
 	index.areaMap = dev->areaMgmt.getMap();
 	index.areaSummary[0] = tmp[0];
 	index.areaSummary[1] = tmp[1];
-	index.usedAreas = dev->usedAreas;
+	index.usedAreas = dev->areaMgmt.getUsedAreas();
 	bool someDirty = false;
 
 	//write the open/uncommitted AS'es to Superindex

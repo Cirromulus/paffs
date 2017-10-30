@@ -51,6 +51,12 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
 				break;
 			}
 			break;
+		case journalEntry::Superblock::Type::activeArea:
+			size = sizeof(journalEntry::superblock::ActiveArea);
+			break;
+		case journalEntry::Superblock::Type::usedAreas:
+			size = sizeof(journalEntry::superblock::UsedAreas);
+			break;
 		}
 		break;
 	case JournalEntry::Topic::tree:
@@ -180,12 +186,12 @@ FlashPersistence::rewind()
 {
 	//TODO: ActiveArea has to be consistent even after a remount
 	//TODO: Save AA in Superpage
-	if(device->activeArea[AreaType::journal] == 0)
+	if(device->areaMgmt.getActiveArea(AreaType::journal) == 0)
 	{
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid journal Area (0)!");
 		return Result::bug;
 	}
-	curr.addr = combineAddress(device->activeArea[AreaType::journal], 0);
+	curr.addr = combineAddress(device->areaMgmt.getActiveArea(AreaType::journal), 0);
 	curr.offs = 0;
 	return Result::ok;
 }
@@ -237,7 +243,7 @@ FlashPersistence::appendEntry(const JournalEntry& entry)
 		//just init current page b.c. we assume free pages after last page
 		loadCurrentPage(false);
 	}
-	memcpy(&buf.data[curr.offs], &entry, size);
+	memcpy(&buf.data[curr.offs], static_cast<const void*>(&entry), size);
 	curr.offs = size;
 
 	if(entry.topic == JournalEntry::Topic::checkpoint)
@@ -284,7 +290,7 @@ FlashPersistence::readNextElem(journalEntry::Max& entry)
 		return Result::nf;
 	}
 
-	memcpy(&entry, &buf.data[curr.offs], curr.offs + sizeof(journalEntry::Max) > dataPagesPerArea ?
+	memcpy(static_cast<void*>(&entry), &buf.data[curr.offs], curr.offs + sizeof(journalEntry::Max) > dataPagesPerArea ?
 	                                    dataPagesPerArea - curr.offs : sizeof(journalEntry::Max));
 	uint16_t size = getSizeFromMax(entry);
 	PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE),

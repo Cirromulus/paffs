@@ -295,6 +295,15 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
 				break;
 			}
 			break;
+		case journalEntry::Superblock::Type::activeArea:
+			printf("Set ActiveArea of %s to %" PRIu32 "\n",
+					areaNames[static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->type],
+					static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->area);
+			break;
+		case journalEntry::Superblock::Type::usedAreas:
+			printf("Set used Areas to %" PRIu32 "\n",
+					static_cast<const journalEntry::superblock::UsedAreas*>(&entry)->usedAreas);
+			break;
 		}
 		break;
 	case JournalEntry::Topic::tree:

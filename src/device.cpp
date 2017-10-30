@@ -15,7 +15,7 @@ namespace paffs{
 outpost::rtos::SystemClock systemClock;
 
 Device::Device(Driver& _driver) : driver(_driver),
-		usedAreas(0), lasterr(Result::ok), mounted(false), readOnly(false),
+		lasterr(Result::ok), mounted(false), readOnly(false),
 		tree(this), sumCache(this), areaMgmt(this), dataIO(this), superblock(this),
 		journalPersistence(this),
 		journal(journalPersistence, superblock, sumCache, tree){};
@@ -116,7 +116,7 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 		}
 
 		if(!(hadAreaType & 1 << AreaType::superblock)){
-			activeArea[AreaType::superblock] = area;
+			areaMgmt.setActiveArea(AreaType::superblock, area);
 			areaMgmt.setType(area, AreaType::superblock);
 			areaMgmt.initArea(area);
 			if(++hadSuperblocks == superChainElems)
@@ -125,7 +125,7 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 		}
 
 		if(!(hadAreaType & 1 << AreaType::journal)){
-			activeArea[AreaType::journal] = area;
+			areaMgmt.setActiveArea(AreaType::journal, area);
 			areaMgmt.setType(area, AreaType::journal);
 			areaMgmt.initArea(area);
 			hadAreaType |= 1 << AreaType::journal;
@@ -133,7 +133,7 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 		}
 
 		if(!(hadAreaType & 1 << AreaType::garbageBuffer)){
-			activeArea[AreaType::garbageBuffer] = area;
+			areaMgmt.setActiveArea(AreaType::garbageBuffer, area);
 			areaMgmt.setType(area, AreaType::garbageBuffer);
 			areaMgmt.initArea(area);
 			hadAreaType |= 1 << AreaType::garbageBuffer;
@@ -231,7 +231,7 @@ Result Device::mnt(bool readOnlyMode){
 	//FIXME: This is O(n), save active Area in SuperIndex
 	for(AreaPos i = 0; i < areasNo; i++){
 		if(areaMgmt.getType(i) == AreaType::garbageBuffer){
-			activeArea[AreaType::garbageBuffer] = i;
+			areaMgmt.setActiveArea(AreaType::garbageBuffer, i);
 		}
 		//Superblock does not need an active Area,
 		//data and index active areas are extracted by areaSummaryCache
@@ -289,7 +289,7 @@ Result Device::unmnt(){
 	}
 
 	if(traceMask & PAFFS_TRACE_AREA){
-		printf("Info: \n\t%" PRIu32 " used Areas\n", usedAreas);
+		printf("Info: \n\t%" PRIu32 " used Areas\n", areaMgmt.getUsedAreas());
 		for(unsigned int i = 0; i < areasNo; i++){
 			printf("\tArea %03d on %03u as %10s from page %4d %s\n"
 					, i, areaMgmt.getPos(i), areaNames[areaMgmt.getType(i)]
@@ -666,7 +666,7 @@ Result Device::mkDir(const char* fullPath, Permission mask){
 		return Result::notMounted;
 	if(readOnly)
 		return Result::readonly;
-	if(usedAreas > areasNo - minFreeAreas)
+	if(areaMgmt.getUsedAreas() > areasNo - minFreeAreas)
 		return Result::nospace;
 
 	unsigned int lastSlash = 0;
@@ -840,7 +840,7 @@ Result Device::createFile(SmartInodePtr &outFile, const char* fullPath, Permissi
 		return Result::notMounted;
 	if(readOnly)
 		return Result::readonly;
-	if(usedAreas > areasNo - minFreeAreas)
+	if(areaMgmt.getUsedAreas() > areasNo - minFreeAreas)
 		return Result::nospace;
 
 	unsigned int lastSlash = 0;
@@ -964,7 +964,7 @@ Result Device::touch(const char* path){
 		return Result::notMounted;
 	if(readOnly)
 		return Result::readonly;
-	if(usedAreas > areasNo - minFreeAreas)
+	if(areaMgmt.getUsedAreas() > areasNo - minFreeAreas)
 		//If we use reserved Areas, extensive touching may fill flash anyway
 		return Result::nospace;
 
@@ -1038,7 +1038,7 @@ Result Device::write(Obj& obj, const char* buf, unsigned int bytes_to_write, uns
 		return Result::notMounted;
 	if(readOnly)
 		return Result::readonly;
-	if(usedAreas > areasNo - minFreeAreas)
+	if(areaMgmt.getUsedAreas() > areasNo - minFreeAreas)
 		return Result::nospace;
 	if(obj.dirent.node == nullptr){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Objects dirent.node is invalid!");
@@ -1248,9 +1248,7 @@ Result Device::initializeDevice(){
 		return Result::alrMounted;
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Device is not yet mounted");
 
-	activeArea[AreaType::superblock] = 0;
-	activeArea[AreaType::index] = 0;
-	activeArea[AreaType::data] = 0;
+	areaMgmt.clear();
 
 	if(areasNo < AreaType::no - 2){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Device too small, at least %u Areas are needed!",
@@ -1280,7 +1278,7 @@ Result Device::initializeDevice(){
 
 Result Device::destroyDevice(){
 
-	memset(activeArea, 0, sizeof(AreaPos)*AreaType::no);
+	areaMgmt.clear();
 	inodePool.clear();
 	filesPool.clear();
 	return Result::ok;

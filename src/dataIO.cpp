@@ -199,7 +199,7 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 		bool misaligned = false;
 		Result rBuf = dev->lasterr;
 		dev->lasterr = Result::ok;
-		dev->activeArea[AreaType::data] = dev->areaMgmt.findWritableArea(AreaType::data);
+		dev->areaMgmt.findWritableArea(AreaType::data);
 		if(dev->lasterr != Result::ok){
 			//TODO: Return to a safe state by trying to resurrect dirty marked pages
 			//		Mark fresh written pages as dirty. If old pages have been deleted,
@@ -209,19 +209,19 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 		dev->lasterr = rBuf;
 
 		//Handle Areas
-		if(dev->areaMgmt.getStatus(dev->activeArea[AreaType::data]) ==AreaStatus::empty){
+		if(dev->areaMgmt.getStatus(dev->areaMgmt.getActiveArea(AreaType::data)) ==AreaStatus::empty){
 			//We'll have to use a fresh area,
 			//so generate the areaSummary in Memory
-			dev->areaMgmt.initArea(dev->activeArea[AreaType::data]);
+			dev->areaMgmt.initArea(dev->areaMgmt.getActiveArea(AreaType::data));
 		}
 
 		//find new page to write to
 		unsigned int firstFreePage = 0;
-		if(dev->areaMgmt.findFirstFreePage(&firstFreePage, dev->activeArea[AreaType::data]) == Result::nospace){
-			PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->activeArea[AreaType::data]);
+		if(dev->areaMgmt.findFirstFreePage(&firstFreePage, dev->areaMgmt.getActiveArea(AreaType::data)) == Result::nospace){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev->areaMgmt.getActiveArea(AreaType::data));
 			return Result::bug;
 		}
-		Addr pageAddress = combineAddress(dev->activeArea[AreaType::data], firstFreePage);
+		Addr pageAddress = combineAddress(dev->areaMgmt.getActiveArea(AreaType::data), firstFreePage);
 
 		//Prepare buffer and calculate bytes to write
 		char* buf = &const_cast<char*>(data)[*bytes_written];
@@ -289,7 +289,7 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write Page!");
 			return res;
 		}
-		res = dev->sumCache.setPageStatus(dev->activeArea[AreaType::data], firstFreePage,
+		res = dev->sumCache.setPageStatus(dev->areaMgmt.getActiveArea(AreaType::data), firstFreePage,
 		                                  SummaryEntry::used);
 		if(res != Result::ok){
 			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!", resultMsg[static_cast<int>(res)]);
@@ -316,7 +316,7 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 
 
 		//this may have filled the flash
-		res = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::data], AreaType::data);
+		res = dev->areaMgmt.manageActiveAreaFull(AreaType::data);
 		if(res != Result::ok)
 			return res;
 

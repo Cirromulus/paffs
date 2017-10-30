@@ -60,6 +60,8 @@ namespace journalEntry
 		enum class Type{
 			rootnode,
 			areaMap,
+			activeArea,
+			usedAreas,
 		};
 		Type type;
 	protected:
@@ -129,6 +131,21 @@ namespace journalEntry
 				Erasecount erasecount;
 				Position position;
 			};
+		};
+
+		struct ActiveArea : public Superblock
+		{
+			AreaType type;
+			AreaPos area;
+			ActiveArea(AreaType _type, AreaPos _area) : Superblock(Type::activeArea),
+					type(_type), area(_area){};
+		};
+
+		struct UsedAreas : public Superblock
+		{
+			AreaPos usedAreas;
+			UsedAreas(AreaPos _usedAreas) : Superblock(Type::usedAreas),
+					usedAreas(_usedAreas){};
 		};
 
 		union Max

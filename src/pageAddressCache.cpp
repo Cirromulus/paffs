@@ -444,12 +444,12 @@ Result PageAddressCache::readAddrList (Addr from, Addr list[addrsPerPage]){
 Result PageAddressCache::writeAddrList(Addr &source, Addr list[addrsPerPage]){
 	Result r = dev.lasterr;
 	dev.lasterr = Result::ok;
-	dev.activeArea[AreaType::index] = dev.areaMgmt.findWritableArea(AreaType::index);
+	dev.areaMgmt.findWritableArea(AreaType::index);
 	if(dev.lasterr != Result::ok){
 		//TODO: Reset former pagestatus, so that FS will be in a safe state
 		return dev.lasterr;
 	}
-	if(dev.activeArea[AreaType::index] == 0){
+	if(dev.areaMgmt.getActiveArea(AreaType::index) == 0){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "findWritableArea returned 0");
 		return Result::bug;
 	}
@@ -457,11 +457,11 @@ Result PageAddressCache::writeAddrList(Addr &source, Addr list[addrsPerPage]){
 
 	unsigned int firstFreePage = 0;
 	if(dev.areaMgmt.findFirstFreePage(&firstFreePage,
-			dev.activeArea[AreaType::index]) == Result::nospace){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev.activeArea[AreaType::index]);
+			dev.areaMgmt.getActiveArea(AreaType::index)) == Result::nospace){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%d).", dev.areaMgmt.getActiveArea(AreaType::index));
 		return dev.lasterr = Result::bug;
 	}
-	Addr to = combineAddress(dev.activeArea[AreaType::index], firstFreePage);
+	Addr to = combineAddress(dev.areaMgmt.getActiveArea(AreaType::index), firstFreePage);
 
 	r = dev.driver.writePage(getPageNumber(to, dev), reinterpret_cast<char*>(list),
 			addrsPerPage * sizeof(Addr));
@@ -471,7 +471,7 @@ Result PageAddressCache::writeAddrList(Addr &source, Addr list[addrsPerPage]){
 	}
 
 	//Mark Page as used
-	r = dev.sumCache.setPageStatus(dev.activeArea[AreaType::index],
+	r = dev.sumCache.setPageStatus(dev.areaMgmt.getActiveArea(AreaType::index),
 			firstFreePage, SummaryEntry::used);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
@@ -481,7 +481,7 @@ Result PageAddressCache::writeAddrList(Addr &source, Addr list[addrsPerPage]){
 	Addr formerPosition = source;
 	source = to;
 
-	r = dev.areaMgmt.manageActiveAreaFull(&dev.activeArea[AreaType::index], AreaType::index);
+	r = dev.areaMgmt.manageActiveAreaFull(AreaType::index);
 	if(r != Result::ok)
 		return r;
 

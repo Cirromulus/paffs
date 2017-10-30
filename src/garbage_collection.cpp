@@ -128,12 +128,12 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 	if(traceMask & PAFFS_TRACE_VERIFY_AS){
 		unsigned char buf[totalBytesPerPage];
 		for(unsigned i = 0; i < totalPagesPerArea; i++){
-			Addr addr = combineAddress(dev->activeArea[AreaType::garbageBuffer], i);
+			Addr addr = combineAddress(dev->areaMgmt.getActiveArea(AreaType::garbageBuffer), i);
 			dev->driver.readPage(getPageNumber(addr, *dev), buf, totalBytesPerPage);
 			for(unsigned j = 0; j < totalBytesPerPage; j++){
 				if(buf[j] != 0xFF){
 					PAFFS_DBG(PAFFS_TRACE_BUG, "Garbage buffer "
-							"on %" PRIu32 " is not empty!", dev->areaMgmt.getPos(dev->activeArea[AreaType::garbageBuffer]));
+							"on %" PRIu32 " is not empty!", dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(AreaType::garbageBuffer)));
 					return Result::bug;
 				}
 			}
@@ -153,7 +153,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 				return Result::nospace;
 			}
 
-			if(dev->usedAreas <= areasNo){
+			if(dev->areaMgmt.getUsedAreas() <= areasNo){
 				PAFFS_DBG_S(PAFFS_TRACE_GC, "and have no reserved Areas left.");
 				return Result::nospace;
 			}
@@ -173,7 +173,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 			}
 			if(nextPos == areasNo){
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Used Areas said we had space left (%" PRIu32 " areas), "
-						"but no empty area was found!", dev->usedAreas);
+						"but no empty area was found!", dev->areaMgmt.getUsedAreas());
 				return Result::bug;
 			}
 
@@ -183,7 +183,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 			if(lastDeletionTarget == 0){
 				//this is first round, without having something deleted.
 				//Just init and return nextPos.
-				dev->activeArea[AreaType::index] = nextPos;
+				dev->areaMgmt.setActiveArea(AreaType::index, nextPos);
 				return Result::ok;
 			}
 
@@ -226,10 +226,10 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 			//still some valid data, copy to new area
 			PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "GC found just partially clean area %u on pos %u", deletion_target, dev->areaMgmt.getPos(deletion_target));
 
-			r = moveValidDataToNewArea(deletion_target, dev->activeArea[AreaType::garbageBuffer], summary);
+			r = moveValidDataToNewArea(deletion_target, dev->areaMgmt.getActiveArea(AreaType::garbageBuffer), summary);
 			//while(getchar() == EOF);
 			if(r != Result::ok){
-				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not copy valid pages from area %u to %u!", deletion_target, dev->activeArea[AreaType::garbageBuffer]);
+				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not copy valid pages from area %u to %u!", deletion_target, dev->areaMgmt.getActiveArea(AreaType::garbageBuffer));
 				//TODO: Handle something, maybe put area in ReadOnly or copy somewhere else..
 				//TODO: Maybe copy rest of Pages before quitting
 				return r;
@@ -255,21 +255,21 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 	}
 
 	//swap logical position of areas to keep addresses valid
-	dev->areaMgmt.swapAreaPosition(deletion_target, dev->activeArea[AreaType::garbageBuffer]);
+	dev->areaMgmt.swapAreaPosition(deletion_target, dev->areaMgmt.getActiveArea(AreaType::garbageBuffer));
 
 	if(targetType != AreaType::unset){
 		//This assumes that current activearea is closed...
-		if(dev->activeArea[targetType] != 0){
+		if(dev->areaMgmt.getActiveArea(targetType) != 0){
 			PAFFS_DBG(PAFFS_TRACE_BUG, "old active Area (%" PRIu32 " on %" PRIu32 ") is not closed!",
-					dev->activeArea[targetType], dev->areaMgmt.getPos(dev->activeArea[targetType]));
+					dev->areaMgmt.getActiveArea(targetType), dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(targetType)));
 			return Result::bug;
 		}
-		dev->activeArea[targetType] = deletion_target;
+		dev->areaMgmt.setActiveArea(targetType, deletion_target);
 	}
 
 	PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "Garbagecollection erased pos %u and gave area %u pos %u.",
-	            dev->areaMgmt.getPos(dev->activeArea[AreaType::garbageBuffer]), dev->activeArea[targetType],
-	            dev->areaMgmt.getPos(dev->activeArea[targetType]));
+	            dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(AreaType::garbageBuffer)), dev->areaMgmt.getActiveArea(targetType),
+	            dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(targetType)));
 
 	return Result::ok;
 }

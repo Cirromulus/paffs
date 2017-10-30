@@ -778,34 +778,34 @@ Result TreeCache::writeTreeNode(TreeCacheNode& node){
 	}
 
 	dev->lasterr = Result::ok;
-	dev->activeArea[AreaType::index] = dev->areaMgmt.findWritableArea(AreaType::index);
-/*	if(dev->areaMgmt.getStatus(dev->activeArea[AreaType::index]) != AreaStatus::active){
+	dev->areaMgmt.findWritableArea(AreaType::index);
+/*	if(dev->areaMgmt.getStatus(dev->areaMgmt.getActiveArea(AreaType::index)) != AreaStatus::active){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "findWritableArea returned an inactive area "
-				"(%" PRIu32 " on %" PRIu32 ")!", dev->activeArea[AreaType::index],
-				dev->areaMgmt.getPos(dev->activeArea[AreaType::index]));
+				"(%" PRIu32 " on %" PRIu32 ")!", dev->areaMgmt.getActiveArea(AreaType::index),
+				dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(AreaType::index)));
 		return Result::bug;
 	}*/
 	if(dev->lasterr != Result::ok){
 		return dev->lasterr;
 	}
 	//Handle Areas
-	if(dev->areaMgmt.getStatus(dev->activeArea[AreaType::index]) ==AreaStatus::empty){
+	if(dev->areaMgmt.getStatus(dev->areaMgmt.getActiveArea(AreaType::index)) ==AreaStatus::empty){
 		//We'll have to use a fresh area,
 		//so generate the areaSummary in Memory
-		dev->areaMgmt.initArea(dev->activeArea[AreaType::index]);
+		dev->areaMgmt.initArea(dev->areaMgmt.getActiveArea(AreaType::index));
 	}
-	if(dev->activeArea[AreaType::index] == 0){
+	if(dev->areaMgmt.getActiveArea(AreaType::index) == 0){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "WRITE TREE NODE findWritableArea returned 0");
 		return Result::bug;
 	}
 
 	unsigned int firstFreePage = 0;
-	if(dev->areaMgmt.findFirstFreePage(&firstFreePage, dev->activeArea[AreaType::index]) == Result::nospace){
+	if(dev->areaMgmt.findFirstFreePage(&firstFreePage, dev->areaMgmt.getActiveArea(AreaType::index)) == Result::nospace){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned full area (%" PRIu32 " on %" PRIu32 ").",
-		          dev->activeArea[AreaType::index], dev->areaMgmt.getPos(dev->activeArea[AreaType::index]));
+		          dev->areaMgmt.getActiveArea(AreaType::index), dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(AreaType::index)));
 		return dev->lasterr = Result::bug;
 	}
-	Addr addr = combineAddress(dev->activeArea[AreaType::index], firstFreePage);
+	Addr addr = combineAddress(dev->areaMgmt.getActiveArea(AreaType::index), firstFreePage);
 	Addr oldSelf = node.raw.self;
 	node.raw.self = addr;
 
@@ -816,7 +816,7 @@ Result TreeCache::writeTreeNode(TreeCacheNode& node){
 	}
 
 	//Mark Page as used
-	r = dev->sumCache.setPageStatus(dev->activeArea[AreaType::index], firstFreePage, SummaryEntry::used);
+	r = dev->sumCache.setPageStatus(dev->areaMgmt.getActiveArea(AreaType::index), firstFreePage, SummaryEntry::used);
 	if(r != Result::ok){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
 		return r;
@@ -840,7 +840,7 @@ Result TreeCache::writeTreeNode(TreeCacheNode& node){
 		}
 	}
 
-	r = dev->areaMgmt.manageActiveAreaFull(&dev->activeArea[AreaType::index], AreaType::index);
+	r = dev->areaMgmt.manageActiveAreaFull(AreaType::index);
 	if(r != Result::ok)
 		return r;
 
@@ -855,7 +855,7 @@ Result TreeCache::readTreeNode(Addr addr, TreeNode &node){
 
 	if(dev->areaMgmt.getType(extractLogicalArea(addr)) != AreaType::index){
 		if(traceMask & PAFFS_TRACE_AREA){
-			printf("Info: \n\t%" PRIu32 " used Areas\n", dev->usedAreas);
+			printf("Info: \n\t%" PRIu32 " used Areas\n", dev->areaMgmt.getUsedAreas());
 			for(unsigned int i = 0; i < areasNo; i++){
 				printf("\tArea %03d on %03u as %10s from page %4d %s\n"
 						, i, dev->areaMgmt.getPos(i), areaNames[dev->areaMgmt.getType(i)]

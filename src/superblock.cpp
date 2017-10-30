@@ -60,6 +60,13 @@ void Superblock::processEntry(JournalEntry& entry){
 		}
 		break;
 	}
+	case journalEntry::Superblock::Type::activeArea:
+		dev->areaMgmt.setActiveArea(static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->type,
+				static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->area);
+		break;
+	case journalEntry::Superblock::Type::usedAreas:
+		dev->areaMgmt.setUsedAreas(static_cast<const journalEntry::superblock::UsedAreas*>(&entry)->usedAreas);
+		break;
 	}
 }
 
@@ -974,7 +981,7 @@ Result Superblock::deleteSuperBlock(AreaPos area, uint8_t block) {
 		dev->areaMgmt.increaseErasecount(area);
 		dev->areaMgmt.setStatus(area, AreaStatus::empty);
 		dev->areaMgmt.setType(area, AreaType::unset);
-		dev->usedAreas--;
+		dev->areaMgmt.decreaseUsedAreas();
 		PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Superblock Area %u at pos. %u.", area, dev->areaMgmt.getPos(area));
 	}
 

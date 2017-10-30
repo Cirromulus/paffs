@@ -30,8 +30,6 @@ class Device{
 
 public:
 	Driver& driver;
-	AreaPos activeArea[AreaType::no];
-	AreaPos usedAreas;
 	Result lasterr;
 	bool mounted;
 	bool readOnly;
