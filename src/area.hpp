@@ -61,8 +61,10 @@ public:
 	void decreaseUsedAreas();
 
 	void swapAreaPosition(AreaPos a, AreaPos b);
+
 	//Only for serializing areMap in Superblock
 	Area* getMap();
+	AreaPos* getActiveAreas();
 
 	/**
 	 * May call garbage collection

@@ -7,9 +7,10 @@
 
 #pragma once
 
-#include <stdint.h>
 #include "commonTypes.hpp"
 #include "journalTopic.hpp"
+#include <inttypes.h>
+#include <stdint.h>
 
 namespace paffs{
 
@@ -45,7 +46,49 @@ struct SuperIndex{
 	AreaPos usedAreas;
 	Area* areaMap;
 	AreaPos asPositions[2];
+	AreaPos* activeAreas;
 	SummaryEntry* areaSummary[2];
+	static uint16_t
+	getNeededBytes(uint16_t numberOfAreaSummaries)
+	{
+		if(numberOfAreaSummaries > 2){
+			PAFFS_DBG(PAFFS_TRACE_BUG, "Not more than two area Summaries may be allowed in SuperIndex!"
+					" (queried %u)", numberOfAreaSummaries);
+			return 0;
+		}
+		//Serial Number Skipped because it is inserted later on
+		uint16_t neededBytes =
+				sizeof(AreaPos) +					//LogPrev
+				sizeof(Addr) +						//rootNode
+				sizeof(AreaPos) +					//usedAreas
+				areasNo * sizeof(Area) +			//AreaMap
+				2 * sizeof(AreaPos) +				//Area Summary Positions
+				AreaType::no * sizeof(AreaPos) +	//ActiveAreas
+				numberOfAreaSummaries * dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
+		if(dataPagesPerArea % 8 != 0)
+			neededBytes++;
+		return neededBytes;
+	}
+
+	uint16_t
+	getNeededBytes()
+	{
+		unsigned int neededASes = 0;
+		for(unsigned int i = 0; i < 2; i++){
+			if(asPositions[i] > 0)
+				neededASes++;
+		}
+		return getNeededBytes(neededASes);
+	}
+
+	Result
+	deserializeFromBuffer(Device* dev, const char* buf);
+
+	Result
+	serializeToBuffer(char* buf);
+
+	void
+	print();
 };
 
 class Superblock : public JournalTopic{
@@ -70,7 +113,6 @@ public:
 	//returns PAFFS_NF if no superindex is in flash
 	Result readSuperIndex(SuperIndex* index);
 	Result commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew = false);
-	void printSuperIndex(SuperIndex* ind);
 	void setTestmode(bool t);
 private:
 	/**
@@ -142,7 +184,6 @@ private:
 	 * @return newArea: new log. area
 	 */
 	AreaPos findBestNextFreeArea(AreaPos logPrev);
-	unsigned int calculateNeededBytesForSuperIndex(unsigned char numberOfAreaSummaries = 2);
 };
 
 }

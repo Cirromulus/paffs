@@ -242,6 +242,11 @@ Area* AreaManagement::getMap(){
 	return map;
 }
 
+AreaPos* AreaManagement::getActiveAreas()
+{
+	return activeArea;
+}
+
 unsigned int AreaManagement::findWritableArea(AreaType areaType){
 	if(getActiveArea(areaType) != 0){
 		if(getStatus(getActiveArea(areaType)) != AreaStatus::active){

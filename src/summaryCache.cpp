@@ -452,7 +452,6 @@ Result SummaryCache::loadAreaSummaries(){
 	SummaryEntry tmp[2][dataPagesPerArea];			//High Stack usage, FIXME?
 	SuperIndex index;
 	memset(&index, 0, sizeof(SuperIndex));
-	index.areaMap = dev->areaMgmt.getMap();
 	index.areaSummary[0] = tmp[0];
 	index.areaSummary[1] = tmp[1];
 
@@ -522,10 +521,10 @@ Result SummaryCache::commitAreaSummaries(bool createNew){
 	SummaryEntry tmp[2][dataPagesPerArea]; //FIXME high Stack usage
 	SuperIndex index;
 	memset(&index, 0, sizeof(SuperIndex));
-	index.areaMap = dev->areaMgmt.getMap();
 	index.areaSummary[0] = tmp[0];
 	index.areaSummary[1] = tmp[1];
-	index.usedAreas = dev->areaMgmt.getUsedAreas();
+	//Rest of members are inited in superblock.cpp
+
 	bool someDirty = false;
 
 	//write the open/uncommitted AS'es to Superindex

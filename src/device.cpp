@@ -228,14 +228,6 @@ Result Device::mnt(bool readOnlyMode){
 
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Replayed Journal if needed");
 
-	//FIXME: This is O(n), save active Area in SuperIndex
-	for(AreaPos i = 0; i < areasNo; i++){
-		if(areaMgmt.getType(i) == AreaType::garbageBuffer){
-			areaMgmt.setActiveArea(AreaType::garbageBuffer, i);
-		}
-		//Superblock does not need an active Area,
-		//data and index active areas are extracted by areaSummaryCache
-	}
 	SmartInodePtr rootDir;
 	r = findOrLoadInode(0, rootDir);
 	if(r != Result::ok){
