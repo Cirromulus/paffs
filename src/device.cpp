@@ -173,7 +173,6 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 		destroyDevice();
 		return r;
 	}
-	journal.clear();
 
 	destroyDevice();
 	driver.deInitializeNand();
@@ -214,7 +213,18 @@ Result Device::mnt(bool readOnlyMode){
 
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Area Summaries loaded");
 
-	journal.processBuffer();
+	r = journal.enable();
+	if(r != Result::ok)
+	{
+		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not enable Journal!");
+		return r;
+	}
+	r = journal.processBuffer();
+	if(r != Result::ok)
+	{
+		PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not process journal!");
+		return r;
+	}
 
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Replayed Journal if needed");
 

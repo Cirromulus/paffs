@@ -14,57 +14,70 @@
 using namespace paffs;
 using namespace std;
 
-void
+Result
 Journal::addEvent(const JournalEntry& entry){
-	if(recovery)
+	if(disabled)
 	{
-		//Skipping, because we are currently replaying a buffer
-		return;
+		//Skipping, because we are currently replaying a buffer or formatting fs
+		return Result::ok;
 	}
 	Result r = persistence.appendEntry(entry);
 	if(r == Result::nospace){
 		PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Log full. should be flushed.");
-		return;
+		return r;
 	}
 	if(r != Result::ok)
 	{
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not append Entry to persistence");
+		return r;
 	}
 	if(traceMask & (PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE))
 	{
 		printMeaning(entry);
 	}
+	return Result::ok;
 }
 
-void
+Result
 Journal::checkpoint()
 {
-	addEvent(journalEntry::Checkpoint());
+	return addEvent(journalEntry::Checkpoint());
 }
 
-void
+Result
 Journal::clear()
 {
-	persistence.clear();
+	return persistence.clear();
 }
 
-void
+Result
 Journal::processBuffer(){
-	persistence.rewind();
 	journalEntry::Max entry;
 	EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics];
+
+	Result r = persistence.rewind();
+	if(r != Result::ok)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read rewind Journal!");
+		return r;
+	}
 	for(EntryIdentifier& id : firstUnsuccededEntry)
 	{
 		id = persistence.tell();
 	}
-
-	if(persistence.readNextElem(entry) != Result::ok)
+	r = persistence.readNextElem(entry);
+	if(r == Result::nf)
 	{
 		PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "No Replay of Journal needed");
-		return;
+		return Result::ok;
+	}
+	if(r != Result::ok)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read First element of Journal!");
+		return r;
 	}
 
-	recovery = true;
+	disabled = true;
 	PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Replay of Journal needed");
 	PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE), "Scanning for success entries...");
 
@@ -78,7 +91,12 @@ Journal::processBuffer(){
 		{
 			firstUnsuccededEntry[static_cast<unsigned>(entry.success.target)] = persistence.tell();
 		}
-	}while(persistence.readNextElem(entry) == Result::ok);
+	}while((r = persistence.readNextElem(entry)) == Result::ok);
+	if(r != Result::nf)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read next element of Journal!");
+		return r;
+	}
 
 	if(traceMask & (PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE))
 	{
@@ -91,27 +109,50 @@ Journal::processBuffer(){
 	}
 	PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE), "Scanning for checkpoints...");
 
-	persistence.rewind();
+	r = persistence.rewind();
+	if(r != Result::ok)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not rewind Journal!");
+		return r;
+	}
+
 	EntryIdentifier firstUnprocessedEntry = persistence.tell();
 
-	while(persistence.readNextElem(entry) == Result::ok)
+	while((r = persistence.readNextElem(entry)) == Result::ok)
 	{
 		if(entry.base.topic == JournalEntry::Topic::checkpoint)
 		{
 			EntryIdentifier curr = persistence.tell();
-			applyCheckpointedJournalEntries(firstUnprocessedEntry, curr, firstUnsuccededEntry);
+			r = applyCheckpointedJournalEntries(firstUnprocessedEntry, curr, firstUnsuccededEntry);
+			if(r != Result::ok)
+			{
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not apply checkpointed Entries!");
+				return r;
+			}
 			firstUnprocessedEntry = curr;
 		}
 	}
+	if(r != Result::nf)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read Journal!");
+		return r;
+	}
+
 	if(firstUnprocessedEntry != persistence.tell())
 	{
 		PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Uncheckpointed Entries exist");
-		applyUncheckpointedJournalEntries(firstUnprocessedEntry);
+		r = applyUncheckpointedJournalEntries(firstUnprocessedEntry);
+		if(r != Result::ok)
+		{
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not apply UNcheckpointed Entries!");
+			return r;
+		}
 	}
-	recovery = false;
+	disabled = false;
+	return Result::ok;
 }
 
-void
+Result
 Journal::applyCheckpointedJournalEntries(EntryIdentifier& from, EntryIdentifier& to,
 		EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics])
 {
@@ -119,14 +160,20 @@ Journal::applyCheckpointedJournalEntries(EntryIdentifier& from, EntryIdentifier&
 			"from %" PRIu64 ".%" PRIu16 " to %" PRIu64 ".%" PRIu16,
 			from.flash.addr, from.flash.offs, to.flash.addr, to.flash.offs);
 	EntryIdentifier restore = persistence.tell();
-	persistence.seek(from);
+	Result r = persistence.seek(from);
+	if(r != Result::ok)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not seek persistence!");
+		return r;
+	}
 	while(true)
 	{
 		journalEntry::Max entry;
-		if(persistence.readNextElem(entry) != Result::ok)
+		r = persistence.readNextElem(entry);
+		if(r != Result::ok)
 		{
 			PAFFS_DBG(PAFFS_TRACE_BUG, "Could not read journal to target end");
-			break;
+			return r;
 		}
 		if(persistence.tell() == to)
 			break;
@@ -148,18 +195,29 @@ Journal::applyCheckpointedJournalEntries(EntryIdentifier& from, EntryIdentifier&
 			}
 		}
 	}
-	persistence.seek(restore);
+	r = persistence.seek(restore);
+	if(r != Result::ok)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not restore pointer in persistence!");
+		return r;
+	}
+	return Result::ok;
 }
 
-void
+Result
 Journal::applyUncheckpointedJournalEntries(EntryIdentifier& from)
 {
 	PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Applying UNcheckpointed Entries "
 			"from %" PRIu64 ".%" PRIu16, from.flash.addr, from.flash.offs);
 	EntryIdentifier restore = persistence.tell();
-	persistence.seek(from);
+	Result r = persistence.seek(from);
+	if(r != Result::ok)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not seek persistence!");
+		return r;
+	}
 	journalEntry::Max entry;
-	while(persistence.readNextElem(entry) == Result::ok)
+	while((r = persistence.readNextElem(entry)) == Result::ok)
 	{
 		for(JournalTopic* worker : topics)
 		{
@@ -169,7 +227,18 @@ Journal::applyUncheckpointedJournalEntries(EntryIdentifier& from)
 			}
 		}
 	}
-	persistence.seek(restore);
+	if(r != Result::nf)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read Entry!");
+		return r;
+	}
+	r = persistence.seek(restore);
+	if(r != Result::ok)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not restore pointer in persistence!");
+		return r;
+	}
+	return Result::ok;
 }
 
 void
@@ -295,4 +364,17 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
 	printf(" event");
 	if(withNewline)
 		printf(".\n");
+}
+
+void
+Journal::disable()
+{
+	disabled = true;
+}
+
+Result
+Journal::enable()
+{
+	disabled = false;
+	return persistence.rewind();
 }

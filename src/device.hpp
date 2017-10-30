@@ -56,6 +56,7 @@ public:
 	 * \param[in] complete if true, delete complete flash (may take a while)
 	 * if false (default), only the superblocks are erased,
 	 * everything else is considered deleted
+	 * \warn Journal is disabled during format
 	 */
 	Result format(const BadBlockList &badBlockList, bool complete = false);
 

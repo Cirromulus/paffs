@@ -16,7 +16,7 @@ class Journal{
 	JournalTopic* topics[3];
 
 	JournalPersistence& persistence;
-	bool recovery;
+	bool disabled;
 public:
 	Journal(JournalPersistence& _persistence, JournalTopic& superblock, JournalTopic& summaryCache,
 	        JournalTopic& tree): persistence(_persistence){
@@ -26,24 +26,28 @@ public:
 		topics[2] = &tree;
 		//TODO Inode
 
-		recovery = false;
+		disabled = true;
 	}
 
-	void
+	Result
 	addEvent(const JournalEntry& entry);
-	void
+	Result
 	checkpoint();
-	void
+	Result
 	clear();
-	void
+	Result
 	processBuffer();
 	void
 	printMeaning(const JournalEntry& entry, bool withNewLine = true);
-private:
 	void
+	disable();
+	Result
+	enable();
+private:
+	Result
 	applyCheckpointedJournalEntries(EntryIdentifier& from, EntryIdentifier& to,
 			EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics]);
-	void
+	Result
 	applyUncheckpointedJournalEntries(EntryIdentifier& from);
 	PageAbs
 	getSizeFromMax(const journalEntry::Max &entry);

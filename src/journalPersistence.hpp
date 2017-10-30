@@ -91,10 +91,10 @@ public:
 	~JournalPersistence(){};
 
 	// Rewind has to be called before scanning Elements
-	virtual void
+	virtual Result
 	rewind() = 0;
 
-	virtual void
+	virtual Result
 	seek(EntryIdentifier& addr) = 0;
 
 	virtual EntryIdentifier
@@ -116,9 +116,9 @@ class MramPersistence : public JournalPersistence
 	PageAbs curr;
 public:
 	MramPersistence(Device* _device) : JournalPersistence(_device), curr(0){};
-	void
+	Result
 	rewind();
-	void
+	Result
 	seek(EntryIdentifier& addr);
 	EntryIdentifier
 	tell();
@@ -148,9 +148,9 @@ class FlashPersistence : public JournalPersistence
 	EntryIdentifier::Flash curr;
 public:
 	FlashPersistence(Device* _device) : JournalPersistence(_device){};
-	void
+	Result
 	rewind();
-	void
+	Result
 	seek(EntryIdentifier& addr);
 	EntryIdentifier
 	tell();

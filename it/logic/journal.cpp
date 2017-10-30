@@ -21,6 +21,7 @@ TEST(Journal, WriteAndReadMRAM){
 	fs.setTraceMask(fs.getTraceMask() |
 			PAFFS_TRACE_JOURNAL |
 			PAFFS_TRACE_VERBOSE);
+	dev->journal.enable();
 	dev->superblock.registerRootnode(1234);
 	dev->superblock.registerRootnode(5678);
 	dev->areaMgmt.setStatus(0, AreaStatus::active);

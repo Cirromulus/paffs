@@ -108,16 +108,18 @@ JournalPersistence::getSizeFromMax(const journalEntry::Max &entry)
 }
 
 //======= MRAM ========
-void
+Result
 MramPersistence::rewind()
 {
 	curr = sizeof(PageAbs);
+	return Result::ok;
 }
 
-void
+Result
 MramPersistence::seek(EntryIdentifier& addr)
 {
 	curr = addr.mram.offs;
+	return Result::ok;
 }
 
 EntryIdentifier
@@ -173,28 +175,36 @@ MramPersistence::readNextElem(journalEntry::Max& entry)
 
 //FIXME: no revert of changes of uncheckpointed entries if it is buffered.
 
-void
+Result
 FlashPersistence::rewind()
 {
 	//TODO: ActiveArea has to be consistent even after a remount
 	//TODO: Save AA in Superpage
+	if(device->activeArea[AreaType::journal] == 0)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid journal Area (0)!");
+		return Result::bug;
+	}
 	curr.addr = combineAddress(device->activeArea[AreaType::journal], 0);
 	curr.offs = 0;
+	return Result::ok;
 }
-void
+Result
 FlashPersistence::seek(EntryIdentifier& addr)
 {
 	if(buf.dirty)
 	{
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Skipping a journal Commit in seek!");
-		return;
+		return Result::bug;
 	}
 	curr = addr.flash;
 	Result r = loadCurrentPage();
 	if(r != Result::ok)
 	{
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load a page in journal!");
+		return r;
 	}
+	return Result::ok;
 }
 EntryIdentifier
 FlashPersistence::tell()
@@ -269,7 +279,24 @@ FlashPersistence::readNextElem(journalEntry::Max& entry)
 			return Result::nf;
 		loadCurrentPage();
 	}
-	memcpy(&entry, , )
+	if(buf.data[curr.offs] == 0)
+	{
+		return Result::nf;
+	}
+
+	memcpy(&entry, &buf.data[curr.offs], curr.offs + sizeof(journalEntry::Max) > dataPagesPerArea ?
+	                                    dataPagesPerArea - curr.offs : sizeof(journalEntry::Max));
+	uint16_t size = getSizeFromMax(entry);
+	PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE),
+			"Read entry at %" PRIu32 ":%" PRIu32 " %" PRIu16 "-%" PRIu16,
+			extractLogicalArea(curr.addr), extractPageOffs(curr.addr), curr.offs, curr.offs + size);
+	if(size == 0)
+	{
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Did not recognize JournalEntry");
+		return Result::fail;
+	}
+	curr.offs += size;
+	return Result::ok;
 }
 
 Result
@@ -316,7 +343,7 @@ FlashPersistence::findNextPos(bool forACheckpoint)
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find a free page in journal!");
 		return Result::nospace;
 	}
-	curr = EntryIdentifier::Flash(combineAddress(extractLogicalArea(curr.addr), extractPageOffs(curr.addr) + 1), 0);
+	curr = EntryIdentifier(combineAddress(extractLogicalArea(curr.addr), extractPageOffs(curr.addr) + 1), 0).flash;
 	return Result::ok;
 }
 
