@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <simu/flashCell.h>
+#include <simu/flashCell.hpp>
 #include <simu/mram.hpp>
 #include <stddef.h>
 #include "driver.hpp"

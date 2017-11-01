@@ -95,7 +95,7 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 
 		if(hadAreaType &
 				(1 << AreaType::superblock |
-				1 << AreaType::journal |
+				//1 << AreaType::journal |
 				1 << AreaType::garbageBuffer) ||
 				complete){
 			for(unsigned int p = 0; p < blocksPerArea; p++){
@@ -124,13 +124,14 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 			continue;
 		}
 
+		/*
 		if(!(hadAreaType & 1 << AreaType::journal)){
 			areaMgmt.setActiveArea(AreaType::journal, area);
 			areaMgmt.setType(area, AreaType::journal);
 			areaMgmt.initArea(area);
 			hadAreaType |= 1 << AreaType::journal;
 			continue;
-		}
+		}*/
 
 		if(!(hadAreaType & 1 << AreaType::garbageBuffer)){
 			areaMgmt.setActiveArea(AreaType::garbageBuffer, area);

@@ -5,7 +5,7 @@
  *      Author: user
  */
 #include <paffs.hpp>
-#include <simu/flashCell.h>
+#include <simu/flashCell.hpp>
 #include <simu/mram.hpp>
 #include <iostream>
 #include <fstream>
