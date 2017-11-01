@@ -11,17 +11,11 @@
 
 using namespace paffs;
 
-TEST(Journal, WriteAndReadMRAM){
-	std::vector<paffs::Driver*> drv;
-	drv.push_back(paffs::getDriver(0));
+class JournalTest : public InitFs{};
 
-	Paffs fs(drv);
+TEST_F(JournalTest, WriteAndReadMRAM){
 	Device* dev = fs.getDevice(0);
 
-	fs.setTraceMask(fs.getTraceMask() |
-			PAFFS_TRACE_JOURNAL |
-			PAFFS_TRACE_VERBOSE);
-	dev->journal.enable();
 	dev->superblock.registerRootnode(1234);
 	dev->superblock.registerRootnode(5678);
 	dev->areaMgmt.setStatus(0, AreaStatus::active);

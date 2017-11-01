@@ -270,7 +270,7 @@ FlashPersistence::appendEntry(const JournalEntry& entry)
 Result
 FlashPersistence::clear()
 {
-	//TODO: Change Area with garbage collection
+	//TODO: Change Area with garbage collection, gc should notice usage upon mount and delete
 	return Result::nimpl;
 }
 
