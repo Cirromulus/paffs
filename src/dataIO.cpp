@@ -209,7 +209,7 @@ Result DataIO::writePageData(PageOffs pageFrom, PageOffs toPage, unsigned offs,
 		dev->lasterr = rBuf;
 
 		//Handle Areas
-		if(dev->areaMgmt.getStatus(dev->areaMgmt.getActiveArea(AreaType::data)) ==AreaStatus::empty){
+		if(dev->areaMgmt.getStatus(dev->areaMgmt.getActiveArea(AreaType::data)) == AreaStatus::empty){
 			//We'll have to use a fresh area,
 			//so generate the areaSummary in Memory
 			dev->areaMgmt.initArea(dev->areaMgmt.getActiveArea(AreaType::data));

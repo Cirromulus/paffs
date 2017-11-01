@@ -100,6 +100,7 @@ void AreaManagement::clear()
 	memset(map, 0, areasNo * sizeof(Area));
 	memset(activeArea, 0, AreaType::no * sizeof(AreaPos));
 	usedAreas = 0;
+	overallDeletions = 0;
 	PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Cleared Areamap, active Area and used Areas");
 }
 
@@ -155,16 +156,14 @@ void AreaManagement::setStatus(AreaPos area, AreaStatus status){
 	map[area].status = status;
 }
 void AreaManagement::increaseErasecount(AreaPos area){
-	setErasecount(area, getErasecount(area) + 1);
-}
-void AreaManagement::setErasecount(AreaPos area, uint32_t erasecount){
 	if(area >= areasNo){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set AreaMap Erasecount out of bounds! "
 				"(%" PRIu32 " >= %" PRIu32 ")", area, areasNo);
 		return;
 	}
-	dev->journal.addEvent(journalEntry::superblock::areaMap::Erasecount(area, erasecount));
-	map[area].erasecount = erasecount;
+	overallDeletions++;
+	dev->journal.addEvent(journalEntry::superblock::areaMap::IncreaseErasecount(area));
+	map[area].erasecount++;
 }
 void AreaManagement::setPos(AreaPos area, AreaPos pos){
 	if(area >= areasNo){
@@ -237,6 +236,16 @@ void AreaManagement::swapAreaPosition(AreaPos a, AreaPos b){
 	map[b].position = tmp1;
 	map[b].erasecount = tmp2;
 }
+
+void AreaManagement::setOverallDeletions(uint64_t& deletions)
+{
+	overallDeletions = deletions;
+}
+uint64_t AreaManagement::getOverallDeletions()
+{
+	return overallDeletions;
+}
+
 //Only for serializing areMap in Superblock
 Area* AreaManagement::getMap(){
 	return map;
@@ -272,8 +281,10 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 		 * If some day we support data cache, this would be allowed to use this pool as well.
 		**/
 		for(unsigned int area = 0; area < areasNo; area++){
-			if(getStatus(area) ==AreaStatus::empty &&
-					getType(area) != AreaType::retired){
+			if(getStatus(area) == AreaStatus::empty &&
+					getType(area) != AreaType::retired &&
+					(overallDeletions < areasNo * 2 ||
+					getErasecount(area) <= overallDeletions / areasNo / 2)){
 				setType(area, areaType);
 				initArea(area);
 				PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found empty Area %u for %s", area, areaNames[areaType]);

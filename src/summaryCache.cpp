@@ -312,6 +312,7 @@ Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry sta
 			}
 		}
 
+		//FIXME: This is very bad for wear leveling
 		if(summaryCache[translation[area]].getDirtyPages() == dataPagesPerArea){
 			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Area %" PRIu32 " has run full of dirty pages, deleting.", area);
 			//This also deletes the summary entry

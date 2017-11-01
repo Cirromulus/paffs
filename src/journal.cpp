@@ -279,7 +279,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
 						areaStatusNames[static_cast<const journalEntry::superblock::areaMap::Status*>(&entry)->status]);
 				found = true;
 				break;
-			case journalEntry::superblock::AreaMap::Operation::erasecount:
+			case journalEntry::superblock::AreaMap::Operation::increaseErasecount:
 				printf("set Erasecount");
 				found = true;
 				break;

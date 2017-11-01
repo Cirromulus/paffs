@@ -84,7 +84,7 @@ namespace journalEntry
 			enum class Operation{
 				type,
 				status,
-				erasecount,
+				increaseErasecount,
 				position,
 				swap,
 			};
@@ -109,10 +109,8 @@ namespace journalEntry
 						status(_status){};
 				AreaStatus status;
 			};
-			struct Erasecount : public AreaMap{
-				Erasecount(AreaPos _offs, uint32_t _erasecount) : AreaMap(_offs, Operation::erasecount),
-						erasecount(_erasecount){};
-				uint32_t erasecount;
+			struct IncreaseErasecount : public AreaMap{
+				IncreaseErasecount(AreaPos _offs) : AreaMap(_offs, Operation::increaseErasecount){};
 			};
 			struct Position : public AreaMap{
 				Position(AreaPos _offs, AreaPos _position) : AreaMap(_offs, Operation::position),
@@ -128,7 +126,7 @@ namespace journalEntry
 			{
 				Type type;
 				Status status;
-				Erasecount erasecount;
+				IncreaseErasecount erasecount;
 				Position position;
 			};
 		};

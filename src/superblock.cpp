@@ -28,10 +28,13 @@ SuperIndex::deserializeFromBuffer(Device* dev, const char* buf)
 	pointer += sizeof(AreaPos);
 	memcpy(areaMap, &buf[pointer], areasNo * sizeof(Area));
 	pointer += areasNo * sizeof(Area);
-	memcpy(asPositions, &buf[pointer], 2 * sizeof(AreaPos));
-	pointer += 2 * sizeof(AreaPos);
 	memcpy(activeAreas, &buf[pointer], AreaType::no * sizeof(AreaPos));
 	pointer += AreaType::no * sizeof(AreaPos);
+	memcpy(&overallDeletions, &buf[pointer], sizeof(uint64_t));
+	pointer += sizeof(uint64_t);
+
+	memcpy(asPositions, &buf[pointer], 2 * sizeof(AreaPos));
+	pointer += 2 * sizeof(AreaPos);
 
 	unsigned char asCount = 0;
 	for(unsigned int i = 0; i < 2; i++){
@@ -105,10 +108,13 @@ SuperIndex::serializeToBuffer(char* buf)
 	pointer += sizeof(AreaPos);
 	memcpy(&buf[pointer], areaMap, areasNo * sizeof(Area));
 	pointer += areasNo * sizeof(Area);
-	memcpy(&buf[pointer], asPositions, 2 * sizeof(AreaPos));
-	pointer += 2 * sizeof(AreaPos);
 	memcpy(&buf[pointer], activeAreas, AreaType::no * sizeof(AreaPos));
 	pointer += AreaType::no * sizeof(AreaPos);
+	memcpy(&buf[pointer], &overallDeletions, sizeof(uint64_t));
+	pointer += sizeof(uint64_t);
+
+	memcpy(&buf[pointer], asPositions, 2 * sizeof(AreaPos));
+	pointer += 2 * sizeof(AreaPos);
 
 	//Collect area summaries and pack them
 	for(unsigned int i = 0; i < 2; i++){
@@ -169,6 +175,7 @@ SuperIndex::print()
 	for(uint16_t i = 0; i < AreaType::no; i ++){
 		printf("%10s: %" PRIu32 "\n", areaNames[i], activeAreas[i]);
 	}
+	printf("Overall deletions: %" PRIu64 "\n", overallDeletions);
 }
 
 JournalEntry::Topic Superblock::getTopic(){
@@ -201,9 +208,8 @@ void Superblock::processEntry(JournalEntry& entry){
 			dev->areaMgmt.setStatus(a->offs,
 					static_cast<const journalEntry::superblock::areaMap::Status*>(&entry)->status);
 			break;
-		case journalEntry::superblock::AreaMap::Operation::erasecount:
-			dev->areaMgmt.setErasecount(a->offs,
-					static_cast<const journalEntry::superblock::areaMap::Erasecount*>(&entry)->erasecount);
+		case journalEntry::superblock::AreaMap::Operation::increaseErasecount:
+			dev->areaMgmt.increaseErasecount(a->offs);
 			break;
 		case journalEntry::superblock::AreaMap::Operation::position:
 			dev->areaMgmt.setPos(a->offs,
@@ -256,140 +262,6 @@ Addr Superblock::getRootnodeAddr(){
 	}
 
 	return rootnode_addr;
-}
-
-void Superblock::setTestmode(bool t){
-	testmode = t;
-}
-/**
- * @brief Ugh, O(n) with areaCount
- */
-Result Superblock::resolveDirectToLogicalPath(Addr directPath[superChainElems],
-		Addr outPath[superChainElems]){
-	AreaPos p = 0;
-	int d = 0;
-	for(AreaPos i = 0; i < areasNo; i++){
-		p = dev->areaMgmt.getPos(i);
-		for(d = 0; d < superChainElems; d++){
-			if(p == extractLogicalArea(directPath[d]))
-				outPath[d] = combineAddress(i, extractPageOffs(directPath[d]));
-		}
-	}
-	return Result::ok;
-}
-
-Result Superblock::fillPathWithFirstSuperblockAreas(Addr directPath[superChainElems]){
-	int foundElems = 0;
-	for(AreaPos i = 0; i < areasNo && foundElems <= superChainElems; i++){
-		if(dev->areaMgmt.getType(i) == AreaType::superblock){
-			directPath[foundElems++] = combineAddress(dev->areaMgmt.getPos(i), 0);
-			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found new superblock area for chain %d", foundElems);
-		}
-	}
-	if(foundElems != superChainElems){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find enough superBlocks path! got %d, should %u", foundElems, superChainElems);
-		return Result::fail;
-	}
-	return Result::ok;
-}
-
-Result Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew){
-
-	Result r;
-	if(createNew){
-		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Creating new superchain");
-		memset(superChainIndexes, 0, superChainElems * sizeof(SerialNo));
-		r = fillPathWithFirstSuperblockAreas(pathToSuperIndexDirect);
-		if(r != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not init superchain");
-			return r;
-		}
-	}
-
-	if(!asDirty && !rootnode_dirty){
-		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Skipping write of superIndex "
-				"because nothing is dirty");
-		return Result::ok;
-	}
-
-	//Get index of last chain elem (SuperEntry) and increase
-	newIndex->no = superChainIndexes[jumpPadNo+1]+1;
-	newIndex->rootNode = rootnode_addr;
-	newIndex->areaMap = dev->areaMgmt.getMap();
-	newIndex->usedAreas = dev->areaMgmt.getUsedAreas();
-	newIndex->activeAreas = dev->areaMgmt.getActiveAreas();
-
-
-	if(traceMask & PAFFS_TRACE_VERBOSE){
-		printf("write Super Index:\n");
-		newIndex->print();
-	}
-
-	Addr logicalPath[superChainElems];
-	r = resolveDirectToLogicalPath(pathToSuperIndexDirect, logicalPath);
-	if(r != Result::ok){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not resolve direct to logical path!");
-		return r;
-	}
-
-	AreaPos directAreas[superChainElems];
-	for(int i = 0; i < superChainElems; i++){
-		directAreas[i] = extractLogicalArea(pathToSuperIndexDirect[i]);
-	}
-	AreaPos lastArea = directAreas[jumpPadNo+1];
-
-	r = insertNewSuperIndex(logicalPath[jumpPadNo+1], &directAreas[jumpPadNo+1], newIndex);
-	if(r != Result::ok){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new super Page!");
-		return r;
-	}
-
-	if(!testmode){
-		if(!createNew && lastArea == directAreas[jumpPadNo+1]){
-			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Committing superindex "
-					"at phys. area %" PRIu32 " was enough!", lastArea);
-			rootnode_dirty = false;
-			return Result::ok;
-		}
-	}else{
-		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "comitting jumpPad anyway because of test setting!");
-	}
-
-	for(int i = jumpPadNo; i > 0; i--){
-		JumpPadEntry e = {superChainIndexes[i]+1, 0, directAreas[i+1]};
-		lastArea = directAreas[i];
-		r = insertNewJumpPadEntry(logicalPath[i], &directAreas[i], &e);
-		if(r != Result::ok){
-			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new JumpPadEntry (Chain %d)!", i);
-			return r;
-		}
-		if(!createNew && lastArea == directAreas[i]){
-			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Committing jumpPad no. %d "
-					"at phys. area %" PRIu32 "was enough!", i, lastArea);
-			rootnode_dirty = false;
-			return Result::ok;
-		}
-	}
-	AnchorEntry a = {
-			.no = superChainIndexes[0]+1,
-			.logPrev = 0, .jumpPadArea = directAreas[1],
-			.param = stdParam, .fsVersion = version,
-	};
-	lastArea = directAreas[1];
-	r = insertNewAnchorEntry(logicalPath[0], &directAreas[0], &a);
-	if(r != Result::ok){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new AnchorEntry!");
-		return r;
-	}
-	if(lastArea != directAreas[1]){
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Anchor entry (%" PRIu32 ") may never "
-				"change its previous area (%" PRIu32 ")!", directAreas[1], lastArea);
-		return Result::bug;
-	}
-
-	dev->journal.addEvent(journalEntry::Success(getTopic()));
-	rootnode_dirty = false;
-	return Result::ok;
 }
 
 Result Superblock::readSuperIndex(SuperIndex* index){
@@ -535,7 +407,143 @@ Result Superblock::readSuperIndex(SuperIndex* index){
 	rootnode_dirty = false;
 
 	dev->areaMgmt.setUsedAreas(index->usedAreas);
+	dev->areaMgmt.setOverallDeletions(index->overallDeletions);
 
+	return Result::ok;
+}
+
+Result Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew){
+
+	Result r;
+	if(createNew){
+		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Creating new superchain");
+		memset(superChainIndexes, 0, superChainElems * sizeof(SerialNo));
+		r = fillPathWithFirstSuperblockAreas(pathToSuperIndexDirect);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not init superchain");
+			return r;
+		}
+	}
+
+	if(!asDirty && !rootnode_dirty){
+		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Skipping write of superIndex "
+				"because nothing is dirty");
+		return Result::ok;
+	}
+
+	//Get index of last chain elem (SuperEntry) and increase
+	newIndex->no = superChainIndexes[jumpPadNo+1]+1;
+	newIndex->rootNode = rootnode_addr;
+	newIndex->areaMap = dev->areaMgmt.getMap();
+	newIndex->usedAreas = dev->areaMgmt.getUsedAreas();
+	newIndex->activeAreas = dev->areaMgmt.getActiveAreas();
+	newIndex->overallDeletions = dev->areaMgmt.getOverallDeletions();
+
+
+	if(traceMask & PAFFS_TRACE_VERBOSE){
+		printf("write Super Index:\n");
+		newIndex->print();
+	}
+
+	Addr logicalPath[superChainElems];
+	r = resolveDirectToLogicalPath(pathToSuperIndexDirect, logicalPath);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not resolve direct to logical path!");
+		return r;
+	}
+
+	AreaPos directAreas[superChainElems];
+	for(int i = 0; i < superChainElems; i++){
+		directAreas[i] = extractLogicalArea(pathToSuperIndexDirect[i]);
+	}
+	AreaPos lastArea = directAreas[jumpPadNo+1];
+
+	r = insertNewSuperIndex(logicalPath[jumpPadNo+1], &directAreas[jumpPadNo+1], newIndex);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new super Page!");
+		return r;
+	}
+
+	if(!testmode){
+		if(!createNew && lastArea == directAreas[jumpPadNo+1]){
+			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Committing superindex "
+					"at phys. area %" PRIu32 " was enough!", lastArea);
+			rootnode_dirty = false;
+			return Result::ok;
+		}
+	}else{
+		PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "comitting jumpPad anyway because of test setting!");
+	}
+
+	for(int i = jumpPadNo; i > 0; i--){
+		JumpPadEntry e = {superChainIndexes[i]+1, 0, directAreas[i+1]};
+		lastArea = directAreas[i];
+		r = insertNewJumpPadEntry(logicalPath[i], &directAreas[i], &e);
+		if(r != Result::ok){
+			PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new JumpPadEntry (Chain %d)!", i);
+			return r;
+		}
+		if(!createNew && lastArea == directAreas[i]){
+			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Committing jumpPad no. %d "
+					"at phys. area %" PRIu32 "was enough!", i, lastArea);
+			rootnode_dirty = false;
+			return Result::ok;
+		}
+	}
+	AnchorEntry a = {
+			.no = superChainIndexes[0]+1,
+			.logPrev = 0, .jumpPadArea = directAreas[1],
+			.param = stdParam, .fsVersion = version,
+	};
+	lastArea = directAreas[1];
+	r = insertNewAnchorEntry(logicalPath[0], &directAreas[0], &a);
+	if(r != Result::ok){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new AnchorEntry!");
+		return r;
+	}
+	if(lastArea != directAreas[1]){
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Anchor entry (%" PRIu32 ") may never "
+				"change its previous area (%" PRIu32 ")!", directAreas[1], lastArea);
+		return Result::bug;
+	}
+
+	dev->journal.addEvent(journalEntry::Success(getTopic()));
+	rootnode_dirty = false;
+	return Result::ok;
+}
+
+void Superblock::setTestmode(bool t){
+	testmode = t;
+}
+/**
+ * @brief Ugh, O(n) with areaCount
+ */
+Result Superblock::resolveDirectToLogicalPath(Addr directPath[superChainElems],
+		Addr outPath[superChainElems]){
+	AreaPos p = 0;
+	int d = 0;
+	for(AreaPos i = 0; i < areasNo; i++){
+		p = dev->areaMgmt.getPos(i);
+		for(d = 0; d < superChainElems; d++){
+			if(p == extractLogicalArea(directPath[d]))
+				outPath[d] = combineAddress(i, extractPageOffs(directPath[d]));
+		}
+	}
+	return Result::ok;
+}
+
+Result Superblock::fillPathWithFirstSuperblockAreas(Addr directPath[superChainElems]){
+	int foundElems = 0;
+	for(AreaPos i = 0; i < areasNo && foundElems <= superChainElems; i++){
+		if(dev->areaMgmt.getType(i) == AreaType::superblock){
+			directPath[foundElems++] = combineAddress(dev->areaMgmt.getPos(i), 0);
+			PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found new superblock area for chain %d", foundElems);
+		}
+	}
+	if(foundElems != superChainElems){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find enough superBlocks path! got %d, should %u", foundElems, superChainElems);
+		return Result::fail;
+	}
 	return Result::ok;
 }
 

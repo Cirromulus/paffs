@@ -40,8 +40,8 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
 			case journalEntry::superblock::AreaMap::Operation::status:
 				size = sizeof(journalEntry::superblock::areaMap::Status);
 				break;
-			case journalEntry::superblock::AreaMap::Operation::erasecount:
-				size = sizeof(journalEntry::superblock::areaMap::Erasecount);
+			case journalEntry::superblock::AreaMap::Operation::increaseErasecount:
+				size = sizeof(journalEntry::superblock::areaMap::IncreaseErasecount);
 				break;
 			case journalEntry::superblock::AreaMap::Operation::position:
 				size = sizeof(journalEntry::superblock::areaMap::Type);

@@ -32,6 +32,7 @@ class AreaManagement{
 	Area map[areasNo];
 	AreaPos activeArea[AreaType::no];
 	AreaPos usedAreas;
+	uint64_t overallDeletions;
 	Device *dev;
 public:
 	GarbageCollection gc;
@@ -49,7 +50,6 @@ public:
 	void setType(AreaPos area, AreaType type);
 	void setStatus(AreaPos area, AreaStatus status);
 	void increaseErasecount(AreaPos area);
-	void setErasecount(AreaPos area, uint32_t erasecount);
 	void setPos(AreaPos area, AreaPos pos);
 
 	AreaPos getActiveArea(AreaType type);
@@ -62,9 +62,13 @@ public:
 
 	void swapAreaPosition(AreaPos a, AreaPos b);
 
+	void setOverallDeletions(uint64_t& deletions);
+	uint64_t getOverallDeletions();
+
 	//Only for serializing areMap in Superblock
 	Area* getMap();
 	AreaPos* getActiveAreas();
+
 
 	/**
 	 * May call garbage collection

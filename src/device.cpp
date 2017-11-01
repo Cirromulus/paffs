@@ -71,7 +71,7 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 
 	for(unsigned int area = 0; area < areasNo; area++){
 		areaMgmt.setStatus(area, AreaStatus::empty);
-		areaMgmt.setErasecount(area, 0);
+		//erasecount is already set to 0
 		areaMgmt.setPos(area, area);
 
 		if(areaMgmt.getType(area) == AreaType::retired){

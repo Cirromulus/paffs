@@ -42,11 +42,14 @@ struct JumpPadEntry{
 struct SuperIndex{
 	SerialNo no;
 	AreaPos logPrev;		//if != 0, the logical area prev is now free, while this current is not (obviously)
+	//"public"
 	Addr rootNode;
 	AreaPos usedAreas;
 	Area* areaMap;
-	AreaPos asPositions[2];
 	AreaPos* activeAreas;
+	uint64_t overallDeletions;
+	//"internal"
+	AreaPos asPositions[2];
 	SummaryEntry* areaSummary[2];
 	static uint16_t
 	getNeededBytes(uint16_t numberOfAreaSummaries)
@@ -62,8 +65,9 @@ struct SuperIndex{
 				sizeof(Addr) +						//rootNode
 				sizeof(AreaPos) +					//usedAreas
 				areasNo * sizeof(Area) +			//AreaMap
-				2 * sizeof(AreaPos) +				//Area Summary Positions
 				AreaType::no * sizeof(AreaPos) +	//ActiveAreas
+				sizeof(uint64_t) + 					//overallDeletions
+				2 * sizeof(AreaPos) +				//Area Summary Positions
 				numberOfAreaSummaries * dataPagesPerArea / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
 		if(dataPagesPerArea % 8 != 0)
 			neededBytes++;
