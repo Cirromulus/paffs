@@ -39,7 +39,7 @@ public:
 	AreaManagement areaMgmt;
 	DataIO dataIO;
 	Superblock superblock;
-	FlashPersistence journalPersistence;
+	MramPersistence journalPersistence;
 	Journal journal;
 
 	/*
