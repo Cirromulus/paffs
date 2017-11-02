@@ -83,6 +83,7 @@ public:
 	Result manageActiveAreaFull(AreaType areaType);
 
 	void initArea(AreaPos area);
+	void initAreaAs(AreaPos area, AreaType type);
 	Result closeArea(AreaPos area);
 	void retireArea(AreaPos area);
 	Result deleteAreaContents(AreaPos area);

@@ -191,6 +191,10 @@ void AreaManagement::setActiveArea(AreaType type, AreaPos pos)
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set ActiveArea of invalid Type!");
 		return;
 	}
+	if(map[pos].status != AreaStatus::active)
+	{
+		PAFFS_DBG(PAFFS_TRACE_BUG, "SetActiveArea of Pos %" PRIu32 ", but area is not active!", pos);
+	}
 	dev->journal.addEvent(journalEntry::superblock::ActiveArea(type, pos));
 	activeArea[type] = pos;
 }
@@ -275,7 +279,7 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 		return getActiveArea(areaType);
 	}
 
-	if(getUsedAreas() < areasNo - minFreeAreas || areaType == AreaType::index){
+	if(getUsedAreas() < areasNo - minFreeAreas){
 		/**We only take new areas, if we dont hit the reserved pool.
 		 * The exeption is Index area, which is needed for committing caches.
 		 * If some day we support data cache, this would be allowed to use this pool as well.
@@ -285,8 +289,7 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 					getType(area) != AreaType::retired &&
 					(overallDeletions < areasNo * 2 ||
 					getErasecount(area) <= overallDeletions / areasNo / 2)){
-				setType(area, areaType);
-				initArea(area);
+				initAreaAs(area, areaType);
 				PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found empty Area %u for %s", area, areaNames[areaType]);
 				return area;
 			}
@@ -353,8 +356,11 @@ Result AreaManagement::manageActiveAreaFull(AreaType areaType){
 	return Result::ok;
 }
 
+void AreaManagement::initAreaAs(AreaPos area, AreaType type){
+	setType(area, type);
+	initArea(area);
+}
 
-//TODO: Add initAreaAs(...) to handle typical areaMgmt.setType(abc, def; initArea(...));
 void AreaManagement::initArea(AreaPos area){
 	if(getType(area) == AreaType::unset){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Initing Area with invalid type!");

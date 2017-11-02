@@ -28,6 +28,7 @@ PageOffs GarbageCollection::countDirtyPages(SummaryEntry* summary){
 AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_summary, bool* srcAreaContainsData){
 	AreaPos favourite_area = 0;
 	PageOffs fav_dirty_pages = 0;
+	uint32_t fav_erases = ~0;
 	*srcAreaContainsData = true;
 	SummaryEntry curr[dataPagesPerArea];
 
@@ -43,15 +44,14 @@ AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_s
 				PAFFS_DBG(PAFFS_TRACE_BUG, "Could not load Summary of Area %d for Garbage collection!", i);
 				return 0;
 			}
-			if (dirty_pages == dataPagesPerArea){
+			if (dirty_pages == dataPagesPerArea &&
+					(dev->areaMgmt.getOverallDeletions() < areasNo || //Some wear leveling
+					dev->areaMgmt.getErasecount(i) < dev->areaMgmt.getOverallDeletions() / areasNo)){
+
 				//We can't find a block with more dirty pages in it
-				favourite_area = i;
 				*srcAreaContainsData = false;
-				fav_dirty_pages = dirty_pages;
 				memcpy(out_summary, curr, dataPagesPerArea);
-				if(dev->sumCache.wasASWritten(i))
-					//Convenient: we can reset an AS to free up cache space
-					break;
+				return i;
 			}
 
 			if(target != AreaType::unset){
@@ -60,10 +60,14 @@ AreaPos GarbageCollection::findNextBestArea(AreaType target, SummaryEntry* out_s
 					continue; 	//We cant change types if area is not completely empty
 
 				if(dirty_pages > fav_dirty_pages ||
-						(dev->sumCache.wasASWritten(i) &&
-								dirty_pages != 0 && dirty_pages == fav_dirty_pages)){
+					(dirty_pages != 0 && dirty_pages == fav_dirty_pages &&
+							dev->areaMgmt.getErasecount(i) < fav_erases) ||
+					(dirty_pages != 0 && dirty_pages == fav_dirty_pages &&
+							dev->sumCache.wasASWritten(i))
+					){
 					favourite_area = i;
 					fav_dirty_pages = dirty_pages;
+					fav_erases = dev->areaMgmt.getErasecount(i);
 					memcpy(out_summary, curr, dataPagesPerArea);
 				}
 			}else{
@@ -165,9 +169,8 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 
 			AreaPos nextPos;
 			for(nextPos = 0; nextPos < areasNo; nextPos++){
-				if(dev->areaMgmt.getStatus(nextPos) ==AreaStatus::empty){
-					dev->areaMgmt.setType(nextPos, targetType);
-					dev->areaMgmt.initArea(nextPos);
+				if(dev->areaMgmt.getStatus(nextPos) == AreaStatus::empty){
+					dev->areaMgmt.initAreaAs(nextPos, targetType);
 					PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found empty Area %u", nextPos);
 				}
 			}
@@ -188,8 +191,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 			}
 
 			//Resurrect area, fill it with the former summary. In end routine, positions will be swapped.
-			dev->areaMgmt.setType(lastDeletionTarget, dev->areaMgmt.getType(deletion_target));
-			dev->areaMgmt.initArea(lastDeletionTarget);
+			dev->areaMgmt.initAreaAs(lastDeletionTarget, dev->areaMgmt.getType(deletion_target));
 			r = dev->sumCache.setSummaryStatus(lastDeletionTarget, summary);
 			if(r != Result::ok){
 				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not move former Summary to area %d!", lastDeletionTarget);
@@ -229,7 +231,7 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 			r = moveValidDataToNewArea(deletion_target, dev->areaMgmt.getActiveArea(AreaType::garbageBuffer), summary);
 			//while(getchar() == EOF);
 			if(r != Result::ok){
-				PAFFS_DBG_S(PAFFS_TRACE_GC, "Could not copy valid pages from area %u to %u!", deletion_target, dev->areaMgmt.getActiveArea(AreaType::garbageBuffer));
+				PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not copy valid pages from area %u to %u!", deletion_target, dev->areaMgmt.getActiveArea(AreaType::garbageBuffer));
 				//TODO: Handle something, maybe put area in ReadOnly or copy somewhere else..
 				//TODO: Maybe copy rest of Pages before quitting
 				return r;
@@ -264,7 +266,8 @@ Result GarbageCollection::collectGarbage(AreaType targetType){
 					dev->areaMgmt.getActiveArea(targetType), dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(targetType)));
 			return Result::bug;
 		}
-		dev->areaMgmt.setActiveArea(targetType, deletion_target);
+		//dev->areaMgmt.setActiveArea(targetType, deletion_target);
+		dev->areaMgmt.initAreaAs(deletion_target, targetType);
 	}
 
 	PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL, "Garbagecollection erased pos %u and gave area %u pos %u.",

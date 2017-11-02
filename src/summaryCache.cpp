@@ -313,10 +313,20 @@ Result SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry sta
 		}
 
 		//FIXME: This is very bad for wear leveling
-		if(summaryCache[translation[area]].getDirtyPages() == dataPagesPerArea){
+		/*if(summaryCache[translation[area]].getDirtyPages() == dataPagesPerArea){
 			PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Area %" PRIu32 " has run full of dirty pages, deleting.", area);
 			//This also deletes the summary entry
 			dev->areaMgmt.deleteArea(area);
+		}*/
+		//Commit to Flash, nothing will change in here except for erase
+		if(summaryCache[translation[area]].getDirtyPages() == dataPagesPerArea
+				&& !summaryCache[translation[area]].isAsWritten())
+		{
+			Result r = writeAreasummary(translation[area]);
+			if(r != Result::ok){
+				PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write AreaSummary");
+				return r;
+			}
 		}
 	}
 	return Result::ok;

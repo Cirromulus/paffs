@@ -45,12 +45,14 @@ TEST_F(SuperBlock, multipleRemounts){
 		r = fs.mount();
 		if(r != paffs::Result::ok){
 			printf("Error during round %d!\n", i);
+			printf("mount: %s\n", paffs::err_msg(r));
 		}
 		ASSERT_EQ(r, paffs::Result::ok);
 
 		fil = fs.open("/file", paffs::FC);
 		if(fil == nullptr){
 			printf("Error in Run %u\n", i);
+			printf("open: %s\n", paffs::err_msg(fs.getLastErr()));
 		}
 		ASSERT_NE(fil, nullptr);
 
@@ -59,18 +61,38 @@ TEST_F(SuperBlock, multipleRemounts){
 		ASSERT_EQ(bw, strlen(txt));
 		ASSERT_TRUE(ArraysMatch(buf, txt, strlen(txt)));
 
+		if(i == 2548){
+			printf("Beware of the bug\n");
+		}
+
 		r = fs.touch("/a");
+		if(r != paffs::Result::ok)
+		{
+			printf("(%d) Touch: %s!\n", i, paffs::err_msg(r));
+		}
 		ASSERT_EQ(r, paffs::Result::ok);
 
 		r = fs.close(*fil);
+		if(r != paffs::Result::ok)
+		{
+			printf("Close: %s!\n", paffs::err_msg(r));
+		}
 		ASSERT_EQ(r, paffs::Result::ok);
 
 		dir = fs.openDir("/a");
 		ASSERT_NE(dir, nullptr);
 
 		r = fs.closeDir(dir);
+		if(r != paffs::Result::ok)
+		{
+			printf("Close Dir: %s!\n", paffs::err_msg(r));
+		}
 		ASSERT_EQ(r, paffs::Result::ok);
 		r = fs.unmount();
+		if(r != paffs::Result::ok)
+		{
+			printf("Unmount: %s!\n", paffs::err_msg(r));
+		}
 		ASSERT_EQ(r, paffs::Result::ok);
 	}
 }

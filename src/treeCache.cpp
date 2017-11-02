@@ -789,10 +789,10 @@ Result TreeCache::writeTreeNode(TreeCacheNode& node){
 		return dev->lasterr;
 	}
 	//Handle Areas
-	if(dev->areaMgmt.getStatus(dev->areaMgmt.getActiveArea(AreaType::index)) ==AreaStatus::empty){
-		//We'll have to use a fresh area,
-		//so generate the areaSummary in Memory
-		dev->areaMgmt.initArea(dev->areaMgmt.getActiveArea(AreaType::index));
+	if(dev->areaMgmt.getStatus(dev->areaMgmt.getActiveArea(AreaType::index)) != AreaStatus::active)
+	{
+		PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned inactive area!");
+		return Result::bug;
 	}
 	if(dev->areaMgmt.getActiveArea(AreaType::index) == 0){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "WRITE TREE NODE findWritableArea returned 0");

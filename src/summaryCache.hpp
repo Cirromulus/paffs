@@ -65,6 +65,10 @@ public:
 
 	Result setSummaryStatus(AreaPos area, SummaryEntry* summary);
 
+	/**
+	 * This one does not copy into Cache
+	 * Because it is just for a one-shot of Garbage collection looking for the best area
+	 */
 	Result getSummaryStatus(AreaPos area, SummaryEntry* summary, bool complete=true);
 
 	//Does not check if pages are dirty or free

@@ -116,9 +116,8 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 		}
 
 		if(!(hadAreaType & 1 << AreaType::superblock)){
-			areaMgmt.setActiveArea(AreaType::superblock, area);
-			areaMgmt.setType(area, AreaType::superblock);
-			areaMgmt.initArea(area);
+			areaMgmt.initAreaAs(area, AreaType::superblock);
+			areaMgmt.setActiveArea(AreaType::superblock, 0);
 			if(++hadSuperblocks == superChainElems)
 				hadAreaType |= 1 << AreaType::superblock;
 			continue;
@@ -126,17 +125,13 @@ Result Device::format(const BadBlockList &badBlockList, bool complete){
 
 		/*
 		if(!(hadAreaType & 1 << AreaType::journal)){
-			areaMgmt.setActiveArea(AreaType::journal, area);
-			areaMgmt.setType(area, AreaType::journal);
-			areaMgmt.initArea(area);
+			areaMgmt.initAreaAs(area, AreaType::journal);
 			hadAreaType |= 1 << AreaType::journal;
 			continue;
 		}*/
 
 		if(!(hadAreaType & 1 << AreaType::garbageBuffer)){
-			areaMgmt.setActiveArea(AreaType::garbageBuffer, area);
-			areaMgmt.setType(area, AreaType::garbageBuffer);
-			areaMgmt.initArea(area);
+			areaMgmt.initAreaAs(area, AreaType::garbageBuffer);
 			hadAreaType |= 1 << AreaType::garbageBuffer;
 			continue;
 		}
