@@ -61,10 +61,6 @@ TEST_F(SuperBlock, multipleRemounts){
 		ASSERT_EQ(bw, strlen(txt));
 		ASSERT_TRUE(ArraysMatch(buf, txt, strlen(txt)));
 
-		if(i == 2548){
-			printf("Beware of the bug\n");
-		}
-
 		r = fs.touch("/a");
 		if(r != paffs::Result::ok)
 		{

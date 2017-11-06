@@ -282,7 +282,6 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 	if(getUsedAreas() < areasNo - minFreeAreas){
 		/**We only take new areas, if we dont hit the reserved pool.
 		 * The exeption is Index area, which is needed for committing caches.
-		 * If some day we support data cache, this would be allowed to use this pool as well.
 		**/
 		for(unsigned int area = 0; area < areasNo; area++){
 			if(getStatus(area) == AreaStatus::empty &&
@@ -298,7 +297,7 @@ unsigned int AreaManagement::findWritableArea(AreaType areaType){
 		PAFFS_DBG_S(PAFFS_TRACE_AREA, "FindWritableArea ignored reserved area");
 	}
 
- 	Result r = gc.collectGarbage(areaType);
+	Result r = gc.collectGarbage(areaType);
 	if(r != Result::ok){
 		dev->lasterr = r;
 		return 0;
