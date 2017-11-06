@@ -18,3 +18,7 @@
 #define CELL_SIZE 8
 
 #define TID_FLIP_START_PERCENT 0.85
+
+static constexpr unsigned long usecRead  = 25;
+static constexpr unsigned long usecWrite = 200;
+static constexpr unsigned long usecErase = 1500;
