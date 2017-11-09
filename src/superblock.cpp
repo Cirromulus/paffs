@@ -237,8 +237,7 @@ void Superblock::processUncheckpointedEntry(JournalEntry& entry){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
 		return;
 	}
-	//TODO: Is this really good to suppress this write?
-	// Question: Should type changes be persistent without being checkpointed?
+	//TODO: If swap occurs, check if it was successful.
 	if(static_cast<journalEntry::Superblock*>(&entry)->type ==
 			journalEntry::Superblock::Type::areaMap)
 	{
