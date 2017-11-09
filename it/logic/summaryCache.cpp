@@ -17,7 +17,10 @@ class SummaryCache : public InitFs{};
 
 class InitWithBadBlocks : public testing::Test{
 	static constexpr unsigned int numberOfBadBlocks = 4;
+	static constexpr unsigned int numberOfDoubledBadBlocks = 1;
 	static constexpr unsigned int numberOfNotifiedBlocks = 3;
+
+
 	static std::vector<paffs::Driver*> &collectDrivers(){
 		static std::vector<paffs::Driver*> drv;
 		drv.clear();
@@ -35,6 +38,17 @@ public:
 				allBadBlocks[device][block] = (rand() %
 						((paffs::areasNo - 1) * paffs::blocksPerArea))
 						+ paffs::blocksPerArea;
+			}
+			for(unsigned i = 0; i < numberOfDoubledBadBlocks; i++){
+				unsigned blockToBeDoubled = rand() % numberOfBadBlocks;
+				unsigned blockToBeOverwritten = rand() % (numberOfBadBlocks - 1);
+				if(blockToBeOverwritten == blockToBeDoubled){
+					blockToBeOverwritten++;
+				}
+				allBadBlocks[device][blockToBeOverwritten] =
+						allBadBlocks[device][blockToBeDoubled];
+			}
+			for(unsigned block = 0; block < numberOfBadBlocks; block++){
 				if(block >= numberOfNotifiedBlocks){
 					fs.getDevice(device)->driver.markBad(allBadBlocks[device][block]);
 				}
@@ -61,24 +75,40 @@ public:
 				AccessValues v = dbg->getAccessValues(
 						allBadBlocks[device][block] / dbg->getPlaneSize(),
 						allBadBlocks[device][block] % dbg->getPlaneSize(), 0, 0);
-				//One Write is allowed, for the Bad-Block marker!
-				ASSERT_EQ(v.times_written, 1u);
-					ASSERT_EQ(v.times_reset, 0u);
-				if(block < numberOfNotifiedBlocks){
-					ASSERT_EQ(v.times_read, 0u);
-				}else{
-					//The block has to be checked, but not reset
-					bool areaAlreadyRetired = false;
-					for(unsigned i = 0; i < block && !areaAlreadyRetired; i++){
-						areaAlreadyRetired |=
-							allBadBlocks[device][i] / paffs::blocksPerArea
-							== allBadBlocks[device][block] / paffs::blocksPerArea;
-							//This area was already retired, so no additional check
+
+				//count how many times the current area was forced bad by list
+				unsigned int areaAlreadyForcedBad = 0;
+				unsigned int blockAlreadyForcedBad = 0;
+				for(unsigned i = 0; i < numberOfBadBlocks; i++){
+					if(allBadBlocks[device][i] / paffs::blocksPerArea
+						== allBadBlocks[device][block] / paffs::blocksPerArea){
+						areaAlreadyForcedBad ++;
 					}
-					if(!areaAlreadyRetired){
-						ASSERT_EQ(v.times_read, 1u);
+					if(allBadBlocks[device][i] == allBadBlocks[device][block]){
+						blockAlreadyForcedBad ++;
 					}
 				}
+
+				//never deleted
+				ASSERT_EQ(v.times_reset, 0u);
+
+				if(block < numberOfNotifiedBlocks){
+					//notified blocks
+					ASSERT_EQ(v.times_read, 0u);
+
+				}else{
+					//Self-detectable blocks
+					if(areaAlreadyForcedBad > 1){
+						//It was already set to bad, so no check for badblock marker.
+						ASSERT_EQ(v.times_read, 0u);
+					}else{
+						ASSERT_EQ(v.times_read, 1u);
+					}
+
+				}
+				//bad Block marker gets written
+				//as many times as it got the list entry plus the tests own bbm
+				ASSERT_EQ(v.times_written, blockAlreadyForcedBad);
 			}
 		}
 	}
