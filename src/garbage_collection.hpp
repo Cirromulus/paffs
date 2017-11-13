@@ -2,7 +2,7 @@
  * garbage_collection.h
  *
  *  Created on: 28.12.2016
- *      Author: urinator
+ *      Author: Pascal Pieper
  */
 
 #pragma once

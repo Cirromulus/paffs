@@ -2,7 +2,7 @@
  * unittests.cpp
  *
  *  Created on: Feb 22, 2017
- *      Author: user
+ *      Author: Pascal Pieper
  */
 
 #include <gmock/gmock.h>

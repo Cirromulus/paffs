@@ -2,7 +2,7 @@
  * journal.hpp
  *
  *  Created on: Sep 19, 2017
- *      Author: user
+ *      Author: Pascal Pieper
  */
 
 #pragma once

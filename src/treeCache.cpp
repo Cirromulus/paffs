@@ -2,7 +2,7 @@
  * treeCache.c
  *
  *  Created on: 23.09.2016
- *      Author: urinator
+ *      Author: Pascal Pieper
  */
 
 #include "treeCache.hpp"

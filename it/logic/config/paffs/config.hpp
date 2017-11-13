@@ -2,7 +2,7 @@
  * standard.hpp
  *
  *  Created on: Feb 14, 2017
- *      Author: user
+ *      Author: Pascal Pieper
  */
 #include <stdint.h>
 #include <simu/config.hpp>

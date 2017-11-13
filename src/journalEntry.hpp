@@ -2,7 +2,7 @@
  * journalEntry.hpp
  *
  *  Created on: 22.09.2017
- *      Author: urinator
+ *      Author: Pascal Pieper
  */
 
 #pragma once

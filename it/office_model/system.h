@@ -2,7 +2,7 @@
  * system.h
  *
  *  Created on: Mar 7, 2017
- *      Author: user
+ *      Author: Pascal Pieper
  */
 
 #ifndef IT_OFFICE_MODEL_SYSTEM_H_

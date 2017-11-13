@@ -2,7 +2,7 @@
  * fc_driver.c
  *
  *  Created on: 21.06.2016
- *      Author: urinator
+ *      Author: Pascal Pieper
  */
 #include "null.hpp"
 

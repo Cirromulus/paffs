@@ -2,7 +2,7 @@
  * paffs_trace.h
  *
  *  Created on: 10.07.2016
- *      Author: urinator
+ *      Author: Pascal Pieper
  */
 
 #ifndef DS_PAFFS_PAFFS_TRACE_H_

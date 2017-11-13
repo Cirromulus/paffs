@@ -2,7 +2,7 @@
  * journalPersistences.cpp
  *
  *  Created on: 24.10.2017
- *      Author: urinator
+ *      Author: Pascal Pieper
  */
 
 
