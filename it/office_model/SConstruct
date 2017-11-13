@@ -43,8 +43,8 @@ envGlobal['CXXFLAGS_language'] = ['-std=gnu++11']
 envGlobal['CFLAGS_language'] = ['-std=gnu99']
 
 envGlobal.Append(CPPPATH=[
-	#This defines wich config will be used.	This may be a local copy as well.
-	os.path.join(pluginpath, 'paffs/config/K9F8G08U0M')
+    #This defines which config paffs will use.
+    os.path.abspath("./config/")
 ])
 
 envGlobal.SConscript([

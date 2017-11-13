@@ -145,17 +145,19 @@ Result SimuDriver::readMRAM(PageAbs startByte,
 }
 
 Nandaddress SimuDriver::translatePageToAddress(uint64_t page, FlashCell* fc){
+	(void) fc;
 	Nandaddress r;
-	r.page = page % fc->blockSize;
-	r.block = (page / fc->blockSize) % fc->planeSize;
-	r.plane = (page / fc->blockSize) / fc->planeSize;
+	r.page = page % simu::pagesPerBlock;
+	r.block = (page / simu::pagesPerBlock) % simu::blocksPerPlane;
+	r.plane = (page / simu::pagesPerBlock) / simu::blocksPerPlane;
 	return r;
 }
 
 Nandaddress SimuDriver::translateBlockToAddress(uint32_t block, FlashCell* fc){
+	(void) fc;
 	Nandaddress r;
-	r.plane = block / fc->planeSize;
-	r.block = block % fc->planeSize;
+	r.plane = block / simu::blocksPerPlane;
+	r.block = block % simu::blocksPerPlane;
 	r.page = 0;
 	return r;
 }
