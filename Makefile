@@ -23,6 +23,9 @@ build-embedded:
 	
 build-integration:
 	@scons $(MAKEJOBS) -C $(INTEGRATIONDIR) --release-build	
+	
+build-integration-bigflash:
+	@scons $(MAKEJOBS) -C $(INTEGRATIONDIR) --release-build --bigflash	
 
 build-integration-debug:
 	@scons $(MAKEJOBS) -C $(INTEGRATIONDIR)
@@ -43,6 +46,9 @@ test-unit: build-unittest
 
 test-integration: build-integration
 	./build/release/it/integrationtest --gtest_output=xml:./build/release/test/integration_coverage.xml
+
+test-integration-bigflash: build-integration-bigflash
+	./build/release/it/bigflash/integrationtest --gtest_output=xml:./build/release/test/integration_coverage.xml
 
 test-embedded: build-embedded
 	/opt/grmon-eval-2.0.83/linux64/bin/grmon -uart /dev/cobc_dsu_2 -stack 0x40fffff0 -baud 460800 -gdb
