@@ -62,33 +62,24 @@ struct SuperIndex
     //"internal"
     AreaPos asPositions[2];
     SummaryEntry* areaSummary[2];
-    static uint16_t
-    getNeededBytes(uint16_t numberOfAreaSummaries)
+    static constexpr uint16_t
+    getNeededBytes(const uint16_t numberOfAreaSummaries)
     {
-        if (numberOfAreaSummaries > 2)
-        {
-            PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "Not more than two area Summaries may be allowed in SuperIndex!"
-                      " (queried %u)",
-                      numberOfAreaSummaries);
-            return 0;
-        }
         // Serial Number Skipped because it is inserted later on
-        uint16_t neededBytes =
-                sizeof(AreaPos) +                 // LogPrev
-                sizeof(Addr) +                    // rootNode
-                sizeof(AreaPos) +                 // usedAreas
-                areasNo * sizeof(Area) +          // AreaMap
-                AreaType::no * sizeof(AreaPos) +  // ActiveAreas
-                sizeof(uint64_t) +                // overallDeletions
-                2 * sizeof(AreaPos)
-                +  // Area Summary Positions
-                numberOfAreaSummaries * dataPagesPerArea
-                        / 8; /* One bit per entry, two entrys for INDEX and DATA section*/
-        if (dataPagesPerArea % 8 != 0)
-            neededBytes++;
-        return neededBytes;
+        return numberOfAreaSummaries <= 2 ?
+               sizeof(AreaPos) +                 // LogPrev
+               sizeof(Addr) +                    // rootNode
+               sizeof(AreaPos) +                 // usedAreas
+               areasNo * sizeof(Area) +          // AreaMap
+               AreaType::no * sizeof(AreaPos) +  // ActiveAreas
+               sizeof(uint64_t) +                // overallDeletions
+               2 * sizeof(AreaPos)
+               +  // Area Summary Positions
+               ceil(numberOfAreaSummaries * dataPagesPerArea / 8)
+               /* One bit per entry, two entrys for INDEX and DATA section*/
+        : 0;
     }
+
 
     uint16_t
     getNeededBytes()
@@ -121,6 +112,10 @@ class Superblock : public JournalTopic
     SerialNo superChainIndexes[superChainElems];
     bool testmode = false;
 
+    //This buffer is only used for reading/writing the superindex.
+    //TODO: Use another pagebuf that is unused during superindex commit
+    char buf[SuperIndex::getNeededBytes(2)];
+
 public:
     Superblock(Device* mdev) : dev(mdev){};
     Result
@@ -142,7 +137,6 @@ public:
     commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew = false);
     void
     setTestmode(bool t);
-
 private:
     /**
      * Worst case O(n) with area count

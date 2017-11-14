@@ -877,7 +877,7 @@ Superblock::readMostRecentEntryInBlock(AreaPos area,
     for (unsigned int i = 0; i < pagesPerBlock; i++)
     {
         PageAbs page = i + page_offs;
-        char buf[sizeof(SerialNo) + sizeof(AreaPos) + sizeof(AreaPos)];
+        memset(buf, 0, sizeof(SerialNo) + sizeof(AreaPos) + sizeof(AreaPos));
         Result r = dev->driver.readPage(
                 page, buf, sizeof(SerialNo) + sizeof(AreaPos) + sizeof(AreaPos));
         if (r != Result::ok)
@@ -1123,7 +1123,7 @@ Superblock::insertNewSuperIndex(Addr logPrev, AreaPos* directArea, SuperIndex* e
 
     // Every page needs its serial Number
     unsigned int needed_bytes = SuperIndex::getNeededBytes(neededASes);
-    unsigned int needed_pages = needed_bytes / (dataBytesPerPage - sizeof(SerialNo)) + 1;
+    unsigned int needed_pages = ceil(needed_bytes / static_cast<float>(dataBytesPerPage - sizeof(SerialNo)));
 
     Result r = findFirstFreeEntryInArea(*directArea, &page, needed_pages);
     entry->logPrev = 0;
@@ -1184,7 +1184,6 @@ Superblock::writeSuperPageIndex(PageAbs pageStart, SuperIndex* entry)
                 needed_pages,
                 needed_bytes);
 
-    char buf[needed_bytes];
     memset(buf, 0, needed_bytes);
     Result r;
     r = entry->serializeToBuffer(buf);
@@ -1251,13 +1250,12 @@ Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap)
 
     // note: Serial number is inserted on the first bytes for every page later on.
     unsigned int needed_bytes = SuperIndex::getNeededBytes(2);
-    unsigned int needed_pages = needed_bytes / (dataBytesPerPage - sizeof(SerialNo)) + 1;
+    unsigned int needed_pages = ceil(needed_bytes / static_cast<float>(dataBytesPerPage - sizeof(SerialNo)));
     PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
                 "Maximum Pages needed to read SuperIndex: %d (%d bytes, 2 AS'es)",
                 needed_pages,
                 needed_bytes);
 
-    char buf[needed_bytes];
     memset(buf, 0, needed_bytes);
     uint32_t pointer = 0;
     PageAbs pageBase = getPageNumberFromDirect(addr);
