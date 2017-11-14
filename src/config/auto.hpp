@@ -29,5 +29,5 @@ static constexpr uint16_t superChainElems = jumpPadNo + 2;
 static constexpr uint16_t addrsPerPage = dataBytesPerPage / sizeof(Addr);
 static constexpr uint16_t minFreeAreas = 1;
 
-	static constexpr uint16_t journalTopicLogSize = 500;
+static constexpr uint16_t journalTopicLogSize = 500;
 }

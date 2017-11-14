@@ -230,5 +230,7 @@ class Driver;
 
 }  // namespace paffs
 
+// clang-format off
 #include <paffs/config.hpp>
 #include "config/auto.hpp"
+// clang-format on
