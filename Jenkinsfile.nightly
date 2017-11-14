@@ -16,7 +16,7 @@ pipeline {
         skipDefaultCheckout()
     }
     triggers {
-        pollSCM('0 0 * * *')
+        pollSCM('H 0 * * *')
     }
 
     stages {
@@ -47,7 +47,7 @@ pipeline {
         stage("build-integration") {
             steps {
                 dir('paffs') {
-                    sh 'make test-integration-big'
+                    sh 'make test-integration-bigflash'
                 }
             }
         }
