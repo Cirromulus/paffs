@@ -19,16 +19,15 @@
 
 namespace paffs
 {
-
-class JournalTopic{
+class JournalTopic
+{
 public:
-	virtual
-	~JournalTopic(){};
-	virtual JournalEntry::Topic
-	getTopic() = 0;
-	virtual void
-	processEntry(JournalEntry& entry) = 0;
-	virtual void
-	processUncheckpointedEntry(JournalEntry&){};
+    virtual ~JournalTopic(){};
+    virtual JournalEntry::Topic
+    getTopic() = 0;
+    virtual void
+    processEntry(JournalEntry& entry) = 0;
+    virtual void
+    processUncheckpointedEntry(JournalEntry&){};
 };
 }

@@ -18,4 +18,3 @@ namespace paffs
 {
 constexpr const char* JournalEntry::topicNames[];
 }
-

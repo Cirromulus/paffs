@@ -17,46 +17,54 @@
 #include "journalPersistence.hpp"
 #include "journalTopic.hpp"
 
-namespace paffs{
+namespace paffs
+{
+class Journal
+{
+    JournalTopic* topics[3];
 
-class Journal{
-	JournalTopic* topics[3];
+    JournalPersistence& persistence;
+    bool disabled;
 
-	JournalPersistence& persistence;
-	bool disabled;
 public:
-	Journal(JournalPersistence& _persistence, JournalTopic& superblock, JournalTopic& summaryCache,
-	        JournalTopic& tree): persistence(_persistence){
+    Journal(JournalPersistence& _persistence,
+            JournalTopic& superblock,
+            JournalTopic& summaryCache,
+            JournalTopic& tree)
+        : persistence(_persistence)
+    {
+        topics[0] = &superblock;
+        topics[1] = &summaryCache;
+        topics[2] = &tree;
+        // TODO Inode
 
-		topics[0] = &superblock;
-		topics[1] = &summaryCache;
-		topics[2] = &tree;
-		//TODO Inode
+        disabled = true;
+    }
 
-		disabled = true;
-	}
+    Result
+    addEvent(const JournalEntry& entry);
+    Result
+    checkpoint();
+    Result
+    clear();
+    Result
+    processBuffer();
+    void
+    printMeaning(const JournalEntry& entry, bool withNewLine = true);
+    void
+    disable();
+    Result
+    enable();
 
-	Result
-	addEvent(const JournalEntry& entry);
-	Result
-	checkpoint();
-	Result
-	clear();
-	Result
-	processBuffer();
-	void
-	printMeaning(const JournalEntry& entry, bool withNewLine = true);
-	void
-	disable();
-	Result
-	enable();
 private:
-	Result
-	applyCheckpointedJournalEntries(EntryIdentifier& from, EntryIdentifier& to,
-			EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics]);
-	Result
-	applyUncheckpointedJournalEntries(EntryIdentifier& from);
-	PageAbs
-	getSizeFromMax(const journalEntry::Max &entry);
+    Result
+    applyCheckpointedJournalEntries(
+            EntryIdentifier& from,
+            EntryIdentifier& to,
+            EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics]);
+    Result
+    applyUncheckpointedJournalEntries(EntryIdentifier& from);
+    PageAbs
+    getSizeFromMax(const journalEntry::Max& entry);
 };
 };
