@@ -7,6 +7,12 @@ AddOption(
     help='release build',
     default=False)
 
+AddOption(
+    '--bigflash',
+    action='store_true',
+    help='increases Flash size',
+    default=False)
+
 
 print("INTEGRATION TESTS")
 
@@ -49,11 +55,18 @@ clangcflags = [
 envGlobal.Append(CCFLAGS_target = clangcflags)
 envGlobal.Append(CXXFLAGS_target = clangcflags)
 
-envGlobal.Append(CPPPATH=[
-	#This defines which config paffs will use.
-	os.path.abspath("./config/")
-])
-
+if GetOption('bigflash'):
+    print("Building with big flash config.")
+    envGlobal['BUILDPATH'] = os.path.join(envGlobal['BUILDPATH'], 'bigflash')
+    envGlobal.Append(CPPPATH=[
+        #This defines which config paffs will use.
+        os.path.abspath("./config_big/")
+    ])
+else:
+    envGlobal.Append(CPPPATH=[
+        os.path.abspath("./config/")
+    ])
+    
 envGlobal.SConscript([
     os.path.join(rootpath, 'src/SConscript'),
 	os.path.join(rootpath, 'src/driver/SConscript.simudriver'),
