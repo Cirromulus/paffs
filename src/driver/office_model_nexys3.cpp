@@ -24,9 +24,7 @@ Driver* getDriver(const uint8_t deviceId){
 	return out;
 }
 
-Driver* getDriverSpecial(const uint8_t deviceId, void* fc){
-	(void) deviceId;
-	(void) fc;
+Driver* getDriverSpecial(const uint8_t, void*, void*){
 	printf("No Special parameter implemented!\n");
 	return NULL;
 }

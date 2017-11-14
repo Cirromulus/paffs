@@ -144,13 +144,13 @@ task_system_init(rtems_task_argument)
 	}
 
 	printf("File was found.\n");
-	fs->getObjInfo("/test.txt", &inf);
+	fs->getObjInfo("/test.txt", inf);
 	printf("Size: %lu Byte\n", inf.size);
 
 	if(inf.size != 0){
 		printf("Reading contents of file:\n");
 		char rbuf[inf.size+1];
-		r = fs->read(file, rbuf, inf.size, &br);
+		r = fs->read(*file, rbuf, inf.size, &br);
 		rbuf[inf.size] = 0;
 		if(r != Result::ok){
 			printf("Error reading file: %s\n", err_msg(r));
@@ -164,7 +164,7 @@ task_system_init(rtems_task_argument)
 	}
 
 
-	r = fs->write(file, wbuf, strlen(wbuf), &br);
+	r = fs->write(*file, wbuf, strlen(wbuf), &br);
 	if(r != Result::ok){
 		printf("Error writing file: %s\n", err_msg(r));
 		goto idle;
