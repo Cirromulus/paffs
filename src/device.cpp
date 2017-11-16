@@ -16,13 +16,14 @@
 #include "driver/driver.hpp"
 #include "paffs_trace.hpp"
 #include <inttypes.h>
+#include <memory>
 
 namespace paffs
 {
 outpost::rtos::SystemClock systemClock;
 
-Device::Device(Driver& _driver)
-    : driver(_driver),
+Device::Device(Driver& _driver) :
+      driver(_driver),
       lasterr(Result::ok),
       mounted(false),
       readOnly(false),
@@ -54,7 +55,9 @@ Result
 Device::format(const BadBlockList& badBlockList, bool complete)
 {
     if (mounted)
+    {
         return Result::alrMounted;
+    }
 
     Result r = initializeDevice();
     if (r != Result::ok)
@@ -157,16 +160,20 @@ Device::format(const BadBlockList& badBlockList, bool complete)
             areaMgmt.initAreaAs(area, AreaType::superblock);
             areaMgmt.setActiveArea(AreaType::superblock, 0);
             if (++hadSuperblocks == superChainElems)
+            {
                 hadAreaType |= 1 << AreaType::superblock;
+            }
             continue;
         }
 
-        /*
-        if(!(hadAreaType & 1 << AreaType::journal)){
-            areaMgmt.initAreaAs(area, AreaType::journal);
-            hadAreaType |= 1 << AreaType::journal;
-            continue;
-        }*/
+        if(useJournal)
+        {
+            if(!(hadAreaType & 1 << AreaType::journal)){
+                areaMgmt.initAreaAs(area, AreaType::journal);
+                hadAreaType |= 1 << AreaType::journal;
+                continue;
+            }
+        }
 
         if (!(hadAreaType & 1 << AreaType::garbageBuffer))
         {
@@ -178,9 +185,11 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         areaMgmt.setType(area, AreaType::unset);
     }
 
-    r = tree.start_new_tree();
+    r = tree.startNewTree();
     if (r != Result::ok)
+    {
         return r;
+    }
     {
         SmartInodePtr rootDir;
         r = createDirInode(rootDir, R | W | X);
@@ -227,7 +236,9 @@ Device::mnt(bool readOnlyMode)
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "mount with valid driver");
 
     if (mounted)
+    {
         return Result::alrMounted;
+    }
 
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "not yet mounted");
 
@@ -459,16 +470,15 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
     }
     if (folder.size <= sizeof(DirEntryCount))
     {
-        // Just contains a zero for "No entrys"
+        // Just contains a zero for "No entries"
         return Result::nf;
     }
 
-    char* buf = new char[folder.size];
+    std::unique_ptr<char[]> buf(new char[folder.size]);
     unsigned int bytes_read = 0;
-    Result r = dataIO.readInodeData(folder, 0, folder.size, &bytes_read, buf);
+    Result r = dataIO.readInodeData(folder, 0, folder.size, &bytes_read, buf.get());
     if (r != Result::ok || bytes_read != folder.size)
     {
-        delete[] buf;
         return r == Result::ok ? Result::bug : r;
     }
 
@@ -483,7 +493,6 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
                       folder.no,
                       direntryl,
                       sizeof(DirEntryLength) + sizeof(InodeNo));
-            delete[] buf;
             return Result::bug;
         }
         if (direntryl > folder.size)
@@ -493,7 +502,6 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
                       folder.no,
                       direntryl,
                       folder.size);
-            delete[] buf;
             return Result::bug;
         }
         unsigned int dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
@@ -504,14 +512,13 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
                       folder.no,
                       folder.size,
                       p + dirnamel);
-            delete[] buf;
             return Result::bug;
         }
         p += sizeof(DirEntryLength);
         InodeNo tmp_no;
         memcpy(&tmp_no, &buf[p], sizeof(InodeNo));
         p += sizeof(InodeNo);
-        char* tmpname = new char[dirnamel + 1];
+        char tmpname[dirnamel + 1];
         memcpy(tmpname, &buf[p], dirnamel);
         tmpname[dirnamel] = 0;
         p += dirnamel;
@@ -519,13 +526,9 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         {
             // Eintrag gefunden
             outInode = tmp_no;
-            delete[] tmpname;
-            delete[] buf;
             return Result::ok;
         }
-        delete[] tmpname;
     }
-    delete[] buf;
     return Result::nf;
 }
 
@@ -542,7 +545,7 @@ Device::getInodeOfElem(SmartInodePtr& outInode, const char* fullPath)
     }
 
     unsigned int fpLength = strlen(fullPath);
-    char* fullPathC = new char[fpLength + 1];
+    char fullPathC[fpLength + 1];
     memcpy(fullPathC, fullPath, fpLength);
     fullPathC[fpLength] = 0;
 
@@ -559,7 +562,6 @@ Device::getInodeOfElem(SmartInodePtr& outInode, const char* fullPath)
 
         if (curr->type != InodeType::dir)
         {
-            delete[] fullPathC;
             return Result::einval;
         }
 
@@ -567,7 +569,6 @@ Device::getInodeOfElem(SmartInodePtr& outInode, const char* fullPath)
         InodeNo next;
         if ((r = getInodeNoInDir(next, *curr, fnP)) != Result::ok)
         {
-            delete[] fullPathC;
             // this may be a NotFound
             return r;
         }
@@ -580,14 +581,12 @@ Device::getInodeOfElem(SmartInodePtr& outInode, const char* fullPath)
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get next Inode");
-            delete[] fullPathC;
             return r;
         }
         // todo: Dirent cachen
         fnP = strtok(nullptr, delimiter);
     }
     outInode = curr;
-    delete[] fullPathC;
     return Result::ok;
 }
 
@@ -636,7 +635,7 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
     DirEntryLength direntryl = sizeof(DirEntryLength) + sizeof(InodeNo)
                                + elemNameL;  // Size of the new directory entry
 
-    unsigned char* buf = new unsigned char[direntryl];
+    unsigned char buf[direntryl];
     buf[0] = direntryl;
     memcpy(&buf[sizeof(DirEntryLength)], &newElem.no, sizeof(InodeNo));
 
@@ -645,38 +644,34 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
     if (contDir.size == 0)
         contDir.size = sizeof(DirEntryCount);  // To hold the Number of Entries
 
-    char* dirData = new char[contDir.size + direntryl];
+    std::unique_ptr<char[]> dirData(new char[contDir.size + direntryl]);
     unsigned int bytes = 0;
     Result r;
     if (contDir.reservedPages > 0)
     {  // if Directory is not empty
-        r = dataIO.readInodeData(contDir, 0, contDir.size, &bytes, dirData);
+        r = dataIO.readInodeData(contDir, 0, contDir.size, &bytes, dirData.get());
         if (r != Result::ok || bytes != contDir.size)
         {
             lasterr = r;
-            delete[] dirData;
-            delete[] buf;
             return r;
         }
     }
     else
     {
-        memset(dirData, 0, contDir.size);  // Wipe directory-entry-count area
+        memset(dirData.get(), 0, contDir.size);  // Wipe directory-entry-count area
     }
 
     // append record
     memcpy(&dirData[contDir.size], buf, direntryl);
-
     DirEntryCount directoryEntryCount = 0;
-    memcpy(&directoryEntryCount, dirData, sizeof(DirEntryCount));
+    memcpy(&directoryEntryCount, dirData.get(), sizeof(DirEntryCount));
     directoryEntryCount++;
-    memcpy(dirData, &directoryEntryCount, sizeof(DirEntryCount));
+    memcpy(dirData.get(), &directoryEntryCount, sizeof(DirEntryCount));
 
     // TODO: If write more than one page, split in start and end page to reduce
     // unnecessary writes on intermediate pages.
-    r = dataIO.writeInodeData(contDir, 0, contDir.size + direntryl, &bytes, dirData);
-    delete[] dirData;
-    delete[] buf;
+    r = dataIO.writeInodeData(contDir, 0, contDir.size + direntryl, &bytes, dirData.get());
+    dirData.reset();
     if (bytes != contDir.size && r == Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
@@ -716,7 +711,7 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
 Result
 Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
 {
-    char* dirData = new char[contDir.size];
+    std::unique_ptr<char[]> dirData(new char[contDir.size]);
     unsigned int bytes = 0;
     Result r;
     if (contDir.reservedPages > 0)
@@ -725,13 +720,11 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
         if (r != Result::ok || bytes != contDir.size)
         {
             lasterr = r;
-            delete[] dirData;
             return r;
         }
     }
     else
     {
-        delete[] dirData;
         return Result::nf;  // did not find directory entry, because dir is empty
     }
 
@@ -750,18 +743,16 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
 
             if ((r = dataIO.deleteInodeData(contDir, newSize)) != Result::ok)
             {
-                delete[] dirData;
                 return r;
             }
 
             if (restByte > 0 && restByte < 4)  // should either be 0 (no entries left) or bigger
-                                               // than 4 (minimum size for one entry)
+            {                                  // than 4 (minimum size for one entry)
                 PAFFS_DBG(PAFFS_TRACE_BUG, "Something is fishy! (%d)", restByte);
-
+            }
             if (newSize == 0)
             {
                 // This was the last entry
-                delete[] dirData;
                 return dataIO.pac.commit();
             }
 
@@ -769,8 +760,7 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
             memcpy(&dirData[pointer], &dirData[pointer + entryl], restByte);
 
             unsigned int bw = 0;
-            r = dataIO.writeInodeData(contDir, 0, newSize, &bw, dirData);
-            delete[] dirData;
+            r = dataIO.writeInodeData(contDir, 0, newSize, &bw, dirData.get());
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update Inode Data");
@@ -780,7 +770,6 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
         }
         pointer += entryl;
     }
-    delete[] dirData;
     return Result::nf;
 }
 
@@ -788,18 +777,26 @@ Result
 Device::mkDir(const char* fullPath, Permission mask)
 {
     if (!mounted)
+    {
         return Result::notMounted;
+    }
     if (readOnly)
+    {
         return Result::readonly;
+    }
     if (areaMgmt.getUsedAreas() > areasNo - minFreeAreas)
+    {
         return Result::nospace;
+    }
 
     unsigned int lastSlash = 0;
 
     SmartInodePtr parDir;
     Result res = getParentDir(fullPath, parDir, &lastSlash);
     if (res != Result::ok)
+    {
         return res;
+    }
 
     if (strlen(&fullPath[lastSlash]) > maxDirEntryLength)
     {
@@ -1500,7 +1497,9 @@ Result
 Device::initializeDevice()
 {
     if (mounted)
+    {
         return Result::alrMounted;
+    }
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Device is not yet mounted");
 
     areaMgmt.clear();

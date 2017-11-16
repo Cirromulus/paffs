@@ -23,19 +23,29 @@ extern const char* area_names[];
 extern const char* areaStatusNames[];
 
 // Helper functions
-// Translates indirect Addr to physical page number in respect to the Area mapping
+/**
+ * \brief Translates indirect Addr to physical page number in respect to the Area mapping
+ */
 PageAbs
 getPageNumber(const Addr addr, Device& dev);
-// Translates direct Addr to physical page number ignoring AreaMap
+/**
+ * \brief Translates direct Addr to physical page number ignoring AreaMap
+ */
 PageAbs
 getPageNumberFromDirect(const Addr addr);
-// Returns the absolute page number from *logical* address
+/**
+ * \brief Returns the absolute page number from *logical* address
+ */
 BlockAbs
 getBlockNumber(const Addr addr, Device& dev);
-// Translates direct Addr to physical Block number ignoring AreaMap
+/**
+ * \brief Translates direct Addr to physical Block number ignoring AreaMap
+ */
 BlockAbs
 getBlockNumberFromDirect(const Addr addr);
-// combines two values to one type
+/**
+ * \brief combines two values to one type
+ */
 Addr
 combineAddress(const AreaPos logical_area, const PageOffs page);
 unsigned int

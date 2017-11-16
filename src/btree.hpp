@@ -47,9 +47,9 @@ public:
     findFirstFreeNo(InodeNo* outNumber);
 
     void
-    print_tree();
+    printTree();
     Result
-    start_new_tree();
+    startNewTree();
     Result
     commitCache();
     void
@@ -61,11 +61,11 @@ public:
 
 private:
     void
-    print_leaves(TreeCacheNode& c);
+    printLeaves(TreeCacheNode& c);
     void
-    print_queued_keys_r(queue_s* q);
+    printQueuedKeysRecursively(queue_s* q);
     void
-    print_keys(TreeCacheNode& c);
+    printKeys(TreeCacheNode& c);
 
     bool
     isTreeCacheNodeEqual(TreeCacheNode& left, TreeCacheNode& right);
@@ -75,22 +75,22 @@ private:
     height(TreeCacheNode& root);
     // Length is number of Kanten, not Knoten
     int
-    length_to_root(TreeCacheNode& child);
+    lengthToRoot(TreeCacheNode& child);
     // Path is root first, child last
     Result
-    path_from_root(TreeCacheNode& child, Addr* path, unsigned int& lengthOut);
+    pathFromRoot(TreeCacheNode& child, Addr* path, unsigned int& lengthOut);
     int
-    find_range(TreeCacheNode& root,
-               InodeNo key_start,
-               InodeNo key_end,
-               int returned_keys[],
-               void* returned_pointers[]);
+    findRange(TreeCacheNode& root,
+              InodeNo key_start,
+              InodeNo key_end,
+              int returned_keys[],
+              void* returned_pointers[]);
     Result
-    find_branch(TreeCacheNode& target, TreeCacheNode*& outtreeCacheNode);
+    findBranch(TreeCacheNode& target, TreeCacheNode*& outtreeCacheNode);
     Result
-    find_leaf(InodeNo key, TreeCacheNode*& outtreeCacheNode);
+    findLeaf(InodeNo key, TreeCacheNode*& outtreeCacheNode);
     Result
-    find_in_leaf(TreeCacheNode& leaf, InodeNo key, Inode& outInode);
+    findInLeaf(TreeCacheNode& leaf, InodeNo key, Inode& outInode);
     Result
     find(InodeNo key, Inode& outInode);
     int
@@ -99,44 +99,44 @@ private:
     // Insertion.
 
     int
-    get_left_index(TreeCacheNode& parent, TreeCacheNode& left);
+    getLeftIndex(TreeCacheNode& parent, TreeCacheNode& left);
     Result
-    insert_into_leaf(TreeCacheNode& leaf, const Inode& pointer);
+    insertIntoLeaf(TreeCacheNode& leaf, const Inode& pointer);
     Result
-    insert_into_leaf_after_splitting(TreeCacheNode& leaf, const Inode& newInode);
+    insertIntoLeafAfterSplitting(TreeCacheNode& leaf, const Inode& newInode);
     Result
-    insert_into_node(TreeCacheNode& newNode, int left_index, InodeNo key, TreeCacheNode& right);
+    insertIntoNode(TreeCacheNode& newNode, int left_index, InodeNo key, TreeCacheNode& right);
     Result
-    insert_into_node_after_splitting(TreeCacheNode& old_node,
-                                     unsigned int left_index,
-                                     InodeNo key,
-                                     TreeCacheNode& right);
+    insertIntoNodeAfterSplitting(TreeCacheNode& old_node,
+                                 unsigned int left_index,
+                                 InodeNo key,
+                                 TreeCacheNode& right);
     Result
-    insert_into_parent(TreeCacheNode& left, InodeNo key, TreeCacheNode& right);
+    insertIntoParent(TreeCacheNode& left, InodeNo key, TreeCacheNode& right);
     Result
-    insert_into_new_root(TreeCacheNode& left, InodeNo key, TreeCacheNode& right);
+    insertIntoNewRoot(TreeCacheNode& left, InodeNo key, TreeCacheNode& right);
 
     // Deletion.
 
     int
-    get_neighbor_index(TreeCacheNode& n);
+    getNeighborIndex(TreeCacheNode& n);
     Result
-    adjust_root(TreeCacheNode& root);
+    adjustRoot(TreeCacheNode& root);
     Result
-    coalesce_nodes(TreeCacheNode& n,
+    coalesceNodes(TreeCacheNode& n,
                    TreeCacheNode& neighbor,
                    int neighbor_index,
                    unsigned int k_prime);
     Result
-    redistribute_nodes(TreeCacheNode& n,
-                       TreeCacheNode& neighbor,
-                       int neighbor_index,
-                       unsigned int k_prime_index,
-                       unsigned int k_prime);
+    redistributeNodes(TreeCacheNode& n,
+                      TreeCacheNode& neighbor,
+                      int neighbor_index,
+                      unsigned int k_prime_index,
+                      unsigned int k_prime);
     Result
-    delete_entry(TreeCacheNode& n, InodeNo key);
+    deleteEntry(TreeCacheNode& n, InodeNo key);
     Result
-    remove_entry_from_node(TreeCacheNode& n, InodeNo key);
+    removeEntryFromNode(TreeCacheNode& n, InodeNo key);
 };
 }
 #endif

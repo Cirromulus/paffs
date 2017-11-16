@@ -61,18 +61,18 @@ extern const char* resultMsg[];          // Initialized in paffs.cpp
 
 typedef uint8_t Permission;
 
-const Permission R = 0x1;
-const Permission W = 0x2;
-const Permission X = 0x4;
-const Permission permMask = R | W | X;
+static constexpr Permission R = 0x1;
+static constexpr Permission W = 0x2;
+static constexpr Permission X = 0x4;
+static constexpr Permission permMask = R | W | X;
 
 typedef uint8_t Fileopenmask;
-const Fileopenmask FR = 0x01;   // file read
-const Fileopenmask FW = 0x02;   // file write
-const Fileopenmask FEX = 0x04;  // file execute
-const Fileopenmask FA = 0x08;   // file append
-const Fileopenmask FE = 0x10;   // file open only existing
-const Fileopenmask FC = 0x20;   // file create
+static constexpr Fileopenmask FR = 0x01;   // file read
+static constexpr Fileopenmask FW = 0x02;   // file write
+static constexpr Fileopenmask FEX = 0x04;  // file execute
+static constexpr Fileopenmask FA = 0x08;   // file append
+static constexpr Fileopenmask FE = 0x10;   // file open only existing
+static constexpr Fileopenmask FC = 0x20;   // file create
 
 enum class Seekmode
 {
@@ -83,18 +83,19 @@ enum class Seekmode
 
 struct Param
 {
-    unsigned int totalBytesPerPage;
-    unsigned int oobBytesPerPage;
-    unsigned int pagesPerBlock;
-    unsigned int blocksTotal;
-    unsigned int jumpPadNo;
+    //Note: Order of config mixed for better alignment of members
+    uint16_t totalBytesPerPage;
+    uint16_t pagesPerBlock;
+    uint16_t blocksTotal;
+    uint8_t oobBytesPerPage;
+    uint8_t jumpPadNo;
     // Automatically filled//
-    unsigned int dataBytesPerPage;
-    unsigned long areasNo;
-    unsigned int blocksPerArea;
-    unsigned int totalPagesPerArea;
-    unsigned int dataPagesPerArea;
-    unsigned int superChainElems;
+    uint16_t dataBytesPerPage;
+    uint16_t dataPagesPerArea;
+    uint16_t totalPagesPerArea;
+    uint8_t blocksPerArea;
+    uint8_t superChainElems;
+    uint32_t areasNo;
 };
 
 extern const Param stdParam;

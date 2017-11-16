@@ -35,7 +35,7 @@ class Device
 {
     InodePool<maxNumberOfInodes> inodePool;
     ObjectPool<maxNumberOfFiles, Obj> filesPool;
-
+    bool useJournal = false;
 public:
     Driver& driver;
     Result lasterr;
