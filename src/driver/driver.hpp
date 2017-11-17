@@ -20,29 +20,43 @@
 namespace paffs{
 
 class Driver {
+protected:
+    char buf[totalBytesPerPage];
 public:
 	Driver(){};
 	virtual ~Driver(){};
 
-	virtual Result initializeNand() = 0;
-	virtual Result deInitializeNand() = 0;
-	virtual Result writePage (PageAbs pageNo,
-	                          void* data, unsigned int dataLen) = 0;
-	virtual Result readPage (PageAbs pageNo,
-	                         void* data, unsigned int dataLen) = 0;
-	virtual Result eraseBlock (BlockAbs blockNo) = 0;
-	virtual Result markBad (BlockAbs blockNo) = 0;
-	virtual Result checkBad (BlockAbs blockNo) = 0;
+	virtual Result
+	initializeNand() = 0;
+	virtual Result
+	deInitializeNand() = 0;
+	virtual char*
+	getPageBuffer()
+	{
+	    return buf;
+	};
+	virtual Result
+	writePage (PageAbs pageNo, void* data, unsigned int dataLen) = 0;
+	virtual Result
+	readPage (PageAbs pageNo, void* data, unsigned int dataLen) = 0;
+	virtual Result
+	eraseBlock (BlockAbs blockNo) = 0;
+	virtual Result
+	markBad (BlockAbs blockNo) = 0;
+	virtual Result
+	checkBad (BlockAbs blockNo) = 0;
 
-	virtual Result writeMRAM(PageAbs startByte,
-	                         const void* data, unsigned int dataLen){
+	virtual Result
+	writeMRAM(PageAbs startByte, const void* data, unsigned int dataLen)
+	{
 		(void) startByte;
 		(void) data;
 		(void) dataLen;
 		return Result::nimpl;
 	}
-	virtual Result readMRAM(PageAbs startByte,
-	                        void* data, unsigned int dataLen){
+	virtual Result
+	readMRAM(PageAbs startByte, void* data, unsigned int dataLen)
+	{
 		(void) startByte;
 		(void) data;
 		(void) dataLen;

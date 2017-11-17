@@ -26,7 +26,6 @@ class SimuDriver : public Driver{
 	Mram *mram;
 	bool selfLoadedFlash = false;
 	bool selfLoadedMRAM = false;
-	unsigned char buf[totalBytesPerPage];
 public:
 	SimuDriver(){
 		selfLoadedFlash = true;
@@ -56,21 +55,32 @@ public:
 		return cell->getDebugInterface();
 	}
 
-	Result initializeNand() override;
-	Result deInitializeNand() override;
-	Result writePage(uint64_t page_no, void* data, unsigned int data_len) override;
-	Result readPage(uint64_t page_no, void* data, unsigned int data_len) override;
-	Result eraseBlock(uint32_t block_no) override;
-	Result markBad(uint32_t block_no) override;
-	Result checkBad(uint32_t block_no) override;
-	Result writeMRAM(PageAbs startByte,
-	                 const void* data, unsigned int dataLen) override;
-	Result readMRAM(PageAbs startByte,
-	                void* data, unsigned int dataLen) override;
+	Result
+	initializeNand() override;
+	Result
+	deInitializeNand() override;
+	Result
+	writePage(PageAbs page_no, void* data, unsigned int data_len) override;
+	Result
+	readPage(PageAbs page_no, void* data, unsigned int data_len) override;
+	Result
+	eraseBlock(BlockAbs block_no) override;
+	Result
+	markBad(BlockAbs block_no) override;
+	Result
+	checkBad(BlockAbs block_no) override;
+	Result
+	writeMRAM(PageAbs startByte,
+	          const void* data, unsigned int dataLen) override;
+	Result
+	readMRAM(PageAbs startByte,
+	         void* data, unsigned int dataLen) override;
 private:
-	Nandaddress translatePageToAddress(uint64_t sector, FlashCell* fc);
+	Nandaddress
+	translatePageToAddress(PageAbs sector);
 
-	Nandaddress translateBlockToAddress(uint32_t block, FlashCell* fc);
+	Nandaddress
+	translateBlockToAddress(BlockAbs block);
 };
 
 }

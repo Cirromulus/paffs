@@ -31,7 +31,6 @@ using namespace outpost::iff;
 using namespace outpost::leon3;
 
 class OfficeModelNexys3Driver : public Driver{
-	unsigned char buf[totalBytesPerPage];
 	unsigned int bank, device;
 	SpaceWireLight spacewire;
 	Nand *nand;
@@ -52,13 +51,20 @@ public:
 		delete if_fpga;
 	}
 
-	virtual Result initializeNand();
-	virtual Result deInitializeNand();
-	Result writePage(uint64_t page_no, void* data, unsigned int data_len);
-	Result readPage(uint64_t page_no, void* data, unsigned int data_len);
-	Result eraseBlock(uint32_t block_no);
-	Result markBad(uint32_t block_no);
-	Result checkBad(uint32_t block_no);
+	Result
+	initializeNand() override;
+	Result
+	deInitializeNand() override;
+	Result
+	writePage(uint64_t page_no, void* data, unsigned int data_len) override;
+	Result
+	readPage(uint64_t page_no, void* data, unsigned int data_len) override;
+	Result
+	eraseBlock(uint32_t block_no) override;
+	Result
+	markBad(uint32_t block_no) override;
+	Result
+	checkBad(uint32_t block_no) override;
 private:
 	bool initSpaceWire();
 };

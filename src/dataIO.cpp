@@ -62,7 +62,9 @@ DataIO::writeInodeData(Inode& inode,
         // We are skipping unused pages
         PageOffs lastUsedPage = inode.size / dataBytesPerPage;
         if (inode.size % dataBytesPerPage > 0)
+        {
             lastUsedPage++;
+        }
 
         for (unsigned i = lastUsedPage; i < pageFrom; i++)
         {
@@ -70,10 +72,9 @@ DataIO::writeInodeData(Inode& inode,
         }
     }
 
-    unsigned pageoffs = offs % dataBytesPerPage;
     res = writePageData(pageFrom,
                         toPage,
-                        pageoffs,
+                        offs % dataBytesPerPage,
                         bytes,
                         data,
                         pac,
@@ -82,7 +83,9 @@ DataIO::writeInodeData(Inode& inode,
                         inode.reservedPages);
 
     if (inode.size < *bytes_written + offs)
+    {
         inode.size = *bytes_written + offs;
+    }
 
     // the Tree UpdateExistingInode has to be done by high level functions,
     // bc they may modify it by themselves
@@ -171,7 +174,7 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
         return r;
     }
 
-    for (int page = toPage - pageFrom; page >= 0; page--)
+    for (int page = (toPage - pageFrom); page >= 0; page--)
     {
         Addr pageAddr;
         r = pac.getPage(page + pageFrom, &pageAddr);
@@ -252,7 +255,7 @@ DataIO::writePageData(PageOffs pageFrom,
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried writing something in readOnly mode!");
         return Result::bug;
     }
-    if (offs > dataBytesPerPage)
+    else if (offs > dataBytesPerPage)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried applying an offset %d > %d", offs, dataBytesPerPage);
         return Result::bug;
@@ -261,7 +264,6 @@ DataIO::writePageData(PageOffs pageFrom,
     Result res;
     for (unsigned int page = 0; page <= toPage - pageFrom; page++)
     {
-        bool misaligned = false;
         Result rBuf = dev->lasterr;
         dev->lasterr = Result::ok;
         dev->areaMgmt.findWritableArea(AreaType::data);
@@ -297,12 +299,14 @@ DataIO::writePageData(PageOffs pageFrom,
                 combineAddress(dev->areaMgmt.getActiveArea(AreaType::data), firstFreePage);
 
         // Prepare buffer and calculate bytes to write
-        char* buf = &const_cast<char*>(data)[*bytes_written];
+        char* buf = dev->driver.getPageBuffer();
         unsigned int btw = bytes - *bytes_written;
         if ((btw + offs) > dataBytesPerPage)
         {
-            btw = (btw + offs) > dataBytesPerPage ? dataBytesPerPage - offs : dataBytesPerPage;
+            btw = (btw + offs) > dataBytesPerPage ?
+                    dataBytesPerPage - offs : dataBytesPerPage;
         }
+        memcpy(buf, &data[*bytes_written], btw);
 
         Addr pageAddr;
         res = ac.getPage(page + pageFrom, &pageAddr);
@@ -314,24 +318,25 @@ DataIO::writePageData(PageOffs pageFrom,
             return res;
         }
 
+        // End Misaligned || start misaligned
         if ((btw + offs < dataBytesPerPage && page * dataBytesPerPage + btw < filesize)
-            ||  // End Misaligned
+            ||
             offs > 0)
-        {  // Start Misaligned
+        {
             // we are misaligned, so fill write buffer with valid Data
-            misaligned = true;
-            buf = new char[dataBytesPerPage];
-            memset(buf, 0x0, dataBytesPerPage);
-
             unsigned int btr = dataBytesPerPage;
 
             // limit maximum bytes to read if file is smaller than actual page
             if ((pageFrom + 1 + page) * dataBytesPerPage > filesize)
             {
                 if (filesize > (pageFrom + page) * dataBytesPerPage)
+                {
                     btr = filesize - (pageFrom + page) * dataBytesPerPage;
+                }
                 else
+                {
                     btr = 0;
+                }
             }
 
             if (pageAddr != 0  // not an empty page TODO: doubled code
@@ -343,9 +348,12 @@ DataIO::writePageData(PageOffs pageFrom,
                         pageFrom + page, pageFrom + page, 0, btr, buf, ac, &bytes_read);
                 if (r != Result::ok || bytes_read != btr)
                 {
-                    delete[] buf;
                     return Result::bug;
                 }
+            }else
+            {
+                //We are overriding into nonexistent page, assume zero
+                memset(buf, 0, dataBytesPerPage);
             }
 
             // Handle offset
@@ -369,7 +377,9 @@ DataIO::writePageData(PageOffs pageFrom,
         res = dev->driver.writePage(getPageNumber(pageAddress, *dev), buf, btw);
         if (res != Result::ok)
         {
-            PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write Page!");
+            PAFFS_DBG(PAFFS_TRACE_ERROR,
+                      "ERR: write returned FAIL at phy.P: %llu",
+                      static_cast<long long unsigned int>(getPageNumber(pageAddress, *dev)));
             return res;
         }
         res = dev->sumCache.setPageStatus(
@@ -415,21 +425,11 @@ DataIO::writePageData(PageOffs pageFrom,
         if (res != Result::ok)
             return res;
 
-        if (misaligned)
-            delete[] buf;
-
         PAFFS_DBG_S(PAFFS_TRACE_WRITE,
                     "write r.P: %d/%d, phy.P: %llu",
                     page + 1,
                     toPage + 1,
                     static_cast<long long unsigned int>(getPageNumber(pageAddress, *dev)));
-        if (res != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "ERR: write returned FAIL at phy.P: %llu",
-                      static_cast<long long unsigned int>(getPageNumber(pageAddress, *dev)));
-            return Result::fail;
-        }
     }
     return Result::ok;
 }
@@ -443,17 +443,8 @@ DataIO::readPageData(PageOffs pageFrom,
                      PageAddressCache& ac,
                      unsigned* bytes_read)
 {
-    char* wrap = data;
-    bool misaligned = false;
-    if (offs > 0)
-    {
-        misaligned = true;
-        wrap = new char[bytes + offs];
-    }
-
     for (unsigned int page = 0; page <= toPage - pageFrom; page++)
     {
-        char* buf = &wrap[page * dataBytesPerPage];
         Addr pageAddr;
         Result r = ac.getPage(page + pageFrom, &pageAddr);
         if (r != Result::ok)
@@ -477,8 +468,9 @@ DataIO::readPageData(PageOffs pageFrom,
             {
                 // This Page is currently not written to flash
                 // because it contains just empty space
-                memset(buf, 0, btr);
-                *bytes_read += btr;
+                memset(&data[*bytes_read], 0, btr);
+                *bytes_read += btr - offs;
+                offs = 0;   //Offset is only applied to first page
                 continue;
             }
             PAFFS_DBG(PAFFS_TRACE_BUG,
@@ -527,6 +519,7 @@ DataIO::readPageData(PageOffs pageFrom,
         }
 
         PageAbs addr = getPageNumber(pageAddr, *dev);
+        char* buf = dev->driver.getPageBuffer();
         r = dev->driver.readPage(addr, buf, btr);
         if (r != Result::ok)
         {
@@ -538,19 +531,13 @@ DataIO::readPageData(PageOffs pageFrom,
             }
             else
             {
-                if (misaligned)
-                    delete[] wrap;
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read page, aborting pageData Read");
                 return dev->lasterr = r;
             }
         }
-        *bytes_read += btr;
-    }
-    if (misaligned)
-    {
-        memcpy(data, &wrap[offs], bytes);
-        *bytes_read -= offs;
-        delete[] wrap;
+        memcpy(&data[*bytes_read], &buf[offs], btr - offs);
+        *bytes_read += btr - offs;
+        offs = 0;   //offset is only applied to first page
     }
 
     return Result::ok;

@@ -171,7 +171,7 @@ static constexpr uint16_t directAddrCount = 11;
 struct Inode
 {
     InodeNo no;
-    InodeType type;  //:2;
+    InodeType type;  //2 Bit;
     Permission perm : 3;
     uint32_t reservedPages;  // Space on filesystem used in Pages
     FileSize size;           // Space on filesystem needed in bytes
