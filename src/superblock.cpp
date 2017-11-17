@@ -152,7 +152,7 @@ SuperIndex::serializeToBuffer(char* buf)
             if (areaSummary[i][j] != SummaryEntry::dirty)
                 buf[pointer + j / 8] |= 1 << j % 8;
         }
-        pointer += dataPagesPerArea / 8 + 1;
+        pointer += ceil(dataPagesPerArea / 8.);
     }
 
     PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "%u bytes have been written to Buffer", pointer);

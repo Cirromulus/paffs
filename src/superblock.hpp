@@ -75,7 +75,7 @@ struct SuperIndex
                sizeof(uint64_t) +                // overallDeletions
                2 * sizeof(AreaPos)
                +  // Area Summary Positions
-               ceil(numberOfAreaSummaries * dataPagesPerArea / 8)
+               ceil(numberOfAreaSummaries * dataPagesPerArea / 8.)
                /* One bit per entry, two entrys for INDEX and DATA section*/
         : 0;
     }
