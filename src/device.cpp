@@ -716,7 +716,7 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
     Result r;
     if (contDir.reservedPages > 0)
     {  // if Directory is not empty
-        r = dataIO.readInodeData(contDir, 0, contDir.size, &bytes, dirData);
+        r = dataIO.readInodeData(contDir, 0, contDir.size, &bytes, dirData.get());
         if (r != Result::ok || bytes != contDir.size)
         {
             lasterr = r;

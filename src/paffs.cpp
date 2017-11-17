@@ -20,17 +20,19 @@
 
 namespace paffs
 {
+//Note: Order is different
 const Param stdParam{totalBytesPerPage,
-                     oobBytesPerPage,
                      pagesPerBlock,
                      blocksTotal,
+                     oobBytesPerPage,
                      jumpPadNo,
                      dataBytesPerPage,
-                     areasNo,
-                     blocksPerArea,
-                     totalPagesPerArea,
                      dataPagesPerArea,
-                     superChainElems};
+                     totalPagesPerArea,
+                     blocksPerArea,
+                     superChainElems,
+                     areasNo,
+};
 
 unsigned int traceMask =
         // PAFFS_TRACE_VERBOSE |

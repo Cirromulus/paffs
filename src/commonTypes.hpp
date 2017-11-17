@@ -87,14 +87,14 @@ struct Param
     uint16_t totalBytesPerPage;
     uint16_t pagesPerBlock;
     uint16_t blocksTotal;
-    uint8_t oobBytesPerPage;
-    uint8_t jumpPadNo;
+    uint8_t  oobBytesPerPage;
+    uint8_t  jumpPadNo;
     // Automatically filled//
     uint16_t dataBytesPerPage;
     uint16_t dataPagesPerArea;
     uint16_t totalPagesPerArea;
-    uint8_t blocksPerArea;
-    uint8_t superChainElems;
+    uint8_t  blocksPerArea;
+    uint8_t  superChainElems;
     uint32_t areasNo;
 };
 
@@ -118,24 +118,29 @@ struct BadBlockList
 {
     BlockAbs* mList;
     uint16_t mSize;
+    inline
     BadBlockList() : mList(nullptr), mSize(0){};
+    inline
     BadBlockList(const BlockAbs* list, const uint16_t size) : mSize(size)
     {
         mList = new BlockAbs[size];
         memcpy(mList, list, size * sizeof(BlockAbs));
     };
-    BadBlockList&
-    operator=(BadBlockList const& other)
-    {
-        mList = new BlockAbs[other.mSize];
-        memcpy(mList, other.mList, other.mSize * sizeof(BlockAbs));
-        mSize = other.mSize;
-        return *this;
-    }
+    inline
     BadBlockList(BadBlockList const& other)
     {
         *this = other;
     }
+    inline BadBlockList&
+    operator=(BadBlockList const& other)
+    {
+        BlockAbs* tmpList = new BlockAbs[other.mSize];
+        memcpy(tmpList, other.mList, other.mSize * sizeof(BlockAbs));
+        mSize = other.mSize;
+        mList = tmpList;
+        return *this;
+    }
+    inline
     ~BadBlockList()
     {
         if (mList != nullptr)
@@ -143,7 +148,8 @@ struct BadBlockList
             delete[] mList;
         }
     }
-    BlockAbs operator[](size_t pos) const
+    inline BlockAbs
+    operator[](size_t pos) const
     {
         if (pos > mSize)
         {
