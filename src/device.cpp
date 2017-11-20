@@ -305,11 +305,11 @@ Device::unmnt()
     InodePool<maxNumberOfInodes>::InodeMap::iterator it = inodePool.map.begin();
     if (it != inodePool.map.end())
     {
-        PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Unclosed files remain, closing for unmount");
+        PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Unclosed files remain, committing for unmount");
         while (it != inodePool.map.end())
         {
             PAFFS_DBG_S(PAFFS_TRACE_ALWAYS,
-                        "Close Inode %" PRIu32 " with %u references",
+                        "Commit Inode %" PRIu32 " with %u references",
                         it->first,
                         it->second.second);
             // TODO: Later, we would choose the actual pac instance (or the PAC will choose the
@@ -326,9 +326,7 @@ Device::unmnt()
                 // we ignore Result, because we unmount.
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit pac of an open file");
             }
-
-            inodePool.pool.freeObject(*it->second.first);
-            it = inodePool.map.erase(it);
+            it++;
         }
     }
 
@@ -399,6 +397,7 @@ Device::createInode(SmartInodePtr& outInode, Permission mask)
     outInode->crea =
             systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
     outInode->mod = outInode->crea;
+
     return Result::ok;
 }
 
@@ -1259,9 +1258,9 @@ Device::write(Obj& obj, const char* buf, unsigned int bytes_to_write, unsigned i
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Could not write %u of %u bytes",
+                  "Could not write %u of %u bytes at %u",
                   bytes_to_write - *bytes_written,
-                  bytes_to_write);
+                  bytes_to_write, obj.fp);
         if (*bytes_written > 0)
         {
             Result r2 = tree.updateExistingInode(*obj.dirent.node);
@@ -1408,13 +1407,9 @@ Device::truncate(const char* path, unsigned int newLength)
 Result
 Device::remove(const char* path)
 {
-    Result r = truncate(path, 0);
-    if (r != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete the files contents");
-        return r;
-    }
     SmartInodePtr object;
+    Result r;
+
     if ((r = getInodeOfElem(object, path)) != Result::ok)
         return r;
 
@@ -1423,6 +1418,13 @@ Device::remove(const char* path)
     {
         // Still opened by others
         return Result::einval;
+    }
+
+    r = truncate(path, 0);
+    if (r != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete the files contents");
+        return r;
     }
 
     SmartInodePtr parentDir;

@@ -23,6 +23,10 @@ struct ObjectPool
 {
     BitList<size> activeObjects;
     T objects[size];
+    ~ObjectPool()
+    {
+        clear();
+    }
     Result
     getNewObject(T*& outObj)
     {
@@ -32,7 +36,7 @@ struct ObjectPool
             return Result::nospace;
         }
         activeObjects.setBit(objOffs);
-        objects[objOffs] = T();
+        new (&objects[objOffs]) T;
         outObj = &objects[objOffs];
         return Result::ok;
     }
@@ -51,6 +55,7 @@ struct ObjectPool
         }
         activeObjects.resetBit(&obj - objects);
         obj.~T();
+        memset(&obj, 0, sizeof(T));
         return Result::ok;
     }
     bool
@@ -75,6 +80,15 @@ struct ObjectPool
     void
     clear()
     {
+        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Clear ObjectPool");
+        for(size_t i(0); i < size; i++)
+        {
+            if(activeObjects.getBit(i))
+            {
+                PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Freeing forgotten Object");
+                freeObject(objects[i]);
+            }
+        }
         activeObjects.clear();
     }
 };
@@ -98,6 +112,11 @@ struct InodePool : InodePoolBase
     ObjectPool<size, Inode> pool;
     InodeMap map;
 
+    ~InodePool()
+    {
+        clear();
+    }
+
     Result
     getExistingInode(InodeNo no, SmartInodePtr& target) override
     {
@@ -108,7 +127,7 @@ struct InodePool : InodePoolBase
         }
         Inode* inode = it->second.first;  // Inode Pointer
         it->second.second++;              // Inode Refcount
-        // printf("Changed Refcount of %u to %u\n", no, it->second.second);
+        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Increased Refcount of %u to %u", no, it->second.second);
         target.setInode(*inode, *this);
         return Result::ok;
     }
@@ -129,9 +148,12 @@ struct InodePool : InodePoolBase
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get new Inode from Pool");
             return r;
         }
+        memset(inode, 0, sizeof(Inode));
         inode->no = no;
         target.setInode(*inode, *this);
         map.insert(InodeMapElem(no, InodeWithRefcount(target, 1)));
+        //DEBUG
+        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Added new Inode %u", no);
         return Result::ok;
     }
     virtual Result
@@ -140,7 +162,8 @@ struct InodePool : InodePoolBase
         InodeMap::iterator it = map.find(no);
         if (it == map.end())
         {
-            PAFFS_DBG(PAFFS_TRACE_BUG, "inode was not found in pool!");
+            //Upon unmount, we dont care about that
+            //PAFFS_DBG(PAFFS_TRACE_BUG, "inode %u was not found in pool!", no);
             return Result::bug;
         }
         if (it->second.second == 0)
@@ -149,9 +172,10 @@ struct InodePool : InodePoolBase
             return Result::bug;
         }
         it->second.second--;  // Inode refcount
-        // printf("Changed Refcount of %u to %u\n", no, it->second.second);
+        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Decreased Refcount of %u to %u", no, it->second.second);
         if (it->second.second == 0)
         {
+            PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Freeing Inode %u", it->first);
             Result r = pool.freeObject(*it->second.first);  // Inode
             if (r != Result::ok)
             {
@@ -168,7 +192,7 @@ struct InodePool : InodePoolBase
         InodeMap::iterator it = map.find(no);
         if (it == map.end())
         {
-            PAFFS_DBG(PAFFS_TRACE_BUG, "inode was not found in pool!");
+            PAFFS_DBG(PAFFS_TRACE_BUG, "inode %" PRIu32 " was not found in pool!", no);
             return Result::bug;
         }
         if (it->second.second == 0)
@@ -176,11 +200,12 @@ struct InodePool : InodePoolBase
             PAFFS_DBG(PAFFS_TRACE_BUG, "Obj's Refcount is already zero!");
             return Result::bug;
         }
-        Result r = pool.freeObject(it->second.first);  // Inode
+        Result r = pool.freeObject(*it->second.first);  // Inode
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not free Inode from Pool in Openlist!");
         }
+        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Force-Freeing Inode %u", it->first);
         map.erase(it);
         return Result::ok;
     }
@@ -188,6 +213,18 @@ struct InodePool : InodePoolBase
     void
     clear()
     {
+        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Clear InodePool");
+        InodeMap::iterator it = map.begin();
+        if(it != map.end())
+        {
+            PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Freeing forgotten Inode %" PRIu32, it->first);
+            while(it != map.end())
+            {
+                InodeMap::iterator old = it;
+                it++;
+                removeInode(old->first);
+            }
+        }
         pool.clear();
         map.clear();
     }

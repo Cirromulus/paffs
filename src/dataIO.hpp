@@ -68,6 +68,8 @@ private:
                  char* data,
                  PageAddressCache& ac,
                  unsigned* bytes_read);
+
+    bool checkIfSaneReadAddress(Addr pageAddr);
 };
 };
 

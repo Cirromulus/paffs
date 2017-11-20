@@ -63,7 +63,6 @@ SimuDriver::writePage(PageAbs page_no,
 	{
 		return Result::fail;
 	}
-
 	if(data_len > totalBytesPerPage)
 	{
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write %u Bytes to a page of %u!", data_len, totalBytesPerPage);
@@ -94,7 +93,14 @@ Result
 SimuDriver::readPage(PageAbs page_no,
                      void* data, unsigned int data_len){
 	if(!cell)
-		return Result::fail;
+	{
+	    return Result::fail;
+	}
+    if(data_len > totalBytesPerPage)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried reading more than a page width!");
+        return Result::einval;
+    }
 	//TODO: Simple write-trough buffer by checking if same address
 
 	Nandaddress d = translatePageToAddress(page_no);

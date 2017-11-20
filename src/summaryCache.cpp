@@ -18,7 +18,6 @@
 #include "device.hpp"
 #include "driver/driver.hpp"
 #include "superblock.hpp"
-#include <inttypes.h>
 
 namespace paffs
 {
@@ -375,7 +374,7 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
     if (page > dataPagesPerArea)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Tried to access page out of bounds! (was: %d, should: < %d",
+                  "Tried to access page out of bounds! (was: %" PRIu32 ", should: < %" PRIu32 ")",
                   page,
                   dataPagesPerArea);
         return Result::einval;

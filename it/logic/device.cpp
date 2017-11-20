@@ -141,11 +141,11 @@ TEST_F(FileTest, directoryReadWrite)
     paffs::Result r;
     r = fs.mkDir("/a", p);
     ASSERT_EQ(r, paffs::Result::ok);
-    r = fs.mkDir("/a/b", p);
-    ASSERT_EQ(r, paffs::Result::ok);
-    r = fs.touch("/a/b/file1");
-    ASSERT_EQ(r, paffs::Result::ok);
     r = fs.mkDir("/b", p);
+    ASSERT_EQ(r, paffs::Result::ok);
+    r = fs.mkDir("/a/1", p);
+    ASSERT_EQ(r, paffs::Result::ok);
+    r = fs.touch("/a/1/file1");
     ASSERT_EQ(r, paffs::Result::ok);
     r = fs.mkDir("/b/c", p);
     ASSERT_EQ(r, paffs::Result::ok);
@@ -177,12 +177,12 @@ TEST_F(FileTest, directoryReadWrite)
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
     ASSERT_EQ(entr->node->type, paffs::InodeType::dir);
-    EXPECT_TRUE(StringsMatch(entr->name, "b/"));
+    EXPECT_TRUE(StringsMatch(entr->name, "1/"));
     r = fs.closeDir(dir);
     ASSERT_EQ(r, paffs::Result::ok);
 
     // a/b
-    dir = fs.openDir("/a/b");
+    dir = fs.openDir("/a/1");
     ASSERT_NE(dir, nullptr);
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
@@ -265,7 +265,7 @@ TEST_F(FileTest, maxFilesize)
     if (blocksize - i > 0)
         memcpy(&block[i], txt, blocksize - i);
 
-    fil = fs.open("/file", paffs::FW | paffs::FC);
+    fil = fs.open("/file", paffs::FW | paffs::FR | paffs::FC);
     if (fs.getLastErr() != paffs::Result::ok)
         printf("%s!\n", paffs::err_msg(fs.getLastErr()));
     ASSERT_NE(fil, nullptr);
@@ -284,6 +284,11 @@ TEST_F(FileTest, maxFilesize)
         }
         ASSERT_EQ(r, paffs::Result::ok);
         EXPECT_EQ(bw, blocksize);
+
+        fs.seek(*fil, -bw, paffs::Seekmode::cur);
+        r = fs.read(*fil, blockcopy, blocksize, &bw);
+        ASSERT_EQ(r, paffs::Result::ok);
+        ASSERT_TRUE(ArraysMatch(block, blockcopy, blocksize));
     }
     maxFileSize = i;
     r = fs.close(*fil);
@@ -307,19 +312,11 @@ TEST_F(FileTest, maxFilesize)
     while (i < maxFileSize)
     {
         memset(blockcopy, 0, blocksize);
-        if(i == 103680)
-        {
-            printf("Beware of the bug\n");
-        }
         r = fs.read(*fil, blockcopy, blocksize, &bw);
         ASSERT_EQ(r, paffs::Result::ok);
         if (maxFileSize - i >= blocksize)
         {
             ASSERT_EQ(bw, blocksize);
-            if(memcmp(block, blockcopy, blocksize))
-            {
-                printf("Arrays differ at bytes %u-%u\n", i, i+bw);
-            }
             ASSERT_TRUE(ArraysMatch(block, blockcopy, blocksize));
         }
         else

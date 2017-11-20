@@ -39,8 +39,11 @@ public:
     {
         paffs::BadBlockList bbl[paffs::maxNumberOfDevices];  // Empty
         paffs::Result r = fs.format(bbl);
-        fs.setTraceMask(PAFFS_TRACE_VERIFY_TC | PAFFS_TRACE_VERIFY_AS | PAFFS_TRACE_BUG
-                        | PAFFS_TRACE_ERROR);
+        fs.setTraceMask(PAFFS_TRACE_VERIFY_TC |
+                        PAFFS_TRACE_VERIFY_AS |
+                        PAFFS_WRITE_VERIFY_AS | //tmp
+                        PAFFS_TRACE_BUG |
+                        PAFFS_TRACE_ERROR);
         if (r != paffs::Result::ok)
             std::cerr << "Could not format device!" << std::endl;
         ASSERT_EQ(r, paffs::Result::ok);

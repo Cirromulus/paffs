@@ -298,17 +298,8 @@ DataIO::writePageData(PageOffs pageFrom,
         Addr pageAddress =
                 combineAddress(dev->areaMgmt.getActiveArea(AreaType::data), firstFreePage);
 
-        // Prepare buffer and calculate bytes to write
-        char* buf = dev->driver.getPageBuffer();
-        unsigned int btw = bytes - *bytes_written;
-        if ((btw + offs) > dataBytesPerPage)
-        {
-            btw = (btw + offs) > dataBytesPerPage ?
-                    dataBytesPerPage - offs : dataBytesPerPage;
-        }
-        memcpy(buf, &data[*bytes_written], btw);
-
         Addr pageAddr;
+        //GetPage may overwrite our driver buffer
         res = ac.getPage(page + pageFrom, &pageAddr);
         if (res != Result::ok)
         {
@@ -318,10 +309,18 @@ DataIO::writePageData(PageOffs pageFrom,
             return res;
         }
 
-        // End Misaligned || start misaligned
-        if ((btw + offs < dataBytesPerPage && page * dataBytesPerPage + btw < filesize)
-            ||
-            offs > 0)
+        // Prepare buffer and calculate bytes to write
+        unsigned int btw = bytes - *bytes_written;
+        if ((btw + offs) > dataBytesPerPage)
+        {
+            btw = dataBytesPerPage - offs;
+        }
+
+        char* buf = dev->driver.getPageBuffer();
+
+        // start misaligned || End Misaligned
+        if (offs > 0 ||
+           (btw + offs < dataBytesPerPage && page * dataBytesPerPage + btw < filesize))
         {
             // we are misaligned, so fill write buffer with valid Data
             unsigned int btr = dataBytesPerPage;
@@ -371,6 +370,7 @@ DataIO::writePageData(PageOffs pageFrom,
         else
         {
             // not misaligned, we are writing a whole page or a new page
+            memcpy(buf, &data[*bytes_written], btw);
             *bytes_written += btw;
         }
 
@@ -461,61 +461,20 @@ DataIO::readPageData(PageOffs pageFrom,
                           : (bytes + offs) - page * dataBytesPerPage;
         }
 
-        AreaPos area = extractLogicalArea(pageAddr);
-        if (dev->areaMgmt.getType(area) != AreaType::data)
+        if (pageAddr == combineAddress(0, unusedMarker))
         {
-            if (pageAddr == combineAddress(0, unusedMarker))
-            {
-                // This Page is currently not written to flash
-                // because it contains just empty space
-                memset(&data[*bytes_read], 0, btr);
-                *bytes_read += btr - offs;
-                offs = 0;   //Offset is only applied to first page
-                continue;
-            }
-            PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "READ INODE operation of invalid area at %d:%d",
-                      extractLogicalArea(pageAddr),
-                      extractPageOffs(pageAddr));
-            return Result::bug;
+            // This Page is currently not written to flash
+            // because it contains just empty space
+            memset(&data[*bytes_read], 0, btr - offs);
+            *bytes_read += btr - offs;
+            offs = 0;   //Offset is only applied to first page
+            continue;
         }
-        if (traceMask & PAFFS_TRACE_VERIFY_AS)
+
+
+        if(!checkIfSaneReadAddress(pageAddr))
         {
-            SummaryEntry e = dev->sumCache.getPageStatus(
-                    extractLogicalArea(pageAddr), extractPageOffs(pageAddr), &r);
-            if (r != Result::ok)
-            {
-                PAFFS_DBG(PAFFS_TRACE_ERROR,
-                          "Could not load AreaSummary of area %d for verification!",
-                          extractLogicalArea(pageAddr));
-            }
-            else
-            {
-                if (e == SummaryEntry::dirty)
-                {
-                    PAFFS_DBG(PAFFS_TRACE_BUG,
-                              "READ INODE operation of outdated (dirty) data at %d:%d",
-                              extractLogicalArea(pageAddr),
-                              extractPageOffs(pageAddr));
-                    return Result::bug;
-                }
-
-                if (e == SummaryEntry::free)
-                {
-                    PAFFS_DBG(PAFFS_TRACE_BUG,
-                              "READ INODE operation of invalid (free) data at %d:%d",
-                              extractLogicalArea(pageAddr),
-                              extractPageOffs(pageAddr));
-                    return Result::bug;
-                }
-
-                if (e >= SummaryEntry::error)
-                {
-                    PAFFS_DBG(PAFFS_TRACE_BUG,
-                              "READ INODE operation of data with invalid AreaSummary at area %d!",
-                              extractLogicalArea(pageAddr));
-                }
-            }
+            return Result::bug;
         }
 
         PageAbs addr = getPageNumber(pageAddr, *dev);
@@ -541,5 +500,61 @@ DataIO::readPageData(PageOffs pageFrom,
     }
 
     return Result::ok;
+}
+
+
+bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
+{
+    if (dev->areaMgmt.getType(extractLogicalArea(pageAddr)) != AreaType::data)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG,
+                  "READ INODE operation of invalid area at %" PRIu32 ":%" PRIu32,
+                  extractLogicalArea(pageAddr),
+                  extractPageOffs(pageAddr));
+        return false;
+    }
+
+    if (traceMask & PAFFS_TRACE_VERIFY_AS)
+    {
+        Result r;
+        SummaryEntry e = dev->sumCache.getPageStatus(
+                extractLogicalArea(pageAddr), extractPageOffs(pageAddr), &r);
+        if (r != Result::ok)
+        {
+            PAFFS_DBG(PAFFS_TRACE_ERROR,
+                      "Could not load AreaSummary of area %d for verification!",
+                      extractLogicalArea(pageAddr));
+            return false;
+        }
+        else
+        {
+            if (e == SummaryEntry::dirty)
+            {
+                PAFFS_DBG(PAFFS_TRACE_BUG,
+                          "READ INODE operation of outdated (dirty) data at %d:%d",
+                          extractLogicalArea(pageAddr),
+                          extractPageOffs(pageAddr));
+                return false;
+            }
+
+            if (e == SummaryEntry::free)
+            {
+                PAFFS_DBG(PAFFS_TRACE_BUG,
+                          "READ INODE operation of invalid (free) data at %d:%d",
+                          extractLogicalArea(pageAddr),
+                          extractPageOffs(pageAddr));
+                return false;
+            }
+
+            if (e >= SummaryEntry::error)
+            {
+                PAFFS_DBG(PAFFS_TRACE_BUG,
+                          "READ INODE operation of data with invalid AreaSummary at area %d!",
+                          extractLogicalArea(pageAddr));
+                return false;
+            }
+        }
+    }
+    return true;
 }
 }
