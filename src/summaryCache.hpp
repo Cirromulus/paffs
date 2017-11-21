@@ -21,13 +21,12 @@ namespace paffs
 {
 class AreaSummaryElem
 {
-    unsigned char entry[dataPagesPerArea / 4 + 1];  // assumes an Odd number of dataPagesPerArea
-    unsigned char statusBits;  // dirty < asWritten < loadedFromSuperIndex < used
-    AreaPos area;
-    PageOffs dirtyPages;
+    unsigned char mEntry[(dataPagesPerArea + 3) / 4];
+    unsigned char mStatusBits;  // dirty < asWritten < loadedFromSuperIndex < used
+    AreaPos mArea;
+    PageOffs mDirtyPages;
     void
     setUsed(bool used = true);
-
 public:
     AreaSummaryElem();
     ~AreaSummaryElem();
@@ -42,12 +41,11 @@ public:
     void
     setDirty(bool dirty = true);
     bool
-    isAsWritten();
+    isAreaSummaryWritten();
     void
-    setAsWritten(bool written = true);
+    setAreaSummaryWritten(bool written = true);
     /**
-     * @brief used to determine, if AS
-     * did not change since loaded from SuperPage
+     * \brief used to determine if AS did not change since loaded from SuperPage
      */
     bool
     isLoadedFromSuperPage();
@@ -77,14 +75,18 @@ public:
     SummaryCache(Device* mdev);
     ~SummaryCache();
 
-    // Same as setPageStatus(area, page, state)
+    /**
+     * Functionally same as setPageStatus(area, page, state)
+     */
     Result
     setPageStatus(Addr addr, SummaryEntry state);
 
     Result
     setPageStatus(AreaPos area, PageOffs page, SummaryEntry state);
 
-    // Same as getPageStatus(area, page, Result)
+    /*
+     * Functionally same as getPageStatus(area, page, Result)
+     */
     SummaryEntry
     getPageStatus(Addr addr, Result* result);
 
@@ -101,22 +103,31 @@ public:
     Result
     getSummaryStatus(AreaPos area, SummaryEntry* summary, bool complete = true);
 
-    // Does not check if pages are dirty or free
+    /*
+     * Does not check if pages are dirty or free
+     */
     Result
     getEstimatedSummaryStatus(AreaPos area, SummaryEntry* summary);
 
-    // for retired or unused Areas
+    /*
+     * \warn Only for retired or unused Areas
+     */
     Result
     deleteSummary(AreaPos area);
 
-    // For Garbage collection to consider cached AS-Areas before others
+    /**
+     * Used by Garbage collection to consider cached AS-Areas before others
+     */
     bool
     isCached(AreaPos area);
-    // For Garbage collection to consider committed AS-Areas before others
+    /**
+     * Used by Garbage collection to consider committed AS-Areas before others
+     */
     bool
     wasASWritten(AreaPos area);
-
-    // For Garbage collection that has deleted the AS too
+    /**
+     * Used by Garbage collection that can delete the AS too
+     */
     void
     resetASWritten(AreaPos area);
 
@@ -149,7 +160,7 @@ private:
      * @warn Decreases wear-off efficiency if used regularly.
      */
     Result
-    commitASHard(int& clearedAreaCachePosition);
+    commitAreaSummaryHard(int& clearedAreaCachePosition);
 
     SummaryEntry
     getPackedStatus(uint16_t position, PageOffs page);

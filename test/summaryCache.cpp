@@ -30,28 +30,28 @@ TEST(SummaryCacheElem, packedStatusIntegrity)
         ASSERT_EQ(asElem.getStatus(i), paffs::SummaryEntry::free);
     }
     ASSERT_EQ(asElem.isDirty(), false);
-    ASSERT_EQ(asElem.isAsWritten(), false);
+    ASSERT_EQ(asElem.isAreaSummaryWritten(), false);
     ASSERT_EQ(asElem.isLoadedFromSuperPage(), false);
 
     asElem.setDirty();
     ASSERT_EQ(asElem.isDirty(), true);
-    ASSERT_EQ(asElem.isAsWritten(), false);
+    ASSERT_EQ(asElem.isAreaSummaryWritten(), false);
     ASSERT_EQ(asElem.isLoadedFromSuperPage(), false);
 
     asElem.setDirty(false);
     ASSERT_EQ(asElem.isDirty(), false);
 
-    asElem.setAsWritten();
+    asElem.setAreaSummaryWritten();
     ASSERT_EQ(asElem.isDirty(), false);
-    ASSERT_EQ(asElem.isAsWritten(), true);
+    ASSERT_EQ(asElem.isAreaSummaryWritten(), true);
     ASSERT_EQ(asElem.isLoadedFromSuperPage(), false);
 
-    asElem.setAsWritten(false);
-    ASSERT_EQ(asElem.isAsWritten(), false);
+    asElem.setAreaSummaryWritten(false);
+    ASSERT_EQ(asElem.isAreaSummaryWritten(), false);
 
     asElem.setLoadedFromSuperPage();
     ASSERT_EQ(asElem.isDirty(), false);
-    ASSERT_EQ(asElem.isAsWritten(), false);
+    ASSERT_EQ(asElem.isAreaSummaryWritten(), false);
     ASSERT_EQ(asElem.isLoadedFromSuperPage(), true);
 
     for (unsigned int i = 0; i < paffs::dataPagesPerArea; i++)

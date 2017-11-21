@@ -28,7 +28,7 @@ Result
 DataIO::writeInodeData(Inode& inode,
                        unsigned int offs,
                        unsigned int bytes,
-                       unsigned int* bytes_written,
+                       unsigned int* bytesWritten,
                        const char* data)
 {
     if (dev->readOnly)
@@ -39,7 +39,7 @@ DataIO::writeInodeData(Inode& inode,
     if (offs + bytes == 0)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Write size 0! Bug?");
-        return Result::einval;
+        return Result::invalidInput;
     }
 
     // todo: use pageFrom as offset to reduce memory usage and IO
@@ -78,13 +78,13 @@ DataIO::writeInodeData(Inode& inode,
                         bytes,
                         data,
                         pac,
-                        bytes_written,
+                        bytesWritten,
                         inode.size,
                         inode.reservedPages);
 
-    if (inode.size < *bytes_written + offs)
+    if (inode.size < *bytesWritten + offs)
     {
-        inode.size = *bytes_written + offs;
+        inode.size = *bytesWritten + offs;
     }
 
     // the Tree UpdateExistingInode has to be done by high level functions,
@@ -93,13 +93,13 @@ DataIO::writeInodeData(Inode& inode,
 }
 
 Result
-DataIO::readInodeData(
-        Inode& inode, unsigned int offs, unsigned int bytes, unsigned int* bytes_read, char* data)
+DataIO::readInodeData(Inode& inode, unsigned int offs, unsigned int bytes,
+                      unsigned int* bytesRead, char* data)
 {
     if (offs + bytes == 0)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Read size 0! Bug?");
-        return dev->lasterr = Result::einval;
+        return dev->lasterr = Result::invalidInput;
     }
 
     if (offs + bytes > inode.size)
@@ -111,7 +111,7 @@ DataIO::readInodeData(
         bytes = inode.size - offs;
     }
 
-    *bytes_read = 0;
+    *bytesRead = 0;
     unsigned int pageFrom = offs / dataBytesPerPage;
     unsigned int toPage = (offs + bytes) / dataBytesPerPage;
     if ((offs + bytes) % dataBytesPerPage == 0)
@@ -126,7 +126,7 @@ DataIO::readInodeData(
         return res;
     }
 
-    return readPageData(pageFrom, toPage, offs % dataBytesPerPage, bytes, data, pac, bytes_read);
+    return readPageData(pageFrom, toPage, offs % dataBytesPerPage, bytes, data, pac, bytesRead);
 }
 
 // inode->size and inode->reservedSize is altered.
@@ -164,7 +164,7 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
     if (inode.size < offs)
     {
         // Offset bigger than actual filesize
-        return Result::einval;
+        return Result::invalidInput;
     }
 
     Result r = pac.setTargetInode(inode);
@@ -423,7 +423,9 @@ DataIO::writePageData(PageOffs pageFrom,
         // this may have filled the flash
         res = dev->areaMgmt.manageActiveAreaFull(AreaType::data);
         if (res != Result::ok)
+        {
             return res;
+        }
 
         PAFFS_DBG_S(PAFFS_TRACE_WRITE,
                     "write r.P: %d/%d, phy.P: %llu",
@@ -536,7 +538,7 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
                           extractPageOffs(pageAddr));
                 return false;
             }
-
+            else
             if (e == SummaryEntry::free)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
@@ -545,7 +547,7 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
                           extractPageOffs(pageAddr));
                 return false;
             }
-
+            else
             if (e >= SummaryEntry::error)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,

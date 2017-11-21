@@ -134,7 +134,7 @@ rtems_task task_system_init(rtems_task_argument)
     file = fs->open("/test.txt", FR | FW | FE);  // open read/write and only existing
     if (file == nullptr)
     {
-        if (fs->getLastErr() == Result::nf)
+        if (fs->getLastErr() == Result::notFound)
         {
             fs->resetLastErr();
             printf("File not found, creating new...\n");

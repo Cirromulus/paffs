@@ -23,11 +23,12 @@ struct ObjectPool
 {
     BitList<size> activeObjects;
     T objects[size];
+    inline
     ~ObjectPool()
     {
         clear();
     }
-    Result
+    inline Result
     getNewObject(T*& outObj)
     {
         size_t objOffs = activeObjects.findFirstFree();
@@ -40,13 +41,13 @@ struct ObjectPool
         outObj = &objects[objOffs];
         return Result::ok;
     }
-    Result
+    inline Result
     freeObject(T& obj)
     {
         if (!isFromPool(obj))
         {
             PAFFS_DBG(PAFFS_TRACE_BUG, "Tried freeing an Object out of range!");
-            return Result::einval;
+            return Result::invalidInput;
         }
         if (!activeObjects.getBit(&obj - objects))
         {
@@ -58,12 +59,12 @@ struct ObjectPool
         memset(&obj, 0, sizeof(T));
         return Result::ok;
     }
-    bool
+    inline bool
     isFromPool(T& obj)
     {
         return (&obj - objects >= 0 && static_cast<unsigned int>(&obj - objects) < size);
     }
-    size_t
+    inline size_t
     getUsage()
     {
         uint8_t usedObjects = 0;
@@ -77,7 +78,7 @@ struct ObjectPool
         return usedObjects;
     }
 
-    void
+    inline void
     clear()
     {
         PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Clear ObjectPool");
@@ -112,18 +113,19 @@ struct InodePool : InodePoolBase
     ObjectPool<size, Inode> pool;
     InodeMap map;
 
+    inline
     ~InodePool()
     {
         clear();
     }
 
-    Result
+    inline Result
     getExistingInode(InodeNo no, SmartInodePtr& target) override
     {
         InodeMap::iterator it = map.find(no);
         if (it == map.end())
         {
-            return Result::nf;
+            return Result::notFound;
         }
         Inode* inode = it->second.first;  // Inode Pointer
         it->second.second++;              // Inode Refcount
@@ -131,7 +133,7 @@ struct InodePool : InodePoolBase
         target.setInode(*inode, *this);
         return Result::ok;
     }
-    Result
+    inline Result
     requireNewInode(InodeNo no, SmartInodePtr& target)
     {
         InodeMap::iterator it = map.find(no);
@@ -156,7 +158,7 @@ struct InodePool : InodePoolBase
         PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Added new Inode %u", no);
         return Result::ok;
     }
-    virtual Result
+    inline Result
     removeInodeReference(InodeNo no) override
     {
         InodeMap::iterator it = map.find(no);
@@ -185,8 +187,8 @@ struct InodePool : InodePoolBase
         }
 
         return Result::ok;
-    };
-    Result
+    }
+    inline Result
     removeInode(InodeNo no)
     {
         InodeMap::iterator it = map.find(no);
@@ -210,7 +212,7 @@ struct InodePool : InodePoolBase
         return Result::ok;
     }
 
-    void
+    inline void
     clear()
     {
         PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Clear InodePool");
@@ -229,7 +231,7 @@ struct InodePool : InodePoolBase
         map.clear();
     }
 
-    size_t
+    inline size_t
     getUsage()
     {
         return pool.getUsage();

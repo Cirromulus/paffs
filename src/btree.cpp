@@ -338,7 +338,7 @@ Btree::findInLeaf(TreeCacheNode& leaf, InodeNo key, Inode& outInode)
         if (leaf.raw.as.leaf.keys[i] == key)
             break;
     if (i == leaf.raw.num_keys)
-        return Result::nf;
+        return Result::notFound;
     outInode = leaf.raw.as.leaf.pInodes[i];
     return Result::ok;
 }

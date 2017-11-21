@@ -537,7 +537,7 @@ TreeCache::updateFlashAddressInParent(TreeCacheNode& node)
               "Could not find Node %d in its parent (Node %d)!",
               getIndexFromPointer(node),
               getIndexFromPointer(*node.parent));
-    return Result::nf;
+    return Result::notFound;
 }
 
 // Only valid if resolveDirtyPaths has been called before
@@ -809,14 +809,14 @@ TreeCache::getTreeNodeAtIndexFrom(uint16_t index, TreeCacheNode& parent, TreeCac
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get child from Treenode not located in cache!");
         dev->lasterr = Result::ok;
-        return Result::einval;
+        return Result::invalidInput;
     }
 
     if (parent.raw.as.branch.pointers[index] == 0)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
                   "Tried to get treenode neither located in cache nor in flash!");
-        return Result::einval;
+        return Result::invalidInput;
     }
 
     cache_misses++;

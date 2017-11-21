@@ -23,7 +23,7 @@ namespace paffs
 {
 AreaSummaryElem::AreaSummaryElem()
 {
-    statusBits = 0;
+    mStatusBits = 0;
     clear();
 };
 AreaSummaryElem::~AreaSummaryElem()
@@ -37,10 +37,10 @@ AreaSummaryElem::clear()
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to clear a dirty cache elem!");
     }
-    memset(entry, 0, dataPagesPerArea / 4 + 1);
-    statusBits = 0;
-    dirtyPages = 0;
-    area = 0;
+    memset(mEntry, 0, size(mEntry)+ 1);
+    mStatusBits = 0;
+    mDirtyPages = 0;
+    mArea = 0;
 }
 SummaryEntry
 AreaSummaryElem::getStatus(PageOffs page)
@@ -58,8 +58,11 @@ AreaSummaryElem::getStatus(PageOffs page)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Status of unused cache elem!");
         return SummaryEntry::error;
     }
-    return static_cast<SummaryEntry>((entry[page / 4] & (0b11 << (page % 4) * 2))
-                                     >> (page % 4) * 2);
+
+    //Mask bitfield byte leaving inactive bytes to zero, then right shift to bottom
+    return static_cast<SummaryEntry>(
+        (mEntry[page / 4] & (0b11 << (page % 4) * 2))
+        >> (page % 4) * 2 );
 }
 void
 AreaSummaryElem::setStatus(PageOffs page, SummaryEntry value)
@@ -77,45 +80,48 @@ AreaSummaryElem::setStatus(PageOffs page, SummaryEntry value)
                   dataPagesPerArea);
         return;
     }
-    entry[page / 4] = (entry[page / 4] & ~(0b11 << (page % 4) * 2))
-                      | (static_cast<int>(value) << (page % 4) * 2);
+    //First mask bitfield byte leaving active bytes to zero, then insert value
+    mEntry[page / 4] = (mEntry[page / 4] & ~(0b11 << (page % 4) * 2))
+                      | (static_cast<uint8_t>(value) << (page % 4) * 2);
     if (value == SummaryEntry::dirty)
-        dirtyPages++;
+    {
+        mDirtyPages++;
+    }
     setDirty();
     setLoadedFromSuperPage(false);
 }
 bool
 AreaSummaryElem::isDirty()
 {
-    return statusBits & 0b1;
+    return mStatusBits & 0b1;
 }
 void
 AreaSummaryElem::setDirty(bool dirty)
 {
     if (dirty)
     {
-        statusBits |= 0b1;
+        mStatusBits |= 0b1;
     }
     else
     {
-        statusBits &= ~0b1;
+        mStatusBits &= ~0b1;
     }
 }
 bool
-AreaSummaryElem::isAsWritten()
+AreaSummaryElem::isAreaSummaryWritten()
 {
-    return statusBits & 0b10;
+    return mStatusBits & 0b10;
 }
 void
-AreaSummaryElem::setAsWritten(bool written)
+AreaSummaryElem::setAreaSummaryWritten(bool written)
 {
     if (written)
     {
-        statusBits |= 0b10;
+        mStatusBits |= 0b10;
     }
     else
     {
-        statusBits &= ~0b10;
+        mStatusBits &= ~0b10;
     }
 }
 /**
@@ -125,35 +131,35 @@ AreaSummaryElem::setAsWritten(bool written)
 bool
 AreaSummaryElem::isLoadedFromSuperPage()
 {
-    return statusBits & 0b100;
+    return mStatusBits & 0b100;
 }
 void
 AreaSummaryElem::setLoadedFromSuperPage(bool loaded)
 {
     if (loaded)
     {
-        statusBits |= 0b100;
+        mStatusBits |= 0b100;
     }
     else
     {
-        statusBits &= ~0b100;
+        mStatusBits &= ~0b100;
     }
 }
 bool
 AreaSummaryElem::isUsed()
 {
-    return statusBits & 0b1000;
+    return mStatusBits & 0b1000;
 }
 void
 AreaSummaryElem::setUsed(bool used)
 {
     if (used)
     {
-        statusBits |= 0b1000;
+        mStatusBits |= 0b1000;
     }
     else
     {
-        statusBits &= ~0b1000;
+        mStatusBits &= ~0b1000;
     }
 }
 PageOffs
@@ -163,7 +169,7 @@ AreaSummaryElem::getDirtyPages()
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Dirty Pages of unused cache elem!");
     }
-    return dirtyPages;
+    return mDirtyPages;
 }
 void
 AreaSummaryElem::setDirtyPages(PageOffs pages)
@@ -172,7 +178,7 @@ AreaSummaryElem::setDirtyPages(PageOffs pages)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Dirty Pages of unused cache elem!");
     }
-    dirtyPages = pages;
+    mDirtyPages = pages;
 }
 
 void
@@ -184,10 +190,10 @@ AreaSummaryElem::setArea(AreaPos areaPos)
                   "Tried to set areaPos %" PRIu32 ", but "
                   "SummaryElem is set to area %" PRIu32 "!",
                   areaPos,
-                  area);
+                  mArea);
         return;
     }
-    area = areaPos;
+    mArea = areaPos;
     setUsed();
 }
 
@@ -199,7 +205,7 @@ AreaSummaryElem::getArea()
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get areaPos of unused SummaryElem!");
         return 0;
     }
-    return area;
+    return mArea;
 }
 
 SummaryCache::SummaryCache(Device* mdev) : dev(mdev)
@@ -226,7 +232,7 @@ SummaryCache::~SummaryCache()
 }
 
 Result
-SummaryCache::commitASHard(int& clearedAreaCachePosition)
+SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition)
 {
     PageOffs favDirtyPages = 0;
     AreaPos favouriteArea = 0;
@@ -235,7 +241,7 @@ SummaryCache::commitASHard(int& clearedAreaCachePosition)
     {
         // found a cached element
         cachePos = it.second;
-        if (summaryCache[cachePos].isDirty() && summaryCache[cachePos].isAsWritten()
+        if (summaryCache[cachePos].isDirty() && summaryCache[cachePos].isAreaSummaryWritten()
             && dev->areaMgmt.getStatus(it.first) != AreaStatus::active
             && (dev->areaMgmt.getType(it.first) == AreaType::data
                 || dev->areaMgmt.getType(it.first) == AreaType::index))
@@ -264,7 +270,7 @@ SummaryCache::commitASHard(int& clearedAreaCachePosition)
             {
                 PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "\tnot dirty");
             }
-            if (!summaryCache[cachePos].isAsWritten())
+            if (!summaryCache[cachePos].isAreaSummaryWritten())
             {
                 PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "\tnot AS written");
             }
@@ -377,7 +383,7 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
                   "Tried to access page out of bounds! (was: %" PRIu32 ", should: < %" PRIu32 ")",
                   page,
                   dataPagesPerArea);
-        return Result::einval;
+        return Result::invalidInput;
     }
     if (state == SummaryEntry::free)
     {
@@ -451,7 +457,7 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
         }*/
         // Commit to Flash, nothing will change in here except for erase
         if (summaryCache[translation[area]].getDirtyPages() == dataPagesPerArea
-            && !summaryCache[translation[area]].isAsWritten())
+            && !summaryCache[translation[area]].isAreaSummaryWritten())
         {
             Result r = writeAreasummary(translation[area]);
             if (r != Result::ok)
@@ -479,7 +485,7 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result* result)
                   "Tried to access page out of bounds! (was: %d, should: < %d",
                   page,
                   dataPagesPerArea);
-        *result = Result::einval;
+        *result = Result::invalidInput;
         return SummaryEntry::error;
     }
     if (translation.find(area) == translation.end())
@@ -499,7 +505,7 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result* result)
                 // TODO: Handle biterror.
                 return buf[page];
             }
-            else if (r == Result::nf)
+            else if (r == Result::notFound)
             {
                 PAFFS_DBG_S(
                         PAFFS_TRACE_ASCACHE, "Loaded free AreaSummary of %d without caching", area);
@@ -519,7 +525,7 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result* result)
                   "Tried to access page out of bounds! (was: %d, should: < %d",
                   page,
                   dataPagesPerArea);
-        *result = Result::einval;
+        *result = Result::invalidInput;
         return SummaryEntry::error;
     }
 
@@ -540,7 +546,7 @@ SummaryCache::getSummaryStatus(AreaPos area, SummaryEntry* summary, bool complet
             // TODO: Handle biterror
             PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of Area %d", area);
         }
-        else if (r == Result::nf)
+        else if (r == Result::notFound)
         {
             PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded empty AreaSummary of Area %d", area);
             r = Result::ok;
@@ -611,7 +617,7 @@ SummaryCache::wasASWritten(AreaPos area)
         // It has to have an AS written.
         return true;
     }
-    return summaryCache[translation[area]].isAsWritten();
+    return summaryCache[translation[area]].isAreaSummaryWritten();
 }
 
 // For Garbage collection that has deleted the AS too
@@ -625,7 +631,7 @@ SummaryCache::resetASWritten(AreaPos area)
                   area);
         return;
     }
-    summaryCache[translation[area]].setAsWritten(false);
+    summaryCache[translation[area]].setAreaSummaryWritten(false);
 }
 
 Result
@@ -665,7 +671,7 @@ SummaryCache::loadAreaSummaries()
             summaryCache[i].setDirtyPages(countDirtyPages(i));
             summaryCache[i].setLoadedFromSuperPage();
 
-            unsigned char as[totalBytesPerPage];
+            unsigned char summary[totalBytesPerPage];
             PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                         "Checking for an AS at area %" PRIu32 " (phys. %" PRIu32 ", "
                         "abs. page %" PRIu64 ")",
@@ -675,7 +681,7 @@ SummaryCache::loadAreaSummaries()
                                       *dev));
             r = dev->driver.readPage(
                     getPageNumber(combineAddress(index.asPositions[i], dataPagesPerArea), *dev),
-                    as,
+                    summary,
                     totalBytesPerPage);
             if (r != Result::ok && r != Result::biterrorCorrected)
             {
@@ -687,9 +693,9 @@ SummaryCache::loadAreaSummaries()
             }
             for (unsigned int t = 0; t < totalBytesPerPage; t++)
             {
-                if (as[t] != 0xFF)
+                if (summary[t] != 0xFF)
                 {
-                    summaryCache[i].setAsWritten();
+                    summaryCache[i].setAreaSummaryWritten();
                     break;
                 }
             }
@@ -749,7 +755,7 @@ SummaryCache::commitAreaSummaries(bool createNew)
             break;
         }
         if (!summaryCache[cacheElem.second].isDirty()
-            && summaryCache[cacheElem.second].isAsWritten())
+            && summaryCache[cacheElem.second].isAreaSummaryWritten())
             continue;
 
         someDirty |= summaryCache[cacheElem.second].isDirty()
@@ -787,7 +793,7 @@ SummaryCache::processEntry(JournalEntry& entry)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
         return;
     }
-    const journalEntry::SummaryCache* e = static_cast<const journalEntry::SummaryCache*>(&entry);
+    auto e = static_cast<const journalEntry::SummaryCache*>(&entry);
     switch (e->subtype)
     {
     case journalEntry::SummaryCache::Subtype::commit:
@@ -803,8 +809,7 @@ SummaryCache::processEntry(JournalEntry& entry)
     case journalEntry::SummaryCache::Subtype::setStatus:
     {
         // TODO activate some failsafe that checks for invalid writes during this setPages
-        const journalEntry::summaryCache::SetStatus* s =
-                static_cast<const journalEntry::summaryCache::SetStatus*>(&entry);
+        auto s = static_cast<const journalEntry::summaryCache::SetStatus*>(&entry);
         setPageStatus(s->area, s->page, s->status);
         break;
     }
@@ -830,8 +835,7 @@ SummaryCache::processUncheckpointedEntry(JournalEntry& entry)
     case journalEntry::SummaryCache::Subtype::setStatus:
     {
         // TODO activate some failsafe that checks for invalid writes during this setPages
-        const journalEntry::summaryCache::SetStatus* s =
-                static_cast<const journalEntry::summaryCache::SetStatus*>(&entry);
+        auto s = static_cast<const journalEntry::summaryCache::SetStatus*>(&entry);
         if (s->status == SummaryEntry::used)
         {
             setPageStatus(s->area, s->page, SummaryEntry::dirty);
@@ -853,7 +857,7 @@ SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent)
     if (nextEntry < 0)
     {
         r = freeNextBestSummaryCacheEntry(urgent);
-        if (!urgent && r == Result::nf)
+        if (!urgent && r == Result::notFound)
         {
             PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                         "Nonurgent Cacheclean did not return free space, activating read-only");
@@ -880,18 +884,20 @@ SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent)
     if (r == Result::ok || r == Result::biterrorCorrected)
     {
         packStatusArray(translation[area], buf);
-        summaryCache[nextEntry].setAsWritten();
+        summaryCache[nextEntry].setAreaSummaryWritten();
         summaryCache[nextEntry].setDirty(
                 r == Result::biterrorCorrected);  // Rewrites corrected Bit somewhen
         PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of %d to cache", area);
         summaryCache[translation[area]].setDirtyPages(countDirtyPages(translation[area]));
     }
-    else if (r == Result::nf)
+    else if (r == Result::notFound)
     {
         PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded new AreaSummary for %d", area);
     }
     else
+    {
         return r;
+    }
 
     PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Created cache entry for area %d", area);
     return Result::ok;
@@ -935,13 +941,15 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
         }
     }
     if (fav > -1)
+    {
         return Result::ok;
+    }
 
     // Look for the least probable Area to be used that has no committed AS
     uint32_t maxDirtyPages = 0;
     for (int i = 0; i < areaSummaryCacheSize; i++)
     {
-        if (summaryCache[i].isUsed() && !summaryCache[i].isAsWritten()
+        if (summaryCache[i].isUsed() && !summaryCache[i].isAreaSummaryWritten()
             && dev->areaMgmt.getStatus(summaryCache[i].getArea()) != AreaStatus::active)
         {
             PageOffs tmp = countUnusedPages(i);
@@ -958,7 +966,9 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
     }
 
     if (!urgent)
-        return Result::nf;
+    {
+        return Result::notFound;
+    }
 
     PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                 "freeNextBestCache found no uncommitted Area, activating Garbage collection");
@@ -977,7 +987,7 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
     maxDirtyPages = 0;
     for (int i = 0; i < areaSummaryCacheSize; i++)
     {
-        if (summaryCache[i].isUsed() && !summaryCache[i].isAsWritten()
+        if (summaryCache[i].isUsed() && !summaryCache[i].isAreaSummaryWritten()
             && dev->areaMgmt.getStatus(summaryCache[i].getArea()) != AreaStatus::active)
         {
             PageOffs tmp = countUnusedPages(i);
@@ -995,7 +1005,7 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
 
     PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Garbage collection could not relocate any Areas");
     // Ok, just swap Area-positions, clearing AS
-    r = commitASHard(fav);
+    r = commitAreaSummaryHard(fav);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not free any AS cache elem!");
@@ -1026,7 +1036,7 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
     {
         PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Garbage collection could not free any Areas");
         // Ok, just swap Area-positions, clearing AS
-        r = commitASHard(fav);
+        r = commitAreaSummaryHard(fav);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not free any AS cache elem!");
@@ -1040,7 +1050,7 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
     }
 
     PAFFS_DBG(PAFFS_TRACE_ERROR, "No area was found to clear!");
-    return Result::nf;
+    return Result::notFound;
 }
 
 uint32_t
@@ -1050,7 +1060,9 @@ SummaryCache::countDirtyPages(uint16_t position)
     for (uint32_t i = 0; i < dataPagesPerArea; i++)
     {
         if (summaryCache[position].getStatus(i) == SummaryEntry::dirty)
+        {
             dirty++;
+        }
     }
     return dirty;
 }
@@ -1062,7 +1074,9 @@ SummaryCache::countUsedPages(uint16_t position)
     for (uint32_t i = 0; i < dataPagesPerArea; i++)
     {
         if (summaryCache[position].getStatus(i) == SummaryEntry::used)
+        {
             used++;
+        }
     }
     return used;
 }
@@ -1095,15 +1109,15 @@ SummaryCache::commitAndEraseElem(uint16_t position)
 Result
 SummaryCache::writeAreasummary(uint16_t pos)
 {
-    if (summaryCache[pos].isAsWritten())
+    if (summaryCache[pos].isAreaSummaryWritten())
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to commit elem with existing AS Commit!");
         return Result::bug;
     }
     char buf[areaSummarySize];
     memset(buf, 0, areaSummarySize);
-    unsigned int needed_pages = 1 + areaSummarySize / dataBytesPerPage;
-    if (needed_pages != totalPagesPerArea - dataPagesPerArea)
+    unsigned int neededPages = 1 + areaSummarySize / dataBytesPerPage;
+    if (neededPages != totalPagesPerArea - dataPagesPerArea)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
         return Result::fail;
@@ -1118,18 +1132,18 @@ SummaryCache::writeAreasummary(uint16_t pos)
             buf[j / 8 + 1] |= 1 << j % 8;
     }
 
-    uint32_t pointer = 0;
-    uint64_t page_offs =
+    PageOffs pointer = 0;
+    PageAbs basePage =
             getPageNumber(combineAddress(summaryCache[pos].getArea(), dataPagesPerArea), *dev);
     Result r;
-    for (unsigned int page = 0; page < needed_pages; page++)
+    for (unsigned int page = 0; page < neededPages; page++)
     {
         unsigned int btw = pointer + dataBytesPerPage < areaSummarySize ? dataBytesPerPage
                                                                         : areaSummarySize - pointer;
         if (traceMask & PAFFS_TRACE_VERIFY_AS)
         {
             unsigned char readbuf[totalBytesPerPage];
-            r = dev->driver.readPage(page_offs + page, readbuf, totalBytesPerPage);
+            r = dev->driver.readPage(basePage + page, readbuf, totalBytesPerPage);
             for (unsigned int i = 0; i < totalBytesPerPage; i++)
             {
                 if (readbuf[i] != 0xFF)
@@ -1142,14 +1156,14 @@ SummaryCache::writeAreasummary(uint16_t pos)
                 }
             }
         }
-        r = dev->driver.writePage(page_offs + page, &buf[pointer], btw);
+        r = dev->driver.writePage(basePage + page, &buf[pointer], btw);
         if (r != Result::ok)
             return r;
 
         pointer += btw;
     }
     dev->journal.addEvent(journalEntry::summaryCache::Commit(summaryCache[pos].getArea()));
-    summaryCache[pos].setAsWritten();
+    summaryCache[pos].setAreaSummaryWritten();
     summaryCache[pos].setDirty(false);
     return Result::ok;
 }
@@ -1201,7 +1215,7 @@ SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bool comp
     {
         // Magic marker not here, so no AS present
         PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "And just found an unset AS.");
-        return Result::nf;
+        return Result::notFound;
     }
 
     for (unsigned int j = 0; j < dataPagesPerArea; j++)
@@ -1228,19 +1242,23 @@ SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bool comp
                         return r;
                     }
                 }
-                bool contains_data = false;
+                bool containsData = false;
                 for (unsigned int byte = 0; byte < totalBytesPerPage; byte++)
                 {
                     if (pagebuf[byte] != 0xFF)
                     {
-                        contains_data = true;
+                        containsData = true;
                         break;
                     }
                 }
-                if (contains_data)
+                if (containsData)
+                {
                     out_summary[j] = SummaryEntry::used;
+                }
                 else
+                {
                     out_summary[j] = SummaryEntry::free;
+                }
             }
             else
             {
@@ -1255,7 +1273,9 @@ SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bool comp
     }
 
     if (bitErrorWasCorrected)
+    {
         return Result::biterrorCorrected;
+    }
     return Result::ok;
 }
 

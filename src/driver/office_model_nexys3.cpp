@@ -61,7 +61,7 @@ OfficeModelNexys3Driver::writePage(uint64_t page_no,
 {
 	if(data_len == 0 || data_len > totalBytesPerPage){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid write size (%d)", data_len);
-		return Result::einval;
+		return Result::invalidInput;
 	}
 
 	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "Write %u bytes at page %" PRIu64, data_len, page_no);
@@ -89,7 +89,7 @@ OfficeModelNexys3Driver::readPage(uint64_t page_no,
 	PAFFS_DBG_S(PAFFS_TRACE_READ, "Read %u bytes at page %" PRIu64, data_len, page_no);
 	if(data_len == 0 || data_len > totalBytesPerPage){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid read size (%u)", data_len);
-		return Result::einval;
+		return Result::invalidInput;
 	}
 
 	nand->readPage(bank, device, page_no, buf);

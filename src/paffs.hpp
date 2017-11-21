@@ -25,8 +25,8 @@ extern unsigned int traceMask;
 
 class Paffs
 {
-    // TODO: Devices on bss rather than on heap
     Device* devices[maxNumberOfDevices] = {};
+    char deviceMemory[maxNumberOfDevices][sizeof(Device)];
     bool validDevices[maxNumberOfDevices] = {};
     void
     printCacheSizes();

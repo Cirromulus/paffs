@@ -25,7 +25,7 @@ union EntryIdentifier {
         Addr addr;
         uint16_t offs;
 
-        bool
+        inline bool
         operator<(const Flash& other)
         {
             if (addr == other.addr)
@@ -34,17 +34,17 @@ union EntryIdentifier {
             }
             return addr < other.addr;
         }
-        bool
+        inline bool
         operator==(const Flash& other)
         {
             return addr == other.addr && offs == other.offs;
         }
-        bool
+        inline bool
         operator!=(const Flash& other)
         {
             return !(*this == other);
         }
-        bool
+        inline bool
         operator>=(const Flash& other)
         {
             return !(*this < other);
@@ -54,35 +54,39 @@ union EntryIdentifier {
     {
         PageAbs offs;
     } mram;
+    inline
     EntryIdentifier(){};
+    inline
     EntryIdentifier(Addr _addr, uint16_t _offs)
     {
         flash.addr = _addr;
         flash.offs = _offs;
     }
+    inline
     EntryIdentifier(Flash _flash) : flash(_flash){};
+    inline
     EntryIdentifier(PageAbs _offs)
     {
         mram.offs = _offs;
         flash.offs = 0;
     }
 
-    bool
+    inline bool
     operator<(const EntryIdentifier& other)
     {
         return flash < other.flash;
     }
-    bool
+    inline bool
     operator==(const EntryIdentifier& other)
     {
         return flash == other.flash;
     }
-    bool
+    inline bool
     operator!=(const EntryIdentifier& other)
     {
         return !(*this == other);
     }
-    bool
+    inline bool
     operator>=(const EntryIdentifier& other)
     {
         return !(*this < other);
@@ -99,10 +103,14 @@ protected:
     getSizeFromJE(const JournalEntry& entry);
 
 public:
+    inline
     JournalPersistence(Device* _device) : device(_device){};
-    virtual ~JournalPersistence(){};
+    virtual
+    ~JournalPersistence(){};
 
-    // Rewind has to be called before scanning Elements
+    /**
+     * \warn Rewind has to be called before scanning or writing Elements
+     */
     virtual Result
     rewind() = 0;
 
@@ -127,19 +135,20 @@ class MramPersistence : public JournalPersistence
     PageAbs curr;
 
 public:
+    inline
     MramPersistence(Device* _device) : JournalPersistence(_device), curr(0){};
     Result
-    rewind();
+    rewind() override;
     Result
-    seek(EntryIdentifier& addr);
+    seek(EntryIdentifier& addr) override;
     EntryIdentifier
-    tell();
+    tell() override;
     Result
-    appendEntry(const JournalEntry& entry);
+    appendEntry(const JournalEntry& entry) override;
     Result
-    clear();
+    clear() override;
     Result
-    readNextElem(journalEntry::Max& entry);
+    readNextElem(journalEntry::Max& entry) override;
 };
 
 class FlashPersistence : public JournalPersistence
@@ -161,19 +170,20 @@ class FlashPersistence : public JournalPersistence
     EntryIdentifier::Flash curr;
 
 public:
+    inline
     FlashPersistence(Device* _device) : JournalPersistence(_device){};
     Result
-    rewind();
+    rewind() override;
     Result
-    seek(EntryIdentifier& addr);
+    seek(EntryIdentifier& addr) override;
     EntryIdentifier
-    tell();
+    tell() override;
     Result
-    appendEntry(const JournalEntry& entry);
+    appendEntry(const JournalEntry& entry) override;
     Result
-    clear();
+    clear() override;
     Result
-    readNextElem(journalEntry::Max& entry);
+    readNextElem(journalEntry::Max& entry) override;
 
 private:
     Result

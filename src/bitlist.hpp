@@ -18,68 +18,69 @@
 
 namespace paffs
 {
-template <size_t size>
+template <size_t numberOfBits>
 class BitList
 {
-    char list[size / 8 + 1];
+    char list[(numberOfBits + 7) / 8];
 
 public:
+    inline
     BitList()
     {
         clear();
     }
 
-    void
+    inline void
     clear()
     {
         memset(list, 0, sizeof(list));
     }
 
-    void
+    inline void
     setBit(unsigned n)
     {
-        if (n < size)
+        if (n < numberOfBits)
         {
             list[n / 8] |= 1 << n % 8;
         }
         else
         {
-            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Bit at %u, but size is %zu", n, size);
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Bit at %u, but size is %zu", n, numberOfBits);
         }
     }
 
-    void
+    inline void
     resetBit(unsigned n)
     {
-        if (n < size)
+        if (n < numberOfBits)
         {
             list[n / 8] &= ~(1 << n % 8);
         }
         else
         {
-            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to reset Bit at %u, but size is %zu", n, size);
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to reset Bit at %u, but size is %zu", n, numberOfBits);
         }
     }
 
-    bool
+    inline bool
     getBit(unsigned n)
     {
-        if (n < size)
+        if (n < numberOfBits)
         {
             return list[n / 8] & 1 << n % 8;
         }
-        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Bit at %u, but size is %zu", n, size);
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Bit at %u, but size is %zu", n, numberOfBits);
         return false;
     }
 
-    size_t
+    inline size_t
     findFirstFree()
     {
-        for (unsigned i = 0; i <= size / 8; i++)
+        for (unsigned i = 0; i <= numberOfBits / 8; i++)
         {
             if (list[i] != 0xFF)
             {
-                for (unsigned int j = i * 8; j < (i + 1) * 8 && j < size; j++)
+                for (unsigned int j = i * 8; j < (i + 1) * 8 && j < numberOfBits; j++)
                 {
                     if (!getBit(j))
                     {
@@ -88,13 +89,13 @@ public:
                 }
             }
         }
-        return size;
+        return numberOfBits;
     }
 
-    bool
+    inline bool
     isSetSomewhere()
     {
-        for (unsigned i = 0; i <= size / 8; i++)
+        for (unsigned i = 0; i <= numberOfBits / 8; i++)
         {
             if (list[i])
             {
@@ -104,20 +105,20 @@ public:
         return false;
     }
 
-    void
+    inline void
     printStatus()
     {
-        for (unsigned i = 0; i < size; i++)
+        for (unsigned i = 0; i < numberOfBits; i++)
         {
             printf("%s", getBit(i) ? "1" : "0");
         }
         printf("\n");
     }
 
-    bool
-    operator==(BitList<size>& rhs) const
+    inline bool
+    operator==(BitList<numberOfBits>& rhs) const
     {
-        for (unsigned i = 0; i <= size / 8; i++)
+        for (unsigned i = 0; i <= numberOfBits / 8; i++)
         {
             if (list[i] != rhs.list[i])
             {
@@ -127,8 +128,8 @@ public:
         return true;
     }
 
-    bool
-    operator!=(BitList<size>& rhs) const
+    inline bool
+    operator!=(BitList<numberOfBits>& rhs) const
     {
         return !(*this == rhs);
     }

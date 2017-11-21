@@ -99,7 +99,7 @@ SimuDriver::readPage(PageAbs page_no,
     if(data_len > totalBytesPerPage)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried reading more than a page width!");
-        return Result::einval;
+        return Result::invalidInput;
     }
 	//TODO: Simple write-trough buffer by checking if same address
 

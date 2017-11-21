@@ -35,13 +35,13 @@ public:
     writeInodeData(Inode& inode,
                    unsigned int offs,
                    unsigned int bytes,
-                   unsigned int* bytes_written,
+                   unsigned int* bytesWritten,
                    const char* data);
     Result
     readInodeData(Inode& inode,
                   unsigned int offs,
                   unsigned int bytes,
-                  unsigned int* bytes_read,
+                  unsigned int* bytesRead,
                   char* data);
     Result
     deleteInodeData(Inode& inode, unsigned int offs);

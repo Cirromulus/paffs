@@ -29,6 +29,7 @@ struct AddrListCacheElem
     uint16_t positionInParent;
     bool dirty : 1;
     bool active : 1;
+    inline
     AddrListCacheElem() : positionInParent(0), dirty(false), active(false){};
     void
     setAddr(PageNo pos, Addr addr);
@@ -41,12 +42,13 @@ class PageAddressCache
     AddrListCacheElem tripl[3];
     AddrListCacheElem doubl[2];  // name clash with double
     AddrListCacheElem singl;
-    Device& dev;
+    Device& device;
     Inode* inode;
     typedef std::function<void(Addr)> InformJournalFunc;
 
 public:
-    PageAddressCache(Device& mdev) : dev(mdev), inode(nullptr){};
+    inline
+    PageAddressCache(Device& mdev) : device(mdev), inode(nullptr){};
     Result
     setTargetInode(Inode& node);
     Result

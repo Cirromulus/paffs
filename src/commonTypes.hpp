@@ -32,11 +32,12 @@ static const uint8_t version = 1;
 enum class Result : uint8_t
 {
     ok = 0,
-    fail,
-    nf,
+    biterrorCorrected,
+    biterrorNotCorrected,
+    notFound,
     exists,
     toobig,
-    einval,
+    invalidInput,
     nimpl,
     bug,
     noparent,
@@ -49,8 +50,7 @@ enum class Result : uint8_t
     alrMounted,
     objNameTooLong,
     readonly,
-    biterrorCorrected,
-    biterrorNotCorrected,
+    fail,
     num_result
 };
 

@@ -38,7 +38,9 @@ extern unsigned int traceMask;
                     __LINE__,                                \
                     __FILENAME__);                           \
             if ((mask)&PAFFS_TRACE_BUG)                      \
+            {                                                \
                 raise(SIGINT);                               \
+            }                                                \
         }                                                    \
     } while (0)
 

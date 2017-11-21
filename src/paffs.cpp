@@ -54,27 +54,29 @@ unsigned int traceMask =
         // PAFFS_TRACE_GC_DETAIL |
         0;
 
-const char* resultMsg[] = {"ok",
-                           "Unknown error",
-                           "Object not found",
-                           "Object already exists",
-                           "Object too big",
-                           "Input values malformed",
-                           "Operation not yet supported",
-                           "An internal Error occured",
-                           "Node is already root, no Parent",
-                           "No (usable) space left on device",
-                           "Not enough RAM for cache",
-                           "Operation not permitted",
-                           "Directory is not empty",
-                           "Flash needs retirement",
-                           "Device is not mounted",
-                           "Device is already mounted",
-                           "Object name is too big",
-                           "Tried writing on readOnly Device",
-                           "Biterror could be corrected by ECC",
-                           "Biterror could not be corrected by ECC",
-                           "You should not be seeing this..."};
+const char* resultMsg[] = {
+    "ok",
+    "Biterror could be corrected by ECC",
+    "Biterror could not be corrected by ECC",
+    "Object not found",
+    "Object already exists",
+    "Object too big",
+    "Input values malformed",
+    "Operation not yet supported",
+    "An internal Error occured",
+    "Node is already root, no Parent",
+    "No (usable) space left on device",
+    "Not enough RAM for cache",
+    "Operation not permitted",
+    "Directory is not empty",
+    "Flash needs retirement",
+    "Device is not mounted",
+    "Device is already mounted",
+    "Object name is too big",
+    "Tried writing on readOnly Device",
+    "Unknown error",
+    "You should not be seeing this..."
+};
 
 const char*
 err_msg(Result pr)
@@ -148,8 +150,8 @@ Paffs::Paffs(std::vector<Driver*>& deviceDrivers)
     memset(validDevices, false, maxNumberOfDevices * sizeof(bool));
     memset(devices, 0, maxNumberOfDevices * sizeof(void*));
     int i = 0;
-    for (std::vector<Driver*>::iterator it = deviceDrivers.begin(); it != deviceDrivers.end();
-         it++, i++)
+    for (auto it = deviceDrivers.begin(); it != deviceDrivers.end();
+         ++it, i++)
     {
         if (i >= maxNumberOfDevices)
         {
@@ -159,7 +161,7 @@ Paffs::Paffs(std::vector<Driver*>& deviceDrivers)
             break;
         }
         validDevices[i] = true;
-        devices[i] = new Device(**it);
+        devices[i] = new (deviceMemory[i]) Device(**it);
     }
     printCacheSizes();
 }
@@ -170,7 +172,7 @@ Paffs::~Paffs()
         if (devices[i] != nullptr)
         {
             Driver* drv = &devices[i]->driver;
-            delete devices[i];
+            devices[i]->~Device();
             delete drv;
         }
     }
@@ -229,70 +231,78 @@ Paffs::format(const BadBlockList badBlockList[maxNumberOfDevices], bool complete
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------\n");
 
-    Result r = Result::ok;
+    Result globalReturn = Result::ok;
     for (uint8_t i = 0; i < maxNumberOfDevices; i++)
     {
         if (validDevices[i])
         {
-            Result r_ = devices[i]->format(badBlockList[i], complete);
-            if (r != Result::ok)
-                r = r_;
+            Result deviceReturn = devices[i]->format(badBlockList[i], complete);
+            if (deviceReturn > globalReturn)
+            {   //Results are (somewhat) ordered by badness
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not format device %d!", i);
+                globalReturn = deviceReturn;
+            }
         }
     }
-    return r;
+    return globalReturn;
 }
 
 Result
 Paffs::mount(bool readOnly)
 {
     // TODO: Handle errors
-    Result r = Result::ok;
+    Result globalReturn = Result::ok;
     for (uint8_t i = 0; i < maxNumberOfDevices; i++)
     {
         if (validDevices[i])
         {
-            Result r_ = devices[i]->mnt(readOnly);
-            if (r == Result::ok)
-                r = r_;
+            Result deviceReturn = devices[i]->mnt(readOnly);
+            if (deviceReturn > globalReturn)
+            {   //Results are (somewhat) ordered by badness
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mount device %d!", i);
+                globalReturn = deviceReturn;
+            }
         }
     }
-    return r;
+    return globalReturn;
 }
 Result
 Paffs::unmount()
 {
     // TODO: Handle errors
-    Result r = Result::ok;
+    Result globalReturn = Result::ok;
     for (uint8_t i = 0; i < maxNumberOfDevices; i++)
     {
         if (validDevices[i])
         {
-            Result r_ = devices[i]->unmnt();
-            if (r != Result::ok)
-            {
+            Result deviceReturn = devices[i]->unmnt();
+            if (deviceReturn > globalReturn)
+            {   //Results are (somewhat) ordered by badness
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not unmount device %d!", i);
-                r = r_;
+                globalReturn = deviceReturn;
             }
         }
     }
-    return r;
+    return globalReturn;
 }
 
 Result
 Paffs::mkDir(const char* fullPath, Permission mask)
 {
     // TODO: Handle errors
-    Result r = Result::ok;
+    Result globalReturn = Result::ok;
     for (uint8_t i = 0; i < maxNumberOfDevices; i++)
     {
         if (validDevices[i])
         {
-            Result r_ = devices[i]->mkDir(fullPath, mask);
-            if (r == Result::ok)
-                r = r_;
+            Result deviceReturn = devices[i]->mkDir(fullPath, mask);
+            if (deviceReturn > globalReturn)
+            {   //Results are (somewhat) ordered by badness
+                globalReturn = deviceReturn;
+            }
         }
     }
-    return r;
+    return globalReturn;
 }
 
 Dir*

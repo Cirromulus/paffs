@@ -215,7 +215,7 @@ TEST_F(FileTest, permissions)
 
     fil = fs.open("/file", paffs::FR);
     EXPECT_EQ(fil, nullptr);
-    EXPECT_EQ(fs.getLastErr(), paffs::Result::nf);
+    EXPECT_EQ(fs.getLastErr(), paffs::Result::notFound);
     fs.resetLastErr();
 
     fil = fs.open("/file", paffs::FR | paffs::FC);
@@ -362,7 +362,7 @@ TEST_F(FileTest, maxFilesize)
     }
 
     r = fs.remove("/file");
-    ASSERT_EQ(r, paffs::Result::einval);
+    ASSERT_EQ(r, paffs::Result::invalidInput);
     r = fs.close(*fil);
     ASSERT_EQ(r, paffs::Result::ok);
     r = fs.remove("/file");
