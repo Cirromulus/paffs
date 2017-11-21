@@ -56,15 +56,15 @@ public:
 	Result
 	deInitializeNand() override;
 	Result
-	writePage(uint64_t page_no, void* data, unsigned int data_len) override;
+	writePage(PageAbs page_no, void* data, unsigned int data_len) override;
 	Result
-	readPage(uint64_t page_no, void* data, unsigned int data_len) override;
+	readPage(PageAbs page_no, void* data, unsigned int data_len) override;
 	Result
-	eraseBlock(uint32_t block_no) override;
+	eraseBlock(BlockAbs block_no) override;
 	Result
-	markBad(uint32_t block_no) override;
+	markBad(BlockAbs block_no) override;
 	Result
-	checkBad(uint32_t block_no) override;
+	checkBad(BlockAbs block_no) override;
 private:
 	bool initSpaceWire();
 };
