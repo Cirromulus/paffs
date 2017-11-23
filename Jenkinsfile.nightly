@@ -18,7 +18,6 @@ pipeline {
     triggers {
         pollSCM('H 0 * * *')
     }
-
     stages {
         stage('checkout') {
             steps {
@@ -32,16 +31,12 @@ pipeline {
                 }
                 dir('satfon-simulation') {
                     git credentialsId: 'jenkins-ssh-gitlab',
-                        url: 'ssh://git@hbryavsci1l.hb.dlr.de:8929/avionics-software-open/satfon-simulation.git'
+                        url: 'ssh://git@hbryavsci1l.hb.dlr.de:10022/avionics-software-open/satfon-simulation.git'
                 }
                 dir('outpost-core') {
                     git credentialsId: 'jenkins-ssh-gitlab',
-                        url: 'ssh://git@hbryavsci1l.hb.dlr.de:8929/avionics-software-open/outpost-core.git'
+                        url: 'ssh://git@hbryavsci1l.hb.dlr.de:10022/avionics-software-open/outpost-core.git'
                 }
-                stash includes: 'paffs/**', name: 'paffs'
-                stash includes: 'scons-build-tools/**', name: 'scons-build-tools'
-                stash includes: 'satfon-simulation/**', name: 'satfon-simulation'
-                stash includes: 'outpost-core/**', name: 'outpost-core'
             }
         }
         stage("build-integration") {
@@ -53,8 +48,8 @@ pipeline {
         }
         stage("collect-testresults") {
             steps {
-            dir('paffs') {
-            step([$class: 'XUnitPublisher',
+                dir('paffs') {
+                    step([$class: 'XUnitPublisher',
                         testTimeMargin: '3000',
                         thresholdMode: 1,
                         thresholds: [
