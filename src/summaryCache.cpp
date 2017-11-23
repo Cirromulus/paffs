@@ -1114,13 +1114,13 @@ SummaryCache::writeAreasummary(uint16_t pos)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to commit elem with existing AS Commit!");
         return Result::bug;
     }
-    char buf[areaSummarySize];
-    memset(buf, 0, areaSummarySize);
-    unsigned int neededPages = 1 + areaSummarySize / dataBytesPerPage;
-    if (neededPages != totalPagesPerArea - dataPagesPerArea)
+    BitList<dataPagesPerArea> summary;
+    if(summary.getByteUsage() != static_cast<unsigned>(areaSummarySize - 1))
     {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "AreaSummary size differs with formatting infos!");
-        return Result::fail;
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Calculated Bytes for areaSummary differ!"
+                "(BitList: %zu, autocalc: %" PRIu32 ")",
+                summary.getByteUsage(), areaSummarySize - 1);
+        return Result::bug;
     }
     // TODO: Check if areaOOB is clean, and maybe Verify written data
     PAFFS_DBG_S(
@@ -1129,24 +1129,27 @@ SummaryCache::writeAreasummary(uint16_t pos)
     for (unsigned int j = 0; j < dataPagesPerArea; j++)
     {
         if (summaryCache[pos].getStatus(j) != SummaryEntry::dirty)
-            buf[j / 8 + 1] |= 1 << j % 8;
+        {
+            summary.setBit(j);
+        }
     }
 
-    PageOffs pointer = 0;
+    uint16_t bytesWritten = 0;
+    uint16_t summaryPos = 0;
     PageAbs basePage =
             getPageNumber(combineAddress(summaryCache[pos].getArea(), dataPagesPerArea), *dev);
     Result r;
-    for (unsigned int page = 0; page < neededPages; page++)
+    for (PageOffs page = 0; page < oobPagesPerArea; page++)
     {
-        unsigned int btw = pointer + dataBytesPerPage < areaSummarySize ? dataBytesPerPage
-                                                                        : areaSummarySize - pointer;
+        unsigned int btw = (areaSummarySize - bytesWritten) > dataBytesPerPage ? dataBytesPerPage
+                                                            : areaSummarySize - bytesWritten;
         if (traceMask & PAFFS_TRACE_VERIFY_AS)
         {
-            unsigned char readbuf[totalBytesPerPage];
+            char* readbuf = dev->driver.getPageBuffer();
             r = dev->driver.readPage(basePage + page, readbuf, totalBytesPerPage);
             for (unsigned int i = 0; i < totalBytesPerPage; i++)
             {
-                if (readbuf[i] != 0xFF)
+                if (static_cast<uint8_t>(readbuf[i]) != 0xFF)
                 {
                     PAFFS_DBG(PAFFS_TRACE_BUG,
                               "Tried to write AreaSummary over an existing one at "
@@ -1156,11 +1159,24 @@ SummaryCache::writeAreasummary(uint16_t pos)
                 }
             }
         }
-        r = dev->driver.writePage(basePage + page, &buf[pointer], btw);
-        if (r != Result::ok)
-            return r;
+        char* writebuf = dev->driver.getPageBuffer();
+        if(page == 0)
+        {
+            writebuf[bytesWritten++] = 0;
+            memcpy(&writebuf[bytesWritten], &summary.expose()[summaryPos], btw - 1);
+            summaryPos += btw - 1;
+        }else
+        {
+            memcpy(&writebuf[bytesWritten], &summary.expose()[summaryPos], btw);
+            summaryPos += btw;
+        }
+        bytesWritten += btw;
 
-        pointer += btw;
+        r = dev->driver.writePage(basePage + page, writebuf, btw);
+        if (r != Result::ok)
+        {
+            return r;
+        }
     }
     dev->journal.addEvent(journalEntry::summaryCache::Commit(summaryCache[pos].getArea()));
     summaryCache[pos].setAreaSummaryWritten();
@@ -1171,27 +1187,18 @@ SummaryCache::writeAreasummary(uint16_t pos)
 Result
 SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bool complete)
 {
-    unsigned char buf[areaSummarySize];
-    memset(buf, 0, areaSummarySize);
-    unsigned int needed_pages = 1 + areaSummarySize / dataBytesPerPage;
-    if (needed_pages != totalPagesPerArea - dataPagesPerArea)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "AreaSummary size differs with formatting infos!\n"
-                  "needed pages: %u, total-dataPagesPerArea: %u",
-                  needed_pages,
-                  totalPagesPerArea - dataPagesPerArea);
-        return Result::fail;
-    }
+    BitList<dataPagesPerArea> summary;
     bool bitErrorWasCorrected = false;
-    uint32_t pointer = 0;
-    uint64_t page_offs = getPageNumber(combineAddress(area, dataPagesPerArea), *dev);
+    uint16_t bytesRead = 0;
+    uint16_t summaryPos = 0;
+    PageAbs basePage = getPageNumber(combineAddress(area, dataPagesPerArea), *dev);
     Result r;
-    for (unsigned int page = 0; page < needed_pages; page++)
+    for (unsigned int page = 0; page < oobPagesPerArea; page++)
     {
-        unsigned int btr = pointer + dataBytesPerPage < areaSummarySize ? dataBytesPerPage
-                                                                        : areaSummarySize - pointer;
-        r = dev->driver.readPage(page_offs + page, &buf[pointer], btr);
+        unsigned int btr = (areaSummarySize - bytesRead) > dataBytesPerPage ? dataBytesPerPage
+                                                         : areaSummarySize - bytesRead;
+        char* readbuf = dev->driver.getPageBuffer();
+        r = dev->driver.readPage(basePage + page, readbuf, btr);
         if (r != Result::ok)
         {
             if (r == Result::biterrorCorrected)
@@ -1205,22 +1212,32 @@ SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bool comp
                 return r;
             }
         }
-
-        pointer += btr;
+        if(page == 0)
+        {
+            if (readbuf[bytesRead++] != 0)
+            {
+                // Magic marker not here, so no AS present
+                PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "And just found an unset AS.");
+                return Result::notFound;
+            }
+            memcpy(&summary.expose()[summaryPos], &readbuf[bytesRead], btr - 1);
+            summaryPos += btr - 1;
+        }else
+        {
+            memcpy(&summary.expose()[summaryPos], &readbuf[bytesRead], btr);
+            summaryPos += btr;
+        }
+        bytesRead += btr;
     }
     // buffer ready
     // PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "AreaSummary Buffer was filled with %u Bytes.", pointer);
 
-    if (buf[0] == 0xFF)
-    {
-        // Magic marker not here, so no AS present
-        PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "And just found an unset AS.");
-        return Result::notFound;
-    }
+
 
     for (unsigned int j = 0; j < dataPagesPerArea; j++)
     {
-        if (buf[j / 8 + 1] & 1 << j % 8)
+        //Extract every Bit of this bitlist
+        if (summary.getBit(j))
         {
             if (complete)
             {

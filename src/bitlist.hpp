@@ -105,6 +105,18 @@ public:
         return false;
     }
 
+    static inline size_t
+    getByteUsage()
+    {
+        return (numberOfBits + 7) / 8;
+    }
+
+    inline char*
+    expose()
+    {
+        return list;
+    }
+
     inline void
     printStatus()
     {

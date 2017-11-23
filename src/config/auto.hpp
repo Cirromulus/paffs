@@ -32,12 +32,13 @@ static_assert(maxNumberOfFiles >= 1, "At least one file may be open simultaneous
 static constexpr uint16_t totalBytesPerPage = dataBytesPerPage + oobBytesPerPage;
 static constexpr uint16_t areasNo = blocksTotal / blocksPerArea;
 static constexpr uint16_t totalPagesPerArea = blocksPerArea * pagesPerBlock;
-//minimum one byte with one bit per page in an area divided by page width
-static constexpr uint16_t oobPagesPerArea = ceil(((blocksPerArea * pagesPerBlock) / 8. / dataBytesPerPage));
-		;
+//An Area Summary consists of one 'zero byte' and following one bit per data page
+//Calculate the maximum number of pages needed to fit an area summary
+static constexpr uint16_t oobPagesPerArea = ceil((totalPagesPerArea / 8.) / dataBytesPerPage);
 static constexpr uint16_t dataPagesPerArea = totalPagesPerArea - oobPagesPerArea;
-//minimum one byte with one bit per page, and another byte for meta
-static constexpr uint16_t areaSummarySize = 1 + dataPagesPerArea / 8 + 1;
+//The actual summary size is calculated with _data_PagesPerArea
+static constexpr uint16_t areaSummarySize = 1 + ceil(dataPagesPerArea / 8.);
+
 static constexpr uint16_t superChainElems = jumpPadNo + 2;
 
 static constexpr uint16_t addrsPerPage = dataBytesPerPage / sizeof(Addr);

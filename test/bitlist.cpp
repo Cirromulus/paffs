@@ -49,4 +49,12 @@ TEST(Bitlist, SetAndGetBits)
     {
         ASSERT_EQ(bitlist.getBit(i), i % 2 != 0);
     }
+
+    paffs::BitList<length> bitlist2;
+    memcpy(bitlist2.expose(), bitlist.expose(), bitlist.getByteUsage());
+
+    for (unsigned i = 0; i < length; i++)
+    {
+        ASSERT_EQ(bitlist.getBit(i), i % 2 != 0);
+    }
 }
