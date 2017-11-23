@@ -358,15 +358,15 @@ Paffs::getObjInfo(const char* fullPath, ObjInfo& nfo)
 }
 
 Result
-Paffs::read(Obj& obj, char* buf, unsigned int bytes_to_read, unsigned int* bytes_read)
+Paffs::read(Obj& obj, char* buf, unsigned int bytesToRead, unsigned int* bytesRead)
 {
-    return devices[0]->read(obj, buf, bytes_to_read, bytes_read);
+    return devices[0]->read(obj, buf, bytesToRead, bytesRead);
 }
 
 Result
-Paffs::write(Obj& obj, const char* buf, unsigned int bytes_to_write, unsigned int* bytes_written)
+Paffs::write(Obj& obj, const char* buf, unsigned int bytesToWrite, unsigned int* bytesWritten)
 {
-    return devices[0]->write(obj, buf, bytes_to_write, bytes_written);
+    return devices[0]->write(obj, buf, bytesToWrite, bytesWritten);
 }
 
 Result
