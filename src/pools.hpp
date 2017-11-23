@@ -18,7 +18,7 @@
 #include <map>
 namespace paffs
 {
-template <size_t size, typename T>
+template <typename T, size_t size>
 struct ObjectPool
 {
     BitList<size> activeObjects;
@@ -110,7 +110,7 @@ struct InodePoolBase
 template <size_t size>
 struct InodePool : InodePoolBase
 {
-    ObjectPool<size, Inode> pool;
+    ObjectPool<Inode, size> pool;
     InodeMap map;
 
     inline

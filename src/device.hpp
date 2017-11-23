@@ -34,7 +34,7 @@ extern outpost::rtos::SystemClock systemClock;
 class Device
 {
     InodePool<maxNumberOfInodes> inodePool;
-    ObjectPool<maxNumberOfFiles, Obj> filesPool;
+    ObjectPool<Obj, maxNumberOfFiles> filesPool;
     bool useJournal = false;
 public:
     Driver& driver;

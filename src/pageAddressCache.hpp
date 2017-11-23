@@ -39,6 +39,7 @@ struct AddrListCacheElem
 
 class PageAddressCache
 {
+    //The three caches for each indirection layer
     AddrListCacheElem tripl[3];
     AddrListCacheElem doubl[2];  // name clash with double
     AddrListCacheElem singl;
