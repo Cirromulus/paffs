@@ -27,30 +27,30 @@ extern unsigned int traceMask;
 
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
-#define PAFFS_DBG(mask, msg, ...)                            \
-    do                                                       \
-    {                                                        \
-        if ((mask)&traceMask || (mask)&PAFFS_TRACE_ALWAYS)   \
-        {                                                    \
-            fprintf(stderr,                                  \
-                    "paffs: " msg "\n\t-line %d, file %s\n", \
-                    ##__VA_ARGS__,                           \
-                    __LINE__,                                \
-                    __FILENAME__);                           \
-            if ((mask)&PAFFS_TRACE_BUG)                      \
-            {                                                \
-                raise(SIGINT);                               \
-            }                                                \
-        }                                                    \
+#define PAFFS_DBG(mask, msg, ...)                                  \
+    do                                                             \
+    {                                                              \
+        if (((mask) & traceMask) || ((mask) & PAFFS_TRACE_ALWAYS)) \
+        {                                                          \
+            fprintf(stderr,                                        \
+                    "paffs: " msg "\n\t-line %d, file %s\n",       \
+                    ##__VA_ARGS__,                                 \
+                    __LINE__,                                      \
+                    __FILENAME__);                                 \
+            if ((mask)&PAFFS_TRACE_BUG)                            \
+            {                                                      \
+                raise(SIGINT);                                     \
+            }                                                      \
+        }                                                          \
     } while (0)
 
-#define PAFFS_DBG_S(mask, msg, ...)                             \
-    do                                                          \
-    {                                                           \
-        if ((mask)&traceMask || (mask)&PAFFS_TRACE_ALWAYS)      \
-        {                                                       \
-            fprintf(stderr, "paffs: " msg "\n", ##__VA_ARGS__); \
-        }                                                       \
+#define PAFFS_DBG_S(mask, msg, ...)                                \
+    do                                                             \
+    {                                                              \
+        if (((mask) & traceMask) || ((mask) & PAFFS_TRACE_ALWAYS)) \
+        {                                                          \
+            fprintf(stderr, "paffs: " msg "\n", ##__VA_ARGS__);    \
+        }                                                          \
     } while (0)
 
 // clang-format off
