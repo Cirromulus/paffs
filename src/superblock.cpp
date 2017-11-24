@@ -17,6 +17,7 @@
 #include "dataIO.hpp"
 #include "device.hpp"
 #include "driver/driver.hpp"
+#include "bitlist.hpp"
 #include <stdlib.h>
 
 namespace paffs
@@ -63,7 +64,7 @@ SuperIndex::deserializeFromBuffer(Device* dev, const char* buf)
         // Unpack AreaSummary
         for (unsigned int j = 0; j < dataPagesPerArea; j++)
         {
-            if (buf[pointer + j / 8] & 1 << j % 8)
+            if (BitList<dataPagesPerArea>::getBit(j, &buf[pointer]))
             {
                 // TODO: Normally, we would check in the OOB for a Checksum or so, which is present
                 // all the time
@@ -104,7 +105,7 @@ SuperIndex::deserializeFromBuffer(Device* dev, const char* buf)
                 areaSummary[i][j] = SummaryEntry::dirty;
             }
         }
-        pointer += dataPagesPerArea / 8 + 1;
+        pointer += BitList<dataPagesPerArea>::getByteUsage();
     }
 
     if (pointer != getNeededBytes(asCount))
@@ -155,10 +156,12 @@ SuperIndex::serializeToBuffer(char* buf)
             continue;
         for (unsigned int j = 0; j < dataPagesPerArea; j++)
         {
-            if (areaSummary[i][j] != SummaryEntry::dirty)
-                buf[pointer + j / 8] |= 1 << j % 8;
+            if(areaSummary[i][j] != SummaryEntry::dirty)
+            {
+                BitList<dataPagesPerArea>::setBit(j, &buf[pointer]);
+            }
         }
-        pointer += dataPagesPerArea / 8 + 1;
+        pointer += BitList<dataPagesPerArea>::getByteUsage();
     }
 
     PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "%u bytes have been written to Buffer", pointer);
@@ -1255,25 +1258,25 @@ Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap)
     // when dynamic ASses are allowed.
 
     // note: Serial number is inserted on the first bytes for every page later on.
-    unsigned int needed_bytes = SuperIndex::getNeededBytes(2);
-    unsigned int needed_pages = needed_bytes / (dataBytesPerPage - sizeof(SerialNo)) + 1;
+    unsigned int neededBytes = SuperIndex::getNeededBytes(2);
+    unsigned int neededPages = neededBytes / (dataBytesPerPage - sizeof(SerialNo)) + 1;
     PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
                 "Maximum Pages needed to read SuperIndex: %d (%d bytes, 2 AS'es)",
-                needed_pages,
-                needed_bytes);
+                neededPages,
+                neededBytes);
 
-    char buf[needed_bytes];
-    memset(buf, 0, needed_bytes);
+    char buf[neededBytes];
+    memset(buf, 0, neededBytes);
     uint32_t pointer = 0;
     PageAbs pageBase = getPageNumberFromDirect(addr);
     entry->no = emptySerial;
-    unsigned char pagebuf[dataBytesPerPage];
+    char* pagebuf = device->driver.getPageBuffer();
     SerialNo localSerialTmp;
-    for (unsigned int page = 0; page < needed_pages; page++)
+    for (unsigned int page = 0; page < neededPages; page++)
     {
-        unsigned int btr = pointer + dataBytesPerPage - sizeof(SerialNo) < needed_bytes
+        unsigned int btr = pointer + dataBytesPerPage - sizeof(SerialNo) < neededBytes
                                    ? dataBytesPerPage - sizeof(SerialNo)
-                                   : needed_bytes - pointer;
+                                   : neededBytes - pointer;
         r = device->driver.readPage(pageBase + page, pagebuf, btr + sizeof(SerialNo));
         if (r != Result::ok)
         {

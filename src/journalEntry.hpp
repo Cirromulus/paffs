@@ -25,11 +25,9 @@ toUnderlying(E e) noexcept
     return static_cast<typename std::underlying_type<E>::type>(e);
 }
 
-//TODO: Define enum classes to smaller underlying types
-
 struct JournalEntry
 {
-    enum class Topic
+    enum class Topic : uint8_t
     {
         invalid = 0,
         checkpoint,
@@ -66,7 +64,7 @@ namespace journalEntry
 
     struct Superblock : public JournalEntry
     {
-        enum class Type
+        enum class Type : uint8_t
         {
             rootnode,
             areaMap,
@@ -91,7 +89,7 @@ namespace journalEntry
 
         struct AreaMap : public Superblock
         {
-            enum class Operation
+            enum class Operation : uint8_t
             {
                 type,
                 status,
@@ -174,7 +172,7 @@ namespace journalEntry
 
     struct BTree : public JournalEntry
     {
-        enum class Operation
+        enum class Operation : uint8_t
         {
             insert,
             update,
@@ -217,7 +215,7 @@ namespace journalEntry
 
     struct SummaryCache : public JournalEntry
     {
-        enum class Subtype
+        enum class Subtype : uint8_t
         {
             commit,
             remove,
@@ -264,7 +262,7 @@ namespace journalEntry
 
     struct Inode : public JournalEntry
     {
-    enum class Operation
+    enum class Operation : uint8_t
     {
         add,
         write,

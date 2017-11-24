@@ -18,10 +18,10 @@
 
 namespace paffs
 {
-template <size_t numberOfBits>
+template <size_t numberOfElements>
 class BitList
 {
-    char list[(numberOfBits + 7) / 8];
+    char mList[(numberOfElements + 7) / 8];
 
 public:
     inline
@@ -33,69 +33,93 @@ public:
     inline void
     clear()
     {
-        memset(list, 0, sizeof(list));
+        memset(mList, 0, sizeof(mList));
     }
 
-    inline void
-    setBit(unsigned n)
+    static inline void
+    setBit(unsigned n, char* list)
     {
-        if (n < numberOfBits)
+        if (n < numberOfElements)
         {
             list[n / 8] |= 1 << n % 8;
         }
         else
         {
-            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Bit at %u, but size is %zu", n, numberOfBits);
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Bit at %u, but size is %zu", n, numberOfElements);
+        }
+    }
+
+    inline void
+    setBit(unsigned n)
+    {
+        setBit(n, mList);
+    }
+
+    static inline void
+    resetBit(unsigned n, char* list)
+    {
+        if (n < numberOfElements)
+        {
+            list[n / 8] &= ~(1 << n % 8);
+        }
+        else
+        {
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to reset Bit at %u, but size is %zu", n, numberOfElements);
         }
     }
 
     inline void
     resetBit(unsigned n)
     {
-        if (n < numberOfBits)
+        resetBit(n, mList);
+    }
+
+    static inline bool
+    getBit(unsigned n, const char* list)
+    {
+        if (n < numberOfElements)
         {
-            list[n / 8] &= ~(1 << n % 8);
+            return list[n / 8] & 1 << n % 8;
         }
-        else
-        {
-            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to reset Bit at %u, but size is %zu", n, numberOfBits);
-        }
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Bit at %u, but size is %zu", n, numberOfElements);
+        return false;
     }
 
     inline bool
     getBit(unsigned n)
     {
-        if (n < numberOfBits)
-        {
-            return list[n / 8] & 1 << n % 8;
-        }
-        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Bit at %u, but size is %zu", n, numberOfBits);
-        return false;
+        return getBit(n, mList);
     }
 
-    inline size_t
-    findFirstFree()
+    static inline size_t
+    findFirstFree(const char* list)
     {
-        for (unsigned i = 0; i <= numberOfBits / 8; i++)
+        for (unsigned i = 0; i <= numberOfElements / 8; i++)
         {
             if (list[i] != 0xFF)
             {
-                for (unsigned int j = i * 8; j < (i + 1) * 8 && j < numberOfBits; j++)
+                for (unsigned int j = i * 8; j < (i + 1) * 8 && j < numberOfElements; j++)
                 {
-                    if (!getBit(j))
+                    if (!getBit(j, list))
                     {
                         return j;
                     }
                 }
             }
         }
-        return numberOfBits;
+        return numberOfElements;
     }
 
-    inline bool
-    isSetSomewhere()
+    inline size_t
+    findFirstFree()
     {
-        for (unsigned i = 0; i <= numberOfBits / 8; i++)
+        return findFirstFree(mList);
+    }
+
+    static inline bool
+    isSetSomewhere(const char* list)
+    {
+        for (unsigned i = 0; i <= numberOfElements / 8; i++)
         {
             if (list[i])
             {
@@ -105,22 +129,28 @@ public:
         return false;
     }
 
+    inline bool
+    isSetSomewhere()
+    {
+        return isSetSomewhere(mList);
+    }
+
     static inline size_t
     getByteUsage()
     {
-        return (numberOfBits + 7) / 8;
+        return (numberOfElements + 7) / 8;
     }
 
     inline char*
     expose()
     {
-        return list;
+        return mList;
     }
 
     inline void
     printStatus()
     {
-        for (unsigned i = 0; i < numberOfBits; i++)
+        for (unsigned i = 0; i < numberOfElements; i++)
         {
             printf("%s", getBit(i) ? "1" : "0");
         }
@@ -128,11 +158,11 @@ public:
     }
 
     inline bool
-    operator==(BitList<numberOfBits>& rhs) const
+    operator==(BitList<numberOfElements>& rhs) const
     {
-        for (unsigned i = 0; i <= numberOfBits / 8; i++)
+        for (unsigned i = 0; i <= numberOfElements / 8; i++)
         {
-            if (list[i] != rhs.list[i])
+            if (mList[i] != rhs.mList[i])
             {
                 return false;
             }
@@ -141,9 +171,41 @@ public:
     }
 
     inline bool
-    operator!=(BitList<numberOfBits>& rhs) const
+    operator!=(BitList<numberOfElements>& rhs) const
     {
         return !(*this == rhs);
+    }
+};
+
+template <size_t numberOfElements>
+class TwoBitList
+{
+    char mList[(numberOfElements + 3) / 4];
+public:
+    inline
+    TwoBitList()
+    {
+        clear();
+    }
+
+    inline void
+    clear()
+    {
+        memset(mList, 0, sizeof(mList));
+    }
+    inline void
+    setValue(size_t pos, uint8_t value)
+    {
+        //First mask bitfield byte leaving active bytes to zero, then insert value
+        mList[pos / 4] = (mList[pos / 4] & ~(0b11 << (pos % 4) * 2))
+              | (static_cast<uint8_t>(value) << (pos % 4) * 2);
+    }
+    inline uint8_t
+    getValue(size_t pos)
+    {
+        //Mask bitfield byte leaving inactive bytes to zero, then right shift to bottom
+        return (mList[pos / 4] & (0b11 << (pos % 4) * 2))
+            >> (pos % 4) * 2;
     }
 };
 };

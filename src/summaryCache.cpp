@@ -14,7 +14,6 @@
 
 #include "summaryCache.hpp"
 #include "area.hpp"
-#include "bitlist.hpp"
 #include "device.hpp"
 #include "driver/driver.hpp"
 #include "superblock.hpp"
@@ -37,7 +36,7 @@ AreaSummaryElem::clear()
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to clear a dirty cache elem!");
     }
-    memset(mEntry, 0, size(mEntry)+ 1);
+    mEntries.clear();
     mStatusBits = 0;
     mDirtyPages = 0;
     mArea = 0;
@@ -59,10 +58,8 @@ AreaSummaryElem::getStatus(PageOffs page)
         return SummaryEntry::error;
     }
 
-    //Mask bitfield byte leaving inactive bytes to zero, then right shift to bottom
-    return static_cast<SummaryEntry>(
-        (mEntry[page / 4] & (0b11 << (page % 4) * 2))
-        >> (page % 4) * 2 );
+
+    return static_cast<SummaryEntry>(mEntries.getValue(page));
 }
 void
 AreaSummaryElem::setStatus(PageOffs page, SummaryEntry value)
@@ -81,8 +78,7 @@ AreaSummaryElem::setStatus(PageOffs page, SummaryEntry value)
         return;
     }
     //First mask bitfield byte leaving active bytes to zero, then insert value
-    mEntry[page / 4] = (mEntry[page / 4] & ~(0b11 << (page % 4) * 2))
-                      | (static_cast<uint8_t>(value) << (page % 4) * 2);
+    mEntries.setValue(page, static_cast<uint8_t>(value));
     if (value == SummaryEntry::dirty)
     {
         mDirtyPages++;

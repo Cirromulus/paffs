@@ -15,13 +15,14 @@
 #pragma once
 #include "commonTypes.hpp"
 #include "journalTopic.hpp"
+#include "bitlist.hpp"
 #include <unordered_map>
 
 namespace paffs
 {
 class AreaSummaryElem
 {
-    unsigned char mEntry[(dataPagesPerArea + 3) / 4];
+    TwoBitList<dataPagesPerArea> mEntries;
     unsigned char mStatusBits;  // dirty < asWritten < loadedFromSuperIndex < used
     AreaPos mArea;
     PageOffs mDirtyPages;
