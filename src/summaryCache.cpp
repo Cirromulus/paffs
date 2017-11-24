@@ -663,10 +663,10 @@ SummaryCache::loadAreaSummaries()
 
     for (int i = 0; i < 2; i++)
     {
-        if (index.asPositions[i] > 0)
+        if (index.areaSummaryPositions[i] > 0)
         {
-            translation[index.asPositions[i]] = i;
-            summaryCache[i].setArea(index.asPositions[i]);
+            translation[index.areaSummaryPositions[i]] = i;
+            summaryCache[i].setArea(index.areaSummaryPositions[i]);
             packStatusArray(i, index.areaSummary[i]);
             summaryCache[i].setDirtyPages(countDirtyPages(i));
             summaryCache[i].setLoadedFromSuperPage();
@@ -675,12 +675,12 @@ SummaryCache::loadAreaSummaries()
             PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                         "Checking for an AS at area %" PRIu32 " (phys. %" PRIu32 ", "
                         "abs. page %" PRIu64 ")",
-                        index.asPositions[i],
-                        dev->areaMgmt.getPos(index.asPositions[i]),
-                        getPageNumber(combineAddress(index.asPositions[i], dataPagesPerArea),
+                        index.areaSummaryPositions[i],
+                        dev->areaMgmt.getPos(index.areaSummaryPositions[i]),
+                        getPageNumber(combineAddress(index.areaSummaryPositions[i], dataPagesPerArea),
                                       *dev));
             r = dev->driver.readPage(
-                    getPageNumber(combineAddress(index.asPositions[i], dataPagesPerArea), *dev),
+                    getPageNumber(combineAddress(index.areaSummaryPositions[i], dataPagesPerArea), *dev),
                     summary,
                     totalBytesPerPage);
             if (r != Result::ok && r != Result::biterrorCorrected)
@@ -688,7 +688,7 @@ SummaryCache::loadAreaSummaries()
                 PAFFS_DBG(PAFFS_TRACE_ERROR,
                           "Could not check if AS was already written on "
                           "area %" PRIu32,
-                          index.asPositions[i]);
+                          index.areaSummaryPositions[i]);
                 return r;
             }
             for (unsigned int t = 0; t < totalBytesPerPage; t++)
@@ -699,15 +699,15 @@ SummaryCache::loadAreaSummaries()
                     break;
                 }
             }
-            if (dev->areaMgmt.getStatus(index.asPositions[i]) == AreaStatus::active)
+            if (dev->areaMgmt.getStatus(index.areaSummaryPositions[i]) == AreaStatus::active)
             {
-                dev->areaMgmt.setActiveArea(dev->areaMgmt.getType(index.asPositions[i]),
-                                            index.asPositions[i]);
+                dev->areaMgmt.setActiveArea(dev->areaMgmt.getType(index.areaSummaryPositions[i]),
+                                            index.areaSummaryPositions[i]);
             }
             PAFFS_DBG_S(PAFFS_TRACE_VERBOSE,
                         "Loaded area summary %d on %d",
-                        index.asPositions[i],
-                        dev->areaMgmt.getPos(index.asPositions[i]));
+                        index.areaSummaryPositions[i],
+                        dev->areaMgmt.getPos(index.areaSummaryPositions[i]));
         }
     }
 
@@ -761,7 +761,7 @@ SummaryCache::commitAreaSummaries(bool createNew)
         someDirty |= summaryCache[cacheElem.second].isDirty()
                      && !summaryCache[cacheElem.second].isLoadedFromSuperPage();
 
-        index.asPositions[pos] = cacheElem.first;
+        index.areaSummaryPositions[pos] = cacheElem.first;
         unpackStatusArray(cacheElem.second, index.areaSummary[pos++]);
         summaryCache[cacheElem.second].setDirty(false);
         summaryCache[cacheElem.second].clear();

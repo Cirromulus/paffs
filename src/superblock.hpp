@@ -62,7 +62,7 @@ struct SuperIndex
     AreaPos* activeAreas;
     uint64_t overallDeletions;
     //"internal"
-    AreaPos asPositions[2];
+    AreaPos areaSummaryPositions[2];
     SummaryEntry* areaSummary[2];
     static uint16_t
     getNeededBytes(uint16_t numberOfAreaSummaries)
@@ -98,7 +98,7 @@ struct SuperIndex
         unsigned int neededSummaries = 0;
         for (unsigned int i = 0; i < 2; i++)
         {
-            if (asPositions[i] > 0)
+            if (areaSummaryPositions[i] > 0)
                 neededSummaries++;
         }
         return getNeededBytes(neededSummaries);

@@ -39,23 +39,23 @@ SuperIndex::deserializeFromBuffer(Device* dev, const char* buf)
     memcpy(&overallDeletions, &buf[pointer], sizeof(uint64_t));
     pointer += sizeof(uint64_t);
 
-    memcpy(asPositions, &buf[pointer], 2 * sizeof(AreaPos));
+    memcpy(areaSummaryPositions, &buf[pointer], 2 * sizeof(AreaPos));
     pointer += 2 * sizeof(AreaPos);
 
     unsigned char asCount = 0;
     for (unsigned int i = 0; i < 2; i++)
     {
-        if (asPositions[i] <= 0)
+        if (areaSummaryPositions[i] <= 0)
         {
             continue;
         }
-        if (asPositions[i] > areasNo)
+        if (areaSummaryPositions[i] > areasNo)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
                       "Entry asPosition[%u] is unplausible! "
                       "(was %" PRIu32 ", should > %" PRIu32,
                       i,
-                      asPositions[i],
+                      areaSummaryPositions[i],
                       areasNo);
             return Result::fail;
         }
@@ -67,7 +67,7 @@ SuperIndex::deserializeFromBuffer(Device* dev, const char* buf)
             {
                 // TODO: Normally, we would check in the OOB for a Checksum or so, which is present
                 // all the time
-                Addr tmp = combineAddress(areaMap[asPositions[i]].position, j);
+                Addr tmp = combineAddress(areaMap[areaSummaryPositions[i]].position, j);
                 Result r = dev->driver.readPage(
                         getPageNumberFromDirect(tmp), pagebuf, dataBytesPerPage);
                 if (r != Result::ok)
@@ -145,13 +145,13 @@ SuperIndex::serializeToBuffer(char* buf)
     memcpy(&buf[pointer], &overallDeletions, sizeof(uint64_t));
     pointer += sizeof(uint64_t);
 
-    memcpy(&buf[pointer], asPositions, 2 * sizeof(AreaPos));
+    memcpy(&buf[pointer], areaSummaryPositions, 2 * sizeof(AreaPos));
     pointer += 2 * sizeof(AreaPos);
 
     // Collect area summaries and pack them
     for (unsigned int i = 0; i < 2; i++)
     {
-        if (asPositions[i] <= 0)
+        if (areaSummaryPositions[i] <= 0)
             continue;
         for (unsigned int j = 0; j < dataPagesPerArea; j++)
         {
@@ -187,7 +187,7 @@ SuperIndex::print()
         bool found = false;
         for (unsigned int asOffs = 0; asOffs < 2; asOffs++)
         {
-            if (asPositions[asOffs] != 0 && i == asPositions[asOffs])
+            if (areaSummaryPositions[asOffs] != 0 && i == areaSummaryPositions[asOffs])
             {
                 found = true;
                 PageOffs free = 0, used = 0, dirty = 0;
@@ -423,25 +423,25 @@ Superblock::readSuperIndex(SuperIndex* index)
         return Result::fail;
     }
 
-    if (index->asPositions[0] != 0 && index->areaMap[index->asPositions[0]].type != AreaType::data
-        && index->areaMap[index->asPositions[0]].type != AreaType::index)
+    if (index->areaSummaryPositions[0] != 0 && index->areaMap[index->areaSummaryPositions[0]].type != AreaType::data
+        && index->areaMap[index->areaSummaryPositions[0]].type != AreaType::index)
     {
         PAFFS_DBG_S(PAFFS_TRACE_ERROR,
                     "An superblock-cached Area may never be Type != data or index "
                     "(Area %d is %s)",
-                    index->asPositions[0],
-                    areaNames[index->areaMap[index->asPositions[0]].type]);
+                    index->areaSummaryPositions[0],
+                    areaNames[index->areaMap[index->areaSummaryPositions[0]].type]);
         return Result::fail;
     }
 
-    if (index->asPositions[1] != 0 && index->areaMap[index->asPositions[1]].type != AreaType::data
-        && index->areaMap[index->asPositions[1]].type != AreaType::index)
+    if (index->areaSummaryPositions[1] != 0 && index->areaMap[index->areaSummaryPositions[1]].type != AreaType::data
+        && index->areaMap[index->areaSummaryPositions[1]].type != AreaType::index)
     {
         PAFFS_DBG_S(PAFFS_TRACE_ERROR,
                     "An superblock-cached Area may never be Type != data or index "
                     "(Area %d is %s)",
-                    index->asPositions[1],
-                    areaNames[index->areaMap[index->asPositions[1]].type]);
+                    index->areaSummaryPositions[1],
+                    areaNames[index->areaMap[index->areaSummaryPositions[1]].type]);
         return Result::fail;
     }
 
@@ -1120,7 +1120,7 @@ Superblock::insertNewSuperIndex(Addr logPrev, AreaPos* directArea, SuperIndex* e
     unsigned int neededSummaries = 0;
     for (unsigned int i = 0; i < 2; i++)
     {
-        if (entry->asPositions[i] > 0)
+        if (entry->areaSummaryPositions[i] > 0)
         {
             neededSummaries++;
         }

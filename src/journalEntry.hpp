@@ -25,6 +25,8 @@ toUnderlying(E e) noexcept
     return static_cast<typename std::underlying_type<E>::type>(e);
 }
 
+//TODO: Define enum classes to smaller underlying types
+
 struct JournalEntry
 {
     enum class Topic
