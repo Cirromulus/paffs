@@ -33,7 +33,7 @@ extern unsigned int traceMask;
         if (((mask) & traceMask) || ((mask) & PAFFS_TRACE_ALWAYS)) \
         {                                                          \
             fprintf(stderr,                                        \
-                    "paffs: " msg "\n\t-line %d, file %s\n",       \
+                    "paffs: " msg "\n\t-line %" PRId16 ", file %s\n",       \
                     ##__VA_ARGS__,                                 \
                     __LINE__,                                      \
                     __FILENAME__);                                 \

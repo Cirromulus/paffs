@@ -393,7 +393,7 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
         Result r = loadUnbufferedArea(area, true);
         if (r != Result::ok)
         {
-            PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not load AS of area %d!", area);
+            PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not load AS of area %" PRId16 "!", area);
             return r;
         }
     }
@@ -401,7 +401,7 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "Tried setting Pagestatus on UNSET area "
-                  "%" PRIu32 " (on %" PRIu32 ", status %d)",
+                  "%" PRIu32 " (on %" PRIu32 ", status %" PRId16 ")",
                   area,
                   dev->areaMgmt.getPos(area),
                   dev->areaMgmt.getStatus(area));
@@ -478,7 +478,7 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result* result)
     if (page > dataPagesPerArea)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Tried to access page out of bounds! (was: %d, should: < %d",
+                  "Tried to access page out of bounds! (was: %" PRId16 ", should: < %" PRId16 "",
                   page,
                   dataPagesPerArea);
         *result = Result::invalidInput;
@@ -495,7 +495,7 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result* result)
             if (r == Result::ok || r == Result::biterrorCorrected)
             {
                 PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
-                            "Loaded existing AreaSummary of %d without caching",
+                            "Loaded existing AreaSummary of %" PRId16 " without caching",
                             area);
                 *result = Result::ok;
                 // TODO: Handle biterror.
@@ -504,7 +504,7 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result* result)
             else if (r == Result::notFound)
             {
                 PAFFS_DBG_S(
-                        PAFFS_TRACE_ASCACHE, "Loaded free AreaSummary of %d without caching", area);
+                        PAFFS_TRACE_ASCACHE, "Loaded free AreaSummary of %" PRId16 " without caching", area);
                 *result = Result::ok;
                 return SummaryEntry::free;
             }
@@ -518,7 +518,7 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result* result)
     if (page > dataPagesPerArea)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Tried to access page out of bounds! (was: %d, should: < %d",
+                  "Tried to access page out of bounds! (was: %" PRId16 ", should: < %" PRId16 "",
                   page,
                   dataPagesPerArea);
         *result = Result::invalidInput;
@@ -540,11 +540,11 @@ SummaryCache::getSummaryStatus(AreaPos area, SummaryEntry* summary, bool complet
         if (r == Result::ok || r == Result::biterrorCorrected)
         {
             // TODO: Handle biterror
-            PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of Area %d", area);
+            PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of Area %" PRId16 "", area);
         }
         else if (r == Result::notFound)
         {
-            PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded empty AreaSummary of Area %d", area);
+            PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded empty AreaSummary of Area %" PRId16 "", area);
             r = Result::ok;
         }
         return r;
@@ -581,7 +581,7 @@ SummaryCache::deleteSummary(AreaPos area)
     if (translation.find(area) == translation.end())
     {
         // This is not a bug, because an uncached area can be deleted
-        PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Tried to delete nonexisting Area %d", area);
+        PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Tried to delete nonexisting Area %" PRId16 "", area);
         return Result::ok;
     }
 
@@ -590,7 +590,7 @@ SummaryCache::deleteSummary(AreaPos area)
     summaryCache[translation[area]].setDirty(false);
     summaryCache[translation[area]].clear();
     translation.erase(area);
-    PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Deleted cache entry of area %d", area);
+    PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Deleted cache entry of area %" PRId16 "", area);
     return Result::ok;
 }
 
@@ -623,7 +623,7 @@ SummaryCache::resetASWritten(AreaPos area)
     if (translation.find(area) == translation.end())
     {
         PAFFS_DBG(PAFFS_TRACE_ASCACHE,
-                  "Tried to reset AS-Record of non-cached Area %d. This is probably not a bug.",
+                  "Tried to reset AS-Record of non-cached Area %" PRId16 ". This is probably not a bug.",
                   area);
         return;
     }
@@ -670,7 +670,7 @@ SummaryCache::loadAreaSummaries()
             unsigned char summary[totalBytesPerPage];
             PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                         "Checking for an AS at area %" PRIu32 " (phys. %" PRIu32 ", "
-                        "abs. page %" PRIu64 ")",
+                        "abs. page %" PRIu32 ")",
                         index.areaSummaryPositions[i],
                         dev->areaMgmt.getPos(index.areaSummaryPositions[i]),
                         getPageNumber(combineAddress(index.areaSummaryPositions[i], dataPagesPerArea),
@@ -701,7 +701,7 @@ SummaryCache::loadAreaSummaries()
                                             index.areaSummaryPositions[i]);
             }
             PAFFS_DBG_S(PAFFS_TRACE_VERBOSE,
-                        "Loaded area summary %d on %d",
+                        "Loaded area summary %" PRId16 " on %" PRId16 "",
                         index.areaSummaryPositions[i],
                         dev->areaMgmt.getPos(index.areaSummaryPositions[i]));
         }
@@ -796,7 +796,7 @@ SummaryCache::processEntry(JournalEntry& entry)
     case journalEntry::SummaryCache::Subtype::remove:
         PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                     "Deleting cache "
-                    "entry of area %d",
+                    "entry of area %" PRId16 "",
                     summaryCache[e->area].getArea());
         summaryCache[e->area].setDirty(false);
         translation.erase(summaryCache[e->area].getArea());
@@ -883,19 +883,19 @@ SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent)
         summaryCache[nextEntry].setAreaSummaryWritten();
         summaryCache[nextEntry].setDirty(
                 r == Result::biterrorCorrected);  // Rewrites corrected Bit somewhen
-        PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of %d to cache", area);
+        PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of %" PRId16 " to cache", area);
         summaryCache[translation[area]].setDirtyPages(countDirtyPages(translation[area]));
     }
     else if (r == Result::notFound)
     {
-        PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded new AreaSummary for %d", area);
+        PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded new AreaSummary for %" PRId16 "", area);
     }
     else
     {
         return r;
     }
 
-    PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Created cache entry for area %d", area);
+    PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Created cache entry for area %" PRId16 "", area);
     return Result::ok;
 }
 
@@ -933,7 +933,7 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
         }
         else
         {
-            PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "freeNextBestCache ignored empty pos %d", i);
+            PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "freeNextBestCache ignored empty pos %" PRId16 "", i);
         }
     }
     if (fav > -1)
@@ -1023,7 +1023,7 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
         }
         if (activeAreas > 2)
         {
-            PAFFS_DBG(PAFFS_TRACE_BUG, "More than two active Areas after gc! (%u)", activeAreas);
+            PAFFS_DBG(PAFFS_TRACE_BUG, "More than two active Areas after gc! (%" PRIu32 ")", activeAreas);
             return Result::bug;
         }
     }
@@ -1049,7 +1049,7 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
     return Result::notFound;
 }
 
-uint32_t
+PageOffs
 SummaryCache::countDirtyPages(uint16_t position)
 {
     uint32_t dirty = 0;
@@ -1063,7 +1063,7 @@ SummaryCache::countDirtyPages(uint16_t position)
     return dirty;
 }
 
-uint32_t
+PageOffs
 SummaryCache::countUsedPages(uint16_t position)
 {
     uint32_t used = 0;
@@ -1095,7 +1095,7 @@ SummaryCache::commitAndEraseElem(uint16_t position)
     }
     PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                 "Committed and deleted cache "
-                "entry of area %d",
+                "entry of area %" PRId16 "",
                 summaryCache[position].getArea());
     translation.erase(summaryCache[position].getArea());
     summaryCache[position].clear();
@@ -1120,7 +1120,7 @@ SummaryCache::writeAreasummary(uint16_t pos)
     }
     // TODO: Check if areaOOB is clean, and maybe Verify written data
     PAFFS_DBG_S(
-            PAFFS_TRACE_ASCACHE, "Committing AreaSummary to Area %d", summaryCache[pos].getArea());
+            PAFFS_TRACE_ASCACHE, "Committing AreaSummary to Area %" PRId16 "", summaryCache[pos].getArea());
 
     for (unsigned int j = 0; j < dataPagesPerArea; j++)
     {
@@ -1226,7 +1226,7 @@ SummaryCache::readAreasummary(AreaPos area, SummaryEntry* out_summary, bool comp
         bytesRead += btr;
     }
     // buffer ready
-    // PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "AreaSummary Buffer was filled with %u Bytes.", pointer);
+    // PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "AreaSummary Buffer was filled with %" PRIu32 " Bytes.", pointer);
 
 
 

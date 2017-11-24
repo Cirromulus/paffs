@@ -56,11 +56,11 @@ OfficeModelNexys3Driver::deInitializeNand()
 }
 
 Result
-OfficeModelNexys3Driver::writePage(uint64_t page_no,
+OfficeModelNexys3Driver::writePage(PageAbs page_no,
                                    void* data, unsigned int data_len)
 {
 	if(data_len == 0 || data_len > totalBytesPerPage){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid write size (%d)", data_len);
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid write size (%" PRId16 ")", data_len);
 		return Result::invalidInput;
 	}
 
@@ -83,7 +83,7 @@ OfficeModelNexys3Driver::writePage(uint64_t page_no,
 	return Result::ok;
 }
 Result
-OfficeModelNexys3Driver::readPage(uint64_t page_no,
+OfficeModelNexys3Driver::readPage(PageAbs page_no,
                                   void* data, unsigned int data_len)
 {
 	PAFFS_DBG_S(PAFFS_TRACE_READ, "Read %u bytes at page %" PRIu64, data_len, page_no);
@@ -111,13 +111,13 @@ OfficeModelNexys3Driver::readPage(uint64_t page_no,
 	return Result::ok;
 }
 Result
-OfficeModelNexys3Driver::eraseBlock(uint32_t block_no)
+OfficeModelNexys3Driver::eraseBlock(BlockAbs block_no)
 {
 	nand->eraseBlock(bank, device, block_no);
 	return Result::ok;
 }
 Result
-OfficeModelNexys3Driver::markBad(uint32_t block_no)
+OfficeModelNexys3Driver::markBad(BlockAbs block_no)
 {
 	memset(buf, 0, totalBytesPerPage);
     for (size_t page = 0; page < 2; ++page){
@@ -128,7 +128,7 @@ OfficeModelNexys3Driver::markBad(uint32_t block_no)
 }
 
 Result
-OfficeModelNexys3Driver::checkBad(uint32_t block_no)
+OfficeModelNexys3Driver::checkBad(BlockAbs block_no)
 {
     for (size_t page = 0; page < 2; ++page){
         size_t pageNumber = block_no * pagesPerBlock + page;

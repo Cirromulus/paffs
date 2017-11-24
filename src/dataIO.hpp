@@ -33,15 +33,15 @@ public:
     // Updates changes to treeCache as well
     Result
     writeInodeData(Inode& inode,
-                   unsigned int offs,
-                   unsigned int bytes,
-                   unsigned int* bytesWritten,
+                   FileSize offs,
+                   FileSize bytes,
+                   FileSize* bytesWritten,
                    const char* data);
     Result
     readInodeData(Inode& inode,
-                  unsigned int offs,
-                  unsigned int bytes,
-                  unsigned int* bytesRead,
+                  FileSize offs,
+                  FileSize bytes,
+                  FileSize* bytesRead,
                   char* data);
     Result
     deleteInodeData(Inode& inode, unsigned int offs);
@@ -51,23 +51,23 @@ private:
      * @param reservedPages Is increased if new page was used
      */
     Result
-    writePageData(PageOffs pageFrom,
-                  PageOffs pageTo,
-                  unsigned offs,
-                  unsigned bytes,
+    writePageData(PageAbs  pageFrom,
+                  PageAbs  pageTo,
+                  FileSize offs,
+                  FileSize bytes,
                   const char* data,
                   PageAddressCache& ac,
-                  unsigned* bytes_written,
+                  FileSize* bytes_written,
                   FileSize filesize,
                   uint32_t& reservedPages);
     Result
-    readPageData(PageOffs pageFrom,
-                 PageOffs pageTo,
-                 unsigned offs,
-                 unsigned bytes,
+    readPageData(PageAbs  pageFrom,
+                 PageAbs  pageTo,
+                 FileSize offs,
+                 FileSize bytes,
                  char* data,
                  PageAddressCache& ac,
-                 unsigned* bytes_read);
+                 FileSize* bytes_read);
 
     bool checkIfSaneReadAddress(Addr pageAddr);
 };

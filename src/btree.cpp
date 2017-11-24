@@ -29,7 +29,7 @@ Btree::insertInode(const Inode& inode)
     TreeCacheNode* node = nullptr;
     Result r;
 
-    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert Inode n° %d", inode.no);
+    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert Inode n° %" PRId16 "", inode.no);
 
     r = findLeaf(inode.no, node);
     if (r != Result::ok)
@@ -38,38 +38,39 @@ Btree::insertInode(const Inode& inode)
         return r;
     }
 
-    if (node->raw.num_keys > 0)
+    if (node->raw.keys > 0)
     {
         for (unsigned i = 0; i < leafOrder; i++)
         {
             if (node->raw.as.branch.keys[i] == inode.no)
             {
-                PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Inode already existing with n° %d", inode.no);
+                PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Inode already existing with n° %" PRId16 "", inode.no);
                 return Result::bug;
             }
         }
     }
 
-    cache.lockTreeCacheNode(*node);  // prevents own node from clear
+    mCache.lockTreeCacheNode(*node);  // prevents own node from clear
     TreeCacheNode* c;
-    r = cache.getRootNodeFromCache(c);
+    r = mCache.getRootNodeFromCache(c);
     if (r != Result::ok)
         return r;
 
     // This prevents the cache from a commit inside invalid state
-    r = cache.freeNodes(height(*c));
+    r = mCache.reserveNodes(height(*c) + 2);
     if (r != Result::ok)
     {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not reserve enough nodes in treecache!");
+        PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not reserve enough nodes in treecache!");
         return r;
     }
-    cache.unlockTreeCacheNode(*node);
+
+    mCache.unlockTreeCacheNode(*node);
 
     dev->journal.addEvent(journalEntry::btree::Insert(inode));
 
     /* Case: leaf has room for key and pointer.
      */
-    if (node->raw.num_keys < leafOrder)
+    if (node->raw.keys < leafOrder)
     {
         return insertIntoLeaf(*node, inode);
     }
@@ -88,23 +89,23 @@ Btree::getInode(InodeNo number, Inode& outInode)
 Result
 Btree::updateExistingInode(const Inode& inode)
 {
-    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Update existing inode n° %d", inode.no);
+    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Update existing inode n° %" PRId16 "", inode.no);
     TreeCacheNode* node = nullptr;
     Result r = findLeaf(inode.no, node);
     if (r != Result::ok)
         return r;
 
     int pos;
-    for (pos = 0; pos < node->raw.num_keys; pos++)
+    for (pos = 0; pos < node->raw.keys; pos++)
     {
         if (node->raw.as.leaf.keys[pos] == inode.no)
             break;
     }
 
-    if (pos == node->raw.num_keys)
+    if (pos == node->raw.keys)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Tried to update existing Inode %u,"
+                  "Tried to update existing Inode %" PRIu32 ","
                   "but could not find it!",
                   inode.no);
         return Result::bug;  // This Key did not exist
@@ -141,18 +142,18 @@ Btree::findFirstFreeNo(InodeNo* outNumber)
 {
     TreeCacheNode* c = nullptr;
     *outNumber = 0;
-    Result r = cache.getRootNodeFromCache(c);
+    Result r = mCache.getRootNodeFromCache(c);
     if (r != Result::ok)
         return r;
-    while (!c->raw.is_leaf)
+    while (!c->raw.isLeaf)
     {
-        r = cache.getTreeNodeAtIndexFrom(c->raw.num_keys, *c, c);
+        r = mCache.getTreeNodeAtIndexFrom(c->raw.keys, *c, c);
         if (r != Result::ok)
             return r;
     }
-    if (c->raw.num_keys > 0)
+    if (c->raw.keys > 0)
     {
-        *outNumber = c->raw.as.leaf.pInodes[c->raw.num_keys - 1].no + 1;
+        *outNumber = c->raw.as.leaf.pInodes[c->raw.keys - 1].no + 1;
     }
     return Result::ok;
 }
@@ -160,13 +161,13 @@ Btree::findFirstFreeNo(InodeNo* outNumber)
 Result
 Btree::commitCache()
 {
-    return cache.commitCache();
+    return mCache.commitCache();
 }
 
 void
 Btree::wipeCache()
 {
-    cache.clear();
+    mCache.clear();
 }
 
 JournalEntry::Topic
@@ -204,7 +205,7 @@ Btree::processEntry(JournalEntry& entry)
 bool
 Btree::isTreeCacheNodeEqual(TreeCacheNode& left, TreeCacheNode& right)
 {
-    for (int i = 0; i <= left.raw.num_keys; i++)
+    for (int i = 0; i <= left.raw.keys; i++)
         if (left.raw.as.branch.keys[i] != right.raw.as.branch.keys[i])
             return false;
 
@@ -218,11 +219,16 @@ Btree::isTreeCacheNodeEqual(TreeCacheNode& left, TreeCacheNode& right)
 int
 Btree::height(TreeCacheNode& root)
 {
-    int h = 0;
-    TreeCacheNode* curr = &root;
-    while (!curr->raw.is_leaf)
+    uint16_t h = 0;
+    if(mCache.tryGetHeight(h) == Result::ok)
     {
-        Result r = cache.getTreeNodeAtIndexFrom(0, *curr, curr);
+        return h;
+    }
+    //This calculation is very mCache unfriendly, so only use if no better possibility exists
+    TreeCacheNode* curr = &root;
+    while (!curr->raw.isLeaf)
+    {
+        Result r = mCache.getTreeNodeAtIndexFrom(0, *curr, curr);
         if (r != Result::ok)
         {
             dev->lasterr = r;
@@ -252,7 +258,7 @@ Btree::lengthToRoot(TreeCacheNode& child)
 /* Traces the path from the root to a branch, searching
  * by key.
  * Returns the branch containing the given key.
- * This function is used to build up cache to a given leaf after a cache clean.
+ * This function is used to build up mCache to a given leaf after a mCache clean.
  */
 Result
 Btree::findBranch(TreeCacheNode& target, TreeCacheNode*& outtreeCacheNode)
@@ -260,14 +266,14 @@ Btree::findBranch(TreeCacheNode& target, TreeCacheNode*& outtreeCacheNode)
     int i = 0;
     TreeCacheNode* c = nullptr;
 
-    Result r = cache.getRootNodeFromCache(c);
+    Result r = mCache.getRootNodeFromCache(c);
     if (r != Result::ok)
         return r;
 
     while (!isTreeCacheNodeEqual(*c, target))
     {
         i = 0;
-        while (i < c->raw.num_keys)
+        while (i < c->raw.keys)
         {
             if (target.raw.as.branch.keys[0] >= c->raw.as.branch.keys[i])
                 i++;
@@ -275,8 +281,8 @@ Btree::findBranch(TreeCacheNode& target, TreeCacheNode*& outtreeCacheNode)
                 break;
         }
 
-        // printf("%d ->\n", i);
-        r = cache.getTreeNodeAtIndexFrom(i, *c, c);
+        // printf("%" PRId16 " ->\n", i);
+        r = mCache.getTreeNodeAtIndexFrom(i, *c, c);
         if (r != Result::ok)
             return r;
     }
@@ -295,25 +301,25 @@ Btree::findLeaf(InodeNo key, TreeCacheNode*& outtreeCacheNode)
     int i = 0;
     TreeCacheNode* c = nullptr;
 
-    Result r = cache.getRootNodeFromCache(c);
+    Result r = mCache.getRootNodeFromCache(c);
     if (r != Result::ok)
         return r;
 
     unsigned int depth = 0;
-    while (!c->raw.is_leaf)
+    while (!c->raw.isLeaf)
     {
         depth++;
         if (depth >= treeNodeCacheSize - 1)
         {  //-1 because one node is needed for insert functions.
             PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Cache size (%d) too small for depth %d!",
+                      "Cache size (%" PRId16 ") too small for depth %" PRId16 "!",
                       treeNodeCacheSize,
                       depth);
             return Result::lowmem;
         }
 
         i = 0;
-        while (i < c->raw.num_keys)
+        while (i < c->raw.keys)
         {
             if (key >= c->raw.as.branch.keys[i])
                 i++;
@@ -321,7 +327,7 @@ Btree::findLeaf(InodeNo key, TreeCacheNode*& outtreeCacheNode)
                 break;
         }
 
-        r = cache.getTreeNodeAtIndexFrom(i, *c, c);
+        r = mCache.getTreeNodeAtIndexFrom(i, *c, c);
         if (r != Result::ok)
             return r;
     }
@@ -334,10 +340,10 @@ Result
 Btree::findInLeaf(TreeCacheNode& leaf, InodeNo key, Inode& outInode)
 {
     unsigned int i;
-    for (i = 0; i < leaf.raw.num_keys; i++)
+    for (i = 0; i < leaf.raw.keys; i++)
         if (leaf.raw.as.leaf.keys[i] == key)
             break;
-    if (i == leaf.raw.num_keys)
+    if (i == leaf.raw.keys)
         return Result::notFound;
     outInode = leaf.raw.as.leaf.pInodes[i];
     return Result::ok;
@@ -378,7 +384,7 @@ int
 Btree::getLeftIndex(TreeCacheNode& parent, TreeCacheNode& left)
 {
     int left_index = 0;
-    while (left_index < parent.raw.num_keys)
+    while (left_index < parent.raw.keys)
     {
         if (parent.raw.as.branch.pointers[left_index] != 0)
             if (parent.raw.as.branch.pointers[left_index] == left.raw.self)
@@ -401,17 +407,17 @@ Btree::insertIntoLeaf(TreeCacheNode& leaf, const Inode& newInode)
     int i, insertion_point;
 
     insertion_point = 0;
-    while (insertion_point < leaf.raw.num_keys
+    while (insertion_point < leaf.raw.keys
            && leaf.raw.as.leaf.keys[insertion_point] < newInode.no)
         insertion_point++;
 
-    for (i = leaf.raw.num_keys; i > insertion_point; i--)
+    for (i = leaf.raw.keys; i > insertion_point; i--)
     {
         leaf.raw.as.leaf.keys[i] = leaf.raw.as.leaf.keys[i - 1];
         leaf.raw.as.leaf.pInodes[i] = leaf.raw.as.leaf.pInodes[i - 1];
     }
     leaf.raw.as.leaf.keys[insertion_point] = newInode.no;
-    leaf.raw.num_keys++;
+    leaf.raw.keys++;
     leaf.raw.as.leaf.pInodes[insertion_point] = newInode;
 
     leaf.dirty = true;
@@ -436,19 +442,19 @@ Btree::insertIntoLeafAfterSplitting(TreeCacheNode& leaf, const Inode& newInode)
 
     TreeCacheNode* new_leaf = nullptr;
 
-    cache.lockTreeCacheNode(leaf);
-    Result r = cache.addNewCacheNode(new_leaf);
-    cache.unlockTreeCacheNode(leaf);
+    mCache.lockTreeCacheNode(leaf);
+    Result r = mCache.addNewCacheNode(new_leaf);
+    mCache.unlockTreeCacheNode(leaf);
     if (r != Result::ok)
         return r;
 
-    new_leaf->raw.is_leaf = true;
+    new_leaf->raw.isLeaf = true;
 
     insertion_index = 0;
     while (insertion_index < leafOrder && leaf.raw.as.leaf.keys[insertion_index] < newInode.no)
         insertion_index++;
 
-    for (i = 0, j = 0; i < leaf.raw.num_keys; i++, j++)
+    for (i = 0, j = 0; i < leaf.raw.keys; i++, j++)
     {
         if (j == insertion_index)
             j++;
@@ -459,7 +465,7 @@ Btree::insertIntoLeafAfterSplitting(TreeCacheNode& leaf, const Inode& newInode)
     temp_keys[insertion_index] = newInode.no;
     temp_pInodes[insertion_index] = newInode;
 
-    leaf.raw.num_keys = 0;
+    leaf.raw.keys = 0;
 
     split = cut(leafOrder);
 
@@ -467,22 +473,22 @@ Btree::insertIntoLeafAfterSplitting(TreeCacheNode& leaf, const Inode& newInode)
     {
         leaf.raw.as.leaf.pInodes[i] = temp_pInodes[i];
         leaf.raw.as.leaf.keys[i] = temp_keys[i];
-        leaf.raw.num_keys++;
+        leaf.raw.keys++;
     }
 
     for (i = split, j = 0; i <= leafOrder; i++, j++)
     {
         new_leaf->raw.as.leaf.pInodes[j] = temp_pInodes[i];
         new_leaf->raw.as.leaf.keys[j] = temp_keys[i];
-        new_leaf->raw.num_keys++;
+        new_leaf->raw.keys++;
     }
 
-    for (i = leaf.raw.num_keys; i < leafOrder; i++)
+    for (i = leaf.raw.keys; i < leafOrder; i++)
     {
         memset(&leaf.raw.as.leaf.pInodes[i], 0, sizeof(Inode));
         leaf.raw.as.leaf.keys[i] = 0;
     }
-    for (i = new_leaf->raw.num_keys; i < leafOrder; i++)
+    for (i = new_leaf->raw.keys; i < leafOrder; i++)
     {
         memset(&new_leaf->raw.as.leaf.pInodes[i], 0, sizeof(Inode));
         new_leaf->raw.as.leaf.keys[i] = 0;
@@ -506,7 +512,7 @@ Btree::insertIntoNode(TreeCacheNode& node, int left_index, InodeNo key, TreeCach
 {
     int i;
 
-    for (i = node.raw.num_keys; i > left_index; i--)
+    for (i = node.raw.keys; i > left_index; i--)
     {
         node.raw.as.branch.pointers[i + 1] = node.raw.as.branch.pointers[i];
         node.pointers[i + 1] = node.pointers[i];
@@ -516,7 +522,7 @@ Btree::insertIntoNode(TreeCacheNode& node, int left_index, InodeNo key, TreeCach
     node.pointers[left_index + 1] = &right;
 
     node.raw.as.branch.keys[left_index] = key;
-    node.raw.num_keys++;
+    node.raw.keys++;
     node.dirty = true;
     right.parent = &node;
     right.dirty = true;
@@ -535,7 +541,7 @@ Btree::insertIntoNodeAfterSplitting(TreeCacheNode& old_node,
                                         TreeCacheNode& right)
 {
     PAFFS_DBG_S(PAFFS_TRACE_TREE,
-                "Insert into node after splitting at key %u, index %d",
+                "Insert into node after splitting at key %" PRIu32 ", index %" PRId16 "",
                 key,
                 left_index);
     unsigned int i, j, split, k_prime;
@@ -544,13 +550,13 @@ Btree::insertIntoNodeAfterSplitting(TreeCacheNode& old_node,
     TreeCacheNode* temp_RAMaddresses[branchOrder + 1];
     Addr temp_addresses[branchOrder + 1];
 
-    cache.lockTreeCacheNode(old_node);
-    cache.lockTreeCacheNode(right);
-    Result r = cache.addNewCacheNode(new_node);
+    mCache.lockTreeCacheNode(old_node);
+    mCache.lockTreeCacheNode(right);
+    Result r = mCache.addNewCacheNode(new_node);
     if (r != Result::ok)
         return r;
-    cache.unlockTreeCacheNode(old_node);
-    cache.unlockTreeCacheNode(right);
+    mCache.unlockTreeCacheNode(old_node);
+    mCache.unlockTreeCacheNode(right);
 
     /* First create a temporary set of keys and pointers
      * to hold everything in order, including
@@ -560,7 +566,7 @@ Btree::insertIntoNodeAfterSplitting(TreeCacheNode& old_node,
      * keys and pointers to the old TreeCacheNode and
      * the other half to the new.
      */
-    for (i = 0, j = 0; i < old_node.raw.num_keys + 1U; i++, j++)
+    for (i = 0, j = 0; i < old_node.raw.keys + 1U; i++, j++)
     {
         if (j == left_index + 1)
             j++;
@@ -568,7 +574,7 @@ Btree::insertIntoNodeAfterSplitting(TreeCacheNode& old_node,
         temp_RAMaddresses[j] = old_node.pointers[i];
     }
 
-    for (i = 0, j = 0; i < old_node.raw.num_keys; i++, j++)
+    for (i = 0, j = 0; i < old_node.raw.keys; i++, j++)
     {
         if (j == left_index)
             j++;
@@ -585,13 +591,13 @@ Btree::insertIntoNodeAfterSplitting(TreeCacheNode& old_node,
      */
     split = cut(branchOrder);
 
-    old_node.raw.num_keys = 0;
+    old_node.raw.keys = 0;
     for (i = 0; i < split - 1; i++)
     {
         old_node.raw.as.branch.pointers[i] = temp_addresses[i];
         old_node.pointers[i] = temp_RAMaddresses[i];
         old_node.raw.as.branch.keys[i] = temp_keys[i];
-        old_node.raw.num_keys++;
+        old_node.raw.keys++;
     }
     old_node.raw.as.branch.pointers[i] = temp_addresses[i];
     old_node.pointers[i] = temp_RAMaddresses[i];
@@ -601,7 +607,7 @@ Btree::insertIntoNodeAfterSplitting(TreeCacheNode& old_node,
         new_node->pointers[j] = temp_RAMaddresses[i];
         new_node->raw.as.branch.pointers[j] = temp_addresses[i];
         new_node->raw.as.branch.keys[j] = temp_keys[i];
-        new_node->raw.num_keys++;
+        new_node->raw.keys++;
         if (new_node->pointers[j] != nullptr)
             new_node->pointers[j]->parent = new_node;
         // cleanup
@@ -641,7 +647,7 @@ Btree::insertIntoParent(TreeCacheNode& left, InodeNo key, TreeCacheNode& right)
 
     left_index = getLeftIndex(*parent, left);
 
-    if (parent->raw.num_keys < branchOrder - 1)
+    if (parent->raw.keys < branchOrder - 1)
         return insertIntoNode(*parent, left_index, key, right);
 
     return insertIntoNodeAfterSplitting(*parent, left_index, key, right);
@@ -655,19 +661,19 @@ Btree::insertIntoParent(TreeCacheNode& left, InodeNo key, TreeCacheNode& right)
 Result
 Btree::insertIntoNewRoot(TreeCacheNode& left, InodeNo key, TreeCacheNode& right)
 {
-    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert into new root at key %u", key);
+    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert into new root at key %" PRIu32 "", key);
     TreeCacheNode* new_root = nullptr;
-    cache.lockTreeCacheNode(left);
-    cache.lockTreeCacheNode(right);
-    Result r = cache.addNewCacheNode(new_root);
+    mCache.lockTreeCacheNode(left);
+    mCache.lockTreeCacheNode(right);
+    Result r = mCache.addNewCacheNode(new_root);
     if (r != Result::ok)
     {
         return r;
     }
-    cache.unlockTreeCacheNode(left);
-    cache.unlockTreeCacheNode(right);
+    mCache.unlockTreeCacheNode(left);
+    mCache.unlockTreeCacheNode(right);
 
-    new_root->raw.is_leaf = false;
+    new_root->raw.isLeaf = false;
     new_root->raw.as.branch.keys[0] = key;
     new_root->raw.as.branch.pointers[0] = left.raw.self;
     new_root->pointers[0] = &left;
@@ -676,11 +682,11 @@ Btree::insertIntoNewRoot(TreeCacheNode& left, InodeNo key, TreeCacheNode& right)
     new_root->pointers[1] = &right;
     right.parent = new_root;
 
-    new_root->raw.num_keys = 1;
+    new_root->raw.keys = 1;
     new_root->dirty = true;
     new_root->parent = new_root;
 
-    return cache.setRoot(*new_root);
+    return mCache.setRoot(*new_root);
 }
 
 /* start a new tree.
@@ -689,15 +695,15 @@ Btree::insertIntoNewRoot(TreeCacheNode& left, InodeNo key, TreeCacheNode& right)
 Result
 Btree::startNewTree()
 {
-    cache.clear();
+    mCache.clear();
     TreeCacheNode* new_root = nullptr;
-    Result r = cache.addNewCacheNode(new_root);
+    Result r = mCache.addNewCacheNode(new_root);
     if (r != Result::ok)
         return r;
-    new_root->raw.is_leaf = true;
+    new_root->raw.isLeaf = true;
     new_root->dirty = true;
     new_root->parent = new_root;
-    return cache.setRoot(*new_root);
+    return mCache.setRoot(*new_root);
 }
 
 // DELETION.
@@ -714,7 +720,7 @@ Btree::getNeighborIndex(TreeCacheNode& n)
     int i;
     TreeCacheNode* parent = n.parent;
 
-    for (i = 0; i <= parent->raw.num_keys; i++)
+    for (i = 0; i <= parent->raw.keys; i++)
         if (parent->pointers[i] == &n)  // It is allowed for all other pointers to be invalid
             return i - 1;
 
@@ -732,7 +738,7 @@ Btree::removeEntryFromNode(TreeCacheNode& n, InodeNo key)
 
     // Remove the key and shift other keys accordingly.
     while (n.raw.as.branch.keys[i] != key
-           && i < n.raw.num_keys)  // as.branch is OK, because it is same memory as as.leaf
+           && i < n.raw.keys)  // as.branch is OK, because it is same memory as as.leaf
         i++;
     if (i > 0 && key < n.raw.as.branch.keys[i - 1])
     {
@@ -741,9 +747,9 @@ Btree::removeEntryFromNode(TreeCacheNode& n, InodeNo key)
         return Result::bug;
     }
 
-    if (n.raw.is_leaf)
+    if (n.raw.isLeaf)
     {
-        for (++i; i < n.raw.num_keys; i++)
+        for (++i; i < n.raw.keys; i++)
         {
             n.raw.as.leaf.keys[i - 1] = n.raw.as.leaf.keys[i];
             n.raw.as.leaf.pInodes[i - 1] = n.raw.as.leaf.pInodes[i];
@@ -751,7 +757,7 @@ Btree::removeEntryFromNode(TreeCacheNode& n, InodeNo key)
     }
     else
     {
-        for (++i; i < n.raw.num_keys; i++)
+        for (++i; i < n.raw.keys; i++)
         {
             n.raw.as.branch.keys[i - 1] = n.raw.as.branch.keys[i];
             n.raw.as.branch.pointers[i] = n.raw.as.branch.pointers[i + 1];
@@ -760,17 +766,17 @@ Btree::removeEntryFromNode(TreeCacheNode& n, InodeNo key)
     }
 
     // One key fewer.
-    n.raw.num_keys--;
+    n.raw.keys--;
 
     // Set the other pointers to nullptr for tidiness.
-    if (n.raw.is_leaf)
-        for (i = n.raw.num_keys; i < leafOrder; i++)
+    if (n.raw.isLeaf)
+        for (i = n.raw.keys; i < leafOrder; i++)
         {
             memset(&n.raw.as.leaf.pInodes[i], 0, sizeof(Inode));
             n.raw.as.leaf.keys[i] = 0;
         }
     else
-        for (i = n.raw.num_keys + 1; i < branchOrder; i++)
+        for (i = n.raw.keys + 1; i < branchOrder; i++)
         {
             n.raw.as.branch.pointers[i] = 0;
             n.pointers[i] = nullptr;
@@ -790,7 +796,7 @@ Btree::adjustRoot(TreeCacheNode& root)
      * so just commit dirty changes.
      */
 
-    if (root.raw.num_keys > 0)
+    if (root.raw.keys > 0)
         return Result::ok;
 
     /* Case: empty root.
@@ -800,19 +806,19 @@ Btree::adjustRoot(TreeCacheNode& root)
     // the first (only) child
     // as the new root.
 
-    if (!root.raw.is_leaf)
+    if (!root.raw.isLeaf)
     {
         root.pointers[0]->parent = root.pointers[0];
-        Result r = cache.setRoot(*root.pointers[0]);
+        Result r = mCache.setRoot(*root.pointers[0]);
         if (r != Result::ok)
             return r;
-        return cache.removeNode(root);
+        return mCache.removeNode(root);
     }
 
     // If it is a leaf (has no children),
     // then the whole tree is empty.
 
-    return cache.removeNode(root);
+    return mCache.removeNode(root);
 }
 
 /* Coalesces a TreeCacheNode (n) that has become
@@ -830,7 +836,7 @@ Btree::coalesceNodes(TreeCacheNode& n,
     int i, j, neighbor_insertion_index, n_end;
     TreeCacheNode* tmp;
 
-    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Coalesce nodes at %d", k_prime);
+    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Coalesce nodes at %" PRId16 "", k_prime);
 
     /* Swap neighbor with TreeCacheNode if TreeCacheNode is on the
      * extreme left and neighbor is to its right.
@@ -849,30 +855,30 @@ Btree::coalesceNodes(TreeCacheNode& n,
      * in the special case of n being a leftmost child.
      */
 
-    neighbor_insertion_index = neighbor.raw.num_keys;
+    neighbor_insertion_index = neighbor.raw.keys;
 
     /* Case:  nonleaf TreeCacheNode.
      * Append k_prime and the following pointer.
      * Append all pointers and keys from the neighbor.
      */
 
-    if (!n.raw.is_leaf)
+    if (!n.raw.isLeaf)
     {
         /* Append k_prime.
          */
 
         neighbor.raw.as.branch.keys[neighbor_insertion_index] = k_prime;
-        neighbor.raw.num_keys++;
+        neighbor.raw.keys++;
 
-        n_end = n.raw.num_keys;
+        n_end = n.raw.keys;
 
         for (i = neighbor_insertion_index + 1, j = 0; j < n_end; i++, j++)
         {
             neighbor.raw.as.branch.keys[i] = n.raw.as.branch.keys[j];
             neighbor.raw.as.branch.pointers[i] = n.raw.as.branch.pointers[j];
             neighbor.pointers[i] = n.pointers[j];
-            neighbor.raw.num_keys++;
-            n.raw.num_keys--;
+            neighbor.raw.keys++;
+            n.raw.keys--;
         }
 
         /* The number of pointers is always
@@ -885,7 +891,7 @@ Btree::coalesceNodes(TreeCacheNode& n,
         /* All children must now point up to the same parent.
          */
 
-        for (i = 0; i < neighbor.raw.num_keys + 1; i++)
+        for (i = 0; i < neighbor.raw.keys + 1; i++)
         {
             tmp = neighbor.pointers[i];
             tmp->parent = &neighbor;
@@ -898,11 +904,11 @@ Btree::coalesceNodes(TreeCacheNode& n,
 
     else
     {
-        for (i = neighbor_insertion_index, j = 0; j < n.raw.num_keys; i++, j++)
+        for (i = neighbor_insertion_index, j = 0; j < n.raw.keys; i++, j++)
         {
             neighbor.raw.as.leaf.keys[i] = n.raw.as.leaf.keys[j];
             neighbor.raw.as.leaf.pInodes[i] = n.raw.as.leaf.pInodes[j];
-            neighbor.raw.num_keys++;
+            neighbor.raw.keys++;
         }
     }
 
@@ -912,7 +918,7 @@ Btree::coalesceNodes(TreeCacheNode& n,
     if (r != Result::ok)
         return r;
 
-    return cache.removeNode(n);
+    return mCache.removeNode(n);
 }
 
 /* Redistributes entries between two nodes when
@@ -930,7 +936,7 @@ Btree::redistributeNodes(TreeCacheNode& n,
 {
     int i;
 
-    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Redistribute Nodes at k_prime %d", k_prime);
+    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Redistribute Nodes at k_prime %" PRId16 "", k_prime);
     /* Case: n has a neighbor to the left.
      * Pull the neighbor's last key-pointer pair over
      * from the neighbor's right end to n's left end.
@@ -938,11 +944,11 @@ Btree::redistributeNodes(TreeCacheNode& n,
 
     if (neighbor_index != -1)
     {
-        if (!n.raw.is_leaf)
+        if (!n.raw.isLeaf)
         {
-            n.raw.as.branch.pointers[n.raw.num_keys + 1] = n.raw.as.branch.pointers[n.raw.num_keys];
-            n.pointers[n.raw.num_keys + 1] = n.pointers[n.raw.num_keys];
-            for (i = n.raw.num_keys; i > 0; i--)
+            n.raw.as.branch.pointers[n.raw.keys + 1] = n.raw.as.branch.pointers[n.raw.keys];
+            n.pointers[n.raw.keys + 1] = n.pointers[n.raw.keys];
+            for (i = n.raw.keys; i > 0; i--)
             {
                 n.raw.as.branch.keys[i] = n.raw.as.branch.keys[i - 1];
                 n.pointers[i] = n.pointers[i - 1];
@@ -951,31 +957,31 @@ Btree::redistributeNodes(TreeCacheNode& n,
         }
         else
         {
-            for (i = n.raw.num_keys; i > 0; i--)
+            for (i = n.raw.keys; i > 0; i--)
             {
                 n.raw.as.leaf.keys[i] = n.raw.as.leaf.keys[i - 1];
                 n.raw.as.leaf.pInodes[i] = n.raw.as.leaf.pInodes[i - 1];
             }
         }
 
-        if (!n.raw.is_leaf)
+        if (!n.raw.isLeaf)
         {
-            n.pointers[0] = neighbor.pointers[neighbor.raw.num_keys];  // getTreeNodeIndex not
+            n.pointers[0] = neighbor.pointers[neighbor.raw.keys];  // getTreeNodeIndex not
                                                                        // needed, nullptr is also
                                                                        // allowed
-            n.raw.as.branch.pointers[0] = neighbor.raw.as.branch.pointers[neighbor.raw.num_keys];
+            n.raw.as.branch.pointers[0] = neighbor.raw.as.branch.pointers[neighbor.raw.keys];
             n.pointers[0]->parent = &n;
-            neighbor.pointers[neighbor.raw.num_keys] = nullptr;
-            neighbor.raw.as.branch.pointers[neighbor.raw.num_keys] = 0;
+            neighbor.pointers[neighbor.raw.keys] = nullptr;
+            neighbor.raw.as.branch.pointers[neighbor.raw.keys] = 0;
             n.raw.as.branch.keys[0] = k_prime;
             n.parent->raw.as.branch.keys[k_prime_index] =
-                    neighbor.raw.as.branch.keys[neighbor.raw.num_keys - 1];
+                    neighbor.raw.as.branch.keys[neighbor.raw.keys - 1];
         }
         else
         {
-            n.raw.as.leaf.pInodes[0] = neighbor.raw.as.leaf.pInodes[neighbor.raw.num_keys - 1];
-            memset(&neighbor.raw.as.leaf.pInodes[neighbor.raw.num_keys - 1], 0, sizeof(Inode));
-            n.raw.as.leaf.keys[0] = neighbor.raw.as.leaf.keys[neighbor.raw.num_keys - 1];
+            n.raw.as.leaf.pInodes[0] = neighbor.raw.as.leaf.pInodes[neighbor.raw.keys - 1];
+            memset(&neighbor.raw.as.leaf.pInodes[neighbor.raw.keys - 1], 0, sizeof(Inode));
+            n.raw.as.leaf.keys[0] = neighbor.raw.as.leaf.keys[neighbor.raw.keys - 1];
             n.parent->raw.as.leaf.keys[k_prime_index] = n.raw.as.leaf.keys[0];
         }
     }
@@ -988,12 +994,12 @@ Btree::redistributeNodes(TreeCacheNode& n,
 
     else
     {
-        if (n.raw.is_leaf)
+        if (n.raw.isLeaf)
         {
-            n.raw.as.leaf.keys[n.raw.num_keys] = neighbor.raw.as.leaf.keys[0];
-            n.raw.as.leaf.pInodes[n.raw.num_keys] = neighbor.raw.as.leaf.pInodes[0];
+            n.raw.as.leaf.keys[n.raw.keys] = neighbor.raw.as.leaf.keys[0];
+            n.raw.as.leaf.pInodes[n.raw.keys] = neighbor.raw.as.leaf.pInodes[0];
             n.parent->raw.as.leaf.keys[k_prime_index] = neighbor.raw.as.leaf.keys[1];
-            for (i = 0; i < neighbor.raw.num_keys - 1; i++)
+            for (i = 0; i < neighbor.raw.keys - 1; i++)
             {
                 neighbor.raw.as.leaf.keys[i] = neighbor.raw.as.leaf.keys[i + 1];
                 neighbor.raw.as.leaf.pInodes[i] = neighbor.raw.as.leaf.pInodes[i + 1];
@@ -1001,12 +1007,12 @@ Btree::redistributeNodes(TreeCacheNode& n,
         }
         else
         {
-            n.raw.as.branch.keys[n.raw.num_keys] = k_prime;
-            n.pointers[n.raw.num_keys + 1] = neighbor.pointers[0];
-            n.raw.as.branch.pointers[n.raw.num_keys + 1] = neighbor.raw.as.branch.pointers[0];
-            n.pointers[n.raw.num_keys + 1]->parent = &n;
+            n.raw.as.branch.keys[n.raw.keys] = k_prime;
+            n.pointers[n.raw.keys + 1] = neighbor.pointers[0];
+            n.raw.as.branch.pointers[n.raw.keys + 1] = neighbor.raw.as.branch.pointers[0];
+            n.pointers[n.raw.keys + 1]->parent = &n;
             n.parent->raw.as.branch.keys[k_prime_index] = neighbor.raw.as.branch.keys[0];
-            for (i = 0; i < neighbor.raw.num_keys - 1; i++)
+            for (i = 0; i < neighbor.raw.keys - 1; i++)
             {
                 neighbor.raw.as.branch.keys[i] = neighbor.raw.as.branch.keys[i + 1];
                 neighbor.pointers[i] = neighbor.pointers[i + 1];
@@ -1014,7 +1020,7 @@ Btree::redistributeNodes(TreeCacheNode& n,
             }
         }
 
-        if (!n.raw.is_leaf)
+        if (!n.raw.isLeaf)
         {
             neighbor.pointers[i] = neighbor.pointers[i + 1];
             neighbor.raw.as.branch.pointers[i] = neighbor.raw.as.branch.pointers[i + 1];
@@ -1025,8 +1031,8 @@ Btree::redistributeNodes(TreeCacheNode& n,
      * the neighbor has one fewer of each.
      */
 
-    n.raw.num_keys++;
-    neighbor.raw.num_keys--;
+    n.raw.keys++;
+    neighbor.raw.keys--;
 
     n.dirty = true;
     neighbor.dirty = true;
@@ -1069,13 +1075,13 @@ Btree::deleteEntry(TreeCacheNode& n, InodeNo key)
      * to be preserved after deletion.
      */
 
-    min_keys = n.raw.is_leaf ? cut(leafOrder) : cut(branchOrder) - 1;
+    min_keys = n.raw.isLeaf ? cut(leafOrder) : cut(branchOrder) - 1;
 
     /* Case:  TreeCacheNode stays at or above minimum.
      * (The simple case.)
      */
 
-    if (n.raw.num_keys >= min_keys)
+    if (n.raw.keys >= min_keys)
         return Result::ok;
 
     /* Case:  TreeCacheNode falls below minimum.
@@ -1093,16 +1099,16 @@ Btree::deleteEntry(TreeCacheNode& n, InodeNo key)
     neighbor_index = getNeighborIndex(n);
     k_prime_index = neighbor_index == -1 ? 0 : neighbor_index;
     k_prime = n.parent->raw.as.branch.keys[k_prime_index];
-    r = neighbor_index == -1 ? cache.getTreeNodeAtIndexFrom(1, *n.parent, neighbor)
-                             : cache.getTreeNodeAtIndexFrom(neighbor_index, *n.parent, neighbor);
+    r = neighbor_index == -1 ? mCache.getTreeNodeAtIndexFrom(1, *n.parent, neighbor)
+                             : mCache.getTreeNodeAtIndexFrom(neighbor_index, *n.parent, neighbor);
     if (r != Result::ok)
         return r;
 
-    capacity = neighbor->raw.is_leaf ? leafOrder : branchOrder - 1;
+    capacity = neighbor->raw.isLeaf ? leafOrder : branchOrder - 1;
 
     /* Coalescence. */
 
-    if (neighbor->raw.num_keys + n.raw.num_keys <= capacity)
+    if (neighbor->raw.keys + n.raw.keys <= capacity)
         return coalesceNodes(n, *neighbor, neighbor_index, k_prime);
 
     /* Redistribution. */
@@ -1120,7 +1126,7 @@ void
 Btree::printTree()
 {
     TreeCacheNode* n = nullptr;
-    Result r = cache.getRootNodeFromCache(n);
+    Result r = mCache.getRootNodeFromCache(n);
     if (r != Result::ok)
     {
         printf("%s!\n", err_msg(r));
@@ -1137,18 +1143,18 @@ Btree::printTree()
 void
 Btree::printLeaves(TreeCacheNode& c)
 {
-    if (c.raw.is_leaf)
+    if (c.raw.isLeaf)
     {
         printf("| ");
-        for (int i = 0; i < c.raw.num_keys; i++)
+        for (int i = 0; i < c.raw.keys; i++)
             printf("%" PRIu32 " ", static_cast<uint32_t>(c.raw.as.leaf.pInodes[i].no));
     }
     else
     {
-        for (int i = 0; i <= c.raw.num_keys; i++)
+        for (int i = 0; i <= c.raw.keys; i++)
         {
             TreeCacheNode* n = nullptr;
-            Result r = cache.getTreeNodeAtIndexFrom(i, c, n);
+            Result r = mCache.getTreeNodeAtIndexFrom(i, c, n);
             if (r != Result::ok)
             {
                 printf("%s!\n", err_msg(r));
@@ -1161,7 +1167,7 @@ Btree::printLeaves(TreeCacheNode& c)
 }
 
 /**
- * This only works to depth 'n' if RAM cache is big enough to at least hold all nodes in Path to
+ * This only works to depth 'n' if RAM mCache is big enough to at least hold all nodes in Path to
  * depth 'n-1'
  */
 void
@@ -1172,24 +1178,24 @@ Btree::printQueuedKeysRecursively(queue_s* q)
     while (!queue_empty(q))
     {
         TreeCacheNode* n = static_cast<TreeCacheNode*>(queue_dequeue(q));
-        for (int i = 0; i <= n->raw.num_keys; i++)
+        for (int i = 0; i <= n->raw.keys; i++)
         {
-            if (!n->raw.is_leaf)
+            if (!n->raw.isLeaf)
             {
                 TreeCacheNode* nn = nullptr;  // next node
                 TreeCacheNode* n_cache =
-                        nullptr;  // cache version of the copy of the former cache entry...
+                        nullptr;  // cache version of the copy of the former mCache entry...
 
-                // Build up cache to current branch.
+                // Build up mCache to current branch.
                 // This is not very efficient, but doing that once per branch would require
-                // cache to fit all child nodes of the current branch.
+                // mCache to fit all child nodes of the current branch.
                 Result r = findBranch(*n, n_cache);
                 if (r != Result::ok)
                 {
                     printf("%s!\n", err_msg(r));
                     return;
                 }
-                r = cache.getTreeNodeAtIndexFrom(i, *n_cache, nn);
+                r = mCache.getTreeNodeAtIndexFrom(i, *n_cache, nn);
                 if (r != Result::ok)
                 {
                     printf("%s!\n", err_msg(r));
@@ -1200,14 +1206,14 @@ Btree::printQueuedKeysRecursively(queue_s* q)
                 queue_enqueue(new_q, nn_copy);
                 if (i == 0)
                     printf(".");
-                if (i < n->raw.num_keys)
+                if (i < n->raw.keys)
                     printf("%" PRIu32 ".", static_cast<uint32_t>(n->raw.as.branch.keys[i]));
             }
             else
             {
                 if (i == 0)
                     printf(" ");
-                if (i < n->raw.num_keys)
+                if (i < n->raw.keys)
                     printf("%" PRIu32 " ", static_cast<uint32_t>(n->raw.as.leaf.keys[i]));
             }
         }

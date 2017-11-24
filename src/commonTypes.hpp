@@ -19,11 +19,6 @@
 
 #pragma once
 
-#ifdef __CDT_PARSER__
-#define PRIu32 "u"
-#define PRIu64 "lu"
-#endif
-
 namespace paffs
 {
 static const uint8_t version = 1;
@@ -69,7 +64,7 @@ static constexpr Permission permMask = R | W | X;
 typedef uint8_t Fileopenmask;
 static constexpr Fileopenmask FR = 0x01;   // file read
 static constexpr Fileopenmask FW = 0x02;   // file write
-static constexpr Fileopenmask FEX = 0x04;  // file execute
+static constexpr Fileopenmask FEX= 0x04;   // file execute
 static constexpr Fileopenmask FA = 0x08;   // file append
 static constexpr Fileopenmask FE = 0x10;   // file open only existing
 static constexpr Fileopenmask FC = 0x20;   // file create
@@ -100,19 +95,19 @@ struct Param
 
 extern const Param stdParam;
 
-typedef uint64_t Addr;           // Contains logical area and relative page
-typedef uint32_t AreaPos;        // Has to address total areas
-typedef uint32_t PageOffs;       // Has to address pages per area
-typedef uint64_t PageAbs;        // has to address all pages in a device
-typedef uint32_t BlockAbs;       // has to address all blocks in a device
+typedef uint32_t Addr;           // Contains logical area and relative page
+typedef uint16_t AreaPos;        // Has to address total areas
+typedef uint16_t PageOffs;       // Has to address pages per area
+typedef Addr     PageAbs;        // has to address all pages in a device
+typedef uint16_t BlockAbs;       // has to address all blocks in a device
 typedef uint32_t FileSize;       //~ 4 GB per file
 typedef uint32_t InodeNo;        //~ 4 Million files
 typedef uint16_t DirEntryCount;  // 65,535 Entries per Directory
 typedef uint8_t DirEntryLength;  // 255 characters per Directory entry
-static const DirEntryLength maxDirEntryLength = 255;
+static constexpr DirEntryLength maxDirEntryLength = 255;
 
 // Together with area = 0, it is used to mark an unused page in Inode
-static const PageOffs unusedMarker = 0xFFFFFFFF;
+static constexpr PageOffs unusedMarker = 0xFFFF;
 
 struct BadBlockList
 {

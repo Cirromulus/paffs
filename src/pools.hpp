@@ -129,7 +129,7 @@ struct InodePool : InodePoolBase
         }
         Inode* inode = it->second.first;  // Inode Pointer
         it->second.second++;              // Inode Refcount
-        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Increased Refcount of %u to %u", no, it->second.second);
+        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Increased Refcount of %" PRIu32 " to %" PRIu32 "", no, it->second.second);
         target.setInode(*inode, *this);
         return Result::ok;
     }
@@ -155,7 +155,7 @@ struct InodePool : InodePoolBase
         target.setInode(*inode, *this);
         map.insert(InodeMapElem(no, InodeWithRefcount(target, 1)));
         //DEBUG
-        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Added new Inode %u", no);
+        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Added new Inode %" PRIu32 "", no);
         return Result::ok;
     }
     inline Result
@@ -165,7 +165,7 @@ struct InodePool : InodePoolBase
         if (it == map.end())
         {
             //Upon unmount, we dont care about that
-            //PAFFS_DBG(PAFFS_TRACE_BUG, "inode %u was not found in pool!", no);
+            //PAFFS_DBG(PAFFS_TRACE_BUG, "inode %" PRIu32 " was not found in pool!", no);
             return Result::bug;
         }
         if (it->second.second == 0)
@@ -174,10 +174,10 @@ struct InodePool : InodePoolBase
             return Result::bug;
         }
         it->second.second--;  // Inode refcount
-        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Decreased Refcount of %u to %u", no, it->second.second);
+        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Decreased Refcount of %" PRIu32 " to %" PRIu32 "", no, it->second.second);
         if (it->second.second == 0)
         {
-            PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Freeing Inode %u", it->first);
+            PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Freeing Inode %" PRIu32 "", it->first);
             Result r = pool.freeObject(*it->second.first);  // Inode
             if (r != Result::ok)
             {
@@ -207,7 +207,7 @@ struct InodePool : InodePoolBase
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not free Inode from Pool in Openlist!");
         }
-        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Force-Freeing Inode %u", it->first);
+        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Force-Freeing Inode %" PRIu32 "", it->first);
         map.erase(it);
         return Result::ok;
     }

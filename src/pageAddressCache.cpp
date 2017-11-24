@@ -28,7 +28,7 @@ AddrListCacheElem::setAddr(PageNo pos, Addr addr)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "Tried to set pos %" PRIu32 " to addr,"
-                  " allowed < %u",
+                  " allowed < %" PRIu32 "",
                   pos,
                   addrsPerPage);
     }
@@ -40,7 +40,7 @@ AddrListCacheElem::getAddr(PageNo pos)
 {
     if (pos >= addrsPerPage)
     {
-        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get pos %" PRIu32 " allowed < %u", pos, addrsPerPage);
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get pos %" PRIu32 " allowed < %" PRIu32 "", pos, addrsPerPage);
     }
     return cache[pos];
 }
@@ -143,7 +143,7 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
     }
 
     PAFFS_DBG(PAFFS_TRACE_ERROR,
-              "Get Page bigger than allowed! (was %u, should <%u)",
+              "Get Page bigger than allowed! (was %" PRIu32 ", should <%" PRIu32 ")",
               0,
               0);  // TODO: Actual calculation of values
     return Result::toobig;
@@ -224,7 +224,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
     }
 
     PAFFS_DBG(PAFFS_TRACE_ERROR,
-              "Get Page bigger than allowed! (was %u, should <%u)",
+              "Get Page bigger than allowed! (was %" PRIu32 ", should <%" PRIu32 ")",
               0,
               0);  // TODO: Actual calculation of values
     return Result::toobig;
@@ -348,7 +348,7 @@ PageAddressCache::loadPath(Addr& anchor,
         if (path[depth - i] >= addrsPerPage)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "Miscalculated path for page %" PRIu32 " (was %u, should < %u)",
+                      "Miscalculated path for page %" PRIu32 " (was %" PRIu32 ", should < %" PRIu32 ")",
                       pageOffs,
                       path[depth - i],
                       addrsPerPage);
@@ -380,7 +380,7 @@ PageAddressCache::loadPath(Addr& anchor,
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR,
-                          "Could not commit elem depth %d"
+                          "Could not commit elem depth %" PRId16 ""
                           " at %" PRIu32 ":%" PRIu32 ":%" PRIu32,
                           i,
                           path[0],
@@ -397,7 +397,7 @@ PageAddressCache::loadPath(Addr& anchor,
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR,
-                          "Could not read elem depth %d"
+                          "Could not read elem depth %" PRId16 ""
                           " at %" PRIu32 ":%" PRIu32 ":%" PRIu32,
                           i,
                           path[0],
@@ -423,7 +423,7 @@ PageAddressCache::commitPath(Addr& anchor, AddrListCacheElem* path, unsigned cha
             r = commitElem(path[i - 1], path[i]);
             if (r != Result::ok)
             {
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Elem in depth %u!", i);
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Elem in depth %" PRIu32 "!", i);
                 return r;
             }
         }
@@ -575,7 +575,7 @@ PageAddressCache::readAddrList(Addr from, Addr list[addrsPerPage])
     if (device.areaMgmt.getType(extractLogicalArea(from)) != AreaType::index)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "READ ADDR LIST operation of invalid area at %d:%d",
+                  "READ ADDR LIST operation of invalid area at %" PRId16 ":%" PRId16 "",
                   extractLogicalArea(from),
                   extractPageOffs(from));
         return Result::bug;
@@ -621,12 +621,12 @@ PageAddressCache::writeAddrList(Addr& source, Addr list[addrsPerPage])
     }
     device.lasterr = r;
 
-    unsigned int firstFreePage = 0;
-    if (device.areaMgmt.findFirstFreePage(&firstFreePage, device.areaMgmt.getActiveArea(AreaType::index))
+    PageOffs firstFreePage = 0;
+    if (device.areaMgmt.findFirstFreePage(firstFreePage, device.areaMgmt.getActiveArea(AreaType::index))
         == Result::nospace)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "BUG: findWritableArea returned full area (%d).",
+                  "BUG: findWritableArea returned full area (%" PRId16 ").",
                   device.areaMgmt.getActiveArea(AreaType::index));
         return device.lasterr = Result::bug;
     }
@@ -685,7 +685,7 @@ PageAddressCache::isAddrListPlausible(Addr* addrList, size_t elems)
         if (extractPageOffs(addrList[i]) > dataPagesPerArea)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "PageList elem %d Page is higher than possible "
+                      "PageList elem %" PRId16 " Page is higher than possible "
                       "(was %" PRIu32 ", should < %" PRIu32 ")",
                       i,
                       extractPageOffs(addrList[i]),
@@ -695,7 +695,7 @@ PageAddressCache::isAddrListPlausible(Addr* addrList, size_t elems)
         if (extractLogicalArea(addrList[i]) == 0 && extractPageOffs(addrList[i]) != 0)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "PageList elem %d Area is 0, "
+                      "PageList elem %" PRId16 " Area is 0, "
                       "but Page is not (%" PRIu32 ")",
                       i,
                       extractPageOffs(addrList[i]));

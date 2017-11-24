@@ -226,7 +226,9 @@ fillFlashAndVerify(paffs::Paffs& fs)
             {
                 std::cout << filename << ": " << paffs::err_msg(fs.getLastErr()) << std::endl;
                 ASSERT_THAT(fs.getLastErr(),
-                            AnyOf(Eq(paffs::Result::nospace), Eq(paffs::Result::toobig)));
+                            AnyOf(Eq(paffs::Result::lowmem),
+                                     AnyOf(Eq(paffs::Result::nospace),
+                                     Eq(paffs::Result::toobig))));
                 full = true;
                 break;
             }
@@ -243,7 +245,7 @@ fillFlashAndVerify(paffs::Paffs& fs)
 
             r = fs.close(*fil);
             ASSERT_EQ(r, paffs::Result::ok);
-            ASSERT_EQ(fs.getDevice(0)->tree.cache.isTreeCacheValid(), true);
+            ASSERT_EQ(fs.getDevice(0)->tree.mCache.isTreeCacheValid(), true);
         }
     }
     int ic = i, jc = j;

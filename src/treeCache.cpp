@@ -24,38 +24,38 @@ namespace paffs
 void
 TreeCache::setIndexUsed(uint16_t index)
 {
-    cacheUsage.setBit(index);
+    mCacheUsage.setBit(index);
 }
 
 void
 TreeCache::setIndexFree(uint16_t index)
 {
-    cacheUsage.resetBit(index);
+    mCacheUsage.resetBit(index);
 }
 
 bool
 TreeCache::isIndexUsed(uint16_t index)
 {
-    return cacheUsage.getBit(index);
+    return mCacheUsage.getBit(index);
 }
 
 int16_t
 TreeCache::findFirstFreeIndex()
 {
-    size_t r = cacheUsage.findFirstFree();
+    size_t r = mCacheUsage.findFirstFree();
     return r == treeNodeCacheSize ? -1 : r;
 }
 
 int16_t
 TreeCache::getIndexFromPointer(TreeCacheNode& tcn)
 {
-    if (&tcn - cache > treeNodeCacheSize)
+    if (&tcn - mCache > treeNodeCacheSize)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Index from Pointer not inside array (%p)!", &tcn);
         dev->lasterr = Result::bug;
         return 0;
     }
-    return &tcn - cache;
+    return &tcn - mCache;
 }
 
 /**
@@ -64,8 +64,8 @@ TreeCache::getIndexFromPointer(TreeCacheNode& tcn)
 void
 TreeCache::clear()
 {
-    memset(cache, 0, treeNodeCacheSize * sizeof(TreeCacheNode));
-    cacheUsage.clear();
+    memset(mCache, 0, treeNodeCacheSize * sizeof(TreeCacheNode));
+    mCacheUsage.clear();
 }
 
 Result
@@ -79,11 +79,31 @@ TreeCache::tryAddNewCacheNode(TreeCacheNode*& newTcn)
             printTreeCache();
         return Result::lowmem;
     }
-    newTcn = &cache[index];
+    newTcn = &mCache[index];
     memset(newTcn, 0, sizeof(TreeCacheNode));
     setIndexUsed(index);
     PAFFS_DBG_S(PAFFS_TRACE_TREECACHE, "Created new Cache element %p (position %d)", newTcn, index);
     return Result::ok;
+}
+
+
+Result
+TreeCache::tryGetHeight(uint16_t &heightOut)
+{
+    for(uint16_t node = 0; node < treeNodeCacheSize; node++)
+    {
+        if(mCacheUsage.getBit(node) && mCache[node].raw.isLeaf)
+        {
+            TreeCacheNode* curr = &mCache[node];
+            while(curr != curr->parent)
+            {
+                ++heightOut;
+                curr = curr->parent;
+            }
+            return Result::ok;
+        }
+    }
+    return Result::fail;
 }
 
 /*
@@ -144,9 +164,9 @@ TreeCache::areSiblingsClean(TreeCacheNode& tcn)
 {
     if (tcn.dirty)
         return false;
-    if (tcn.raw.is_leaf)
+    if (tcn.raw.isLeaf)
         return !tcn.dirty;
-    for (int i = 0; i <= tcn.raw.num_keys; i++)
+    for (int i = 0; i <= tcn.raw.keys; i++)
     {
         if (tcn.pointers[i] == nullptr)  // Siblings not in cache
             continue;
@@ -182,14 +202,14 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
     }
     InodeNo last = 0;
     bool first = true;
-    if (node.raw.is_leaf)
+    if (node.raw.isLeaf)
     {
-        for (int i = 0; i < node.raw.num_keys; i++)
+        for (int i = 0; i < node.raw.keys; i++)
         {
             if (node.raw.as.leaf.keys[i] != node.raw.as.leaf.pInodes[i].no)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
-                          "Node n° %d has different Inode number (%d) than its key stated (%d)!",
+                          "Node n° %" PRIu16 " has different Inode number (%d) than its key stated (%d)!",
                           getIndexFromPointer(node),
                           node.raw.as.leaf.keys[i],
                           node.raw.as.leaf.pInodes[i].no);
@@ -213,8 +233,8 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
                 if (node.raw.as.leaf.keys[i] < keyMin)
                 {
                     PAFFS_DBG(PAFFS_TRACE_BUG,
-                              "Node n° %u's keys are inconsistent!\n"
-                              "\twas: %u, but parent stated keys would be over or equal %u!",
+                              "Node n° %" PRIu32 "'s keys are inconsistent!\n"
+                              "\twas: %" PRIu32 ", but parent stated keys would be over or equal %" PRIu32 "!",
                               getIndexFromPointer(node),
                               node.raw.as.leaf.keys[i],
                               keyMin);
@@ -226,8 +246,8 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
                 if (node.raw.as.leaf.keys[i] >= keyMax)
                 {
                     PAFFS_DBG(PAFFS_TRACE_BUG,
-                              "Node n° %u's keys are inconsistent!\n"
-                              "\twas: %u, but parent stated keys would be under %u!",
+                              "Node n° %" PRIu32 "'s keys are inconsistent!\n"
+                              "\twas: %" PRIu32 ", but parent stated keys would be under %" PRIu32 "!",
                               getIndexFromPointer(node),
                               node.raw.as.leaf.keys[i],
                               keyMax);
@@ -238,17 +258,17 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
     }
     else
     {
-        for (int i = 0; i <= node.raw.num_keys; i++)
+        for (int i = 0; i <= node.raw.keys; i++)
         {
-            if (i < node.raw.num_keys)
+            if (i < node.raw.keys)
             {
                 if (keyMin != 0)
                 {
                     if (node.raw.as.branch.keys[i] < keyMin)
                     {
                         PAFFS_DBG(PAFFS_TRACE_BUG,
-                                  "Node n° %u's keys are inconsistent!\n"
-                                  "\twas: %u, but parent stated keys would be over or equal %u!",
+                                  "Node n° %" PRIu32 "'s keys are inconsistent!\n"
+                                  "\twas: %" PRIu32 ", but parent stated keys would be over or equal %" PRIu32 "!",
                                   getIndexFromPointer(node),
                                   node.raw.as.branch.keys[i],
                                   keyMin);
@@ -260,8 +280,8 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
                     if (node.raw.as.branch.keys[i] >= keyMax)
                     {
                         PAFFS_DBG(PAFFS_TRACE_BUG,
-                                  "Node n° %u's keys are inconsistent!\n"
-                                  "\twas: %u, but parent stated keys would be under %u!",
+                                  "Node n° %" PRIu32 "'s keys are inconsistent!\n"
+                                  "\twas: %" PRIu32 ", but parent stated keys would be under %" PRIu32 "!",
                                   getIndexFromPointer(node),
                                   node.raw.as.branch.keys[i],
                                   keyMax);
@@ -295,7 +315,7 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
                     return false;
                 }
                 long keyMin_n = i == 0 ? 0 : node.raw.as.branch.keys[i - 1];
-                long keyMax_n = i >= node.raw.num_keys ? 0 : node.raw.as.branch.keys[i];
+                long keyMax_n = i >= node.raw.keys ? 0 : node.raw.as.branch.keys[i];
                 if (!isSubTreeValid(*node.pointers[i], reachable, keyMin_n, keyMax_n))
                     return false;
             }
@@ -311,29 +331,29 @@ TreeCache::isTreeCacheValid()
     // Just for debugging purposes
     BitList<treeNodeCacheSize> reachable;
 
-    if (!isIndexUsed(cache_root))
+    if (!isIndexUsed(mCacheRoot))
         return true;
 
-    if (!isSubTreeValid(cache[cache_root], reachable, 0, 0))
+    if (!isSubTreeValid(mCache[mCacheRoot], reachable, 0, 0))
         return false;
 
     bool valid = true;
-    if (reachable != cacheUsage)
+    if (reachable != mCacheUsage)
     {
         for (int i = 0; i < treeNodeCacheSize; i++)
         {
-            if (cacheUsage.getBit(i) < reachable.getBit(i))
+            if (mCacheUsage.getBit(i) < reachable.getBit(i))
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG, "Deleted Node n° %d still reachable!", i);
                 return false;
             }
-            if (cacheUsage.getBit(i) > reachable.getBit(i))
+            if (mCacheUsage.getBit(i) > reachable.getBit(i))
             {
-                if (!cache[i].locked && !cache[i].inheritedLock)
+                if (!mCache[i].locked && !mCache[i].inheritedLock)
                 {
                     // it is allowed if we are moving a parent around
                     bool parentLocked = false;
-                    TreeCacheNode*& par = cache[i].parent;
+                    TreeCacheNode*& par = mCache[i].parent;
                     while (par != par->parent)
                     {
                         if (par->locked)
@@ -362,11 +382,11 @@ TreeCache::isTreeCacheValid()
 bool
 TreeCache::resolveDirtyPaths(TreeCacheNode& tcn)
 {
-    if (tcn.raw.is_leaf)
+    if (tcn.raw.isLeaf)
         return tcn.dirty;
 
     bool anyDirt = false;
-    for (int i = 0; i <= tcn.raw.num_keys; i++)
+    for (int i = 0; i <= tcn.raw.keys; i++)
     {
         if (tcn.pointers[i] == nullptr)
             continue;
@@ -418,7 +438,7 @@ TreeCache::deleteFromParent(TreeCacheNode& tcn)
         // the sibling
         return;
     }
-    for (unsigned int i = 0; i <= parent->raw.num_keys; i++)
+    for (unsigned int i = 0; i <= parent->raw.keys; i++)
     {
         if (parent->pointers[i] == &tcn)
         {
@@ -431,9 +451,9 @@ TreeCache::deleteFromParent(TreeCacheNode& tcn)
 bool
 TreeCache::hasNoChilds(TreeCacheNode& tcn)
 {
-    if (tcn.raw.is_leaf)
+    if (tcn.raw.isLeaf)
         return true;
-    for (int i = 0; i <= tcn.raw.num_keys; i++)
+    for (int i = 0; i <= tcn.raw.keys; i++)
         if (tcn.pointers[i] != nullptr)
             return false;
     return true;
@@ -459,17 +479,17 @@ Result
 TreeCache::cleanFreeLeafNodes(uint16_t& neededCleanNodes)
 {
     dev->lasterr = Result::ok;
-    resolveDirtyPaths(cache[cache_root]);
+    resolveDirtyPaths(mCache[mCacheRoot]);
     if (dev->lasterr != Result::ok)
         return dev->lasterr;
 
     for (unsigned int i = 0; i < treeNodeCacheSize; i++)
     {
-        if (!isIndexUsed(getIndexFromPointer(cache[i])))
+        if (!isIndexUsed(getIndexFromPointer(mCache[i])))
             continue;
-        if (!cache[i].dirty && !cache[i].locked && !cache[i].inheritedLock && cache[i].raw.is_leaf)
+        if (!mCache[i].dirty && !mCache[i].locked && !mCache[i].inheritedLock && mCache[i].raw.isLeaf)
         {
-            deleteFromParent(cache[i]);
+            deleteFromParent(mCache[i]);
             setIndexFree(i);
             neededCleanNodes--;
             if (neededCleanNodes == 0)
@@ -488,16 +508,16 @@ Result
 TreeCache::cleanFreeNodes(uint16_t& neededCleanNodes)
 {
     dev->lasterr = Result::ok;
-    resolveDirtyPaths(cache[cache_root]);
+    resolveDirtyPaths(mCache[mCacheRoot]);
     if (dev->lasterr != Result::ok)
         return dev->lasterr;
     for (unsigned int i = 0; i < treeNodeCacheSize; i++)
     {
-        if (!isIndexUsed(getIndexFromPointer(cache[i])))
+        if (!isIndexUsed(getIndexFromPointer(mCache[i])))
             continue;
-        if (!cache[i].dirty && !cache[i].locked && !cache[i].inheritedLock && hasNoChilds(cache[i]))
+        if (!mCache[i].dirty && !mCache[i].locked && !mCache[i].inheritedLock && hasNoChilds(mCache[i]))
         {
-            uint16_t cleaned = deletePathToRoot(cache[i]);
+            uint16_t cleaned = deletePathToRoot(mCache[i]);
             setIndexFree(i);
             if (cleaned > neededCleanNodes)
             {
@@ -524,7 +544,7 @@ TreeCache::updateFlashAddressInParent(TreeCacheNode& node)
         // Rootnode
         return dev->superblock.registerRootnode(node.raw.self);
     }
-    for (int i = 0; i <= node.parent->raw.num_keys; i++)
+    for (int i = 0; i <= node.parent->raw.keys; i++)
     {
         if (node.parent->pointers[i] == &node)
         {
@@ -540,14 +560,14 @@ TreeCache::updateFlashAddressInParent(TreeCacheNode& node)
     return Result::notFound;
 }
 
-// Only valid if resolveDirtyPaths has been called before
+
 Result
 TreeCache::commitNodesRecursively(TreeCacheNode& node)
 {
     if (!node.dirty)
         return Result::ok;
     Result r;
-    if (node.raw.is_leaf)
+    if (node.raw.isLeaf)
     {
         r = writeTreeNode(node);
         if (r != Result::ok)
@@ -559,7 +579,7 @@ TreeCache::commitNodesRecursively(TreeCacheNode& node)
         return r;
     }
 
-    for (int i = 0; i <= node.raw.num_keys; i++)
+    for (uint16_t i = 0; i <= node.raw.keys; i++)
     {
         if (node.pointers[i] == nullptr)
             continue;
@@ -567,7 +587,7 @@ TreeCache::commitNodesRecursively(TreeCacheNode& node)
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not write Node %d's child n° %d (%d) to flash!",
+                      "Could not write Node %" PRIu16 "'s child n° %" PRIu16 " (%" PRIu16 ") to flash!",
                       getIndexFromPointer(node),
                       i,
                       getIndexFromPointer(*node.pointers[i]));
@@ -578,7 +598,7 @@ TreeCache::commitNodesRecursively(TreeCacheNode& node)
     r = writeTreeNode(node);
     if (r != Result::ok)
     {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write cached Treenode branch!");
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write cached Treenode!");
         return r;
     }
     node.dirty = false;
@@ -592,19 +612,48 @@ Result
 TreeCache::commitCache()
 {
     dev->lasterr = Result::ok;
-    resolveDirtyPaths(cache[cache_root]);
+    resolveDirtyPaths(mCache[mCacheRoot]);
     if (dev->lasterr != Result::ok)
         return dev->lasterr;
-    Result r = commitNodesRecursively(cache[cache_root]);
+    Result r = commitNodesRecursively(mCache[mCacheRoot]);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write Node to flash! (%s)", err_msg(r));
         return r;
     }
 
-    dev->journal.addEvent(journalEntry::Success(JournalEntry::Topic::tree));
+    bool unreachableNodesExisting = false;
+    for(uint16_t node = 0; node < treeNodeCacheSize; node++)
+    {
+        if(mCache[node].dirty && !mCache[node].locked)
+        {
+            //We could start a desperate mode, committing non-locked nodes in floating tree.
+            //But this is dangerous for powerloss, leaving tree in inconsistent state.
+            PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Commit did not affect floating node %" PRIu16, node);
+            unreachableNodesExisting = true;
+        }
+    }
+
+    if(!unreachableNodesExisting)
+    {
+        dev->journal.addEvent(journalEntry::Success(JournalEntry::Topic::tree));
+    }
 
     return Result::ok;
+}
+
+Result
+TreeCache::reserveNodes(uint16_t neededNodes)
+{
+
+    PAFFS_DBG(PAFFS_TRACE_TREECACHE, "Reserving %" PRIu16 " nodes", neededNodes);
+
+    if(static_cast<uint16_t>(treeNodeCacheSize - mCacheUsage.countSetBits()) >= neededNodes)
+    {
+        return Result::ok;
+    }
+
+    return freeNodes(neededNodes - (treeNodeCacheSize - mCacheUsage.countSetBits()));
 }
 
 Result
@@ -621,6 +670,7 @@ TreeCache::freeNodes(uint16_t neededCleanNodes)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried reserving more nodes than we could have!");
         return Result::bug;
     }
+
 
     cleanFreeLeafNodes(neededCleanNodes);
     if (neededCleanNodes == 0)
@@ -640,7 +690,9 @@ TreeCache::freeNodes(uint16_t neededCleanNodes)
     if (neededCleanNodes == 0)
         return Result::ok;
 
-    return Result::bug;
+    PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Even hard commit could not allocate "
+            "remaining %" PRIu16 " treenodes!", neededCleanNodes);
+    return Result::lowmem;
 }
 
 /**
@@ -668,12 +720,12 @@ TreeCache::TreeCache::lockTreeCacheNode(TreeCacheNode& tcn)
 bool
 TreeCache::hasLockedChilds(TreeCacheNode& tcn)
 {
-    if (tcn.raw.is_leaf)
+    if (tcn.raw.isLeaf)
     {
         // PAFFS_DBG(PAFFS_TRACE_BUG, "Node is leaf, has no childs!");
         return false;
     }
-    for (int i = 0; i <= tcn.raw.num_keys; i++)
+    for (int i = 0; i <= tcn.raw.keys; i++)
     {
         if (tcn.pointers[i] != nullptr)
         {
@@ -728,13 +780,13 @@ TreeCache::unlockTreeCacheNode(TreeCacheNode& tcn)
 Result
 TreeCache::getRootNodeFromCache(TreeCacheNode*& tcn)
 {
-    if (isIndexUsed(cache_root))
+    if (isIndexUsed(mCacheRoot))
     {
-        tcn = &cache[cache_root];
-        cache_hits++;
+        tcn = &mCache[mCacheRoot];
+        mCacheHits++;
         return Result::ok;
     }
-    cache_misses++;
+    mCacheMisses++;
 
     PAFFS_DBG_S(PAFFS_TRACE_TREECACHE, "Load rootnode from Flash");
 
@@ -747,7 +799,7 @@ TreeCache::getRootNodeFromCache(TreeCacheNode*& tcn)
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Rootnode can't be loaded, cache size (%d) too small!",
+                  "Rootnode can't be loaded, mCache size (%d) too small!",
                   treeNodeCacheSize);
         return r;
     }
@@ -758,19 +810,19 @@ TreeCache::getRootNodeFromCache(TreeCacheNode*& tcn)
 
     tcn = new_root;
 
-    r = readTreeNode(addr, cache[cache_root].raw);
+    r = readTreeNode(addr, mCache[mCacheRoot].raw);
     if (r == Result::biterrorCorrected)
     {
         // Make sure it is going to be rewritten to flash
         PAFFS_DBG(PAFFS_TRACE_INFO, "Corrected biterror in TreeNode");
-        cache[cache_root].dirty = true;
+        mCache[mCacheRoot].dirty = true;
         return Result::ok;
     }
     return r;
 }
 
 /**
- * Possible cache flush. Tree could be empty except for path to child! (and parent, of course)
+ * Possible mCache flush. Tree could be empty except for path to child! (and parent, of course)
  */
 Result
 TreeCache::getTreeNodeAtIndexFrom(uint16_t index, TreeCacheNode& parent, TreeCacheNode*& child)
@@ -784,7 +836,7 @@ TreeCache::getTreeNodeAtIndexFrom(uint16_t index, TreeCacheNode& parent, TreeCac
     TreeCacheNode* target = parent.pointers[index];
     // To make sure parent and child can point to the same address, target is used as tmp buffer
 
-    if (parent.raw.is_leaf)
+    if (parent.raw.isLeaf)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Node from leaf!");
         return Result::bug;
@@ -792,22 +844,22 @@ TreeCache::getTreeNodeAtIndexFrom(uint16_t index, TreeCacheNode& parent, TreeCac
     if (target != nullptr)
     {
         child = target;
-        cache_hits++;
+        mCacheHits++;
         if (traceMask & PAFFS_TRACE_VERBOSE)
         {
             PAFFS_DBG_S(PAFFS_TRACE_TREECACHE,
                         "Cache hit, found target %p (position %ld)",
                         target,
-                        target - cache);
+                        target - mCache);
         }
-        return Result::ok;  // cache hit
+        return Result::ok;  // mCache hit
     }
 
     //--------------
     dev->lasterr = Result::ok;
     if (getIndexFromPointer(parent) == 0 && dev->lasterr != Result::ok)
     {
-        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get child from Treenode not located in cache!");
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get child from Treenode not located in mCache!");
         dev->lasterr = Result::ok;
         return Result::invalidInput;
     }
@@ -815,11 +867,11 @@ TreeCache::getTreeNodeAtIndexFrom(uint16_t index, TreeCacheNode& parent, TreeCac
     if (parent.raw.as.branch.pointers[index] == 0)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Tried to get treenode neither located in cache nor in flash!");
+                  "Tried to get treenode neither located in mCache nor in flash!");
         return Result::invalidInput;
     }
 
-    cache_misses++;
+    mCacheMisses++;
     if (traceMask & PAFFS_TRACE_VERBOSE)
     {
         PAFFS_DBG_S(PAFFS_TRACE_TREECACHE, "Cache Miss");
@@ -867,7 +919,7 @@ TreeCache::setRoot(TreeCacheNode& rootTcn)
         PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: setCacheRoot with root->parent not pointing to itself");
         return Result::bug;
     }
-    cache_root = getIndexFromPointer(rootTcn);
+    mCacheRoot = getIndexFromPointer(rootTcn);
     return Result::ok;
 }
 
@@ -893,82 +945,100 @@ TreeCache::getCacheSize()
 uint16_t
 TreeCache::getCacheHits()
 {
-    return cache_hits;
+    return mCacheHits;
 }
 uint16_t
 TreeCache::getCacheMisses()
 {
-    return cache_misses;
+    return mCacheMisses;
 }
-
 void
-TreeCache::printSubtree(int layer, TreeCacheNode& node)
+TreeCache::printNode(TreeCacheNode& node)
 {
+    printf("[ID: %d PAR: %d %s%s%s|",
+               getIndexFromPointer(node),
+               getIndexFromPointer(*node.parent),
+               node.dirty ? "d" : "-",
+               node.locked ? "l" : "-",
+               node.inheritedLock ? "i" : "-");
+        if (node.raw.isLeaf)
+        {
+            for (int i = 0; i < node.raw.keys; i++)
+            {
+                if (i > 0)
+                    printf(",");
+                printf(" %" PRIu32, node.raw.as.leaf.keys[i]);
+            }
+            printf("]\n");
+        }
+        else
+        {
+            if (node.pointers[0] == 0)
+                printf("x");
+            else
+                printf("%d", getIndexFromPointer(*node.pointers[0]));
+
+            bool isGap = false;
+            for (int i = 1; i <= node.raw.keys; i++)
+            {
+                if (!isGap)
+                    printf("/%" PRIu32 "\\", node.raw.as.branch.keys[i - 1]);
+                if (node.pointers[i] == 0)
+                {
+                    if (!isGap)
+                    {
+                        printf("...");
+                        isGap = true;
+                    }
+                }
+                else
+                {
+                    printf("%d", getIndexFromPointer(*node.pointers[i]));
+                    isGap = false;
+                }
+            }
+            printf("]\n");
+        }
+}
+void
+TreeCache::printSubtree(int layer, BitList<treeNodeCacheSize>& reached, TreeCacheNode& node)
+{
+    reached.setBit(getIndexFromPointer(node));
     for (int i = 0; i < layer; i++)
     {
         printf(".");
     }
-    printf("[ID: %d PAR: %d %s%s%s|",
-           getIndexFromPointer(node),
-           getIndexFromPointer(*node.parent),
-           node.dirty ? "d" : "-",
-           node.locked ? "l" : "-",
-           node.inheritedLock ? "i" : "-");
-    if (node.raw.is_leaf)
+    printNode(node);
+    for (int i = 0; i <= node.raw.keys; i++)
     {
-        for (int i = 0; i < node.raw.num_keys; i++)
+        if (node.pointers[i] != 0)
         {
-            if (i > 0)
-                printf(",");
-            printf(" %" PRIu32, node.raw.as.leaf.keys[i]);
+            printSubtree(layer + 1, reached, *node.pointers[i]);
         }
-        printf("]\n");
     }
-    else
-    {
-        if (node.pointers[0] == 0)
-            printf("x");
-        else
-            printf("%d", getIndexFromPointer(*node.pointers[0]));
 
-        bool isGap = false;
-        for (int i = 1; i <= node.raw.num_keys; i++)
-        {
-            if (!isGap)
-                printf("/%" PRIu32 "\\", node.raw.as.branch.keys[i - 1]);
-            if (node.pointers[i] == 0)
-            {
-                if (!isGap)
-                {
-                    printf("...");
-                    isGap = true;
-                }
-            }
-            else
-            {
-                printf("%d", getIndexFromPointer(*node.pointers[i]));
-                isGap = false;
-            }
-        }
-        printf("]\n");
-        for (int i = 0; i <= node.raw.num_keys; i++)
-        {
-            if (node.pointers[i] != 0)
-                printSubtree(layer + 1, *node.pointers[i]);
-        }
-    }
 }
 void
 TreeCache::printTreeCache()
 {
-    printf("----------------\n");
-    if (isIndexUsed(cache_root))
+    printf("-----------------\n");
+    if (isIndexUsed(mCacheRoot))
     {
-        printSubtree(0, cache[cache_root]);
+        BitList<treeNodeCacheSize> reached;
+        printSubtree(0, reached, mCache[mCacheRoot]);
+        printf("- - floating: - -\n");
+        for(uint16_t node = 0; node < treeNodeCacheSize; node++)
+        {
+            if(!reached.getBit(node) && mCacheUsage.getBit(node))
+            {
+                printf("~ ");
+                printNode(mCache[node]);
+            }
+        }
     }
     else
         printf("Empty treeCache.\n");
-    printf("----------------\n");
+    printf("-----------------\n");
 }
 
 /**
@@ -982,25 +1052,8 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried writing TreeNode in readOnly mode!");
         return Result::bug;
     }
-    if (sizeof(TreeNode) > dataBytesPerPage)
-    {
-        PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "BUG: TreeNode bigger than Page"
-                  " (Was %lu, should %u)",
-                  sizeof(TreeNode),
-                  dataBytesPerPage);
-        return Result::bug;
-    }
-
     dev->lasterr = Result::ok;
     dev->areaMgmt.findWritableArea(AreaType::index);
-    /*	if(dev->areaMgmt.getStatus(dev->areaMgmt.getActiveArea(AreaType::index)) !=
-       AreaStatus::active){
-            PAFFS_DBG(PAFFS_TRACE_BUG, "findWritableArea returned an inactive area "
-                    "(%" PRIu32 " on %" PRIu32 ")!", dev->areaMgmt.getActiveArea(AreaType::index),
-                    dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(AreaType::index)));
-            return Result::bug;
-        }*/
     if (dev->lasterr != Result::ok)
     {
         return dev->lasterr;
@@ -1017,8 +1070,8 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
         return Result::bug;
     }
 
-    unsigned int firstFreePage = 0;
-    if (dev->areaMgmt.findFirstFreePage(&firstFreePage,
+    PageOffs firstFreePage = 0;
+    if (dev->areaMgmt.findFirstFreePage(firstFreePage,
                                         dev->areaMgmt.getActiveArea(AreaType::index))
         == Result::nospace)
     {
@@ -1080,23 +1133,14 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
 Result
 TreeCache::readTreeNode(Addr addr, TreeNode& node)
 {
-    if (sizeof(TreeNode) > dataBytesPerPage)
-    {
-        PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "BUG: TreeNode bigger than Page (Was %lu, should %u)",
-                  sizeof(TreeNode),
-                  dataBytesPerPage);
-        return Result::bug;
-    }
-
     if (dev->areaMgmt.getType(extractLogicalArea(addr)) != AreaType::index)
     {
         if (traceMask & PAFFS_TRACE_AREA)
         {
             printf("Info: \n\t%" PRIu32 " used Areas\n", dev->areaMgmt.getUsedAreas());
-            for (unsigned int i = 0; i < areasNo; i++)
+            for (AreaPos i = 0; i < areasNo; i++)
             {
-                printf("\tArea %03d on %03u as %10s from page %4d %s\n",
+                printf("\tArea %03" PRIu32 "  on %03" PRIu32 " as %10s from page %4d %s\n",
                        i,
                        dev->areaMgmt.getPos(i),
                        areaNames[dev->areaMgmt.getType(i)],
@@ -1104,7 +1148,7 @@ TreeCache::readTreeNode(Addr addr, TreeNode& node)
                        areaStatusNames[dev->areaMgmt.getStatus(i)]);
                 if (i > 128)
                 {
-                    printf("\n -- truncated 128-%u Areas.\n", areasNo);
+                    printf("\n -- truncated 128-%" PRIu16 " Areas.\n", areasNo);
                     break;
                 }
             }

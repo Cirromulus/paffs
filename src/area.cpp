@@ -85,11 +85,11 @@ getBlockNumberFromDirect(const Addr addr)
 
 // Combines the area number with the relative page starting from first page in area
 Addr
-combineAddress(const AreaPos logical_area, const PageOffs page)
+combineAddress(const AreaPos logicalArea, const PageOffs page)
 {
     Addr addr = 0;
-    memcpy(&addr, &page, sizeof(uint32_t));
-    memcpy(&reinterpret_cast<char*>(&addr)[sizeof(AreaPos)], &logical_area, sizeof(PageOffs));
+    memcpy(&addr, &page, sizeof(PageOffs));
+    memcpy(&reinterpret_cast<char*>(&addr)[sizeof(PageOffs)], &logicalArea, sizeof(AreaPos));
     return addr;
 }
 
@@ -97,7 +97,7 @@ unsigned int
 extractLogicalArea(const Addr addr)
 {
     unsigned int area = 0;
-    memcpy(&area, &reinterpret_cast<const char*>(&addr)[sizeof(AreaPos)], sizeof(PageOffs));
+    memcpy(&area, &reinterpret_cast<const char*>(&addr)[sizeof(PageOffs)], sizeof(AreaPos));
     return area;
 }
 unsigned int
@@ -167,7 +167,7 @@ AreaManagement::getPos(AreaPos area)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "Tried to get Position out of bounds! "
-                  "(%" PRIu32 " >= %" PRIu32 ")",
+                  "(%" PRIu32 " >= %" PRIu16 ")",
                   area,
                   areasNo);
         return 0;
@@ -383,7 +383,7 @@ AreaManagement::findWritableArea(AreaType areaType)
             {
                 initAreaAs(area, areaType);
                 PAFFS_DBG_S(
-                        PAFFS_TRACE_AREA, "Found empty Area %u for %s", area, areaNames[areaType]);
+                        PAFFS_TRACE_AREA, "Found empty Area %" PRIu32 " for %s", area, areaNames[areaType]);
                 return area;
             }
         }
@@ -403,7 +403,7 @@ AreaManagement::findWritableArea(AreaType areaType)
     if (getStatus(dev->areaMgmt.getActiveArea(areaType)) > AreaStatus::empty)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "garbage Collection returned invalid Status! (was %d, should <%d)",
+                  "garbage Collection returned invalid Status! (was %" PRId16 ", should <%" PRId16 ")",
                   getStatus(dev->areaMgmt.getActiveArea(areaType)),
                   AreaStatus::empty);
         dev->lasterr = Result::bug;
@@ -413,7 +413,7 @@ AreaManagement::findWritableArea(AreaType areaType)
     if (dev->areaMgmt.getActiveArea(areaType) != 0)
     {
         PAFFS_DBG_S(PAFFS_TRACE_AREA,
-                    "Found GC'ed Area %u for %s",
+                    "Found GC'ed Area %" PRIu32 " for %s",
                     dev->areaMgmt.getActiveArea(areaType),
                     areaNames[areaType]);
         if (getStatus(dev->areaMgmt.getActiveArea(areaType)) != AreaStatus::active)
@@ -436,14 +436,14 @@ AreaManagement::findWritableArea(AreaType areaType)
 }
 
 Result
-AreaManagement::findFirstFreePage(unsigned int* p_out, unsigned int area)
+AreaManagement::findFirstFreePage(PageOffs& page, AreaPos area)
 {
     Result r;
-    for (unsigned int i = 0; i < dataPagesPerArea; i++)
+    for (PageOffs i = 0; i < dataPagesPerArea; i++)
     {
         if (dev->sumCache.getPageStatus(area, i, &r) == SummaryEntry::free)
         {
-            *p_out = i;
+            page = i;
             return Result::ok;
         }
         if (r != Result::ok)
@@ -455,17 +455,17 @@ AreaManagement::findFirstFreePage(unsigned int* p_out, unsigned int area)
 Result
 AreaManagement::manageActiveAreaFull(AreaType areaType)
 {
-    unsigned int ffp;
+    PageOffs ffp;
     AreaPos area = getActiveArea(areaType);
-    if (findFirstFreePage(&ffp, area) != Result::ok)
+    if (findFirstFreePage(ffp, area) != Result::ok)
     {
-        PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Area %u (Type %s) full.", area, areaNames[areaType]);
+        PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Area %" PRIu32 " (Type %s) full.", area, areaNames[areaType]);
         // Current Area is full!
         closeArea(area);
     }
     else
     {
-        // PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Area %u still page %u free.", *area, ffp);
+        // PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Area %" PRIu32 " still page %" PRIu32 " free.", *area, ffp);
     }
 
     return Result::ok;
@@ -495,7 +495,7 @@ AreaManagement::initArea(AreaPos area)
                   getPos(getActiveArea(getType(area))));
     }
     PAFFS_DBG_S(PAFFS_TRACE_AREA,
-                "Info: Init Area %u (pos %u) as %s.",
+                "Info: Init Area %" PRIu32 " (pos %" PRIu32 ") as %s.",
                 static_cast<unsigned int>(area),
                 static_cast<unsigned int>(getPos(area)),
                 areaNames[getType(area)]);
@@ -513,7 +513,7 @@ AreaManagement::closeArea(AreaPos area)
     setStatus(area, AreaStatus::closed);
     setActiveArea(getType(area), 0);
     PAFFS_DBG_S(PAFFS_TRACE_AREA,
-                "Info: Closed %s Area %u at pos. %u.",
+                "Info: Closed %s Area %" PRIu32 " at pos. %" PRIu32 ".",
                 areaNames[getType(area)],
                 area,
                 getPos(area));
@@ -527,7 +527,7 @@ AreaManagement::retireArea(AreaPos area)
     setType(area, AreaType::retired);
     for (unsigned block = 0; block < blocksPerArea; block++)
         dev->driver.markBad(getPos(area) * blocksPerArea + block);
-    PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %u at pos. %u.", area, getPos(area));
+    PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %" PRIu32 " at pos. %" PRIu32 ".", area, getPos(area));
 }
 
 Result
@@ -563,7 +563,7 @@ AreaManagement::deleteAreaContents(AreaPos area)
         if (r != Result::ok)
         {
             PAFFS_DBG_S(PAFFS_TRACE_GC,
-                        "Could not delete block n° %u (Area %u)!",
+                        "Could not delete block n° %" PRIu32 " (Area %" PRIu32 ")!",
                         getPos(area) * blocksPerArea + i,
                         area);
             retireArea(area);
@@ -578,8 +578,8 @@ AreaManagement::deleteAreaContents(AreaPos area)
     if (r == Result::badflash)
     {
         PAFFS_DBG_S(PAFFS_TRACE_GC,
-                    "Could not delete block in area %u "
-                    "on position %u! Retired Area.",
+                    "Could not delete block in area %" PRIu32 " "
+                    "on position %" PRIu32 "! Retired Area.",
                     area,
                     getPos(area));
         if (traceMask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL))
@@ -587,7 +587,7 @@ AreaManagement::deleteAreaContents(AreaPos area)
             printf("Info: \n");
             for (unsigned int i = 0; i < areasNo; i++)
             {
-                printf("\tArea %d on %u as %10s with %3u erases\n",
+                printf("\tArea %" PRId16 " on %" PRIu32 " as %10s with %3u erases\n",
                        i,
                        getPos(i),
                        areaNames[getType(i)],
@@ -595,7 +595,7 @@ AreaManagement::deleteAreaContents(AreaPos area)
             }
         }
     }
-    PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Deleted Area %u Contents at pos. %u.", area, getPos(area));
+    PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Deleted Area %" PRIu32 " Contents at pos. %" PRIu32 ".", area, getPos(area));
     dev->sumCache.deleteSummary(area);
     return r;
 }
@@ -631,7 +631,7 @@ AreaManagement::deleteArea(AreaPos area)
     setStatus(area, AreaStatus::empty);
     setType(area, AreaType::unset);
     decreaseUsedAreas();
-    PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Area %u at pos. %u.", area, getPos(area));
+    PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Area %" PRIu32 " at pos. %" PRIu32 ".", area, getPos(area));
     return r;
 }
 

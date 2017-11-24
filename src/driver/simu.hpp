@@ -60,15 +60,15 @@ public:
 	Result
 	deInitializeNand() override;
 	Result
-	writePage(PageAbs page_no, void* data, unsigned int data_len) override;
+	writePage(PageAbs pageNo, void* data, unsigned int dataLen) override;
 	Result
-	readPage(PageAbs page_no, void* data, unsigned int data_len) override;
+	readPage(PageAbs pageNo, void* data, unsigned int dataLen) override;
 	Result
-	eraseBlock(BlockAbs block_no) override;
+	eraseBlock(BlockAbs blockNo) override;
 	Result
-	markBad(BlockAbs block_no) override;
+	markBad(BlockAbs blockNo) override;
 	Result
-	checkBad(BlockAbs block_no) override;
+	checkBad(BlockAbs blockNo) override;
 	Result
 	writeMRAM(PageAbs startByte,
 	          const void* data, unsigned int dataLen) override;

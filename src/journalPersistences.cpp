@@ -144,7 +144,7 @@ MramPersistence::appendEntry(const JournalEntry& entry)
     uint16_t size = getSizeFromJE(entry);
     device->driver.writeMRAM(curr, &entry, size);
     PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE),
-                "Wrote Entry to %" PRIu64 "-%" PRIu64,
+                "Wrote Entry to %" PRIu32 "-%" PRIu32,
                 curr,
                 curr + size);
     curr += size;
@@ -173,7 +173,7 @@ MramPersistence::readNextElem(journalEntry::Max& entry)
     device->driver.readMRAM(curr, &entry, sizeof(journalEntry::Max));
     uint16_t size = getSizeFromMax(entry);
     PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE),
-                "Read entry at %" PRIu64 "-%" PRIu64,
+                "Read entry at %" PRIu32 "-%" PRIu32,
                 curr,
                 curr + size);
     if (size == 0)

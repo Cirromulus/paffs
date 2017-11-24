@@ -49,7 +49,7 @@ NullDriver::deInitializeNand()
 }
 
 Result
-NullDriver::writePage(uint64_t page_no,
+NullDriver::writePage(PageAbs page_no,
                       void* data, unsigned int data_len)
 {
 	(void) page_no;
@@ -59,7 +59,7 @@ NullDriver::writePage(uint64_t page_no,
 	return Result::nimpl;
 }
 Result
-NullDriver::readPage(uint64_t page_no,
+NullDriver::readPage(PageAbs page_no,
                      void* data, unsigned int data_len)
 {
 	(void) page_no;
@@ -69,7 +69,7 @@ NullDriver::readPage(uint64_t page_no,
 	return Result::nimpl;
 }
 Result
-NullDriver::eraseBlock(uint32_t block_no)
+NullDriver::eraseBlock(BlockAbs block_no)
 {
 	(void) block_no;
 	printf("EraseBlock from Nulldriver.\n");
@@ -77,7 +77,7 @@ NullDriver::eraseBlock(uint32_t block_no)
 }
 
 Result
-NullDriver::markBad(uint32_t block_no)
+NullDriver::markBad(BlockAbs block_no)
 {
 	(void) block_no;
 	printf("MarkBad from Nulldriver.\n");
@@ -85,7 +85,7 @@ NullDriver::markBad(uint32_t block_no)
 }
 
 Result
-NullDriver::checkBad(uint32_t block_no)
+NullDriver::checkBad(BlockAbs block_no)
 {
 	(void) block_no;
 	printf("CheckBad from Nulldriver.\n");

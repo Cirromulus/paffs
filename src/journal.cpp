@@ -114,7 +114,7 @@ Journal::processBuffer()
         printf("FirstUnsucceededEntry:\n");
         for (unsigned i = 0; i < JournalEntry::numberOfTopics; i++)
         {
-            printf("\t%s: %" PRIu64 ".%" PRIu16 "\n",
+            printf("\t%s: %" PRIu32 ".%" PRIu16 "\n",
                    topicNames[i],
                    firstUnsuccededEntry[i].flash.addr,
                    firstUnsuccededEntry[i].flash.offs);
@@ -173,7 +173,7 @@ Journal::applyCheckpointedJournalEntries(
 {
     PAFFS_DBG_S(PAFFS_TRACE_JOURNAL,
                 "Applying Checkpointed Entries "
-                "from %" PRIu64 ".%" PRIu16 " to %" PRIu64 ".%" PRIu16,
+                "from %" PRIu32 ".%" PRIu16 " to %" PRIu32 ".%" PRIu16,
                 from.flash.addr,
                 from.flash.offs,
                 to.flash.addr,
@@ -231,7 +231,7 @@ Journal::applyUncheckpointedJournalEntries(EntryIdentifier& from)
 {
     PAFFS_DBG_S(PAFFS_TRACE_JOURNAL,
                 "Applying UNcheckpointed Entries "
-                "from %" PRIu64 ".%" PRIu16,
+                "from %" PRIu32 ".%" PRIu16,
                 from.flash.addr,
                 from.flash.offs);
     EntryIdentifier restore = persistence.tell();

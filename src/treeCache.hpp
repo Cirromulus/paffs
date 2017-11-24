@@ -23,15 +23,15 @@ class TreeCache
 {
     Device* dev;
 
-    int16_t cache_root = 0;
+    int16_t mCacheRoot = 0;
 
-    TreeCacheNode cache[treeNodeCacheSize];
+    TreeCacheNode mCache[treeNodeCacheSize];
 
-    BitList<treeNodeCacheSize> cacheUsage;
+    BitList<treeNodeCacheSize> mCacheUsage;
 
     // Just for debug/tuning purposes
-    uint16_t cache_hits = 0;
-    uint16_t cache_misses = 0;
+    uint16_t mCacheHits = 0;
+    uint16_t mCacheMisses = 0;
 
 public:
     TreeCache(Device* mdev) : dev(mdev){};
@@ -43,8 +43,7 @@ public:
     commitCache();
 
     Result
-    freeNodes(uint16_t neededCleanNodes = treeNodeCacheSize);
-
+    reserveNodes(uint16_t neededNodes);
     //--------------------------------------
 
     /**
@@ -84,6 +83,12 @@ public:
     addNewCacheNode(TreeCacheNode*& newTcn);
 
     /**
+     * \return fail if not determinable
+     */
+    Result
+    tryGetHeight(uint16_t &heightOut);
+
+    /**
      * Consistency checkers for Treecache
      */
     bool
@@ -107,6 +112,9 @@ public:
     printTreeCache();
 
 private:
+
+    Result
+    freeNodes(uint16_t neededCleanNodes = treeNodeCacheSize);
     /**
      * returns true if path contains dirty elements
      * traverses through all paths and marks them
@@ -124,6 +132,9 @@ private:
     deletePathToRoot(TreeCacheNode& tcn);
     Result
     tryAddNewCacheNode(TreeCacheNode*& newTcn);
+    /**
+     * \warn Only valid if resolveDirtyPaths has been called before
+     */
     Result
     commitNodesRecursively(TreeCacheNode& node);
     void
@@ -133,7 +144,9 @@ private:
     bool
     isIndexUsed(uint16_t index);
     void
-    printSubtree(int layer, TreeCacheNode& node);
+    printNode(TreeCacheNode& node);
+    void
+    printSubtree(int layer, BitList<treeNodeCacheSize>& reached, TreeCacheNode& node);
     int16_t
     findFirstFreeIndex();
     int16_t

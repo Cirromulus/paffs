@@ -26,22 +26,27 @@ static constexpr uint32_t leafOrder =
         (dataBytesPerPage - sizeof(Addr) - sizeof(bool) - sizeof(unsigned char))
         / (sizeof(Inode) + sizeof(InodeNo));
 
-typedef struct TreeNode{
-	union As{
-		struct Branch {
-			InodeNo keys[branchOrder-1];
-			Addr pointers[branchOrder];
-		} branch;
-		struct Leaf {
-			InodeNo keys[leafOrder];
-			Inode pInodes[leafOrder];
-		} leaf;
-	}as;
-	Addr self;	//If '0', it is not committed yet
-	bool is_leaf:1;
-	uint16_t num_keys; //If leaf: Number of pInodes
-							//If Branch: Number of addresses - 1
-} treeNode;
+struct TreeNode
+{
+    union As {
+        struct Branch
+        {
+            InodeNo keys[branchOrder - 1];
+            Addr pointers[branchOrder];
+        } branch;
+        struct Leaf
+        {
+            InodeNo keys[leafOrder];
+            Inode pInodes[leafOrder];
+        } leaf;
+    } as;
+    Addr self;               // If '0', it is not committed yet
+    bool isLeaf : 1;
+    uint16_t keys : 7;  // If leaf:   Number of pInodes
+                             // If Branch: Number of addresses - 1
+};
+
+static_assert(sizeof(TreeNode) <= dataBytesPerPage, "At least one treenode must fit in a page");
 
 struct TreeCacheNode
 {

@@ -87,10 +87,10 @@ err_msg(Result pr)
 void
 Paffs::printCacheSizes()
 {
-    PAFFS_DBG_S(PAFFS_TRACE_INFO, "-----------Devices: %u-----------", maxNumberOfDevices);
+    PAFFS_DBG_S(PAFFS_TRACE_INFO, "-----------Devices: %" PRIu32 "-----------", maxNumberOfDevices);
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "TreeNode size: %zu Byte, TreeCacheNode size: %zu Byte. Cachable Nodes: %u.\n"
-                "\tBranch order: %u, Leaf order: %u\n"
+                "TreeNode size: %zu Byte, TreeCacheNode size: %zu Byte. Cachable Nodes: %" PRIu32 ".\n"
+                "\tBranch order: %" PRIu32 ", Leaf order: %" PRIu32 "\n"
                 "\tOverall TreeCache size: %zu Byte.",
                 sizeof(TreeNode),
                 sizeof(TreeCacheNode),
@@ -100,35 +100,35 @@ Paffs::printCacheSizes()
                 treeNodeCacheSize * sizeof(TreeCacheNode));
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "Packed AreaSummary size: %zu Byte. Cacheable Summaries: %u.\n"
+                "Packed AreaSummary size: %zu Byte. Cacheable Summaries: %" PRIu32 ".\n"
                 "\tOverall AreaSummary cache size: %zu Byte.",
                 dataPagesPerArea / 4 + 2 + sizeof(PageOffs),
                 areaSummaryCacheSize,
                 (dataPagesPerArea / 4 + 2 + sizeof(PageOffs)) * areaSummaryCacheSize);
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "Size of AreaMap Entry: %zu Byte. Areas: %u.\n"
+                "Size of AreaMap Entry: %zu Byte. Areas: %" PRIu32 ".\n"
                 "\tOverall AreaMap Size: %zu Byte.",
                 sizeof(Area),
                 areasNo,
                 sizeof(Area) * areasNo);
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "Size of File object: %zu Byte. Max Open Files: %u.\n"
+                "Size of File object: %zu Byte. Max Open Files: %" PRIu32 ".\n"
                 "\tOverall File cache Size: %zu Byte.",
                 sizeof(Obj),
                 maxNumberOfFiles,
                 sizeof(Obj) * maxNumberOfFiles);
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "Size of Inode object: %zu Byte. Max open Inodes: %u.\n"
+                "Size of Inode object: %zu Byte. Max open Inodes: %" PRIu32 ".\n"
                 "\tOverall Inode cache Size: %zu Byte.",
                 sizeof(Inode),
                 maxNumberOfInodes,
                 sizeof(Inode) * maxNumberOfInodes);
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "Size of Address: %zu. Addresses per Page: %u. AddrListCacheElem: %zu Byte.\n"
+                "Size of Address: %zu. Addresses per Page: %" PRIu32 ". AddrListCacheElem: %zu Byte.\n"
                 "\tOverall AddrBuffer Size: %zu Byte",
                 sizeof(Addr),
                 addrsPerPage,
@@ -136,7 +136,7 @@ Paffs::printCacheSizes()
                 sizeof(PageAddressCache));
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "Size of Device: %zu. Number of Devices: %u.\n"
+                "Size of Device: %zu. Number of Devices: %" PRIu32 ".\n"
                 "\tOverall Devices Size: %zu Byte",
                 sizeof(Device),
                 maxNumberOfDevices,
@@ -156,7 +156,7 @@ Paffs::Paffs(std::vector<Driver*>& deviceDrivers)
         if (i >= maxNumberOfDevices)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Too many device Drivers given! Accepting max %d.",
+                      "Too many device Drivers given! Accepting max %" PRId16 ".",
                       maxNumberOfDevices);
             break;
         }
@@ -239,7 +239,7 @@ Paffs::format(const BadBlockList badBlockList[maxNumberOfDevices], bool complete
             Result deviceReturn = devices[i]->format(badBlockList[i], complete);
             if (deviceReturn > globalReturn)
             {   //Results are (somewhat) ordered by badness
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not format device %d!", i);
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not format device %" PRId16 "!", i);
                 globalReturn = deviceReturn;
             }
         }
@@ -259,7 +259,7 @@ Paffs::mount(bool readOnly)
             Result deviceReturn = devices[i]->mnt(readOnly);
             if (deviceReturn > globalReturn)
             {   //Results are (somewhat) ordered by badness
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mount device %d!", i);
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mount device %" PRId16 "!", i);
                 globalReturn = deviceReturn;
             }
         }
@@ -278,7 +278,7 @@ Paffs::unmount()
             Result deviceReturn = devices[i]->unmnt();
             if (deviceReturn > globalReturn)
             {   //Results are (somewhat) ordered by badness
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not unmount device %d!", i);
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not unmount device %" PRId16 "!", i);
                 globalReturn = deviceReturn;
             }
         }

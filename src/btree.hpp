@@ -32,8 +32,8 @@ class Btree : public JournalTopic
     Device* dev;
 
 public:
-    TreeCache cache;
-    Btree(Device* mdev) : dev(mdev), cache(TreeCache(mdev)){};
+    TreeCache mCache;
+    Btree(Device* mdev) : dev(mdev), mCache(TreeCache(mdev)){};
 
     Result
     insertInode(const Inode& inode);

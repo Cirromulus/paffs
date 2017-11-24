@@ -145,7 +145,7 @@ Device::format(const BadBlockList& badBlockList, bool complete)
                 if (r != Result::ok)
                 {
                     PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
-                                "Found non-marked bad block %u during formatting, "
+                                "Found non-marked bad block %" PRIu32 " during formatting, "
                                 "retiring area %" PRIu32,
                                 p + area * blocksPerArea,
                                 area);
@@ -318,7 +318,7 @@ Device::unmnt()
         while (it != inodePool.map.end())
         {
             PAFFS_DBG_S(PAFFS_TRACE_ALWAYS,
-                        "Commit Inode %" PRIu32 " with %u references",
+                        "Commit Inode %" PRIu32 " with %" PRIu32 " references",
                         it->first,
                         it->second.second);
             // TODO: Later, we would choose the actual pac instance (or the PAC will choose the
@@ -366,7 +366,7 @@ Device::unmnt()
                    areaStatusNames[areaMgmt.getStatus(i)]);
             if (i > 128)
             {
-                printf("\n -- truncated 128-%u Areas.\n", areasNo);
+                printf("\n -- truncated 128-%" PRIu32 " Areas.\n", areasNo);
                 break;
             }
         }
@@ -502,7 +502,7 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         if (direntryl < sizeof(DirEntryLength) + sizeof(InodeNo))
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "Directory entry size of Folder %u is unplausible! (was: %d, should: >%lu)",
+                      "Directory entry size of Folder %" PRIu32 " is unplausible! (was: %" PRId16 ", should: >%lu)",
                       folder.no,
                       direntryl,
                       sizeof(DirEntryLength) + sizeof(InodeNo));
@@ -511,7 +511,7 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         if (direntryl > folder.size)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "BUG: direntry length of Folder %u not plausible (was: %d, should: >%d)!",
+                      "BUG: direntry length of Folder %" PRIu32 " not plausible (was: %" PRId16 ", should: >%" PRId16 ")!",
                       folder.no,
                       direntryl,
                       folder.size);
@@ -521,7 +521,7 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         if (dirnamel > folder.size)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "BUG: dirname length of Inode %u not plausible (was: %d, should: >%d)!",
+                      "BUG: dirname length of Inode %" PRIu32 " not plausible (was: %" PRId16 ", should: >%" PRId16 ")!",
                       folder.no,
                       folder.size,
                       p + dirnamel);
@@ -695,7 +695,7 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
     {
         // Ouch, during directory write
         PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Could not write %u of %u bytes directory data",
+                  "Could not write %" PRIu32 " of %" PRIu32 " bytes directory data",
                   contDir.size + direntryl - bytes,
                   contDir.size + direntryl);
         if (bytes != 0)
@@ -761,7 +761,7 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
 
             if (restByte > 0 && restByte < 4)  // should either be 0 (no entries left) or bigger
             {                                  // than 4 (minimum size for one entry)
-                PAFFS_DBG(PAFFS_TRACE_BUG, "Something is fishy! (%d)", restByte);
+                PAFFS_DBG(PAFFS_TRACE_BUG, "Something is fishy! (%" PRId16 ")", restByte);
             }
             if (newSize == 0)
             {
@@ -891,7 +891,7 @@ Device::openDir(const char* path)
         if (dirnamel > 1 << sizeof(DirEntryLength) * 8)
         {
             // We have an error while reading
-            PAFFS_DBG(PAFFS_TRACE_BUG, "Dirname length was bigger than possible (%u)!", dirnamel);
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Dirname length was bigger than possible (%" PRIu32 ")!", dirnamel);
             delete[] dir->childs;
             delete[] dirData;
             delete dir->self;
@@ -916,7 +916,7 @@ Device::openDir(const char* path)
     if (entry != dir->no_entries)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Directory stated it had %u entries, but has actually %u!",
+                  "Directory stated it had %" PRIu32 " entries, but has actually %" PRIu32 "!",
                   dir->no_entries,
                   entry);
         lasterr = Result::bug;
@@ -1308,7 +1308,7 @@ Device::write(Obj& obj, const char* buf, unsigned int bytesToWrite,
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Could not write %u of %u bytes at %u",
+                  "Could not write %" PRIu32 " of %" PRIu32 " bytes at %" PRIu32 "",
                   bytesToWrite - *bytesWritten,
                   bytesToWrite, obj.fp);
         if (*bytesWritten > 0)
@@ -1327,7 +1327,7 @@ Device::write(Obj& obj, const char* buf, unsigned int bytesToWrite,
     if (*bytesWritten != bytesToWrite)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Could not write Inode Data in whole! (Should: %d, was: %d)",
+                  "Could not write Inode Data in whole! (Should: %" PRId16 ", was: %" PRId16 ")",
                   bytesToWrite,
                   *bytesWritten);
         // TODO: Handle error, maybe rewrite
@@ -1573,7 +1573,7 @@ Device::initializeDevice()
     if (areasNo < AreaType::no - 2)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Device too small, at least %u Areas are needed!",
+                  "Device too small, at least %" PRIu32 " Areas are needed!",
                   static_cast<unsigned>(AreaType::no));
         return Result::invalidInput;
     }
@@ -1595,7 +1595,7 @@ Device::initializeDevice()
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
                   "'blocksPerArea' does not divide "
-                  "%u blocks evenly! (define %u, rest: %u)",
+                  "%" PRIu32 " blocks evenly! (define %" PRIu32 ", rest: %" PRIu32 ")",
                   blocksTotal,
                   blocksPerArea,
                   blocksTotal % blocksPerArea);

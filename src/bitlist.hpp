@@ -45,7 +45,7 @@ public:
         }
         else
         {
-            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Bit at %u, but size is %zu", n, numberOfElements);
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Bit at %" PRIu16 ", but size is %zu", n, numberOfElements);
         }
     }
 
@@ -64,7 +64,7 @@ public:
         }
         else
         {
-            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to reset Bit at %u, but size is %zu", n, numberOfElements);
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to reset Bit at %" PRIu16 ", but size is %zu", n, numberOfElements);
         }
     }
 
@@ -81,7 +81,7 @@ public:
         {
             return list[n / 8] & 1 << n % 8;
         }
-        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Bit at %u, but size is %zu", n, numberOfElements);
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Bit at %" PRIu16 ", but size is %zu", n, numberOfElements);
         return false;
     }
 
@@ -133,6 +133,26 @@ public:
     isSetSomewhere()
     {
         return isSetSomewhere(mList);
+    }
+
+    static inline size_t
+    countSetBits(const char* list)
+    {
+        size_t count = 0;
+        for (unsigned i = 0; i < numberOfElements; i++)
+        {
+            if (getBit(i, list))
+            {
+                ++count;
+            }
+        }
+        return count;
+    }
+
+    inline size_t
+    countSetBits()
+    {
+        return countSetBits(mList);
     }
 
     static inline size_t

@@ -47,7 +47,7 @@ getBlockNumberFromDirect(const Addr addr);
  * combines two values to one type
  */
 Addr
-combineAddress(const AreaPos logical_area, const PageOffs page);
+combineAddress(const AreaPos logicalArea, const PageOffs page);
 unsigned int
 extractLogicalArea(const Addr addr);
 unsigned int
@@ -127,7 +127,7 @@ public:
     findWritableArea(AreaType areaType);
 
     Result
-    findFirstFreePage(unsigned int* p_out, unsigned int area);
+    findFirstFreePage(PageOffs& page, AreaPos area);
 
     Result
     manageActiveAreaFull(AreaType areaType);
