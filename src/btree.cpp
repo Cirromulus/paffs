@@ -31,7 +31,7 @@ Btree::insertInode(const Inode& inode)
 
     PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert Inode n° %d", inode.no);
 
-    r = find_leaf(inode.no, node);
+    r = findLeaf(inode.no, node);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find leaf");
@@ -71,12 +71,12 @@ Btree::insertInode(const Inode& inode)
      */
     if (node->raw.num_keys < leafOrder)
     {
-        return insert_into_leaf(*node, inode);
+        return insertIntoLeaf(*node, inode);
     }
 
     /* Case:  leaf must be split.
      */
-    return insert_into_leaf_after_splitting(*node, inode);
+    return insertIntoLeafAfterSplitting(*node, inode);
 }
 
 Result
@@ -90,7 +90,7 @@ Btree::updateExistingInode(const Inode& inode)
 {
     PAFFS_DBG_S(PAFFS_TRACE_TREE, "Update existing inode n° %d", inode.no);
     TreeCacheNode* node = nullptr;
-    Result r = find_leaf(inode.no, node);
+    Result r = findLeaf(inode.no, node);
     if (r != Result::ok)
         return r;
 
@@ -125,15 +125,15 @@ Btree::deleteInode(InodeNo number)
     Inode key;
     TreeCacheNode* key_leaf;
 
-    Result r = find_leaf(number, key_leaf);
+    Result r = findLeaf(number, key_leaf);
     if (r != Result::ok)
         return r;
-    r = find_in_leaf(*key_leaf, number, key);
+    r = findInLeaf(*key_leaf, number, key);
     if (r != Result::ok)
         return r;
 
     dev->journal.addEvent(journalEntry::btree::Remove(number));
-    return delete_entry(*key_leaf, number);
+    return deleteEntry(*key_leaf, number);
 }
 
 Result
@@ -237,7 +237,7 @@ Btree::height(TreeCacheNode& root)
  * of the path from any TreeCacheNode to the root.
  */
 int
-Btree::length_to_root(TreeCacheNode& child)
+Btree::lengthToRoot(TreeCacheNode& child)
 {
     unsigned int length = 0;
     TreeCacheNode* node = &child;
@@ -255,7 +255,7 @@ Btree::length_to_root(TreeCacheNode& child)
  * This function is used to build up cache to a given leaf after a cache clean.
  */
 Result
-Btree::find_branch(TreeCacheNode& target, TreeCacheNode*& outtreeCacheNode)
+Btree::findBranch(TreeCacheNode& target, TreeCacheNode*& outtreeCacheNode)
 {
     int i = 0;
     TreeCacheNode* c = nullptr;
@@ -290,7 +290,7 @@ Btree::find_branch(TreeCacheNode& target, TreeCacheNode*& outtreeCacheNode)
  * Returns the leaf containing the given key.
  */
 Result
-Btree::find_leaf(InodeNo key, TreeCacheNode*& outtreeCacheNode)
+Btree::findLeaf(InodeNo key, TreeCacheNode*& outtreeCacheNode)
 {
     int i = 0;
     TreeCacheNode* c = nullptr;
@@ -331,14 +331,14 @@ Btree::find_leaf(InodeNo key, TreeCacheNode*& outtreeCacheNode)
 }
 
 Result
-Btree::find_in_leaf(TreeCacheNode& leaf, InodeNo key, Inode& outInode)
+Btree::findInLeaf(TreeCacheNode& leaf, InodeNo key, Inode& outInode)
 {
     unsigned int i;
     for (i = 0; i < leaf.raw.num_keys; i++)
         if (leaf.raw.as.leaf.keys[i] == key)
             break;
     if (i == leaf.raw.num_keys)
-        return Result::nf;
+        return Result::notFound;
     outInode = leaf.raw.as.leaf.pInodes[i];
     return Result::ok;
 }
@@ -350,10 +350,10 @@ Result
 Btree::find(InodeNo key, Inode& outInode)
 {
     TreeCacheNode* c = nullptr;
-    Result r = find_leaf(key, c);
+    Result r = findLeaf(key, c);
     if (r != Result::ok)
         return r;
-    return find_in_leaf(*c, key, outInode);
+    return findInLeaf(*c, key, outInode);
 }
 
 /* Finds the appropriate place to
@@ -375,7 +375,7 @@ Btree::cut(int length)
  * the TreeCacheNode to the left of the key to be inserted.
  */
 int
-Btree::get_left_index(TreeCacheNode& parent, TreeCacheNode& left)
+Btree::getLeftIndex(TreeCacheNode& parent, TreeCacheNode& left)
 {
     int left_index = 0;
     while (left_index < parent.raw.num_keys)
@@ -396,7 +396,7 @@ Btree::get_left_index(TreeCacheNode& parent, TreeCacheNode& left)
  * (No further Tree-action Required)
  */
 Result
-Btree::insert_into_leaf(TreeCacheNode& leaf, const Inode& newInode)
+Btree::insertIntoLeaf(TreeCacheNode& leaf, const Inode& newInode)
 {
     int i, insertion_point;
 
@@ -425,7 +425,7 @@ Btree::insert_into_leaf(TreeCacheNode& leaf, const Inode& newInode)
  * in half.
  */
 Result
-Btree::insert_into_leaf_after_splitting(TreeCacheNode& leaf, const Inode& newInode)
+Btree::insertIntoLeafAfterSplitting(TreeCacheNode& leaf, const Inode& newInode)
 {
     PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert into leaf after splitting");
     InodeNo temp_keys[leafOrder + 1];
@@ -493,7 +493,7 @@ Btree::insert_into_leaf_after_splitting(TreeCacheNode& leaf, const Inode& newIno
     new_key = new_leaf->raw.as.leaf.keys[0];
     leaf.dirty = true;
 
-    return insert_into_parent(leaf, new_key, *new_leaf);
+    return insertIntoParent(leaf, new_key, *new_leaf);
 }
 
 /* Inserts a new key and pointer to a TreeCacheNode
@@ -502,7 +502,7 @@ Btree::insert_into_leaf_after_splitting(TreeCacheNode& leaf, const Inode& newIno
  * (No further Tree-action Required)
  */
 Result
-Btree::insert_into_node(TreeCacheNode& node, int left_index, InodeNo key, TreeCacheNode& right)
+Btree::insertIntoNode(TreeCacheNode& node, int left_index, InodeNo key, TreeCacheNode& right)
 {
     int i;
 
@@ -529,7 +529,7 @@ Btree::insert_into_node(TreeCacheNode& node, int left_index, InodeNo key, TreeCa
  * the order, and causing the TreeCacheNode to split into two.
  */
 Result
-Btree::insert_into_node_after_splitting(TreeCacheNode& old_node,
+Btree::insertIntoNodeAfterSplitting(TreeCacheNode& old_node,
                                         unsigned int left_index,
                                         InodeNo key,
                                         TreeCacheNode& right)
@@ -625,26 +625,26 @@ Btree::insert_into_node_after_splitting(TreeCacheNode& old_node,
      * the old TreeCacheNode to the left and the new to the right.
      */
 
-    return insert_into_parent(old_node, k_prime, *new_node);
+    return insertIntoParent(old_node, k_prime, *new_node);
 }
 
 /* Inserts a new TreeCacheNode (leaf or internal TreeCacheNode) into the B+ tree.
  */
 Result
-Btree::insert_into_parent(TreeCacheNode& left, InodeNo key, TreeCacheNode& right)
+Btree::insertIntoParent(TreeCacheNode& left, InodeNo key, TreeCacheNode& right)
 {
     int left_index;
     TreeCacheNode* parent = left.parent;
 
     if (&left == parent)
-        return insert_into_new_root(left, key, right);
+        return insertIntoNewRoot(left, key, right);
 
-    left_index = get_left_index(*parent, left);
+    left_index = getLeftIndex(*parent, left);
 
     if (parent->raw.num_keys < branchOrder - 1)
-        return insert_into_node(*parent, left_index, key, right);
+        return insertIntoNode(*parent, left_index, key, right);
 
-    return insert_into_node_after_splitting(*parent, left_index, key, right);
+    return insertIntoNodeAfterSplitting(*parent, left_index, key, right);
 }
 
 /* Creates a new root for two subtrees
@@ -653,7 +653,7 @@ Btree::insert_into_parent(TreeCacheNode& left, InodeNo key, TreeCacheNode& right
  * COULD INITIATE A CACHE FLUSH
  */
 Result
-Btree::insert_into_new_root(TreeCacheNode& left, InodeNo key, TreeCacheNode& right)
+Btree::insertIntoNewRoot(TreeCacheNode& left, InodeNo key, TreeCacheNode& right)
 {
     PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert into new root at key %u", key);
     TreeCacheNode* new_root = nullptr;
@@ -687,7 +687,7 @@ Btree::insert_into_new_root(TreeCacheNode& left, InodeNo key, TreeCacheNode& rig
  * So init rootnode
  */
 Result
-Btree::start_new_tree()
+Btree::startNewTree()
 {
     cache.clear();
     TreeCacheNode* new_root = nullptr;
@@ -709,7 +709,7 @@ Btree::start_new_tree()
  * this special case.
  */
 int
-Btree::get_neighbor_index(TreeCacheNode& n)
+Btree::getNeighborIndex(TreeCacheNode& n)
 {
     int i;
     TreeCacheNode* parent = n.parent;
@@ -726,7 +726,7 @@ Btree::get_neighbor_index(TreeCacheNode& n)
  * Does not realign
  */
 Result
-Btree::remove_entry_from_node(TreeCacheNode& n, InodeNo key)
+Btree::removeEntryFromNode(TreeCacheNode& n, InodeNo key)
 {
     unsigned int i = 0;
 
@@ -783,7 +783,7 @@ Btree::remove_entry_from_node(TreeCacheNode& n, InodeNo key)
 }
 
 Result
-Btree::adjust_root(TreeCacheNode& root)
+Btree::adjustRoot(TreeCacheNode& root)
 {
     /* Case: nonempty root.
      * Key and pointer have already been deleted,
@@ -822,7 +822,7 @@ Btree::adjust_root(TreeCacheNode& root)
  * without exceeding the maximum.
  */
 Result
-Btree::coalesce_nodes(TreeCacheNode& n,
+Btree::coalesceNodes(TreeCacheNode& n,
                       TreeCacheNode& neighbor,
                       int neighbor_index,
                       unsigned int k_prime)
@@ -908,7 +908,7 @@ Btree::coalesce_nodes(TreeCacheNode& n,
 
     neighbor.dirty = true;
 
-    Result r = delete_entry(*n.parent, k_prime);
+    Result r = deleteEntry(*n.parent, k_prime);
     if (r != Result::ok)
         return r;
 
@@ -922,7 +922,7 @@ Btree::coalesce_nodes(TreeCacheNode& n,
  * maximum
  */
 Result
-Btree::redistribute_nodes(TreeCacheNode& n,
+Btree::redistributeNodes(TreeCacheNode& n,
                           TreeCacheNode& neighbor,
                           int neighbor_index,
                           unsigned int k_prime_index,
@@ -1041,7 +1041,7 @@ Btree::redistribute_nodes(TreeCacheNode& n,
  * changes to preserve the B+ tree properties.
  */
 Result
-Btree::delete_entry(TreeCacheNode& n, InodeNo key)
+Btree::deleteEntry(TreeCacheNode& n, InodeNo key)
 {
     int min_keys;
     TreeCacheNode* neighbor = nullptr;
@@ -1051,7 +1051,7 @@ Btree::delete_entry(TreeCacheNode& n, InodeNo key)
 
     // Remove key and pointer from TreeCacheNode.
 
-    Result r = remove_entry_from_node(n, key);
+    Result r = removeEntryFromNode(n, key);
     if (r != Result::ok)
         return r;
 
@@ -1059,7 +1059,7 @@ Btree::delete_entry(TreeCacheNode& n, InodeNo key)
      */
 
     if (n.parent == &n)
-        return adjust_root(n);
+        return adjustRoot(n);
 
     /* Case:  deletion from a TreeCacheNode below the root.
      * (Rest of function body.)
@@ -1090,7 +1090,7 @@ Btree::delete_entry(TreeCacheNode& n, InodeNo key)
      * to the neighbor.
      */
 
-    neighbor_index = get_neighbor_index(n);
+    neighbor_index = getNeighborIndex(n);
     k_prime_index = neighbor_index == -1 ? 0 : neighbor_index;
     k_prime = n.parent->raw.as.branch.keys[k_prime_index];
     r = neighbor_index == -1 ? cache.getTreeNodeAtIndexFrom(1, *n.parent, neighbor)
@@ -1103,12 +1103,12 @@ Btree::delete_entry(TreeCacheNode& n, InodeNo key)
     /* Coalescence. */
 
     if (neighbor->raw.num_keys + n.raw.num_keys <= capacity)
-        return coalesce_nodes(n, *neighbor, neighbor_index, k_prime);
+        return coalesceNodes(n, *neighbor, neighbor_index, k_prime);
 
     /* Redistribution. */
 
     else
-        return redistribute_nodes(n, *neighbor, neighbor_index, k_prime_index, k_prime);
+        return redistributeNodes(n, *neighbor, neighbor_index, k_prime_index, k_prime);
 }
 
 /* Prints the B+ tree in the command
@@ -1117,7 +1117,7 @@ Btree::delete_entry(TreeCacheNode& n, InodeNo key)
  * to separate nodes.
  */
 void
-Btree::print_tree()
+Btree::printTree()
 {
     TreeCacheNode* n = nullptr;
     Result r = cache.getRootNodeFromCache(n);
@@ -1126,7 +1126,7 @@ Btree::print_tree()
         printf("%s!\n", err_msg(r));
         return;
     }
-    print_keys(*n);
+    printKeys(*n);
     // print_leaves(&n);
 }
 
@@ -1135,7 +1135,7 @@ Btree::print_tree()
  * pointers, if the verbose_output flag is set.
  */
 void
-Btree::print_leaves(TreeCacheNode& c)
+Btree::printLeaves(TreeCacheNode& c)
 {
     if (c.raw.is_leaf)
     {
@@ -1154,7 +1154,7 @@ Btree::print_leaves(TreeCacheNode& c)
                 printf("%s!\n", err_msg(r));
                 return;
             }
-            print_leaves(*n);
+            printLeaves(*n);
             fflush(stdout);
         }
     }
@@ -1165,7 +1165,7 @@ Btree::print_leaves(TreeCacheNode& c)
  * depth 'n-1'
  */
 void
-Btree::print_queued_keys_r(queue_s* q)
+Btree::printQueuedKeysRecursively(queue_s* q)
 {
     queue_s* new_q = queue_new();
     printf("|");
@@ -1183,7 +1183,7 @@ Btree::print_queued_keys_r(queue_s* q)
                 // Build up cache to current branch.
                 // This is not very efficient, but doing that once per branch would require
                 // cache to fit all child nodes of the current branch.
-                Result r = find_branch(*n, n_cache);
+                Result r = findBranch(*n, n_cache);
                 if (r != Result::ok)
                 {
                     printf("%s!\n", err_msg(r));
@@ -1217,18 +1217,18 @@ Btree::print_queued_keys_r(queue_s* q)
     printf("\n");
     queue_destroy(q);
     if (!queue_empty(new_q))
-        print_queued_keys_r(new_q);
+        printQueuedKeysRecursively(new_q);
     else
         queue_destroy(new_q);
 }
 
 void
-Btree::print_keys(TreeCacheNode& c)
+Btree::printKeys(TreeCacheNode& c)
 {
     queue_s* q = queue_new();
     TreeCacheNode* c_copy = new TreeCacheNode;
     *c_copy = c;
     queue_enqueue(q, c_copy);
-    print_queued_keys_r(q);
+    printQueuedKeysRecursively(q);
 }
 }

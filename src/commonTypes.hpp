@@ -32,11 +32,12 @@ static const uint8_t version = 1;
 enum class Result : uint8_t
 {
     ok = 0,
-    fail,
-    nf,
+    biterrorCorrected,
+    biterrorNotCorrected,
+    notFound,
     exists,
     toobig,
-    einval,
+    invalidInput,
     nimpl,
     bug,
     noparent,
@@ -49,8 +50,7 @@ enum class Result : uint8_t
     alrMounted,
     objNameTooLong,
     readonly,
-    biterrorCorrected,
-    biterrorNotCorrected,
+    fail,
     num_result
 };
 
@@ -61,18 +61,18 @@ extern const char* resultMsg[];          // Initialized in paffs.cpp
 
 typedef uint8_t Permission;
 
-const Permission R = 0x1;
-const Permission W = 0x2;
-const Permission X = 0x4;
-const Permission permMask = R | W | X;
+static constexpr Permission R = 0x1;
+static constexpr Permission W = 0x2;
+static constexpr Permission X = 0x4;
+static constexpr Permission permMask = R | W | X;
 
 typedef uint8_t Fileopenmask;
-const Fileopenmask FR = 0x01;   // file read
-const Fileopenmask FW = 0x02;   // file write
-const Fileopenmask FEX = 0x04;  // file execute
-const Fileopenmask FA = 0x08;   // file append
-const Fileopenmask FE = 0x10;   // file open only existing
-const Fileopenmask FC = 0x20;   // file create
+static constexpr Fileopenmask FR = 0x01;   // file read
+static constexpr Fileopenmask FW = 0x02;   // file write
+static constexpr Fileopenmask FEX = 0x04;  // file execute
+static constexpr Fileopenmask FA = 0x08;   // file append
+static constexpr Fileopenmask FE = 0x10;   // file open only existing
+static constexpr Fileopenmask FC = 0x20;   // file create
 
 enum class Seekmode
 {
@@ -83,18 +83,19 @@ enum class Seekmode
 
 struct Param
 {
-    unsigned int totalBytesPerPage;
-    unsigned int oobBytesPerPage;
-    unsigned int pagesPerBlock;
-    unsigned int blocksTotal;
-    unsigned int jumpPadNo;
+    //Note: Order of config mixed for better alignment of members
+    uint16_t totalBytesPerPage;
+    uint16_t pagesPerBlock;
+    uint16_t blocksTotal;
+    uint8_t  oobBytesPerPage;
+    uint8_t  jumpPadNo;
     // Automatically filled//
-    unsigned int dataBytesPerPage;
-    unsigned long areasNo;
-    unsigned int blocksPerArea;
-    unsigned int totalPagesPerArea;
-    unsigned int dataPagesPerArea;
-    unsigned int superChainElems;
+    uint16_t dataBytesPerPage;
+    uint16_t dataPagesPerArea;
+    uint16_t totalPagesPerArea;
+    uint8_t  blocksPerArea;
+    uint8_t  superChainElems;
+    uint32_t areasNo;
 };
 
 extern const Param stdParam;
@@ -117,24 +118,29 @@ struct BadBlockList
 {
     BlockAbs* mList;
     uint16_t mSize;
+    inline
     BadBlockList() : mList(nullptr), mSize(0){};
+    inline
     BadBlockList(const BlockAbs* list, const uint16_t size) : mSize(size)
     {
         mList = new BlockAbs[size];
         memcpy(mList, list, size * sizeof(BlockAbs));
     };
-    BadBlockList&
-    operator=(BadBlockList const& other)
-    {
-        mList = new BlockAbs[other.mSize];
-        memcpy(mList, other.mList, other.mSize * sizeof(BlockAbs));
-        mSize = other.mSize;
-        return *this;
-    }
+    inline
     BadBlockList(BadBlockList const& other)
     {
         *this = other;
     }
+    inline BadBlockList&
+    operator=(BadBlockList const& other)
+    {
+        BlockAbs* tmpList = new BlockAbs[other.mSize];
+        memcpy(tmpList, other.mList, other.mSize * sizeof(BlockAbs));
+        mSize = other.mSize;
+        mList = tmpList;
+        return *this;
+    }
+    inline
     ~BadBlockList()
     {
         if (mList != nullptr)
@@ -142,7 +148,8 @@ struct BadBlockList
             delete[] mList;
         }
     }
-    BlockAbs operator[](size_t pos) const
+    inline BlockAbs
+    operator[](size_t pos) const
     {
         if (pos > mSize)
         {
@@ -164,7 +171,7 @@ static constexpr uint16_t directAddrCount = 11;
 struct Inode
 {
     InodeNo no;
-    InodeType type;  //:2;
+    InodeType type;  //2 Bit;
     Permission perm : 3;
     uint32_t reservedPages;  // Space on filesystem used in Pages
     FileSize size;           // Space on filesystem needed in bytes

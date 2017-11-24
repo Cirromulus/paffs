@@ -141,11 +141,11 @@ TEST_F(FileTest, directoryReadWrite)
     paffs::Result r;
     r = fs.mkDir("/a", p);
     ASSERT_EQ(r, paffs::Result::ok);
-    r = fs.mkDir("/a/b", p);
-    ASSERT_EQ(r, paffs::Result::ok);
-    r = fs.touch("/a/b/file1");
-    ASSERT_EQ(r, paffs::Result::ok);
     r = fs.mkDir("/b", p);
+    ASSERT_EQ(r, paffs::Result::ok);
+    r = fs.mkDir("/a/1", p);
+    ASSERT_EQ(r, paffs::Result::ok);
+    r = fs.touch("/a/1/file1");
     ASSERT_EQ(r, paffs::Result::ok);
     r = fs.mkDir("/b/c", p);
     ASSERT_EQ(r, paffs::Result::ok);
@@ -177,12 +177,12 @@ TEST_F(FileTest, directoryReadWrite)
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
     ASSERT_EQ(entr->node->type, paffs::InodeType::dir);
-    EXPECT_TRUE(StringsMatch(entr->name, "b/"));
+    EXPECT_TRUE(StringsMatch(entr->name, "1/"));
     r = fs.closeDir(dir);
     ASSERT_EQ(r, paffs::Result::ok);
 
     // a/b
-    dir = fs.openDir("/a/b");
+    dir = fs.openDir("/a/1");
     ASSERT_NE(dir, nullptr);
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
@@ -215,7 +215,7 @@ TEST_F(FileTest, permissions)
 
     fil = fs.open("/file", paffs::FR);
     EXPECT_EQ(fil, nullptr);
-    EXPECT_EQ(fs.getLastErr(), paffs::Result::nf);
+    EXPECT_EQ(fs.getLastErr(), paffs::Result::notFound);
     fs.resetLastErr();
 
     fil = fs.open("/file", paffs::FR | paffs::FC);
@@ -265,7 +265,7 @@ TEST_F(FileTest, maxFilesize)
     if (blocksize - i > 0)
         memcpy(&block[i], txt, blocksize - i);
 
-    fil = fs.open("/file", paffs::FW | paffs::FC);
+    fil = fs.open("/file", paffs::FW | paffs::FR | paffs::FC);
     if (fs.getLastErr() != paffs::Result::ok)
         printf("%s!\n", paffs::err_msg(fs.getLastErr()));
     ASSERT_NE(fil, nullptr);
@@ -278,8 +278,17 @@ TEST_F(FileTest, maxFilesize)
         i += bw;
         if (r == paffs::Result::nospace)
             break;
-        EXPECT_EQ(bw, blocksize);
+        if (r != paffs::Result::ok)
+        {
+            printf("Could not write file at %u because %s\n", fil->fp, paffs::err_msg(r));
+        }
         ASSERT_EQ(r, paffs::Result::ok);
+        EXPECT_EQ(bw, blocksize);
+
+        fs.seek(*fil, -bw, paffs::Seekmode::cur);
+        r = fs.read(*fil, blockcopy, blocksize, &bw);
+        ASSERT_EQ(r, paffs::Result::ok);
+        ASSERT_TRUE(ArraysMatch(block, blockcopy, blocksize));
     }
     maxFileSize = i;
     r = fs.close(*fil);
@@ -353,7 +362,7 @@ TEST_F(FileTest, maxFilesize)
     }
 
     r = fs.remove("/file");
-    ASSERT_EQ(r, paffs::Result::einval);
+    ASSERT_EQ(r, paffs::Result::invalidInput);
     r = fs.close(*fil);
     ASSERT_EQ(r, paffs::Result::ok);
     r = fs.remove("/file");

@@ -40,7 +40,7 @@ TEST(Bitlist, SetAndGetBits)
     {
         ASSERT_EQ(bitlist.getBit(i), true);
     }
-    for (unsigned i = 0; i < length; i++, i++)
+    for (unsigned i = 0; i < length; i += 2)
     {
         bitlist.resetBit(i);
     }
@@ -48,5 +48,47 @@ TEST(Bitlist, SetAndGetBits)
     for (unsigned i = 0; i < length; i++)
     {
         ASSERT_EQ(bitlist.getBit(i), i % 2 != 0);
+    }
+
+    paffs::BitList<length> bitlist2;
+    memcpy(bitlist2.expose(), bitlist.expose(), bitlist.getByteUsage());
+
+    for (unsigned i = 0; i < length; i++)
+    {
+        ASSERT_EQ(bitlist.getBit(i), i % 2 != 0);
+    }
+}
+
+
+TEST(TwoBitlist, SetAndGetBits)
+{
+    paffs::TwoBitList<length> bitlist;
+    for (unsigned i = 0; i < length; i++)
+    {
+        ASSERT_EQ(bitlist.getValue(i), 0u);
+    }
+    for (unsigned i = 0; i < length; i++)
+    {
+        bitlist.setValue(i, 0b11);
+    }
+    for (unsigned i = 0; i < length; i++)
+    {
+        ASSERT_EQ(bitlist.getValue(i), 0b11);
+    }
+    for (unsigned i = 0; i < length; i++)
+    {
+        bitlist.setValue(i, 0b10);
+    }
+    for (unsigned i = 0; i < length; i++)
+    {
+        ASSERT_EQ(bitlist.getValue(i), 0b10);
+    }
+    for (unsigned i = 0; i < length; i++)
+    {
+        bitlist.setValue(i, i % 4);
+    }
+    for (unsigned i = 0; i < length; i++)
+    {
+        ASSERT_EQ(bitlist.getValue(i), i % 4);
     }
 }

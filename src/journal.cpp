@@ -13,6 +13,7 @@
 // ----------------------------------------------------------------------------
 
 #include "journal.hpp"
+#include "journalDebug.hpp"
 #include "area.hpp"
 #include "commonTypes.hpp"
 #include "driver/driver.hpp"
@@ -76,7 +77,7 @@ Journal::processBuffer()
         id = persistence.tell();
     }
     r = persistence.readNextElem(entry);
-    if (r == Result::nf)
+    if (r == Result::notFound)
     {
         PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "No Replay of Journal needed");
         return Result::ok;
@@ -102,7 +103,7 @@ Journal::processBuffer()
             firstUnsuccededEntry[static_cast<unsigned>(entry.success.target)] = persistence.tell();
         }
     } while ((r = persistence.readNextElem(entry)) == Result::ok);
-    if (r != Result::nf)
+    if (r != Result::notFound)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read next element of Journal!");
         return r;
@@ -114,7 +115,7 @@ Journal::processBuffer()
         for (unsigned i = 0; i < JournalEntry::numberOfTopics; i++)
         {
             printf("\t%s: %" PRIu64 ".%" PRIu16 "\n",
-                   JournalEntry::topicNames[i],
+                   topicNames[i],
                    firstUnsuccededEntry[i].flash.addr,
                    firstUnsuccededEntry[i].flash.offs);
         }
@@ -144,7 +145,7 @@ Journal::processBuffer()
             firstUnprocessedEntry = curr;
         }
     }
-    if (r != Result::nf)
+    if (r != Result::notFound)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read Journal!");
         return r;
@@ -194,20 +195,22 @@ Journal::applyCheckpointedJournalEntries(
             return r;
         }
         if (persistence.tell() == to)
+        {
             break;
+        }
 
         for (JournalTopic* worker : topics)
         {
             if (entry.base.topic == worker->getTopic())
             {
-                if (persistence.tell() >= firstUnsuccededEntry[to_underlying(worker->getTopic())])
+                if (persistence.tell() >= firstUnsuccededEntry[toUnderlying(worker->getTopic())])
                 {
                     if (traceMask & (PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE))
                     {
                         printf("Processing entry ");
                         printMeaning(entry.base, false);
                         printf(" by %s\n",
-                               JournalEntry::topicNames[to_underlying(worker->getTopic())]);
+                               topicNames[toUnderlying(worker->getTopic())]);
                     }
                     worker->processEntry(entry.base);
                 }
@@ -249,7 +252,7 @@ Journal::applyUncheckpointedJournalEntries(EntryIdentifier& from)
             }
         }
     }
-    if (r != Result::nf)
+    if (r != Result::notFound)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read Entry!");
         return r;
@@ -269,13 +272,17 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
     bool found = false;
     switch (entry.topic)
     {
+    case JournalEntry::Topic::invalid:
+        printf("\tInvalid/Empty");
+        found = true;
+        break;
     case JournalEntry::Topic::checkpoint:
         printf("\tCheckpoint");
         found = true;
         break;
     case JournalEntry::Topic::success:
         printf("\tCommit success at %s",
-               JournalEntry::topicNames[to_underlying(
+               topicNames[toUnderlying(
                        static_cast<const journalEntry::Success*>(&entry)->target)]);
         found = true;
         break;
@@ -313,17 +320,15 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
                 found = true;
                 break;
             case journalEntry::superblock::AreaMap::Operation::position:
-                printf("set Position to %X:%X",
-                       extractLogicalArea(
-                               static_cast<const journalEntry::superblock::areaMap::Position*>(
-                                       &entry)
-                                       ->position),
-                       extractPageOffs(
-                               static_cast<const journalEntry::superblock::areaMap::Position*>(
-                                       &entry)
-                                       ->position));
+            {
+                const journalEntry::superblock::areaMap::Position* p =
+                        static_cast<const journalEntry::superblock::areaMap::Position*>(&entry);
+                printf("set Position to %02X:%03X",
+                       extractLogicalArea(p->position),
+                       extractPageOffs(p->position));
                 found = true;
                 break;
+            }
             case journalEntry::superblock::AreaMap::Operation::swap:
                 printf("Swap");
                 found = true;

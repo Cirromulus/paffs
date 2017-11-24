@@ -28,7 +28,7 @@ Result
 DataIO::writeInodeData(Inode& inode,
                        unsigned int offs,
                        unsigned int bytes,
-                       unsigned int* bytes_written,
+                       unsigned int* bytesWritten,
                        const char* data)
 {
     if (dev->readOnly)
@@ -39,7 +39,7 @@ DataIO::writeInodeData(Inode& inode,
     if (offs + bytes == 0)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Write size 0! Bug?");
-        return Result::einval;
+        return Result::invalidInput;
     }
 
     // todo: use pageFrom as offset to reduce memory usage and IO
@@ -62,7 +62,9 @@ DataIO::writeInodeData(Inode& inode,
         // We are skipping unused pages
         PageOffs lastUsedPage = inode.size / dataBytesPerPage;
         if (inode.size % dataBytesPerPage > 0)
+        {
             lastUsedPage++;
+        }
 
         for (unsigned i = lastUsedPage; i < pageFrom; i++)
         {
@@ -70,19 +72,20 @@ DataIO::writeInodeData(Inode& inode,
         }
     }
 
-    unsigned pageoffs = offs % dataBytesPerPage;
     res = writePageData(pageFrom,
                         toPage,
-                        pageoffs,
+                        offs % dataBytesPerPage,
                         bytes,
                         data,
                         pac,
-                        bytes_written,
+                        bytesWritten,
                         inode.size,
                         inode.reservedPages);
 
-    if (inode.size < *bytes_written + offs)
-        inode.size = *bytes_written + offs;
+    if (inode.size < *bytesWritten + offs)
+    {
+        inode.size = *bytesWritten + offs;
+    }
 
     // the Tree UpdateExistingInode has to be done by high level functions,
     // bc they may modify it by themselves
@@ -90,13 +93,13 @@ DataIO::writeInodeData(Inode& inode,
 }
 
 Result
-DataIO::readInodeData(
-        Inode& inode, unsigned int offs, unsigned int bytes, unsigned int* bytes_read, char* data)
+DataIO::readInodeData(Inode& inode, unsigned int offs, unsigned int bytes,
+                      unsigned int* bytesRead, char* data)
 {
     if (offs + bytes == 0)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Read size 0! Bug?");
-        return dev->lasterr = Result::einval;
+        return dev->lasterr = Result::invalidInput;
     }
 
     if (offs + bytes > inode.size)
@@ -108,7 +111,7 @@ DataIO::readInodeData(
         bytes = inode.size - offs;
     }
 
-    *bytes_read = 0;
+    *bytesRead = 0;
     unsigned int pageFrom = offs / dataBytesPerPage;
     unsigned int toPage = (offs + bytes) / dataBytesPerPage;
     if ((offs + bytes) % dataBytesPerPage == 0)
@@ -123,7 +126,7 @@ DataIO::readInodeData(
         return res;
     }
 
-    return readPageData(pageFrom, toPage, offs % dataBytesPerPage, bytes, data, pac, bytes_read);
+    return readPageData(pageFrom, toPage, offs % dataBytesPerPage, bytes, data, pac, bytesRead);
 }
 
 // inode->size and inode->reservedSize is altered.
@@ -161,7 +164,7 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
     if (inode.size < offs)
     {
         // Offset bigger than actual filesize
-        return Result::einval;
+        return Result::invalidInput;
     }
 
     Result r = pac.setTargetInode(inode);
@@ -171,7 +174,7 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
         return r;
     }
 
-    for (int page = toPage - pageFrom; page >= 0; page--)
+    for (int page = (toPage - pageFrom); page >= 0; page--)
     {
         Addr pageAddr;
         r = pac.getPage(page + pageFrom, &pageAddr);
@@ -252,7 +255,7 @@ DataIO::writePageData(PageOffs pageFrom,
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried writing something in readOnly mode!");
         return Result::bug;
     }
-    if (offs > dataBytesPerPage)
+    else if (offs > dataBytesPerPage)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried applying an offset %d > %d", offs, dataBytesPerPage);
         return Result::bug;
@@ -261,7 +264,6 @@ DataIO::writePageData(PageOffs pageFrom,
     Result res;
     for (unsigned int page = 0; page <= toPage - pageFrom; page++)
     {
-        bool misaligned = false;
         Result rBuf = dev->lasterr;
         dev->lasterr = Result::ok;
         dev->areaMgmt.findWritableArea(AreaType::data);
@@ -296,15 +298,8 @@ DataIO::writePageData(PageOffs pageFrom,
         Addr pageAddress =
                 combineAddress(dev->areaMgmt.getActiveArea(AreaType::data), firstFreePage);
 
-        // Prepare buffer and calculate bytes to write
-        char* buf = &const_cast<char*>(data)[*bytes_written];
-        unsigned int btw = bytes - *bytes_written;
-        if ((btw + offs) > dataBytesPerPage)
-        {
-            btw = (btw + offs) > dataBytesPerPage ? dataBytesPerPage - offs : dataBytesPerPage;
-        }
-
         Addr pageAddr;
+        //GetPage may overwrite our driver buffer
         res = ac.getPage(page + pageFrom, &pageAddr);
         if (res != Result::ok)
         {
@@ -314,24 +309,33 @@ DataIO::writePageData(PageOffs pageFrom,
             return res;
         }
 
-        if ((btw + offs < dataBytesPerPage && page * dataBytesPerPage + btw < filesize)
-            ||  // End Misaligned
-            offs > 0)
-        {  // Start Misaligned
-            // we are misaligned, so fill write buffer with valid Data
-            misaligned = true;
-            buf = new char[dataBytesPerPage];
-            memset(buf, 0x0, dataBytesPerPage);
+        // Prepare buffer and calculate bytes to write
+        unsigned int btw = bytes - *bytes_written;
+        if ((btw + offs) > dataBytesPerPage)
+        {
+            btw = dataBytesPerPage - offs;
+        }
 
+        char* buf = dev->driver.getPageBuffer();
+
+        // start misaligned || End Misaligned
+        if (offs > 0 ||
+           (btw + offs < dataBytesPerPage && page * dataBytesPerPage + btw < filesize))
+        {
+            // we are misaligned, so fill write buffer with valid Data
             unsigned int btr = dataBytesPerPage;
 
             // limit maximum bytes to read if file is smaller than actual page
             if ((pageFrom + 1 + page) * dataBytesPerPage > filesize)
             {
                 if (filesize > (pageFrom + page) * dataBytesPerPage)
+                {
                     btr = filesize - (pageFrom + page) * dataBytesPerPage;
+                }
                 else
+                {
                     btr = 0;
+                }
             }
 
             if (pageAddr != 0  // not an empty page TODO: doubled code
@@ -343,9 +347,12 @@ DataIO::writePageData(PageOffs pageFrom,
                         pageFrom + page, pageFrom + page, 0, btr, buf, ac, &bytes_read);
                 if (r != Result::ok || bytes_read != btr)
                 {
-                    delete[] buf;
                     return Result::bug;
                 }
+            }else
+            {
+                //We are overriding into nonexistent page, assume zero
+                memset(buf, 0, dataBytesPerPage);
             }
 
             // Handle offset
@@ -363,13 +370,16 @@ DataIO::writePageData(PageOffs pageFrom,
         else
         {
             // not misaligned, we are writing a whole page or a new page
+            memcpy(buf, &data[*bytes_written], btw);
             *bytes_written += btw;
         }
 
         res = dev->driver.writePage(getPageNumber(pageAddress, *dev), buf, btw);
         if (res != Result::ok)
         {
-            PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write Page!");
+            PAFFS_DBG(PAFFS_TRACE_ERROR,
+                      "ERR: write returned FAIL at phy.P: %llu",
+                      static_cast<long long unsigned int>(getPageNumber(pageAddress, *dev)));
             return res;
         }
         res = dev->sumCache.setPageStatus(
@@ -413,23 +423,15 @@ DataIO::writePageData(PageOffs pageFrom,
         // this may have filled the flash
         res = dev->areaMgmt.manageActiveAreaFull(AreaType::data);
         if (res != Result::ok)
+        {
             return res;
-
-        if (misaligned)
-            delete[] buf;
+        }
 
         PAFFS_DBG_S(PAFFS_TRACE_WRITE,
                     "write r.P: %d/%d, phy.P: %llu",
                     page + 1,
                     toPage + 1,
                     static_cast<long long unsigned int>(getPageNumber(pageAddress, *dev)));
-        if (res != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "ERR: write returned FAIL at phy.P: %llu",
-                      static_cast<long long unsigned int>(getPageNumber(pageAddress, *dev)));
-            return Result::fail;
-        }
     }
     return Result::ok;
 }
@@ -443,17 +445,8 @@ DataIO::readPageData(PageOffs pageFrom,
                      PageAddressCache& ac,
                      unsigned* bytes_read)
 {
-    char* wrap = data;
-    bool misaligned = false;
-    if (offs > 0)
-    {
-        misaligned = true;
-        wrap = new char[bytes + offs];
-    }
-
     for (unsigned int page = 0; page <= toPage - pageFrom; page++)
     {
-        char* buf = &wrap[page * dataBytesPerPage];
         Addr pageAddr;
         Result r = ac.getPage(page + pageFrom, &pageAddr);
         if (r != Result::ok)
@@ -470,63 +463,24 @@ DataIO::readPageData(PageOffs pageFrom,
                           : (bytes + offs) - page * dataBytesPerPage;
         }
 
-        AreaPos area = extractLogicalArea(pageAddr);
-        if (dev->areaMgmt.getType(area) != AreaType::data)
+        if (pageAddr == combineAddress(0, unusedMarker))
         {
-            if (pageAddr == combineAddress(0, unusedMarker))
-            {
-                // This Page is currently not written to flash
-                // because it contains just empty space
-                memset(buf, 0, btr);
-                *bytes_read += btr;
-                continue;
-            }
-            PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "READ INODE operation of invalid area at %d:%d",
-                      extractLogicalArea(pageAddr),
-                      extractPageOffs(pageAddr));
-            return Result::bug;
+            // This Page is currently not written to flash
+            // because it contains just empty space
+            memset(&data[*bytes_read], 0, btr - offs);
+            *bytes_read += btr - offs;
+            offs = 0;   //Offset is only applied to first page
+            continue;
         }
-        if (traceMask & PAFFS_TRACE_VERIFY_AS)
+
+
+        if(!checkIfSaneReadAddress(pageAddr))
         {
-            SummaryEntry e = dev->sumCache.getPageStatus(
-                    extractLogicalArea(pageAddr), extractPageOffs(pageAddr), &r);
-            if (r != Result::ok)
-            {
-                PAFFS_DBG(PAFFS_TRACE_ERROR,
-                          "Could not load AreaSummary of area %d for verification!",
-                          extractLogicalArea(pageAddr));
-            }
-            else
-            {
-                if (e == SummaryEntry::dirty)
-                {
-                    PAFFS_DBG(PAFFS_TRACE_BUG,
-                              "READ INODE operation of outdated (dirty) data at %d:%d",
-                              extractLogicalArea(pageAddr),
-                              extractPageOffs(pageAddr));
-                    return Result::bug;
-                }
-
-                if (e == SummaryEntry::free)
-                {
-                    PAFFS_DBG(PAFFS_TRACE_BUG,
-                              "READ INODE operation of invalid (free) data at %d:%d",
-                              extractLogicalArea(pageAddr),
-                              extractPageOffs(pageAddr));
-                    return Result::bug;
-                }
-
-                if (e >= SummaryEntry::error)
-                {
-                    PAFFS_DBG(PAFFS_TRACE_BUG,
-                              "READ INODE operation of data with invalid AreaSummary at area %d!",
-                              extractLogicalArea(pageAddr));
-                }
-            }
+            return Result::bug;
         }
 
         PageAbs addr = getPageNumber(pageAddr, *dev);
+        char* buf = dev->driver.getPageBuffer();
         r = dev->driver.readPage(addr, buf, btr);
         if (r != Result::ok)
         {
@@ -538,21 +492,71 @@ DataIO::readPageData(PageOffs pageFrom,
             }
             else
             {
-                if (misaligned)
-                    delete[] wrap;
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read page, aborting pageData Read");
                 return dev->lasterr = r;
             }
         }
-        *bytes_read += btr;
-    }
-    if (misaligned)
-    {
-        memcpy(data, &wrap[offs], bytes);
-        *bytes_read -= offs;
-        delete[] wrap;
+        memcpy(&data[*bytes_read], &buf[offs], btr - offs);
+        *bytes_read += btr - offs;
+        offs = 0;   //offset is only applied to first page
     }
 
     return Result::ok;
+}
+
+
+bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
+{
+    if (dev->areaMgmt.getType(extractLogicalArea(pageAddr)) != AreaType::data)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG,
+                  "READ INODE operation of invalid area at %" PRIu32 ":%" PRIu32,
+                  extractLogicalArea(pageAddr),
+                  extractPageOffs(pageAddr));
+        return false;
+    }
+
+    if (traceMask & PAFFS_TRACE_VERIFY_AS)
+    {
+        Result r;
+        SummaryEntry e = dev->sumCache.getPageStatus(
+                extractLogicalArea(pageAddr), extractPageOffs(pageAddr), &r);
+        if (r != Result::ok)
+        {
+            PAFFS_DBG(PAFFS_TRACE_ERROR,
+                      "Could not load AreaSummary of area %d for verification!",
+                      extractLogicalArea(pageAddr));
+            return false;
+        }
+        else
+        {
+            if (e == SummaryEntry::dirty)
+            {
+                PAFFS_DBG(PAFFS_TRACE_BUG,
+                          "READ INODE operation of outdated (dirty) data at %d:%d",
+                          extractLogicalArea(pageAddr),
+                          extractPageOffs(pageAddr));
+                return false;
+            }
+            else
+            if (e == SummaryEntry::free)
+            {
+                PAFFS_DBG(PAFFS_TRACE_BUG,
+                          "READ INODE operation of invalid (free) data at %d:%d",
+                          extractLogicalArea(pageAddr),
+                          extractPageOffs(pageAddr));
+                return false;
+            }
+            else
+            if (e >= SummaryEntry::error)
+            {
+                PAFFS_DBG(PAFFS_TRACE_BUG,
+                          "READ INODE operation of data with invalid AreaSummary at area %d!",
+                          extractLogicalArea(pageAddr));
+                return false;
+            }
+        }
+    }
+    return true;
 }
 }

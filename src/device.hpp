@@ -34,8 +34,8 @@ extern outpost::rtos::SystemClock systemClock;
 class Device
 {
     InodePool<maxNumberOfInodes> inodePool;
-    ObjectPool<maxNumberOfFiles, Obj> filesPool;
-
+    ObjectPool<Obj, maxNumberOfFiles> filesPool;
+    bool useJournal = false;
 public:
     Driver& driver;
     Result lasterr;
@@ -50,10 +50,6 @@ public:
     MramPersistence journalPersistence;
     Journal journal;
 
-    /*
-     * Default constructor is for uninitialized Devices only
-     */
-    // Device();
     Device(Driver& driver);
     ~Device();
 
@@ -94,9 +90,9 @@ public:
     Result
     getObjInfo(const char* fullPath, ObjInfo& nfo);
     Result
-    read(Obj& obj, char* buf, unsigned int bytes_to_read, unsigned int* bytes_read);
+    read(Obj& obj, char* buf, unsigned int bytesToRead, unsigned int* bytesRead);
     Result
-    write(Obj& obj, const char* buf, unsigned int bytes_to_write, unsigned int* bytes_written);
+    write(Obj& obj, const char* buf, unsigned int bytesToWrite, unsigned int* bytesWritten);
     Result
     seek(Obj& obj, int m, Seekmode mode);
     Result

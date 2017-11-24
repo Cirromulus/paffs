@@ -22,13 +22,15 @@
 
 namespace paffs{
 
-Driver* getDriver(const uint8_t deviceId){
+Driver*
+getDriver(const uint8_t deviceId){
 	(void) deviceId;
 	Driver* out = new SimuDriver();
 	return out;
 }
 
-Driver* getDriverSpecial(const uint8_t deviceId, void* fc, void *mram){
+Driver*
+getDriverSpecial(const uint8_t deviceId, void* fc, void *mram){
 	(void) deviceId;
 	if(fc == NULL){
 		std::cerr << "Invalid flashCell pointer given!" << std::endl;
@@ -43,90 +45,116 @@ Driver* getDriverSpecial(const uint8_t deviceId, void* fc, void *mram){
 }
 
 
-Result SimuDriver::initializeNand(){
+Result
+SimuDriver::initializeNand(){
 	memset(buf, 0xFF, totalBytesPerPage);
 	return Result::ok;
 }
-Result SimuDriver::deInitializeNand(){
+Result
+SimuDriver::deInitializeNand(){
 	return Result::ok;
 }
 
-Result SimuDriver::writePage(uint64_t page_no,
-								void* data, unsigned int data_len){
+Result
+SimuDriver::writePage(PageAbs page_no,
+                      void* data, unsigned int data_len){
+    //TODO: Simple write-trough buffer by noting address
 	if(!cell)
+	{
 		return Result::fail;
-
-	if(data_len > totalBytesPerPage){
+	}
+	if(data_len > totalBytesPerPage)
+	{
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write %u Bytes to a page of %u!", data_len, totalBytesPerPage);
 		return Result::fail;
 	}
 
-	if(totalBytesPerPage != data_len){
+	if(totalBytesPerPage != data_len)
+	{
 		memset(buf+data_len, 0xFF, totalBytesPerPage - data_len);
 	}
-	memcpy(buf, data, data_len);
+	if(data != buf)
+	{
+	    memcpy(buf, data, data_len);
+	}
 
-	unsigned char* p = &buf[dataBytesPerPage+2];
+	unsigned char* p = reinterpret_cast<unsigned char*>(&buf[dataBytesPerPage+2]);
 	for(int i = 0; i < dataBytesPerPage; i+=256, p+=3)
-		YaffsEcc::calc(static_cast<unsigned char*>(buf) + i, p);
+		YaffsEcc::calc(reinterpret_cast<unsigned char*>(&buf[i]), p);
 
-	Nandaddress d = translatePageToAddress(page_no, cell);
+	Nandaddress d = translatePageToAddress(page_no);
 
-	if(cell->writePage(d.plane, d.block, d.page, static_cast<unsigned char*>(buf)) < 0){
+	if(cell->writePage(d.plane, d.block, d.page, reinterpret_cast<unsigned char*>(buf)) < 0){
 		return Result::fail;
 	}
 	return Result::ok;
 }
-Result SimuDriver::readPage(uint64_t page_no,
-								void* data, unsigned int data_len){
+Result
+SimuDriver::readPage(PageAbs page_no,
+                     void* data, unsigned int data_len){
 	if(!cell)
-		return Result::fail;
+	{
+	    return Result::fail;
+	}
+    if(data_len > totalBytesPerPage)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried reading more than a page width!");
+        return Result::invalidInput;
+    }
+	//TODO: Simple write-trough buffer by checking if same address
 
+	Nandaddress d = translatePageToAddress(page_no);
 
-	Nandaddress d = translatePageToAddress(page_no, cell);
-
-	if(cell->readPage(d.plane, d.block, d.page, buf) < 0){
+	if(cell->readPage(d.plane, d.block, d.page, reinterpret_cast<unsigned char*>(buf)) < 0){
 		return Result::fail;
 	}
 	unsigned char read_ecc[3];
-	unsigned char *p = &buf[dataBytesPerPage + 2];
+	unsigned char *p = reinterpret_cast<unsigned char*>(&buf[dataBytesPerPage + 2]);
 	Result ret = Result::ok;
 	for(int i = 0; i < dataBytesPerPage; i+=256, p+=3) {
-		YaffsEcc::calc(static_cast<unsigned char*>(buf) + i, read_ecc);
-		Result r = YaffsEcc::correct(static_cast<unsigned char*>(buf), p, read_ecc);
+		YaffsEcc::calc(reinterpret_cast<unsigned char*>(buf) + i, read_ecc);
+		Result r = YaffsEcc::correct(reinterpret_cast<unsigned char*>(buf), p, read_ecc);
 		//ok < corrected < notcorrected
 		if (r > ret)
 			ret = r;
 	}
-
-	memcpy(data, buf, data_len);
+	if(data != buf)
+	{
+	    memcpy(data, buf, data_len);
+	}
 	return ret;
 }
-Result SimuDriver::eraseBlock(uint32_t block_no){
+Result
+SimuDriver::eraseBlock(BlockAbs block_no)
+{
 	if(!cell)
 		return Result::fail;
 	if(block_no > blocksTotal){
 		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried erasing Block out of bounds!"
 				"Was %" PRIu32 ", should < %" PRIu32, block_no, blocksTotal);
 	}
-	Nandaddress d = translateBlockToAddress(block_no, cell);
+	Nandaddress d = translateBlockToAddress(block_no);
 	return cell->eraseBlock(d.plane, d.block) == 0 ? Result::ok : Result::fail;
 }
-Result SimuDriver::markBad(uint32_t block_no){
+Result
+SimuDriver::markBad(BlockAbs block_no)
+{
 	memset(buf, 0, totalBytesPerPage);
 	for(unsigned page = 0; page < pagesPerBlock; page++){
-		Nandaddress d = translatePageToAddress(block_no * pagesPerBlock + page, cell);
-		if(cell->writePage(d.plane, d.block, d.page, buf) < 0){
+		Nandaddress d = translatePageToAddress(block_no * pagesPerBlock + page);
+		if(cell->writePage(d.plane, d.block, d.page, reinterpret_cast<unsigned char*>(buf)) < 0){
 			//ignore return Result::fail;
 		}
 	}
 	return Result::ok;
 }
-Result SimuDriver::checkBad(uint32_t block_no){
+Result
+SimuDriver::checkBad(BlockAbs block_no)
+{
 	memset(buf, 0, totalBytesPerPage);
 	for(unsigned page = 0; page < pagesPerBlock; page++){
-		Nandaddress d = translatePageToAddress(block_no * pagesPerBlock + page, cell);
-		if(cell->readPage(d.plane, d.block, d.page, buf) < 0){
+		Nandaddress d = translatePageToAddress(block_no * pagesPerBlock + page);
+		if(cell->readPage(d.plane, d.block, d.page, reinterpret_cast<unsigned char*>(buf)) < 0){
 			return Result::badflash;
 		}
 		if(buf[dataBytesPerPage + 5] == 0)
@@ -135,16 +163,19 @@ Result SimuDriver::checkBad(uint32_t block_no){
 	return Result::ok;
 }
 
-Result SimuDriver::writeMRAM(PageAbs startByte,
-                             const void* data, unsigned int dataLen){
+Result
+SimuDriver::writeMRAM(PageAbs startByte,
+                      const void* data, unsigned int dataLen)
+{
 	unsigned const char* tmp = static_cast<unsigned const char*>(data);
 	for(unsigned int i = 0; i < dataLen; i++){
 		mram->setByte(startByte + i, tmp[i]);
 	}
 	return Result::ok;
 }
-Result SimuDriver::readMRAM(PageAbs startByte,
-                            void* data, unsigned int dataLen){
+Result
+SimuDriver::readMRAM(PageAbs startByte,
+                     void* data, unsigned int dataLen){
 	unsigned char *tmp = static_cast<unsigned char*>(data);
 	for(unsigned int i = 0; i < dataLen; i++){
 		tmp[i] = mram->getByte(startByte + i);
@@ -152,8 +183,9 @@ Result SimuDriver::readMRAM(PageAbs startByte,
 	return Result::ok;
 }
 
-Nandaddress SimuDriver::translatePageToAddress(uint64_t page, FlashCell* fc){
-	(void) fc;
+Nandaddress
+SimuDriver::translatePageToAddress(PageAbs page)
+{
 	Nandaddress r;
 	r.page = page % simu::pagesPerBlock;
 	r.block = (page / simu::pagesPerBlock) % simu::blocksPerPlane;
@@ -161,8 +193,9 @@ Nandaddress SimuDriver::translatePageToAddress(uint64_t page, FlashCell* fc){
 	return r;
 }
 
-Nandaddress SimuDriver::translateBlockToAddress(uint32_t block, FlashCell* fc){
-	(void) fc;
+Nandaddress
+SimuDriver::translateBlockToAddress(BlockAbs block)
+{
 	Nandaddress r;
 	r.plane = block / simu::blocksPerPlane;
 	r.block = block % simu::blocksPerPlane;

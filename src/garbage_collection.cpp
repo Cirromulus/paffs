@@ -37,7 +37,7 @@ GarbageCollection::countDirtyPages(SummaryEntry* summary)
 // Special Case 'unset': Find any Type and also extremely favour Areas with committed AS
 AreaPos
 GarbageCollection::findNextBestArea(AreaType target,
-                                    SummaryEntry* out_summary,
+                                    SummaryEntry* summaryOut,
                                     bool* srcAreaContainsData)
 {
     AreaPos favourite_area = 0;
@@ -69,7 +69,7 @@ GarbageCollection::findNextBestArea(AreaType target,
             {
                 // We can't find a block with more dirty pages in it
                 *srcAreaContainsData = false;
-                memcpy(out_summary, curr, dataPagesPerArea);
+                memcpy(summaryOut, curr, dataPagesPerArea);
                 return i;
             }
 
@@ -88,7 +88,7 @@ GarbageCollection::findNextBestArea(AreaType target,
                     favourite_area = i;
                     fav_dirty_pages = dirty_pages;
                     fav_erases = dev->areaMgmt.getErasecount(i);
-                    memcpy(out_summary, curr, dataPagesPerArea);
+                    memcpy(summaryOut, curr, dataPagesPerArea);
                 }
             }
             else
@@ -99,7 +99,7 @@ GarbageCollection::findNextBestArea(AreaType target,
                 {
                     favourite_area = i;
                     fav_dirty_pages = dirty_pages;
-                    memcpy(out_summary, curr, dataPagesPerArea);
+                    memcpy(summaryOut, curr, dataPagesPerArea);
                 }
             }
         }

@@ -25,8 +25,8 @@ extern unsigned int traceMask;
 
 class Paffs
 {
-    // TODO: Devices on bss rather than on heap
     Device* devices[maxNumberOfDevices] = {};
+    char deviceMemory[maxNumberOfDevices][sizeof(Device)];
     bool validDevices[maxNumberOfDevices] = {};
     void
     printCacheSizes();
@@ -76,9 +76,9 @@ public:
     Result
     getObjInfo(const char* fullPath, ObjInfo& nfo);
     Result
-    read(Obj& obj, char* buf, unsigned int bytes_to_read, unsigned int* bytes_read);
+    read(Obj& obj, char* buf, unsigned int bytesToRead, unsigned int* bytesRead);
     Result
-    write(Obj& obj, const char* buf, unsigned int bytes_to_write, unsigned int* bytes_written);
+    write(Obj& obj, const char* buf, unsigned int bytesToWrite, unsigned int* bytesWritten);
     Result
     seek(Obj& obj, int m, Seekmode mode = Seekmode::set);
     Result

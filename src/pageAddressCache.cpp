@@ -157,7 +157,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
         return Result::bug;
     }
-    if (dev.readOnly)
+    if (device.readOnly)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried setting PageAddress in readOnly mode!");
         return Result::bug;
@@ -267,7 +267,7 @@ PageAddressCache::commit()
         return Result::bug;
     }
 
-    return dev.tree.updateExistingInode(*inode);
+    return device.tree.updateExistingInode(*inode);
 }
 
 bool
@@ -292,17 +292,29 @@ uint16_t
 PageAddressCache::getCacheID(AddrListCacheElem* elem)
 {
     if (elem == &tripl[2])
+    {
         return 6;
+    }
     if (elem == &tripl[1])
+    {
         return 5;
+    }
     if (elem == &tripl[0])
+    {
         return 4;
+    }
     if (elem == &doubl[1])
+    {
         return 3;
+    }
     if (elem == &doubl[0])
+    {
         return 2;
+    }
     if (elem == &singl)
+    {
         return 1;
+    }
     return 0;
 }
 
@@ -322,6 +334,11 @@ PageAddressCache::loadPath(Addr& anchor,
                            unsigned char depth,
                            PageNo& addrPos)
 {
+    if(depth >= 3)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried calculating a depth bigger than 2!");
+        return Result::bug;
+    }
     Result r;
     PageNo path[3] = {0};
     for (unsigned int i = 0; i <= depth; i++)
@@ -429,7 +446,7 @@ PageAddressCache::commitPath(Addr& anchor, AddrListCacheElem* path, unsigned cha
     {
         PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Deleting CacheElem referenced by anchor");
         // invalidate old page.
-        r = dev.sumCache.setPageStatus(
+        r = device.sumCache.setPageStatus(
                 extractLogicalArea(anchor), extractPageOffs(anchor), SummaryEntry::dirty);
         if (r != Result::ok)
         {
@@ -482,7 +499,7 @@ PageAddressCache::commitElem(AddrListCacheElem& parent, AddrListCacheElem& elem)
                     "parent:%" PRIu32,
                     elem.positionInParent);
         // invalidate old page.
-        r = dev.sumCache.setPageStatus(extractLogicalArea(parent.cache[elem.positionInParent]),
+        r = device.sumCache.setPageStatus(extractLogicalArea(parent.cache[elem.positionInParent]),
                                        extractPageOffs(parent.cache[elem.positionInParent]),
                                        SummaryEntry::dirty);
         if (r != Result::ok)
@@ -555,7 +572,7 @@ PageAddressCache::readAddrList(Addr from, Addr list[addrsPerPage])
         memset(list, 0, addrsPerPage * sizeof(Addr));
         return Result::ok;
     }
-    if (dev.areaMgmt.getType(extractLogicalArea(from)) != AreaType::index)
+    if (device.areaMgmt.getType(extractLogicalArea(from)) != AreaType::index)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "READ ADDR LIST operation of invalid area at %d:%d",
@@ -567,7 +584,7 @@ PageAddressCache::readAddrList(Addr from, Addr list[addrsPerPage])
                 "loadCacheElem from %" PRIu32 ":%" PRIu32,
                 extractLogicalArea(from),
                 extractPageOffs(from));
-    Result res = dev.driver.readPage(getPageNumber(from, dev), list, addrsPerPage * sizeof(Addr));
+    Result res = device.driver.readPage(getPageNumber(from, device), list, addrsPerPage * sizeof(Addr));
     if (res != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
@@ -589,34 +606,34 @@ PageAddressCache::readAddrList(Addr from, Addr list[addrsPerPage])
 Result
 PageAddressCache::writeAddrList(Addr& source, Addr list[addrsPerPage])
 {
-    Result r = dev.lasterr;
-    dev.lasterr = Result::ok;
-    dev.areaMgmt.findWritableArea(AreaType::index);
-    if (dev.lasterr != Result::ok)
+    Result r = device.lasterr;
+    device.lasterr = Result::ok;
+    device.areaMgmt.findWritableArea(AreaType::index);
+    if (device.lasterr != Result::ok)
     {
         // TODO: Reset former pagestatus, so that FS will be in a safe state
-        return dev.lasterr;
+        return device.lasterr;
     }
-    if (dev.areaMgmt.getActiveArea(AreaType::index) == 0)
+    if (device.areaMgmt.getActiveArea(AreaType::index) == 0)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "findWritableArea returned 0");
         return Result::bug;
     }
-    dev.lasterr = r;
+    device.lasterr = r;
 
     unsigned int firstFreePage = 0;
-    if (dev.areaMgmt.findFirstFreePage(&firstFreePage, dev.areaMgmt.getActiveArea(AreaType::index))
+    if (device.areaMgmt.findFirstFreePage(&firstFreePage, device.areaMgmt.getActiveArea(AreaType::index))
         == Result::nospace)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "BUG: findWritableArea returned full area (%d).",
-                  dev.areaMgmt.getActiveArea(AreaType::index));
-        return dev.lasterr = Result::bug;
+                  device.areaMgmt.getActiveArea(AreaType::index));
+        return device.lasterr = Result::bug;
     }
-    Addr to = combineAddress(dev.areaMgmt.getActiveArea(AreaType::index), firstFreePage);
+    Addr to = combineAddress(device.areaMgmt.getActiveArea(AreaType::index), firstFreePage);
 
-    r = dev.driver.writePage(
-            getPageNumber(to, dev), reinterpret_cast<char*>(list), addrsPerPage * sizeof(Addr));
+    r = device.driver.writePage(
+            getPageNumber(to, device), reinterpret_cast<char*>(list), addrsPerPage * sizeof(Addr));
     if (r != Result::ok)
     {
         // TODO: Revert Changes to PageStatus
@@ -624,8 +641,8 @@ PageAddressCache::writeAddrList(Addr& source, Addr list[addrsPerPage])
     }
 
     // Mark Page as used
-    r = dev.sumCache.setPageStatus(
-            dev.areaMgmt.getActiveArea(AreaType::index), firstFreePage, SummaryEntry::used);
+    r = device.sumCache.setPageStatus(
+            device.areaMgmt.getActiveArea(AreaType::index), firstFreePage, SummaryEntry::used);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
@@ -635,13 +652,15 @@ PageAddressCache::writeAddrList(Addr& source, Addr list[addrsPerPage])
     Addr formerPosition = source;
     source = to;
 
-    r = dev.areaMgmt.manageActiveAreaFull(AreaType::index);
+    r = device.areaMgmt.manageActiveAreaFull(AreaType::index);
     if (r != Result::ok)
+    {
         return r;
+    }
 
     if (formerPosition != 0)
     {
-        r = dev.sumCache.setPageStatus(formerPosition, SummaryEntry::dirty);
+        r = device.sumCache.setPageStatus(formerPosition, SummaryEntry::dirty);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
@@ -659,7 +678,9 @@ PageAddressCache::isAddrListPlausible(Addr* addrList, size_t elems)
     for (unsigned i = 0; i < elems; i++)
     {
         if (extractPageOffs(addrList[i]) == unusedMarker)
+        {
             continue;
+        }
 
         if (extractPageOffs(addrList[i]) > dataPagesPerArea)
         {

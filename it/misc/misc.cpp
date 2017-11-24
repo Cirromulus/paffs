@@ -37,13 +37,16 @@ import();
 int
 main(int argc, char** argv)
 {
-    (void)argc;
     (void)argv;
 
     if (argc > 1)
+    {
         exportLog();
+    }
     else
+    {
         import();
+    }
 }
 
 void

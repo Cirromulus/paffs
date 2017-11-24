@@ -24,6 +24,7 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
     uint16_t size = 0;
     switch (entry.topic)
     {
+    case JournalEntry::Topic::invalid: size = 0; break;
     case JournalEntry::Topic::checkpoint: size = sizeof(journalEntry::Checkpoint); break;
     case JournalEntry::Topic::success: size = sizeof(journalEntry::Success); break;
     case JournalEntry::Topic::superblock:
@@ -137,7 +138,9 @@ Result
 MramPersistence::appendEntry(const JournalEntry& entry)
 {
     if (curr + sizeof(journalEntry::Max) > mramSize)
+    {
         return Result::nospace;
+    }
     uint16_t size = getSizeFromJE(entry);
     device->driver.writeMRAM(curr, &entry, size);
     PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE),
@@ -163,7 +166,9 @@ MramPersistence::readNextElem(journalEntry::Max& entry)
     PageAbs hwm;
     device->driver.readMRAM(0, &hwm, sizeof(PageAbs));
     if (curr >= hwm)
-        return Result::nf;
+    {
+        return Result::notFound;
+    }
 
     device->driver.readMRAM(curr, &entry, sizeof(journalEntry::Max));
     uint16_t size = getSizeFromMax(entry);
@@ -223,8 +228,7 @@ FlashPersistence::tell()
 Result
 FlashPersistence::appendEntry(const JournalEntry& entry)
 {
-    // YEAH.
-    // Keep in mind that a page cant be written twice for wiederaufnahme des loggings nach replay
+    // Keep in mind that a page cant be written twice when restart of logging after replay
     uint16_t size = getSizeFromJE(entry);
     Result r;
     if (curr.offs + size > dataBytesPerPage)
@@ -285,12 +289,14 @@ FlashPersistence::readNextElem(journalEntry::Max& entry)
         // Reached end of buf
         Result r = findNextPos();
         if (r != Result::ok)
-            return Result::nf;
+        {
+            return Result::notFound;
+        }
         loadCurrentPage();
     }
     if (buf.data[curr.offs] == 0)
     {
-        return Result::nf;
+        return Result::notFound;
     }
 
     memcpy(static_cast<void*>(&entry),

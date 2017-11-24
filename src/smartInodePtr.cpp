@@ -16,11 +16,7 @@
 
 namespace paffs
 {
-SmartInodePtr::SmartInodePtr()
-    : mInode(nullptr),
-      mPool(nullptr){
-              // printf("Construc SIP %p\n", this);
-      };
+SmartInodePtr::SmartInodePtr() : mInode(nullptr), mPool(nullptr) {};
 
 SmartInodePtr::SmartInodePtr(const SmartInodePtr& other) : mInode(nullptr), mPool(nullptr)
 {
