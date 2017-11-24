@@ -24,6 +24,7 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
     uint16_t size = 0;
     switch (entry.topic)
     {
+    case JournalEntry::Topic::invalid: size = 0; break;
     case JournalEntry::Topic::checkpoint: size = sizeof(journalEntry::Checkpoint); break;
     case JournalEntry::Topic::success: size = sizeof(journalEntry::Success); break;
     case JournalEntry::Topic::superblock:

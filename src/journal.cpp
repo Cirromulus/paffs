@@ -13,6 +13,7 @@
 // ----------------------------------------------------------------------------
 
 #include "journal.hpp"
+#include "journalDebug.hpp"
 #include "area.hpp"
 #include "commonTypes.hpp"
 #include "driver/driver.hpp"
@@ -114,7 +115,7 @@ Journal::processBuffer()
         for (unsigned i = 0; i < JournalEntry::numberOfTopics; i++)
         {
             printf("\t%s: %" PRIu64 ".%" PRIu16 "\n",
-                   JournalEntry::topicNames[i],
+                   topicNames[i],
                    firstUnsuccededEntry[i].flash.addr,
                    firstUnsuccededEntry[i].flash.offs);
         }
@@ -209,7 +210,7 @@ Journal::applyCheckpointedJournalEntries(
                         printf("Processing entry ");
                         printMeaning(entry.base, false);
                         printf(" by %s\n",
-                               JournalEntry::topicNames[toUnderlying(worker->getTopic())]);
+                               topicNames[toUnderlying(worker->getTopic())]);
                     }
                     worker->processEntry(entry.base);
                 }
@@ -271,13 +272,17 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
     bool found = false;
     switch (entry.topic)
     {
+    case JournalEntry::Topic::invalid:
+        printf("\tInvalid/Empty");
+        found = true;
+        break;
     case JournalEntry::Topic::checkpoint:
         printf("\tCheckpoint");
         found = true;
         break;
     case JournalEntry::Topic::success:
         printf("\tCommit success at %s",
-               JournalEntry::topicNames[toUnderlying(
+               topicNames[toUnderlying(
                        static_cast<const journalEntry::Success*>(&entry)->target)]);
         found = true;
         break;

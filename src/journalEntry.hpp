@@ -29,16 +29,15 @@ struct JournalEntry
 {
     enum class Topic
     {
-        checkpoint = 1,
+        invalid = 0,
+        checkpoint,
         success,
         superblock,
         tree,
         summaryCache,
         inode,
     };
-    static constexpr const char* topicNames[] = {
-            "CHECKPOINT", "SUCCEED", "SUPERBLOCK", "TREE", "SUMMARY CACHE", "INODE",
-    };
+
     static constexpr const unsigned char numberOfTopics = 6;
     Topic topic;
 
