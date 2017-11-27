@@ -29,7 +29,7 @@ Btree::insertInode(const Inode& inode)
     TreeCacheNode* node = nullptr;
     Result r;
 
-    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert Inode n° %" PRId16 "", inode.no);
+    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert Inode n° %" PRIinodeno, inode.no);
 
     r = findLeaf(inode.no, node);
     if (r != Result::ok)
@@ -44,20 +44,16 @@ Btree::insertInode(const Inode& inode)
         {
             if (node->raw.as.branch.keys[i] == inode.no)
             {
-                PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Inode already existing with n° %" PRId16 "", inode.no);
+                PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Inode already existing with n° %" PRIinodeno "", inode.no);
                 return Result::bug;
             }
         }
     }
 
     mCache.lockTreeCacheNode(*node);  // prevents own node from clear
-    TreeCacheNode* c;
-    r = mCache.getRootNodeFromCache(c);
-    if (r != Result::ok)
-        return r;
 
     // This prevents the cache from a commit inside invalid state
-    r = mCache.reserveNodes(height(*c) + 2);
+    r = mCache.reserveNodes(calculateMaxNeededNewNodesForInsertion(*node));
     if (r != Result::ok)
     {
         PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not reserve enough nodes in treecache!");
@@ -89,7 +85,7 @@ Btree::getInode(InodeNo number, Inode& outInode)
 Result
 Btree::updateExistingInode(const Inode& inode)
 {
-    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Update existing inode n° %" PRId16 "", inode.no);
+    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Update existing inode n° %" PRIinodeno "", inode.no);
     TreeCacheNode* node = nullptr;
     Result r = findLeaf(inode.no, node);
     if (r != Result::ok)
@@ -105,7 +101,7 @@ Btree::updateExistingInode(const Inode& inode)
     if (pos == node->raw.keys)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Tried to update existing Inode %" PRIu32 ","
+                  "Tried to update existing Inode %" PRIinodeno ","
                   "but could not find it!",
                   inode.no);
         return Result::bug;  // This Key did not exist
@@ -156,6 +152,43 @@ Btree::findFirstFreeNo(InodeNo* outNumber)
         *outNumber = c->raw.as.leaf.pInodes[c->raw.keys - 1].no + 1;
     }
     return Result::ok;
+}
+
+uint16_t
+Btree::calculateMaxNeededNewNodesForInsertion(const TreeCacheNode& insertTarget)
+{
+
+    if(insertTarget.raw.isLeaf)
+    {   //we are a leaf
+        if(insertTarget.raw.keys == leafOrder)
+        {   //leaf is full, would split
+            if(insertTarget.parent != &insertTarget)
+            {   //we are a normal leaf
+                return 1 + calculateMaxNeededNewNodesForInsertion(*insertTarget.parent);
+            }else
+            {   //Rootnode splits into brother and parent is new rootnode
+                return 2;
+            }
+        }else
+        {
+            return 0;
+        }
+    }else
+    {   //we are a branch
+        if(insertTarget.raw.keys == branchOrder - 1)
+        {
+            if(insertTarget.parent != &insertTarget)
+            {   //we are a normal branch
+                return 1 + calculateMaxNeededNewNodesForInsertion(*insertTarget.parent);
+            }else
+            {   //Rootnode splits into brother and parent is new rootnode
+                return 2;
+            }
+        }else
+        {
+            return 0;
+        }
+    }
 }
 
 Result
@@ -242,10 +275,10 @@ Btree::height(TreeCacheNode& root)
 /* Utility function to give the length in edges
  * of the path from any TreeCacheNode to the root.
  */
-int
+uint16_t
 Btree::lengthToRoot(TreeCacheNode& child)
 {
-    unsigned int length = 0;
+    uint16_t length = 0;
     TreeCacheNode* node = &child;
     while (node->parent != node)
     {

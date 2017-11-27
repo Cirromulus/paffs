@@ -29,15 +29,15 @@ public:
     virtual Result
     deInitializeNand() override;
     Result
-    writePage(PageAbs page_no, void* data, unsigned int dataLen) override;
+    writePage(PageAbs page, void* data, uint16_t dataLen) override;
     Result
-    readPage(PageAbs page_no, void* data, unsigned int dataLen) override;
+    readPage(PageAbs page, void* data, uint16_t dataLen) override;
     Result
-    eraseBlock(BlockAbs block_no) override;
+    eraseBlock(BlockAbs block) override;
     Result
-    markBad(BlockAbs block_no) override;
+    markBad(BlockAbs block) override;
     Result
-    checkBad(BlockAbs block_no) override;
+    checkBad(BlockAbs block) override;
 };
 
 }

@@ -15,15 +15,16 @@
 #ifndef DS_PAFFS_PAFFS_TRACE_H_
 #define DS_PAFFS_PAFFS_TRACE_H_
 
-namespace paffs
-{
-extern unsigned int traceMask;
-}
-
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
+
+namespace paffs
+{
+typedef uint64_t TraceMask;
+extern TraceMask traceMask;
+}
 
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 

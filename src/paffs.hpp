@@ -21,7 +21,7 @@
 
 namespace paffs
 {
-extern unsigned int traceMask;
+extern TraceMask traceMask;
 
 class Paffs
 {
@@ -76,15 +76,15 @@ public:
     Result
     getObjInfo(const char* fullPath, ObjInfo& nfo);
     Result
-    read(Obj& obj, char* buf, unsigned int bytesToRead, unsigned int* bytesRead);
+    read(Obj& obj, char* buf, FileSize bytesToRead, FileSize* bytesRead);
     Result
-    write(Obj& obj, const char* buf, unsigned int bytesToWrite, unsigned int* bytesWritten);
+    write(Obj& obj, const char* buf, FileSize bytesToWrite, FileSize* bytesWritten);
     Result
     seek(Obj& obj, int m, Seekmode mode = Seekmode::set);
     Result
     flush(Obj& obj);
     Result
-    truncate(const char* path, unsigned int newLength);
+    truncate(const char* path, FileSize newLength);
 
     Result
     chmod(const char* path, Permission perm);
@@ -99,10 +99,10 @@ public:
 
     // ONLY FOR DEBUG
     Device*
-    getDevice(unsigned int number);
+    getDevice(uint16_t number);
     void
-    setTraceMask(unsigned int mask);
-    unsigned int
+    setTraceMask(TraceMask mask);
+    TraceMask
     getTraceMask();
 };
 }

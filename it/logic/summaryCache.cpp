@@ -150,7 +150,9 @@ public:
     virtual void
     SetUp()
     {
-        fs.setTraceMask(PAFFS_TRACE_VERIFY_TC | PAFFS_TRACE_VERIFY_AS | PAFFS_TRACE_ERROR
+        fs.setTraceMask(PAFFS_TRACE_VERIFY_TC
+                        | PAFFS_TRACE_VERIFY_AS
+                        | PAFFS_TRACE_ERROR
                         | PAFFS_TRACE_BUG
                         | PAFFS_TRACE_BAD_BLOCKS);
         paffs::Result r = fs.format(bbl, true);
@@ -206,7 +208,7 @@ fillFlashAndVerify(paffs::Paffs& fs)
     char filename[50];
     bool full = false;
 
-    fs.setTraceMask(fs.getTraceMask() | PAFFS_WRITE_VERIFY_AS | PAFFS_TRACE_VERIFY_AS);
+    //fs.setTraceMask(fs.getTraceMask() | PAFFS_TRACE_TREECACHE);
 
     // fill areas
     for (i = 0; !full; i++)

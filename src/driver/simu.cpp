@@ -23,15 +23,13 @@
 namespace paffs{
 
 Driver*
-getDriver(const uint8_t deviceId){
-	(void) deviceId;
+getDriver(const uint8_t){
 	Driver* out = new SimuDriver();
 	return out;
 }
 
 Driver*
-getDriverSpecial(const uint8_t deviceId, void* fc, void *mram){
-	(void) deviceId;
+getDriverSpecial(const uint8_t, void* fc, void *mram){
 	if(fc == NULL){
 		std::cerr << "Invalid flashCell pointer given!" << std::endl;
 		return NULL;
@@ -56,33 +54,33 @@ SimuDriver::deInitializeNand(){
 }
 
 Result
-SimuDriver::writePage(PageAbs page_no,
-                      void* data, unsigned int data_len){
+SimuDriver::writePage(PageAbs page, void* data, uint16_t dataLen)
+{
     //TODO: Simple write-trough buffer by noting address
 	if(!cell)
 	{
 		return Result::fail;
 	}
-	if(data_len > totalBytesPerPage)
+	if(dataLen > totalBytesPerPage)
 	{
-		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write %u Bytes to a page of %u!", data_len, totalBytesPerPage);
+		PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write %u Bytes to a page of %u!", dataLen, totalBytesPerPage);
 		return Result::fail;
 	}
 
-	if(totalBytesPerPage != data_len)
+	if(totalBytesPerPage != dataLen)
 	{
-		memset(buf+data_len, 0xFF, totalBytesPerPage - data_len);
+		memset(buf+dataLen, 0xFF, totalBytesPerPage - dataLen);
 	}
 	if(data != buf)
 	{
-	    memcpy(buf, data, data_len);
+	    memcpy(buf, data, dataLen);
 	}
 
 	unsigned char* p = reinterpret_cast<unsigned char*>(&buf[dataBytesPerPage+2]);
 	for(int i = 0; i < dataBytesPerPage; i+=256, p+=3)
 		YaffsEcc::calc(reinterpret_cast<unsigned char*>(&buf[i]), p);
 
-	Nandaddress d = translatePageToAddress(page_no);
+	Nandaddress d = translatePageToAddress(page);
 
 	if(cell->writePage(d.plane, d.block, d.page, reinterpret_cast<unsigned char*>(buf)) < 0){
 		return Result::fail;
@@ -90,20 +88,20 @@ SimuDriver::writePage(PageAbs page_no,
 	return Result::ok;
 }
 Result
-SimuDriver::readPage(PageAbs page_no,
-                     void* data, unsigned int data_len){
+SimuDriver::readPage(PageAbs page, void* data, uint16_t dataLen)
+{
 	if(!cell)
 	{
 	    return Result::fail;
 	}
-    if(data_len > totalBytesPerPage)
+    if(dataLen > totalBytesPerPage)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried reading more than a page width!");
         return Result::invalidInput;
     }
 	//TODO: Simple write-trough buffer by checking if same address
 
-	Nandaddress d = translatePageToAddress(page_no);
+	Nandaddress d = translatePageToAddress(page);
 
 	if(cell->readPage(d.plane, d.block, d.page, reinterpret_cast<unsigned char*>(buf)) < 0){
 		return Result::fail;
@@ -120,7 +118,7 @@ SimuDriver::readPage(PageAbs page_no,
 	}
 	if(data != buf)
 	{
-	    memcpy(data, buf, data_len);
+	    memcpy(data, buf, dataLen);
 	}
 	return ret;
 }

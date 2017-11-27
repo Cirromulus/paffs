@@ -115,7 +115,7 @@ Result
 GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea, SummaryEntry* summary)
 {
     PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL,
-                "Moving valid data from Area %" PRIu32 " (on %" PRIu32 ") to Area %" PRIu32 " (on %" PRIu32 ")",
+                "Moving valid data from Area %" PRIu16 " (on %" PRIu16 ") to Area %" PRIu16 " (on %" PRIu16 ")",
                 srcArea,
                 dev->areaMgmt.getPos(srcArea),
                 dstArea,
@@ -165,7 +165,7 @@ GarbageCollection::collectGarbage(AreaType targetType)
     SummaryEntry summary[dataPagesPerArea];
     memset(summary, 0xFF, dataPagesPerArea);
     bool srcAreaContainsData = false;
-    AreaPos deletion_target = 0;
+    AreaPos deletionTarget = 0;
     Result r;
     AreaPos lastDeletionTarget = 0;
 
@@ -182,7 +182,7 @@ GarbageCollection::collectGarbage(AreaType targetType)
                 {
                     PAFFS_DBG(PAFFS_TRACE_BUG,
                               "Garbage buffer "
-                              "on %" PRIu32 " is not empty!",
+                              "on %" PRIu16 " is not empty!",
                               dev->areaMgmt.getPos(
                                       dev->areaMgmt.getActiveArea(AreaType::garbageBuffer)));
                     return Result::bug;
@@ -192,8 +192,8 @@ GarbageCollection::collectGarbage(AreaType targetType)
     }
     while (1)
     {
-        deletion_target = findNextBestArea(targetType, summary, &srcAreaContainsData);
-        if (deletion_target == 0)
+        deletionTarget = findNextBestArea(targetType, summary, &srcAreaContainsData);
+        if (deletionTarget == 0)
         {
             PAFFS_DBG_S(PAFFS_TRACE_GC,
                         "Could not find any GC'able pages for type %s!",
@@ -227,13 +227,13 @@ GarbageCollection::collectGarbage(AreaType targetType)
                 if (dev->areaMgmt.getStatus(nextPos) == AreaStatus::empty)
                 {
                     dev->areaMgmt.initAreaAs(nextPos, targetType);
-                    PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found empty Area %" PRIu32 "", nextPos);
+                    PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found empty Area %" PRIu16 "", nextPos);
                 }
             }
             if (nextPos == areasNo)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
-                          "Used Areas said we had space left (%" PRIu32 " areas), "
+                          "Used Areas said we had space left (%" PRIu16 " areas), "
                           "but no empty area was found!",
                           dev->areaMgmt.getUsedAreas());
                 return Result::bug;
@@ -254,16 +254,16 @@ GarbageCollection::collectGarbage(AreaType targetType)
 
             // Resurrect area, fill it with the former summary. In end routine, positions will be
             // swapped.
-            dev->areaMgmt.initAreaAs(lastDeletionTarget, dev->areaMgmt.getType(deletion_target));
+            dev->areaMgmt.initAreaAs(lastDeletionTarget, dev->areaMgmt.getType(deletionTarget));
             r = dev->sumCache.setSummaryStatus(lastDeletionTarget, summary);
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR,
-                          "Could not move former Summary to area %" PRId16 "!",
+                          "Could not move former Summary to area %" PRIu16 "!",
                           lastDeletionTarget);
                 return r;
             }
-            deletion_target = lastDeletionTarget;
+            deletionTarget = lastDeletionTarget;
             break;
         }
 
@@ -271,12 +271,12 @@ GarbageCollection::collectGarbage(AreaType targetType)
         {
             // Just for debug, in production AS might be invalid and summary may be incomplete
             SummaryEntry tmp[dataPagesPerArea];
-            r = dev->sumCache.getSummaryStatus(deletion_target, tmp);
+            r = dev->sumCache.getSummaryStatus(deletionTarget, tmp);
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_VERIFY_AS,
-                          "Could not verify AreaSummary of area %" PRId16 "!",
-                          deletion_target);
+                          "Could not verify AreaSummary of area %" PRIu16 "!",
+                          deletionTarget);
             }
             if (memcmp(summary, tmp, dataPagesPerArea) != 0)
             {
@@ -290,44 +290,44 @@ GarbageCollection::collectGarbage(AreaType targetType)
             for (unsigned int j = 0; j < dataPagesPerArea; j++)
             {
                 if (summary[j] > SummaryEntry::dirty)
-                    PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %" PRIu32 " contains invalid Entries!", j);
+                    PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %" PRIu16 " contains invalid Entries!", j);
             }
         }
 
         // TODO: more Safety switches like comparison of lastDeletion targetType
 
-        lastDeletionTarget = deletion_target;
+        lastDeletionTarget = deletionTarget;
 
         if (srcAreaContainsData)
         {
             // still some valid data, copy to new area
             PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL,
-                        "GC found just partially clean area %" PRIu32 " on pos %" PRIu32 "",
-                        deletion_target,
-                        dev->areaMgmt.getPos(deletion_target));
+                        "GC found just partially clean area %" PRIu16 " on pos %" PRIu16 "",
+                        deletionTarget,
+                        dev->areaMgmt.getPos(deletionTarget));
 
             r = moveValidDataToNewArea(
-                    deletion_target, dev->areaMgmt.getActiveArea(AreaType::garbageBuffer), summary);
+                    deletionTarget, dev->areaMgmt.getActiveArea(AreaType::garbageBuffer), summary);
             // while(getchar() == EOF);
             if (r != Result::ok)
             {
                 PAFFS_DBG_S(PAFFS_TRACE_ERROR,
-                            "Could not copy valid pages from area %" PRIu32 " to %" PRIu32 "!",
-                            deletion_target,
+                            "Could not copy valid pages from area %" PRIu16 " to %" PRIu16 "!",
+                            deletionTarget,
                             dev->areaMgmt.getActiveArea(AreaType::garbageBuffer));
                 // TODO: Handle something, maybe put area in ReadOnly or copy somewhere else..
                 // TODO: Maybe copy rest of Pages before quitting
                 return r;
             }
-            dev->areaMgmt.deleteAreaContents(deletion_target);
+            dev->areaMgmt.deleteAreaContents(deletionTarget);
             // Copy the updated (no SummaryEntry::dirty pages) summary to the deletion_target (it
             // will be the fresh area!)
-            r = dev->sumCache.setSummaryStatus(deletion_target, summary);
+            r = dev->sumCache.setSummaryStatus(deletionTarget, summary);
             if (r != Result::ok)
             {
                 PAFFS_DBG_S(PAFFS_TRACE_ERROR,
                             "Could not remove dirty entries in AS of area %" PRId16 "",
-                            deletion_target);
+                            deletionTarget);
                 return r;
             }
             // Notify for used Pages
@@ -335,12 +335,12 @@ GarbageCollection::collectGarbage(AreaType targetType)
             {
                 // Safe, because we can assume deletion targetType is same Type as we want (from
                 // getNextBestArea)
-                dev->areaMgmt.setStatus(deletion_target, AreaStatus::active);
+                dev->areaMgmt.setStatus(deletionTarget, AreaStatus::active);
             }
         }
         else
         {
-            dev->areaMgmt.deleteArea(deletion_target);
+            dev->areaMgmt.deleteArea(deletionTarget);
         }
 
         // TODO: Maybe delete more available blocks. Mark them as UNSET+EMPTY
@@ -348,7 +348,7 @@ GarbageCollection::collectGarbage(AreaType targetType)
     }
 
     // swap logical position of areas to keep addresses valid
-    dev->areaMgmt.swapAreaPosition(deletion_target,
+    dev->areaMgmt.swapAreaPosition(deletionTarget,
                                    dev->areaMgmt.getActiveArea(AreaType::garbageBuffer));
 
     if (targetType != AreaType::unset)
@@ -357,17 +357,17 @@ GarbageCollection::collectGarbage(AreaType targetType)
         if (dev->areaMgmt.getActiveArea(targetType) != 0)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "old active Area (%" PRIu32 " on %" PRIu32 ") is not closed!",
+                      "old active Area (%" PRIu16 " on %" PRIu16 ") is not closed!",
                       dev->areaMgmt.getActiveArea(targetType),
                       dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(targetType)));
             return Result::bug;
         }
         // dev->areaMgmt.setActiveArea(targetType, deletion_target);
-        dev->areaMgmt.initAreaAs(deletion_target, targetType);
+        dev->areaMgmt.initAreaAs(deletionTarget, targetType);
     }
 
     PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL,
-                "Garbagecollection erased pos %" PRIu32 " and gave area %" PRIu32 " pos %" PRIu32 ".",
+                "Garbagecollection erased pos %" PRIu16 " and gave area %" PRIu16 " pos %" PRIu16 ".",
                 dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(AreaType::garbageBuffer)),
                 dev->areaMgmt.getActiveArea(targetType),
                 dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(targetType)));

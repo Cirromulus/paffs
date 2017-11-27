@@ -73,11 +73,11 @@ private:
     loadPath(Addr& anchor,
              PageNo pageOffs,
              AddrListCacheElem* start,
-             unsigned char depth,
+             uint8_t depth,
              PageNo& addrPos);
 
     Result
-    commitPath(Addr& anchor, AddrListCacheElem* path, unsigned char depth);
+    commitPath(Addr& anchor, AddrListCacheElem* path, uint8_t depth);
     Result
     commitElem(AddrListCacheElem& parent, AddrListCacheElem& elem);
     Result

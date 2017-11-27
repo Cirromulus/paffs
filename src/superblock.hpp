@@ -86,8 +86,8 @@ struct SuperIndex
     uint16_t
     getNeededBytes()
     {
-        unsigned int neededSummaries = 0;
-        for (unsigned int i = 0; i < 2; i++)
+        uint16_t neededSummaries = 0;
+        for (uint16_t i = 0; i < 2; i++)
         {
             if (areaSummaryPositions[i] > 0)
                 neededSummaries++;
@@ -158,13 +158,13 @@ private:
      * \return NF if last block is full, even if other blocks are free
      */
     Result
-    findFirstFreeEntryInArea(AreaPos area, PageOffs* outPos, unsigned int requiredPages);
+    findFirstFreeEntryInArea(AreaPos area, PageOffs* outPos, PageOffs requiredPages);
 
     Result
     findFirstFreeEntryInBlock(AreaPos area,
                               uint8_t block,
                               PageOffs* outPos,
-                              unsigned int requiredPages);
+                              PageOffs requiredPages);
 
     /**
      * First addr in path is anchor

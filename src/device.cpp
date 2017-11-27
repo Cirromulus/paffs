@@ -78,17 +78,17 @@ Device::format(const BadBlockList& badBlockList, bool complete)
     unsigned char hadAreaType = 0;
     unsigned char hadSuperblocks = 0;
 
-    for (unsigned int block = 0; block < badBlockList.mSize; block++)
+    for (BlockAbs block = 0; block < badBlockList.mSize; block++)
     {
         AreaPos area = badBlockList[block] / blocksPerArea;
         PAFFS_DBG_S(
-                PAFFS_TRACE_BAD_BLOCKS, "Retiring Area %" PRIu32 " because of given List", area);
+                PAFFS_TRACE_BAD_BLOCKS, "Retiring Area %" PRIareapos " because of given List", area);
 
         if (badBlockList[block] > blocksTotal)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
                       "Invalid Bad Block given! "
-                      "was %" PRIu32 " area %" PRIu32 ", should < %" PRIu32,
+                      "was %" PRIblockabs " area %" PRIareapos ", should < %" PRIblockabs,
                       badBlockList[block],
                       area,
                       blocksTotal);
@@ -104,7 +104,7 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         areaMgmt.setType(area, AreaType::retired);
     }
 
-    for (unsigned int area = 0; area < areasNo; area++)
+    for (AreaPos area = 0; area < areasNo; area++)
     {
         areaMgmt.setStatus(area, AreaStatus::empty);
         // erasecount is already set to 0
@@ -116,13 +116,13 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         }
 
         bool anyBlockInAreaBad = false;
-        for (unsigned block = 0; block < blocksPerArea; block++)
+        for (BlockAbs block = 0; block < blocksPerArea; block++)
         {
             if (driver.checkBad(area * blocksPerArea + block) != Result::ok)
             {
                 PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
-                            "Found marked bad block %" PRIu32 " during formatting, "
-                            "retiring area %" PRIu32,
+                            "Found marked bad block %" PRIblockabs " during formatting, "
+                            "retiring area %" PRIareapos,
                             area * blocksPerArea + block,
                             area);
                 anyBlockInAreaBad = true;
@@ -139,14 +139,14 @@ Device::format(const BadBlockList& badBlockList, bool complete)
                            1 << AreaType::garbageBuffer)
             || complete)
         {
-            for (unsigned int p = 0; p < blocksPerArea; p++)
+            for (BlockAbs p = 0; p < blocksPerArea; p++)
             {
                 r = driver.eraseBlock(p + area * blocksPerArea);
                 if (r != Result::ok)
                 {
                     PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
-                                "Found non-marked bad block %" PRIu32 " during formatting, "
-                                "retiring area %" PRIu32,
+                                "Found non-marked bad block %" PRIblockabs " during formatting, "
+                                "retiring area %" PRIareapos,
                                 p + area * blocksPerArea,
                                 area);
                     areaMgmt.setType(area, AreaType::retired);
@@ -318,7 +318,7 @@ Device::unmnt()
         while (it != inodePool.map.end())
         {
             PAFFS_DBG_S(PAFFS_TRACE_ALWAYS,
-                        "Commit Inode %" PRIu32 " with %" PRIu32 " references",
+                        "Commit Inode %" PRIinodeno " with %" PRIu8 " references",
                         it->first,
                         it->second.second);
             // TODO: Later, we would choose the actual pac instance (or the PAC will choose the
@@ -355,10 +355,10 @@ Device::unmnt()
 
     if (traceMask & PAFFS_TRACE_AREA)
     {
-        printf("Info: \n\t%" PRIu32 " used Areas\n", areaMgmt.getUsedAreas());
-        for (unsigned int i = 0; i < areasNo; i++)
+        printf("Info: \n\t%" PRIareapos " used Areas\n", areaMgmt.getUsedAreas());
+        for (AreaPos i = 0; i < areasNo; i++)
         {
-            printf("\tArea %03d on %03u as %10s from page %4d %s\n",
+            printf("\tArea %03" PRIareapos " on %03" PRIareapos " as %10s from page %4" PRIareapos " %s\n",
                    i,
                    areaMgmt.getPos(i),
                    areaNames[areaMgmt.getType(i)],
@@ -366,7 +366,7 @@ Device::unmnt()
                    areaStatusNames[areaMgmt.getStatus(i)]);
             if (i > 128)
             {
-                printf("\n -- truncated 128-%" PRIu32 " Areas.\n", areasNo);
+                printf("\n -- truncated 128-%" PRIareapos " Areas.\n", areasNo);
                 break;
             }
         }
@@ -444,7 +444,7 @@ Device::createFilInode(SmartInodePtr& outInode, Permission mask)
 }
 
 Result
-Device::getParentDir(const char* fullPath, SmartInodePtr& parDir, unsigned int* lastSlash)
+Device::getParentDir(const char* fullPath, SmartInodePtr& parDir, FileNamePos* lastSlash)
 {
     if (fullPath[0] == 0)
     {
@@ -452,7 +452,7 @@ Device::getParentDir(const char* fullPath, SmartInodePtr& parDir, unsigned int* 
         return Result::invalidInput;
     }
 
-    unsigned int p = 0;
+    FileNamePos p = 0;
     *lastSlash = 0;
 
     while (fullPath[p] != 0)
@@ -488,21 +488,22 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
     }
 
     std::unique_ptr<char[]> buf(new char[folder.size]);
-    unsigned int bytesRead = 0;
+    FileSize bytesRead = 0;
     Result r = dataIO.readInodeData(folder, 0, folder.size, &bytesRead, buf.get());
     if (r != Result::ok || bytesRead != folder.size)
     {
         return r == Result::ok ? Result::bug : r;
     }
 
-    unsigned int p = sizeof(DirEntryCount);  // skip directory entry count
+    FileSize p = sizeof(DirEntryCount);  // skip directory entry count
     while (p < folder.size)
     {
         DirEntryLength direntryl = buf[p];
         if (direntryl < sizeof(DirEntryLength) + sizeof(InodeNo))
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "Directory entry size of Folder %" PRIu32 " is unplausible! (was: %" PRId16 ", should: >%lu)",
+                      "Directory entry size of Folder %" PRIinodeno " is unplausible! "
+                              "(was: %" PRIdirentrylen ", should: >%zu)",
                       folder.no,
                       direntryl,
                       sizeof(DirEntryLength) + sizeof(InodeNo));
@@ -511,17 +512,19 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         if (direntryl > folder.size)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "BUG: direntry length of Folder %" PRIu32 " not plausible (was: %" PRId16 ", should: >%" PRId16 ")!",
+                      "BUG: direntry length of Folder %" PRIinodeno " not plausible "
+                              "(was: %" PRIdirentrylen ", should: >%" PRIfilsize ")!",
                       folder.no,
                       direntryl,
                       folder.size);
             return Result::bug;
         }
-        unsigned int dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
+        FileNamePos dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
         if (dirnamel > folder.size)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "BUG: dirname length of Inode %" PRIu32 " not plausible (was: %" PRId16 ", should: >%" PRId16 ")!",
+                      "BUG: dirname length of Inode %" PRIinodeno " not plausible "
+                              "(was: %" PRIfilsize ", should: >%" PRIfilsize ")!",
                       folder.no,
                       folder.size,
                       p + dirnamel);
@@ -557,7 +560,7 @@ Device::getInodeOfElem(SmartInodePtr& outInode, const char* fullPath)
         return Result::fail;
     }
 
-    unsigned int fpLength = strlen(fullPath);
+    FileNamePos fpLength = strlen(fullPath);
     char fullPathC[fpLength + 1];
     memcpy(fullPathC, fullPath, fpLength);
     fullPathC[fpLength] = 0;
@@ -629,7 +632,7 @@ Device::findOrLoadInode(InodeNo no, SmartInodePtr& target)
 Result
 Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
 {
-    unsigned int elemNameL = strlen(name);
+    FileNamePos elemNameL = strlen(name);
     if (name[elemNameL - 1] == '/')
     {
         elemNameL--;
@@ -658,7 +661,7 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
         contDir.size = sizeof(DirEntryCount);  // To hold the Number of Entries
 
     std::unique_ptr<char[]> dirData(new char[contDir.size + direntryl]);
-    unsigned int bytes = 0;
+    FileSize bytes = 0;
     Result r;
     if (contDir.reservedPages > 0)
     {  // if Directory is not empty
@@ -725,7 +728,7 @@ Result
 Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
 {
     std::unique_ptr<char[]> dirData(new char[contDir.size]);
-    unsigned int bytes = 0;
+    FileSize bytes = 0;
     Result r;
     if (contDir.reservedPages > 0)
     {  // if Directory is not empty
@@ -749,8 +752,8 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
         if (memcmp(&dirData[pointer + sizeof(DirEntryLength)], &elem, sizeof(InodeNo)) == 0)
         {
             // Found
-            unsigned int newSize = contDir.size - entryl;
-            unsigned int restByte = newSize - pointer;
+            FileSize newSize = contDir.size - entryl;
+            FileSize restByte = newSize - pointer;
             if (newSize == sizeof(DirEntryCount))
                 newSize = 0;
 
@@ -761,7 +764,7 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
 
             if (restByte > 0 && restByte < 4)  // should either be 0 (no entries left) or bigger
             {                                  // than 4 (minimum size for one entry)
-                PAFFS_DBG(PAFFS_TRACE_BUG, "Something is fishy! (%" PRId16 ")", restByte);
+                PAFFS_DBG(PAFFS_TRACE_BUG, "Something is fishy! (%" PRIfilsize ")", restByte);
             }
             if (newSize == 0)
             {
@@ -772,7 +775,7 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
             (*entries)--;
             memcpy(&dirData[pointer], &dirData[pointer + entryl], restByte);
 
-            unsigned int bw = 0;
+            FileSize bw = 0;
             r = dataIO.writeInodeData(contDir, 0, newSize, &bw, dirData.get());
             if (r != Result::ok)
             {
@@ -802,7 +805,7 @@ Device::mkDir(const char* fullPath, Permission mask)
         return Result::nospace;
     }
 
-    unsigned int lastSlash = 0;
+    FileNamePos lastSlash = 0;
 
     SmartInodePtr parDir;
     Result res = getParentDir(fullPath, parDir, &lastSlash);
@@ -856,7 +859,7 @@ Device::openDir(const char* path)
     }
 
     char* dirData = new char[dirPinode->size];
-    unsigned int br = 0;
+    FileSize br = 0;
     if (dirPinode->reservedPages > 0)
     {
         r = dataIO.readInodeData(*dirPinode, 0, dirPinode->size, &br, dirData);
@@ -878,20 +881,21 @@ Device::openDir(const char* path)
     dir->self->no = dirPinode->no;
 
     dir->self->parent = nullptr;  // no caching, so we probably don't have the parent
-    dir->no_entries = dirPinode->size == 0 ? 0 : dirData[0];
-    dir->childs = new Dirent[dir->no_entries];
+    dir->entries = dirPinode->size == 0 ? 0 : dirData[0];
+    dir->childs = new Dirent[dir->entries];
     dir->pos = 0;
 
-    unsigned int p = sizeof(DirEntryCount);
-    unsigned int entry;
+    FileSize p = sizeof(DirEntryCount);
+    DirEntryCount entry;
     for (entry = 0; p < dirPinode->size; entry++)
     {
         DirEntryLength direntryl = dirData[p];
-        unsigned int dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
+        FileNamePos dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
         if (dirnamel > 1 << sizeof(DirEntryLength) * 8)
         {
             // We have an error while reading
-            PAFFS_DBG(PAFFS_TRACE_BUG, "Dirname length was bigger than possible (%" PRIu32 ")!", dirnamel);
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Dirname length was bigger than possible "
+                    "(%" PRIfilnamepos ")!", dirnamel);
             delete[] dir->childs;
             delete[] dirData;
             delete dir->self;
@@ -913,11 +917,11 @@ Device::openDir(const char* path)
 
     delete[] dirData;
 
-    if (entry != dir->no_entries)
+    if (entry != dir->entries)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Directory stated it had %" PRIu32 " entries, but has actually %" PRIu32 "!",
-                  dir->no_entries,
+                  "Directory stated it had %" PRIdirentrycount " entries, but has actually %" PRIdirentrycount "!",
+                  dir->entries,
                   entry);
         lasterr = Result::bug;
         return nullptr;
@@ -938,7 +942,7 @@ Device::closeDir(Dir*& dir)
         return Result::invalidInput;
     }
 
-    for (int i = 0; i < dir->no_entries; i++)
+    for (FileSize i = 0; i < dir->entries; i++)
     {
         delete[] dir->childs[i].name;
     }
@@ -960,17 +964,17 @@ Device::readDir(Dir& dir)
         lasterr = Result::notMounted;
         return nullptr;
     }
-    if (dir.no_entries == 0)
+    if (dir.entries == 0)
     {
         return nullptr;
     }
 
-    if (dir.pos == dir.no_entries)
+    if (dir.pos == dir.entries)
     {
         return nullptr;
     }
 
-    if (dir.pos > dir.no_entries)
+    if (dir.pos > dir.entries)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "READ DIR on dir that points further than its contents");
         lasterr = Result::bug;
@@ -996,7 +1000,7 @@ Device::readDir(Dir& dir)
 
     if (dir.childs[dir.pos].node->type == InodeType::dir)
     {
-        int namel = strlen(dir.childs[dir.pos].name);
+        FileNamePos namel = strlen(dir.childs[dir.pos].name);
         dir.childs[dir.pos].name[namel] = '/';
         dir.childs[dir.pos].name[namel + 1] = 0;
     }
@@ -1025,7 +1029,7 @@ Device::createFile(SmartInodePtr& outFile, const char* fullPath, Permission mask
         return Result::nospace;
     }
 
-    unsigned int lastSlash = 0;
+    FileNamePos lastSlash = 0;
 
     SmartInodePtr parDir;
     Result res = getParentDir(fullPath, parDir, &lastSlash);
@@ -1234,7 +1238,7 @@ Device::getObjInfo(const char* fullPath, ObjInfo& nfo)
 }
 
 Result
-Device::read(Obj& obj, char* buf, unsigned int bytesToRead, unsigned int* bytesRead)
+Device::read(Obj& obj, char* buf, FileSize bytesToRead, FileSize* bytesRead)
 {
     if (!mounted)
     {
@@ -1269,8 +1273,8 @@ Device::read(Obj& obj, char* buf, unsigned int bytesToRead, unsigned int* bytesR
 }
 
 Result
-Device::write(Obj& obj, const char* buf, unsigned int bytesToWrite,
-              unsigned int* bytesWritten)
+Device::write(Obj& obj, const char* buf, FileSize bytesToWrite,
+              FileSize* bytesWritten)
 {
     *bytesWritten = 0;
     if (!mounted)
@@ -1308,7 +1312,7 @@ Device::write(Obj& obj, const char* buf, unsigned int bytesToWrite,
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Could not write %" PRIu32 " of %" PRIu32 " bytes at %" PRIu32 "",
+                  "Could not write %" PRIfilsize " of %" PRIfilsize " bytes at %" PRIfilsize "",
                   bytesToWrite - *bytesWritten,
                   bytesToWrite, obj.fp);
         if (*bytesWritten > 0)
@@ -1327,7 +1331,7 @@ Device::write(Obj& obj, const char* buf, unsigned int bytesToWrite,
     if (*bytesWritten != bytesToWrite)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Could not write Inode Data in whole! (Should: %" PRId16 ", was: %" PRId16 ")",
+                  "Could not write Inode Data in whole! (Should: %" PRIfilsize ", was: %" PRIfilsize ")",
                   bytesToWrite,
                   *bytesWritten);
         // TODO: Handle error, maybe rewrite
@@ -1359,7 +1363,7 @@ Device::write(Obj& obj, const char* buf, unsigned int bytesToWrite,
 }
 
 Result
-Device::seek(Obj& obj, int m, Seekmode mode)
+Device::seek(Obj& obj, FileSizeDiff m, Seekmode mode)
 {
     if (!mounted)
     {
@@ -1373,12 +1377,12 @@ Device::seek(Obj& obj, int m, Seekmode mode)
         obj.fp = m;
         break;
     case Seekmode::end:
-        if (-m > static_cast<int>(obj.dirent.node->size))
+        if (-m > obj.dirent.node->size)
             return Result::invalidInput;
         obj.fp = obj.dirent.node->size + m;
         break;
     case Seekmode::cur:
-        if (static_cast<int>(obj.fp) + m < 0)
+        if (obj.fp + m < 0)
             return Result::invalidInput;
         obj.fp += m;
         break;
@@ -1417,7 +1421,7 @@ Device::flush(Obj& obj)
 }
 
 Result
-Device::truncate(const char* path, unsigned int newLength)
+Device::truncate(const char* path, FileSize newLength)
 {
     if (!mounted)
     {
@@ -1490,7 +1494,7 @@ Device::remove(const char* path)
     }
 
     SmartInodePtr parentDir;
-    unsigned int lastSlash = 0;
+    uint16_t lastSlash = 0;
     if ((r = getParentDir(path, parentDir, &lastSlash)) != Result::ok)
         return r;
 
@@ -1536,8 +1540,8 @@ Device::chmod(const char* path, Permission perm)
 Result
 Device::getListOfOpenFiles(Obj* list[])
 {
-    unsigned int pos = 0;
-    for (unsigned int i = 0; i < maxNumberOfFiles; i++)
+    uint16_t pos = 0;
+    for (uint16_t i = 0; i < maxNumberOfFiles; i++)
     {
         if (filesPool.activeObjects.getBit(i))
         {
@@ -1573,8 +1577,8 @@ Device::initializeDevice()
     if (areasNo < AreaType::no - 2)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Device too small, at least %" PRIu32 " Areas are needed!",
-                  static_cast<unsigned>(AreaType::no));
+                  "Device too small, at least %" PRIu8 " Areas are needed!",
+                  AreaType::no);
         return Result::invalidInput;
     }
 
@@ -1595,7 +1599,7 @@ Device::initializeDevice()
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
                   "'blocksPerArea' does not divide "
-                  "%" PRIu32 " blocks evenly! (define %" PRIu32 ", rest: %" PRIu32 ")",
+                  "%" PRIblockabs " blocks evenly! (define %" PRIblockabs ", rest: %" PRIblockabs ")",
                   blocksTotal,
                   blocksPerArea,
                   blocksTotal % blocksPerArea);

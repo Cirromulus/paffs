@@ -60,9 +60,9 @@ public:
 	Result
 	deInitializeNand() override;
 	Result
-	writePage(PageAbs pageNo, void* data, unsigned int dataLen) override;
+	writePage(PageAbs pageNo, void* data, uint16_t dataLen) override;
 	Result
-	readPage(PageAbs pageNo, void* data, unsigned int dataLen) override;
+	readPage(PageAbs pageNo, void* data, uint16_t dataLen) override;
 	Result
 	eraseBlock(BlockAbs blockNo) override;
 	Result
@@ -71,10 +71,10 @@ public:
 	checkBad(BlockAbs blockNo) override;
 	Result
 	writeMRAM(PageAbs startByte,
-	          const void* data, unsigned int dataLen) override;
+	          const void* data, uint32_t dataLen) override;
 	Result
 	readMRAM(PageAbs startByte,
-	         void* data, unsigned int dataLen) override;
+	         void* data, uint32_t dataLen) override;
 private:
 	Nandaddress
 	translatePageToAddress(PageAbs sector);

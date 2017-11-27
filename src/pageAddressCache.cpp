@@ -28,7 +28,7 @@ AddrListCacheElem::setAddr(PageNo pos, Addr addr)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "Tried to set pos %" PRIu32 " to addr,"
-                  " allowed < %" PRIu32 "",
+                  " allowed < %" PRIu16 "",
                   pos,
                   addrsPerPage);
     }
@@ -40,7 +40,8 @@ AddrListCacheElem::getAddr(PageNo pos)
 {
     if (pos >= addrsPerPage)
     {
-        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get pos %" PRIu32 " allowed < %" PRIu32 "", pos, addrsPerPage);
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get pos %" PRIu32 ","
+                " allowed < %" PRIu16 "", pos, addrsPerPage);
     }
     return cache[pos];
 }
@@ -143,9 +144,8 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
     }
 
     PAFFS_DBG(PAFFS_TRACE_ERROR,
-              "Get Page bigger than allowed! (was %" PRIu32 ", should <%" PRIu32 ")",
-              0,
-              0);  // TODO: Actual calculation of values
+              "Get Page bigger than allowed! (was --, should <--)");
+    // TODO: Actual calculation of values
     return Result::toobig;
 }
 
@@ -166,7 +166,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
     if (traceMask & PAFFS_TRACE_VERBOSE)
     {
         PAFFS_DBG_S(PAFFS_TRACE_PACACHE,
-                    "SetPage to %" PRIu32 ":%" PRIu32 " at %" PRIu32,
+                    "SetPage to %" PRIareapos ":%" PRIpageoffs " at %" PRIu32,
                     extractLogicalArea(addr),
                     extractPageOffs(addr),
                     page);
@@ -224,9 +224,8 @@ PageAddressCache::setPage(PageNo page, Addr addr)
     }
 
     PAFFS_DBG(PAFFS_TRACE_ERROR,
-              "Get Page bigger than allowed! (was %" PRIu32 ", should <%" PRIu32 ")",
-              0,
-              0);  // TODO: Actual calculation of values
+              "Get Page bigger than allowed! (was --, should <--)");
+    // TODO: Actual calculation of values
     return Result::toobig;
 }
 
@@ -331,7 +330,7 @@ Result
 PageAddressCache::loadPath(Addr& anchor,
                            PageNo pageOffs,
                            AddrListCacheElem* start,
-                           unsigned char depth,
+                           uint8_t depth,
                            PageNo& addrPos)
 {
     if(depth >= 3)
@@ -341,14 +340,14 @@ PageAddressCache::loadPath(Addr& anchor,
     }
     Result r;
     PageNo path[3] = {0};
-    for (unsigned int i = 0; i <= depth; i++)
+    for (uint8_t i = 0; i <= depth; i++)
     {
         path[depth - i] =
                 static_cast<unsigned int>(pageOffs / std::pow(addrsPerPage, i)) % addrsPerPage;
         if (path[depth - i] >= addrsPerPage)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "Miscalculated path for page %" PRIu32 " (was %" PRIu32 ", should < %" PRIu32 ")",
+                      "Miscalculated path for page %" PRIu32 " (was %" PRIu32 ", should < %" PRIu16 ")",
                       pageOffs,
                       path[depth - i],
                       addrsPerPage);
@@ -416,14 +415,14 @@ Result
 PageAddressCache::commitPath(Addr& anchor, AddrListCacheElem* path, unsigned char depth)
 {
     Result r;
-    for (unsigned int i = depth; i > 0; i--)
+    for (uint16_t i = depth; i > 0; i--)
     {
         if (path[i].dirty)
         {
             r = commitElem(path[i - 1], path[i]);
             if (r != Result::ok)
             {
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Elem in depth %" PRIu32 "!", i);
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Elem in depth %" PRIu16 "!", i);
                 return r;
             }
         }
@@ -434,7 +433,7 @@ PageAddressCache::commitPath(Addr& anchor, AddrListCacheElem* path, unsigned cha
     }
 
     bool validEntries = false;
-    for (unsigned int i = 0; i < addrsPerPage; i++)
+    for (uint32_t i = 0; i < addrsPerPage; i++)
     {
         if (path[0].getAddr(i) != 0)
         {
@@ -496,7 +495,7 @@ PageAddressCache::commitElem(AddrListCacheElem& parent, AddrListCacheElem& elem)
     {
         PAFFS_DBG_S(PAFFS_TRACE_PACACHE,
                     "Deleting CacheElem referenced by "
-                    "parent:%" PRIu32,
+                    "parent:%" PRIu16,
                     elem.positionInParent);
         // invalidate old page.
         r = device.sumCache.setPageStatus(extractLogicalArea(parent.cache[elem.positionInParent]),
@@ -515,7 +514,7 @@ PageAddressCache::commitElem(AddrListCacheElem& parent, AddrListCacheElem& elem)
     {
         PAFFS_DBG_S(PAFFS_TRACE_PACACHE,
                     "Committing CacheElem referenced by "
-                    "parent:%" PRIu32,
+                    "parent:%" PRIu16,
                     elem.positionInParent);
         r = writeCacheElem(parent.cache[elem.positionInParent], elem);
         if (r != Result::ok)
@@ -581,7 +580,7 @@ PageAddressCache::readAddrList(Addr from, Addr list[addrsPerPage])
         return Result::bug;
     }
     PAFFS_DBG_S(PAFFS_TRACE_PACACHE,
-                "loadCacheElem from %" PRIu32 ":%" PRIu32,
+                "loadCacheElem from %" PRIareapos ":%" PRIpageoffs,
                 extractLogicalArea(from),
                 extractPageOffs(from));
     Result res = device.driver.readPage(getPageNumber(from, device), list, addrsPerPage * sizeof(Addr));
@@ -675,7 +674,7 @@ PageAddressCache::writeAddrList(Addr& source, Addr list[addrsPerPage])
 bool
 PageAddressCache::isAddrListPlausible(Addr* addrList, size_t elems)
 {
-    for (unsigned i = 0; i < elems; i++)
+    for (uint32_t i = 0; i < elems; i++)
     {
         if (extractPageOffs(addrList[i]) == unusedMarker)
         {
@@ -685,8 +684,8 @@ PageAddressCache::isAddrListPlausible(Addr* addrList, size_t elems)
         if (extractPageOffs(addrList[i]) > dataPagesPerArea)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "PageList elem %" PRId16 " Page is higher than possible "
-                      "(was %" PRIu32 ", should < %" PRIu32 ")",
+                      "PageList elem %" PRIu32 " Page is higher than possible "
+                      "(was %" PRIpageoffs ", should < %" PRIpageoffs ")",
                       i,
                       extractPageOffs(addrList[i]),
                       dataPagesPerArea);
@@ -695,8 +694,8 @@ PageAddressCache::isAddrListPlausible(Addr* addrList, size_t elems)
         if (extractLogicalArea(addrList[i]) == 0 && extractPageOffs(addrList[i]) != 0)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "PageList elem %" PRId16 " Area is 0, "
-                      "but Page is not (%" PRIu32 ")",
+                      "PageList elem %" PRIu32 " Area is 0, "
+                      "but Page is not (%" PRIpageoffs ")",
                       i,
                       extractPageOffs(addrList[i]));
             return false;

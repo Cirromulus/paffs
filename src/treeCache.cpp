@@ -46,7 +46,7 @@ TreeCache::findFirstFreeIndex()
     return r == treeNodeCacheSize ? -1 : r;
 }
 
-int16_t
+uint16_t
 TreeCache::getIndexFromPointer(TreeCacheNode& tcn)
 {
     if (&tcn - mCache > treeNodeCacheSize)
@@ -209,7 +209,8 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
             if (node.raw.as.leaf.keys[i] != node.raw.as.leaf.pInodes[i].no)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
-                          "Node n° %" PRIu16 " has different Inode number (%d) than its key stated (%d)!",
+                          "Node n° %" PRIu16 " has different Inode number (%" PRIinodeno ") "
+                                  "than its key stated (%" PRIinodeno ")!",
                           getIndexFromPointer(node),
                           node.raw.as.leaf.keys[i],
                           node.raw.as.leaf.pInodes[i].no);
@@ -219,7 +220,7 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
             if (!first && node.raw.as.leaf.keys[i] < last)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
-                          "Node n° %d is not sorted (prev: %d, curr: %d)!",
+                          "Node n° %" PRIu16 " is not sorted (prev: %" PRIinodeno ", curr: %" PRIinodeno ")!",
                           getIndexFromPointer(node),
                           last,
                           node.raw.as.leaf.keys[i]);
@@ -233,8 +234,8 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
                 if (node.raw.as.leaf.keys[i] < keyMin)
                 {
                     PAFFS_DBG(PAFFS_TRACE_BUG,
-                              "Node n° %" PRIu32 "'s keys are inconsistent!\n"
-                              "\twas: %" PRIu32 ", but parent stated keys would be over or equal %" PRIu32 "!",
+                              "Node n° %" PRIu16 "'s keys are inconsistent!\n"
+                              "\twas: %" PRIinodeno ", but parent stated keys would be over or equal %" PRIinodeno "!",
                               getIndexFromPointer(node),
                               node.raw.as.leaf.keys[i],
                               keyMin);
@@ -246,8 +247,8 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
                 if (node.raw.as.leaf.keys[i] >= keyMax)
                 {
                     PAFFS_DBG(PAFFS_TRACE_BUG,
-                              "Node n° %" PRIu32 "'s keys are inconsistent!\n"
-                              "\twas: %" PRIu32 ", but parent stated keys would be under %" PRIu32 "!",
+                              "Node n° %" PRIu16 "'s keys are inconsistent!\n"
+                              "\twas: %" PRIinodeno ", but parent stated keys would be under %" PRIinodeno "!",
                               getIndexFromPointer(node),
                               node.raw.as.leaf.keys[i],
                               keyMax);
@@ -267,8 +268,8 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
                     if (node.raw.as.branch.keys[i] < keyMin)
                     {
                         PAFFS_DBG(PAFFS_TRACE_BUG,
-                                  "Node n° %" PRIu32 "'s keys are inconsistent!\n"
-                                  "\twas: %" PRIu32 ", but parent stated keys would be over or equal %" PRIu32 "!",
+                                  "Node n° %" PRIu16 "'s keys are inconsistent!\n"
+                                  "\twas: %" PRIinodeno ", but parent stated keys would be over or equal %" PRIinodeno "!",
                                   getIndexFromPointer(node),
                                   node.raw.as.branch.keys[i],
                                   keyMin);
@@ -280,8 +281,8 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
                     if (node.raw.as.branch.keys[i] >= keyMax)
                     {
                         PAFFS_DBG(PAFFS_TRACE_BUG,
-                                  "Node n° %" PRIu32 "'s keys are inconsistent!\n"
-                                  "\twas: %" PRIu32 ", but parent stated keys would be under %" PRIu32 "!",
+                                  "Node n° %" PRIu16 "'s keys are inconsistent!\n"
+                                  "\twas: %" PRIinodeno ", but parent stated keys would be under %" PRIinodeno "!",
                                   getIndexFromPointer(node),
                                   node.raw.as.branch.keys[i],
                                   keyMax);
@@ -292,7 +293,7 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
                 if (!first && node.raw.as.branch.keys[i] < last)
                 {
                     PAFFS_DBG(PAFFS_TRACE_BUG,
-                              "Node n° %" PRIu16 " is not sorted (prev: %" PRIu32 ", curr: %" PRIu32
+                              "Node n° %" PRIu16 " is not sorted (prev: %" PRIinodeno ", curr: %" PRIinodeno
                               ")!",
                               getIndexFromPointer(node),
                               node.raw.as.leaf.keys[i],
@@ -308,7 +309,7 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
                 if (node.pointers[i]->parent != &node)
                 {
                     PAFFS_DBG(PAFFS_TRACE_BUG,
-                              "Node n° %d stated parent was %d, but is actually %d!",
+                              "Node n° %" PRIu16 " stated parent was %" PRIu16 ", but is actually %" PRIu16 "!",
                               getIndexFromPointer(*node.pointers[i]),
                               getIndexFromPointer(*node.pointers[i]->parent),
                               getIndexFromPointer(node));
@@ -646,7 +647,7 @@ Result
 TreeCache::reserveNodes(uint16_t neededNodes)
 {
 
-    PAFFS_DBG(PAFFS_TRACE_TREECACHE, "Reserving %" PRIu16 " nodes", neededNodes);
+    PAFFS_DBG_S(PAFFS_TRACE_TREECACHE, "Reserving %" PRIu16 " nodes", neededNodes);
 
     if(static_cast<uint16_t>(treeNodeCacheSize - mCacheUsage.countSetBits()) >= neededNodes)
     {
@@ -690,6 +691,10 @@ TreeCache::freeNodes(uint16_t neededCleanNodes)
     if (neededCleanNodes == 0)
         return Result::ok;
 
+    if(traceMask & PAFFS_TRACE_TREECACHE)
+    {
+        printTreeCache();
+    }
     PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Even hard commit could not allocate "
             "remaining %" PRIu16 " treenodes!", neededCleanNodes);
     return Result::lowmem;
@@ -848,9 +853,9 @@ TreeCache::getTreeNodeAtIndexFrom(uint16_t index, TreeCacheNode& parent, TreeCac
         if (traceMask & PAFFS_TRACE_VERBOSE)
         {
             PAFFS_DBG_S(PAFFS_TRACE_TREECACHE,
-                        "Cache hit, found target %p (position %ld)",
+                        "Cache hit, found target %p (position %" PRIu16 ")",
                         target,
-                        target - mCache);
+                        getIndexFromPointer(*target));
         }
         return Result::ok;  // mCache hit
     }
@@ -1076,7 +1081,7 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
         == Result::nospace)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "BUG: findWritableArea returned full area (%" PRIu32 " on %" PRIu32 ").",
+                  "BUG: findWritableArea returned full area (%" PRIareapos " on %" PRIareapos ").",
                   dev->areaMgmt.getActiveArea(AreaType::index),
                   dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(AreaType::index)));
         return dev->lasterr = Result::bug;
@@ -1137,10 +1142,11 @@ TreeCache::readTreeNode(Addr addr, TreeNode& node)
     {
         if (traceMask & PAFFS_TRACE_AREA)
         {
-            printf("Info: \n\t%" PRIu32 " used Areas\n", dev->areaMgmt.getUsedAreas());
+            printf("Info: \n\t%" PRIareapos " used Areas\n", dev->areaMgmt.getUsedAreas());
             for (AreaPos i = 0; i < areasNo; i++)
             {
-                printf("\tArea %03" PRIu32 "  on %03" PRIu32 " as %10s from page %4d %s\n",
+                printf("\tArea %03" PRIareapos "  on %03" PRIareapos " as %10s "
+                        "from page %4" PRIareapos " %s\n",
                        i,
                        dev->areaMgmt.getPos(i),
                        areaNames[dev->areaMgmt.getType(i)],
@@ -1155,7 +1161,7 @@ TreeCache::readTreeNode(Addr addr, TreeNode& node)
             printf("\t----------------------\n");
         }
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "READ TREEENODE operation on %s (Area %" PRIu32 ", pos %" PRIu32 "!",
+                  "READ TREEENODE operation on %s (Area %" PRIareapos ", pos %" PRIareapos "!",
                   areaNames[dev->areaMgmt.getType(extractLogicalArea(addr))],
                   extractLogicalArea(addr),
                   dev->areaMgmt.getPos(extractLogicalArea(addr)));

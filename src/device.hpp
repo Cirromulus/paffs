@@ -90,15 +90,15 @@ public:
     Result
     getObjInfo(const char* fullPath, ObjInfo& nfo);
     Result
-    read(Obj& obj, char* buf, unsigned int bytesToRead, unsigned int* bytesRead);
+    read(Obj& obj, char* buf, FileSize bytesToRead, FileSize* bytesRead);
     Result
-    write(Obj& obj, const char* buf, unsigned int bytesToWrite, unsigned int* bytesWritten);
+    write(Obj& obj, const char* buf, FileSize bytesToWrite, FileSize* bytesWritten);
     Result
-    seek(Obj& obj, int m, Seekmode mode);
+    seek(Obj& obj, FileSizeDiff m, Seekmode mode);
     Result
     flush(Obj& obj);
     Result
-    truncate(const char* path, unsigned int newLength);
+    truncate(const char* path, FileSize newLength);
     Result
     remove(const char* path);
     Result
@@ -123,7 +123,7 @@ private:
     Result
     createFilInode(SmartInodePtr& outInode, Permission mask);
     Result
-    getParentDir(const char* fullPath, SmartInodePtr& parDir, unsigned int* lastSlash);
+    getParentDir(const char* fullPath, SmartInodePtr& parDir, FileNamePos* lastSlash);
     Result
     getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name);
     /**

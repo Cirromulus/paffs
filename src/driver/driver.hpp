@@ -36,9 +36,9 @@ public:
 	    return buf;
 	};
 	virtual Result
-	writePage (PageAbs pageNo, void* data, unsigned int dataLen) = 0;
+	writePage (PageAbs pageNo, void* data, uint16_t dataLen) = 0;
 	virtual Result
-	readPage (PageAbs pageNo, void* data, unsigned int dataLen) = 0;
+	readPage (PageAbs pageNo, void* data, uint16_t dataLen) = 0;
 	virtual Result
 	eraseBlock (BlockAbs blockNo) = 0;
 	virtual Result
@@ -47,7 +47,7 @@ public:
 	checkBad (BlockAbs blockNo) = 0;
 
 	virtual Result
-	writeMRAM(PageAbs startByte, const void* data, unsigned int dataLen)
+	writeMRAM(PageAbs startByte, const void* data, uint32_t dataLen)
 	{
 		(void) startByte;
 		(void) data;
@@ -55,7 +55,7 @@ public:
 		return Result::nimpl;
 	}
 	virtual Result
-	readMRAM(PageAbs startByte, void* data, unsigned int dataLen)
+	readMRAM(PageAbs startByte, void* data, uint32_t dataLen)
 	{
 		(void) startByte;
 		(void) data;

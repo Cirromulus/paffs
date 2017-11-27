@@ -65,7 +65,7 @@ rtems_task task_system_init(rtems_task_argument)
 
     ObjInfo inf;
     Obj* file;
-    unsigned int br;
+    FileSize br;
 
     SevenSegment::clear();
     SevenSegment::write(0, 'P');
@@ -176,7 +176,7 @@ rtems_task task_system_init(rtems_task_argument)
         }
         if (br != inf.size)
         {
-            printf("Error reading file, size differs (%u)\n", br);
+            printf("Error reading file, size differs (%" PRIfilsize ")\n", br);
             goto idle;
         }
         printf("----------\n%s\n----------\n", rbuf);

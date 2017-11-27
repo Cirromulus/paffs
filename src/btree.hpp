@@ -46,6 +46,9 @@ public:
     Result
     findFirstFreeNo(InodeNo* outNumber);
 
+    uint16_t
+    calculateMaxNeededNewNodesForInsertion(const TreeCacheNode& insertTarget);
+
     void
     printTree();
     Result
@@ -74,7 +77,7 @@ private:
     int
     height(TreeCacheNode& root);
     // Length is number of Kanten, not Knoten
-    int
+    uint16_t
     lengthToRoot(TreeCacheNode& child);
     // Path is root first, child last
     Result

@@ -34,7 +34,7 @@ const Param stdParam{totalBytesPerPage,
                      areasNo,
 };
 
-unsigned int traceMask =
+TraceMask traceMask =
         // PAFFS_TRACE_VERBOSE |
         // PAFFS_TRACE_READ |
         PAFFS_TRACE_INFO |
@@ -87,9 +87,9 @@ err_msg(Result pr)
 void
 Paffs::printCacheSizes()
 {
-    PAFFS_DBG_S(PAFFS_TRACE_INFO, "-----------Devices: %" PRIu32 "-----------", maxNumberOfDevices);
+    PAFFS_DBG_S(PAFFS_TRACE_INFO, "-----------Devices: %" PRIu8 "-----------", maxNumberOfDevices);
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "TreeNode size: %zu Byte, TreeCacheNode size: %zu Byte. Cachable Nodes: %" PRIu32 ".\n"
+                "TreeNode size: %zu Byte, TreeCacheNode size: %zu Byte. Cachable Nodes: %" PRIu8 ".\n"
                 "\tBranch order: %" PRIu32 ", Leaf order: %" PRIu32 "\n"
                 "\tOverall TreeCache size: %zu Byte.",
                 sizeof(TreeNode),
@@ -100,35 +100,35 @@ Paffs::printCacheSizes()
                 treeNodeCacheSize * sizeof(TreeCacheNode));
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "Packed AreaSummary size: %zu Byte. Cacheable Summaries: %" PRIu32 ".\n"
+                "Packed AreaSummary size: %zu Byte. Cacheable Summaries: %" PRIu8 ".\n"
                 "\tOverall AreaSummary cache size: %zu Byte.",
                 dataPagesPerArea / 4 + 2 + sizeof(PageOffs),
                 areaSummaryCacheSize,
                 (dataPagesPerArea / 4 + 2 + sizeof(PageOffs)) * areaSummaryCacheSize);
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "Size of AreaMap Entry: %zu Byte. Areas: %" PRIu32 ".\n"
+                "Size of AreaMap Entry: %zu Byte. Areas: %" PRIareapos ".\n"
                 "\tOverall AreaMap Size: %zu Byte.",
                 sizeof(Area),
                 areasNo,
                 sizeof(Area) * areasNo);
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "Size of File object: %zu Byte. Max Open Files: %" PRIu32 ".\n"
+                "Size of File object: %zu Byte. Max Open Files: %" PRIu8 ".\n"
                 "\tOverall File cache Size: %zu Byte.",
                 sizeof(Obj),
                 maxNumberOfFiles,
                 sizeof(Obj) * maxNumberOfFiles);
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "Size of Inode object: %zu Byte. Max open Inodes: %" PRIu32 ".\n"
+                "Size of Inode object: %zu Byte. Max open Inodes: %" PRIu8 ".\n"
                 "\tOverall Inode cache Size: %zu Byte.",
                 sizeof(Inode),
                 maxNumberOfInodes,
                 sizeof(Inode) * maxNumberOfInodes);
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "Size of Address: %zu. Addresses per Page: %" PRIu32 ". AddrListCacheElem: %zu Byte.\n"
+                "Size of Address: %zu. Addresses per Page: %" PRIu16 ". AddrListCacheElem: %zu Byte.\n"
                 "\tOverall AddrBuffer Size: %zu Byte",
                 sizeof(Addr),
                 addrsPerPage,
@@ -136,7 +136,7 @@ Paffs::printCacheSizes()
                 sizeof(PageAddressCache));
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "Size of Device: %zu. Number of Devices: %" PRIu32 ".\n"
+                "Size of Device: %zu. Number of Devices: %" PRIu8 ".\n"
                 "\tOverall Devices Size: %zu Byte",
                 sizeof(Device),
                 maxNumberOfDevices,
@@ -358,13 +358,13 @@ Paffs::getObjInfo(const char* fullPath, ObjInfo& nfo)
 }
 
 Result
-Paffs::read(Obj& obj, char* buf, unsigned int bytesToRead, unsigned int* bytesRead)
+Paffs::read(Obj& obj, char* buf, FileSize bytesToRead, FileSize* bytesRead)
 {
     return devices[0]->read(obj, buf, bytesToRead, bytesRead);
 }
 
 Result
-Paffs::write(Obj& obj, const char* buf, unsigned int bytesToWrite, unsigned int* bytesWritten)
+Paffs::write(Obj& obj, const char* buf, FileSize bytesToWrite, FileSize* bytesWritten)
 {
     return devices[0]->write(obj, buf, bytesToWrite, bytesWritten);
 }
@@ -382,7 +382,7 @@ Paffs::flush(Obj& obj)
 }
 
 Result
-Paffs::truncate(const char* path, unsigned int newLength)
+Paffs::truncate(const char* path, FileSize newLength)
 {
     return devices[0]->truncate(path, newLength);
 }
@@ -417,7 +417,7 @@ Paffs::getNumberOfOpenInodes()
 
 // ONLY FOR DEBUG
 Device*
-Paffs::getDevice(unsigned int number)
+Paffs::getDevice(uint16_t number)
 {
     if (number >= maxNumberOfDevices)
     {
@@ -427,12 +427,12 @@ Paffs::getDevice(unsigned int number)
 }
 
 void
-Paffs::setTraceMask(unsigned int mask)
+Paffs::setTraceMask(TraceMask mask)
 {
     traceMask = mask;
 }
 
-unsigned int
+TraceMask
 Paffs::getTraceMask()
 {
     return traceMask;

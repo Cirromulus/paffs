@@ -290,7 +290,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         switch (static_cast<const journalEntry::Superblock*>(&entry)->type)
         {
         case journalEntry::Superblock::Type::rootnode:
-            printf("rootnode change to %" PRIu32 ":%" PRIu32,
+            printf("rootnode change to %" PRIareapos ":%" PRIpageoffs,
                    extractLogicalArea(
                            static_cast<const journalEntry::superblock::Rootnode*>(&entry)->rootnode),
                    extractPageOffs(static_cast<const journalEntry::superblock::Rootnode*>(&entry)
@@ -298,7 +298,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             found = true;
             break;
         case journalEntry::Superblock::Type::areaMap:
-            printf("AreaMap %" PRIu32 " ",
+            printf("AreaMap %" PRIareapos " ",
                    static_cast<const journalEntry::superblock::AreaMap*>(&entry)->offs);
             switch (static_cast<const journalEntry::superblock::AreaMap*>(&entry)->operation)
             {
@@ -336,12 +336,12 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             }
             break;
         case journalEntry::Superblock::Type::activeArea:
-            printf("Set ActiveArea of %s to %" PRIu32 "\n",
+            printf("Set ActiveArea of %s to %" PRIareapos "\n",
                    areaNames[static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->type],
                    static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->area);
             break;
         case journalEntry::Superblock::Type::usedAreas:
-            printf("Set used Areas to %" PRIu32 "\n",
+            printf("Set used Areas to %" PRIareapos "\n",
                    static_cast<const journalEntry::superblock::UsedAreas*>(&entry)->usedAreas);
             break;
         }
@@ -367,7 +367,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         }
         break;
     case JournalEntry::Topic::summaryCache:
-        printf("SummaryCache Area %" PRIu32 " ",
+        printf("SummaryCache Area %" PRIareapos " ",
                static_cast<const journalEntry::SummaryCache*>(&entry)->area);
         switch (static_cast<const journalEntry::SummaryCache*>(&entry)->subtype)
         {
@@ -380,7 +380,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             found = true;
             break;
         case journalEntry::SummaryCache::Subtype::setStatus:
-            printf("set Page %" PRIu32 " to %s",
+            printf("set Page %" PRIpageoffs " to %s",
                    static_cast<const journalEntry::summaryCache::SetStatus*>(&entry)->page,
                    summaryEntryNames[static_cast<unsigned>(
                            static_cast<const journalEntry::summaryCache::SetStatus*>(&entry)

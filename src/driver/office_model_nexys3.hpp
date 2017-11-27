@@ -23,6 +23,7 @@
 #include <nand.h>
 #include <outpost/hal/spacewire.h>
 #include <spacewire_light.h>
+#include <new>
 
 namespace paffs{
 
@@ -31,40 +32,41 @@ using namespace outpost::iff;
 using namespace outpost::leon3;
 
 class OfficeModelNexys3Driver : public Driver{
-	unsigned int bank, device;
-	SpaceWireLight spacewire;
-	Nand *nand;
-	Amap *if_fpga;
+	uint8_t mBank, mDevice;
+	SpaceWireLight mSpacewire;
+	uint8_t mNandRaw[sizeof(Nand)];
+	uint8_t mAmapRaw[sizeof(Amap)];
+	Nand *mNand;
+	Amap *mIfFpga;
 public:
-	OfficeModelNexys3Driver(unsigned int _bank, unsigned int _device)
-			: bank(_bank), device(_device), spacewire(0){
+	inline
+	OfficeModelNexys3Driver(uint8_t _bank, uint8_t _device)
+			: mBank(_bank), mDevice(_device), mSpacewire(0){
 
 		if(!initSpaceWire()){
 			printf("Spacewire connection failed!");
 		}
-		if_fpga = new Amap(spacewire);
-		nand = new Nand(*if_fpga, 0x00200000);
+		mIfFpga = new(mNandRaw) Amap(mSpacewire);
+		mNand = new(mAmapRaw) Nand(*mIfFpga, 0x00200000);
 	}
 
-	~OfficeModelNexys3Driver(){
-		delete nand;
-		delete if_fpga;
-	}
+	inline
+	~OfficeModelNexys3Driver(){};
 
 	Result
 	initializeNand() override;
 	Result
 	deInitializeNand() override;
 	Result
-	writePage(PageAbs page_no, void* data, unsigned int data_len) override;
+	writePage(PageAbs pageNo, void* data, uint16_t dataLen) override;
 	Result
-	readPage(PageAbs page_no, void* data, unsigned int data_len) override;
+	readPage(PageAbs pageNo, void* data, uint16_t dataLen) override;
 	Result
-	eraseBlock(BlockAbs block_no) override;
+	eraseBlock(BlockAbs blockNo) override;
 	Result
-	markBad(BlockAbs block_no) override;
+	markBad(BlockAbs blockNo) override;
 	Result
-	checkBad(BlockAbs block_no) override;
+	checkBad(BlockAbs blockNo) override;
 private:
 	bool initSpaceWire();
 };

@@ -305,7 +305,7 @@ FlashPersistence::readNextElem(journalEntry::Max& entry)
                                                                     : sizeof(journalEntry::Max));
     uint16_t size = getSizeFromMax(entry);
     PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE),
-                "Read entry at %" PRIu32 ":%" PRIu32 " %" PRIu16 "-%" PRIu16,
+                "Read entry at %" PRIareapos ":%" PRIpageoffs " %" PRIu16 "-%" PRIu16,
                 extractLogicalArea(curr.addr),
                 extractPageOffs(curr.addr),
                 curr.offs,

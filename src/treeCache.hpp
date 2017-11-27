@@ -42,6 +42,9 @@ public:
     Result
     commitCache();
 
+    /**
+     * \warn May flush nodes, so lock used nodes
+     */
     Result
     reserveNodes(uint16_t neededNodes);
     //--------------------------------------
@@ -53,7 +56,7 @@ public:
     clear();
 
     /**
-     * This locks specified treeCache node and its path from Rootnode
+     * This locks specified treeCache node and its path to Rootnode
      * To prevent Cache GC from deleting it
      */
     Result
@@ -149,7 +152,7 @@ private:
     printSubtree(int layer, BitList<treeNodeCacheSize>& reached, TreeCacheNode& node);
     int16_t
     findFirstFreeIndex();
-    int16_t
+    uint16_t
     getIndexFromPointer(TreeCacheNode& tcn);
     bool
     hasLockedChilds(TreeCacheNode& tcn);

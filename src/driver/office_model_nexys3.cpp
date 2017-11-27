@@ -44,55 +44,55 @@ getDriverSpecial(const uint8_t, void*, void*)
 Result
 OfficeModelNexys3Driver::initializeNand()
 {
-	nand->enableLatchUpProtection();
+	mNand->enableLatchUpProtection();
 	return Result::ok;
 }
 Result
 OfficeModelNexys3Driver::deInitializeNand()
 {
 	//FIXME Does this actually turn off NAND?
-	nand->disableLatchUpProtection();
+	mNand->disableLatchUpProtection();
 	return Result::ok;
 }
 
 Result
-OfficeModelNexys3Driver::writePage(PageAbs page_no,
-                                   void* data, unsigned int data_len)
+OfficeModelNexys3Driver::writePage(PageAbs page,
+                                   void* data, uint16_t dataLen)
 {
-	if(data_len == 0 || data_len > totalBytesPerPage){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid write size (%" PRId16 ")", data_len);
+	if(dataLen == 0 || dataLen > totalBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid write size (%" PRId16 ")", dataLen);
 		return Result::invalidInput;
 	}
 
-	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "Write %u bytes at page %" PRIu64, data_len, page_no);
+	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "Write %" PRIu16 " bytes at page %" PRIpageabs, dataLen, page);
 
-	if(totalBytesPerPage != data_len)
+	if(totalBytesPerPage != dataLen)
 	{
-		memset(buf+data_len, 0xFF, totalBytesPerPage - data_len);
+		memset(buf+dataLen, 0xFF, totalBytesPerPage - dataLen);
 	}
 	if(data != buf)
 	{
-	    memcpy(buf, data, data_len);
+	    memcpy(buf, data, dataLen);
 	}
 
     unsigned char* p = reinterpret_cast<unsigned char*>(&buf[dataBytesPerPage+2]);
     for(int i = 0; i < dataBytesPerPage; i+=256, p+=3)
         YaffsEcc::calc(reinterpret_cast<unsigned char*>(&buf[i]), p);
 
-	nand->writePage(bank, device, page_no, reinterpret_cast<uint8_t*>(buf));
+	mNand->writePage(mBank, mDevice, page, reinterpret_cast<uint8_t*>(buf));
 	return Result::ok;
 }
 Result
-OfficeModelNexys3Driver::readPage(PageAbs page_no,
-                                  void* data, unsigned int data_len)
+OfficeModelNexys3Driver::readPage(PageAbs page,
+                                  void* data, uint16_t dataLen)
 {
-	PAFFS_DBG_S(PAFFS_TRACE_READ, "Read %u bytes at page %" PRIu64, data_len, page_no);
-	if(data_len == 0 || data_len > totalBytesPerPage){
-		PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid read size (%u)", data_len);
+	PAFFS_DBG_S(PAFFS_TRACE_READ, "Read %" PRIu16 " bytes at page %" PRIpageabs, dataLen, page);
+	if(dataLen == 0 || dataLen > totalBytesPerPage){
+		PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid read size (%u)", dataLen);
 		return Result::invalidInput;
 	}
 
-	nand->readPage(bank, device, page_no, reinterpret_cast<uint8_t*>(buf));
+	mNand->readPage(mBank, mDevice, page, reinterpret_cast<uint8_t*>(buf));
     unsigned char read_ecc[3];
     unsigned char *p = reinterpret_cast<unsigned char*>(&buf[dataBytesPerPage + 2]);
     Result ret = Result::ok;
@@ -105,34 +105,34 @@ OfficeModelNexys3Driver::readPage(PageAbs page_no,
     }
 	if(data != buf)
 	{
-	    memcpy(data, buf, data_len);
+	    memcpy(data, buf, dataLen);
 	}
 	(void) ret; //TODO: Return actual ECC result
 	return Result::ok;
 }
 Result
-OfficeModelNexys3Driver::eraseBlock(BlockAbs block_no)
+OfficeModelNexys3Driver::eraseBlock(BlockAbs block)
 {
-	nand->eraseBlock(bank, device, block_no);
+	mNand->eraseBlock(mBank, mDevice, block);
 	return Result::ok;
 }
 Result
-OfficeModelNexys3Driver::markBad(BlockAbs block_no)
+OfficeModelNexys3Driver::markBad(BlockAbs block)
 {
 	memset(buf, 0, totalBytesPerPage);
     for (size_t page = 0; page < 2; ++page){
-        size_t pageNumber = block_no * pagesPerBlock + page;
-        nand->writePage(bank, device, pageNumber, reinterpret_cast<uint8_t*>(buf));
+        size_t pageNumber = block * pagesPerBlock + page;
+        mNand->writePage(mBank, mDevice, pageNumber, reinterpret_cast<uint8_t*>(buf));
     }
     return Result::ok;
 }
 
 Result
-OfficeModelNexys3Driver::checkBad(BlockAbs block_no)
+OfficeModelNexys3Driver::checkBad(BlockAbs block)
 {
     for (size_t page = 0; page < 2; ++page){
-        size_t pageNumber = block_no * pagesPerBlock + page;
-        nand->readPage(bank, device, pageNumber, reinterpret_cast<uint8_t*>(buf));
+        size_t pageNumber = block * pagesPerBlock + page;
+        mNand->readPage(mBank, mDevice, pageNumber, reinterpret_cast<uint8_t*>(buf));
         if (static_cast<uint8_t>(buf[4096]) != 0xFF)
             return Result::badflash;
     }
@@ -143,15 +143,15 @@ OfficeModelNexys3Driver::checkBad(BlockAbs block_no)
 bool
 OfficeModelNexys3Driver::initSpaceWire()
 {
-    if (!spacewire.open()){
+    if (!mSpacewire.open()){
     	printf("Spacewire connection opening .. ");
         printf("failed\n");
         return false;
     }
 
-    spacewire.up(outpost::time::Milliseconds(0));
+    mSpacewire.up(outpost::time::Milliseconds(0));
 
-    if (!spacewire.isUp()){
+    if (!mSpacewire.isUp()){
     	printf("check link .. ");
         printf("down\n");
         return false;

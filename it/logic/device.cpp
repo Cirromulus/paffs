@@ -374,7 +374,7 @@ TEST_F(FileTest, maxFilesize)
     // root
     dir = fs.openDir("/");
     ASSERT_NE(dir, nullptr);
-    ASSERT_EQ(dir->no_entries, 0);
+    ASSERT_EQ(dir->entries, 0);
 
     r = fs.closeDir(dir);
     ASSERT_EQ(r, paffs::Result::ok);
