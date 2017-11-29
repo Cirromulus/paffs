@@ -75,7 +75,7 @@ TEST_F(FileTest, seekReadWrite)
 TEST_F(FileTest, createReadWriteDeleteFile)
 {
     // operate on indirection layer
-    unsigned const int filesize = (paffs::addrsPerPage * 2) * paffs::dataBytesPerPage + 50;
+    const paffs::FileSize filesize = (paffs::addrsPerPage * 2) * paffs::dataBytesPerPage + 50;
     char t[] = ".                         Text";  // 30 chars
     char tl[filesize];
     char buf[filesize];
