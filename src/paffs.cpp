@@ -29,6 +29,7 @@ const Param stdParam{totalBytesPerPage,
                      dataBytesPerPage,
                      dataPagesPerArea,
                      totalPagesPerArea,
+                     areaSummarySizePacked,
                      blocksPerArea,
                      superChainElems,
                      areasNo,
@@ -142,6 +143,11 @@ Paffs::printCacheSizes()
                 maxNumberOfDevices,
                 sizeof(Device) * maxNumberOfDevices);
 
+    if(areaSummaryIsPacked)
+    {
+        PAFFS_DBG_S(PAFFS_TRACE_ALWAYS, "\nWARNING: Using packed AreaSummaries (slower)");
+    }
+
     PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------------------\n");
 }
 
@@ -226,7 +232,7 @@ Paffs::format(const BadBlockList badBlockList[maxNumberOfDevices], bool complete
                 areasNo,
                 totalPagesPerArea,
                 dataPagesPerArea,
-                areaSummarySize,
+                areaSummarySizePacked,
                 superChainElems);
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------\n");

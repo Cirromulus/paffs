@@ -23,7 +23,7 @@ namespace paffs
 class AreaSummaryElem
 {
     TwoBitList<dataPagesPerArea> mEntries;
-    unsigned char mStatusBits;  // dirty < asWritten < loadedFromSuperIndex < used
+    uint8_t mStatusBits;  // dirty < asWritten < loadedFromSuperIndex < used
     AreaPos mArea;
     PageOffs mDirtyPages;
     void
@@ -35,8 +35,12 @@ public:
     clear();
     SummaryEntry
     getStatus(PageOffs page);
+    static SummaryEntry
+    getStatus(PageOffs page, TwoBitList<dataPagesPerArea>& list);
     void
     setStatus(PageOffs page, SummaryEntry value);
+    static void
+    setStatus(PageOffs page, SummaryEntry value, TwoBitList<dataPagesPerArea>& list);
     bool
     isDirty();
     void
@@ -62,14 +66,16 @@ public:
     setArea(AreaPos areaPos);
     AreaPos
     getArea();
+    TwoBitList<dataPagesPerArea>*
+    exposeSummary();
 };
 
 class SummaryCache : public JournalTopic
 {
     // excess byte is for dirty- and wasASWritten marker
-    AreaSummaryElem summaryCache[areaSummaryCacheSize];
+    AreaSummaryElem mSummaryCache[areaSummaryCacheSize];
 
-    std::unordered_map<AreaPos, uint16_t> translation;  // from area number to array offset
+    std::unordered_map<AreaPos, uint16_t> mTranslation;  // from area number to array offset
     Device* dev;
 
 public:
@@ -196,13 +202,13 @@ private:
     Result
     commitAndEraseElem(uint16_t position);
     /**
-     * @warn Area needs to be in translation array
+     * TwoBitlist because of `complete` switch
      */
     Result
-    readAreasummary(AreaPos area, SummaryEntry* out_summary, bool complete);
+    readAreasummary(AreaPos area, TwoBitList<dataPagesPerArea>& elem, bool complete);
 
     Result
-    writeAreasummary(uint16_t pos);
+    writeAreasummary(AreaSummaryElem& elem);
 };
 
 }  // namespace paffs

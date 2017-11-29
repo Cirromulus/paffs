@@ -89,6 +89,7 @@ struct Param
     uint16_t dataBytesPerPage;
     uint16_t dataPagesPerArea;
     uint16_t totalPagesPerArea;
+    uint16_t areaSummarySize;
     uint8_t  blocksPerArea;
     uint8_t  superChainElems;
     uint32_t areasNo;

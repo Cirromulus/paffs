@@ -227,5 +227,9 @@ public:
         return (mList[pos / 4] & (0b11 << (pos % 4) * 2))
             >> (pos % 4) * 2;
     }
+    char* expose()
+    {
+        return mList;
+    }
 };
 };

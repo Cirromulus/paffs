@@ -41,8 +41,8 @@ GarbageCollection::findNextBestArea(AreaType target,
                                     bool* srcAreaContainsData)
 {
     AreaPos favourite_area = 0;
-    PageOffs fav_dirty_pages = 0;
-    uint32_t fav_erases = ~0;
+    PageOffs favDirtyPages = 0;
+    uint32_t favErases = ~0;
     *srcAreaContainsData = true;
     SummaryEntry curr[dataPagesPerArea];
 
@@ -55,7 +55,7 @@ GarbageCollection::findNextBestArea(AreaType target,
                 || dev->areaMgmt.getType(i) == AreaType::index))
         {
             Result r = dev->sumCache.getSummaryStatus(i, curr);
-            PageOffs dirty_pages = countDirtyPages(curr);
+            PageOffs dirtyPages = countDirtyPages(curr);
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
@@ -63,7 +63,7 @@ GarbageCollection::findNextBestArea(AreaType target,
                           i);
                 return 0;
             }
-            if (dirty_pages == dataPagesPerArea
+            if (dirtyPages == dataPagesPerArea
                 && (dev->areaMgmt.getOverallDeletions() < areasNo ||  // Some wear leveling
                     dev->areaMgmt.getErasecount(i) < dev->areaMgmt.getOverallDeletions() / areasNo))
             {
@@ -79,15 +79,15 @@ GarbageCollection::findNextBestArea(AreaType target,
                 if (dev->areaMgmt.getType(i) != target)
                     continue;  // We cant change types if area is not completely empty
 
-                if (dirty_pages > fav_dirty_pages
-                    || (dirty_pages != 0 && dirty_pages == fav_dirty_pages
-                        && dev->areaMgmt.getErasecount(i) < fav_erases)
-                    || (dirty_pages != 0 && dirty_pages == fav_dirty_pages
+                if (dirtyPages > favDirtyPages
+                    || (dirtyPages != 0 && dirtyPages == favDirtyPages
+                        && dev->areaMgmt.getErasecount(i) < favErases)
+                    || (dirtyPages != 0 && dirtyPages == favDirtyPages
                         && dev->sumCache.wasASWritten(i)))
                 {
                     favourite_area = i;
-                    fav_dirty_pages = dirty_pages;
-                    fav_erases = dev->areaMgmt.getErasecount(i);
+                    favDirtyPages = dirtyPages;
+                    favErases = dev->areaMgmt.getErasecount(i);
                     memcpy(summaryOut, curr, dataPagesPerArea);
                 }
             }
@@ -95,10 +95,10 @@ GarbageCollection::findNextBestArea(AreaType target,
             {
                 // Special Case for freeing committed AreaSummaries
                 if (dev->sumCache.isCached(i) && dev->sumCache.wasASWritten(i)
-                    && dirty_pages >= fav_dirty_pages)
+                    && dirtyPages >= favDirtyPages)
                 {
                     favourite_area = i;
-                    fav_dirty_pages = dirty_pages;
+                    favDirtyPages = dirtyPages;
                     memcpy(summaryOut, curr, dataPagesPerArea);
                 }
             }

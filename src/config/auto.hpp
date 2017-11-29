@@ -37,7 +37,12 @@ static constexpr uint16_t totalPagesPerArea = blocksPerArea * pagesPerBlock;
 static constexpr uint16_t oobPagesPerArea = ceil((totalPagesPerArea / 8.) / dataBytesPerPage);
 static constexpr uint16_t dataPagesPerArea = totalPagesPerArea - oobPagesPerArea;
 //The actual summary size is calculated with _data_PagesPerArea
-static constexpr uint16_t areaSummarySize = 1 + ceil(dataPagesPerArea / 8.);
+static constexpr uint16_t areaSummarySizePacked = 1 + ceil(dataPagesPerArea / 8.);
+static_assert(areaSummarySizePacked <= dataBytesPerPage, "areaSummary may never exeed one page");
+static constexpr bool     areaSummaryIsPacked = areaSummarySizePacked * 2 > dataBytesPerPage;
+static constexpr uint16_t areaSummarySizeUnpacked = 1 + ceil(dataPagesPerArea / 4.);
+static_assert(!(areaSummaryIsPacked && areaSummarySizePacked > 2048),
+              "High stack usage if used with packed areasummary and big areas!");
 
 static constexpr uint16_t superChainElems = jumpPadNo + 2;
 

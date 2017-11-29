@@ -11,7 +11,7 @@
 namespace simu
 {
 typedef unsigned char FlashByte;
-static constexpr uint16_t pageDataSize  = 2048;
+static constexpr uint16_t pageDataSize  = 4096;
 static constexpr uint16_t pageAuxSize   = (pageDataSize / 32);
 static constexpr uint16_t pageTotalSize = (pageDataSize + pageAuxSize);
 static constexpr uint16_t pagesPerBlock = 64;
