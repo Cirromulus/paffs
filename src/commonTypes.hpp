@@ -97,27 +97,27 @@ struct Param
 extern const Param stdParam;
 
 typedef uint32_t Addr;           // Contains logical area and relative page
-#define PRIaddr PRIu32
+#define pType_addr PRIu32
 typedef uint16_t AreaPos;        // Has to address total areas
-#define PRIareapos PRIu16
+#define pType_areapos PRIu16
 typedef uint16_t PageOffs;       // Has to address pages per area
-#define PRIpageoffs PRIu16
+#define pType_pageoffs PRIu16
 typedef Addr     PageAbs;        // has to address all pages in a device
-#define PRIpageabs PRIaddr
+#define pType_pageabs pType_addr
 typedef uint16_t BlockAbs;       // has to address all blocks in a device
-#define PRIblockabs PRIu16
+#define pType_blockabs PRIu16
 typedef uint32_t FileSize;       //~ 4 GB per file
-#define PRIfilsize PRIu32
+#define pType_filsize PRIu32
 typedef int64_t  FileSizeDiff;
-#define PRIfilsizediff PRId64
+#define pType_filsizediff PRId64
 typedef uint16_t FileNamePos;
-#define PRIfilnamepos PRIu16
+#define pType_filnamepos PRIu16
 typedef uint32_t InodeNo;        //~ 4 Million files
-#define PRIinodeno PRIu32
+#define pType_inodeno PRIu32
 typedef uint16_t DirEntryCount;  // 65,535 Entries per Directory
-#define PRIdirentrycount PRIu16
+#define pType_direntrycount PRIu16
 typedef uint8_t DirEntryLength;  // 255 characters per Directory entry
-#define PRIdirentrylen PRIu8
+#define pType_direntrylen PRIu8
 static constexpr DirEntryLength maxDirEntryLength = 255;
 
 // Together with area = 0, it is used to mark an unused page in Inode

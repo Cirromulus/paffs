@@ -208,7 +208,6 @@ fillFlashAndVerify(paffs::Paffs& fs)
     char filename[50];
     bool full = false;
 
-    //fs.setTraceMask(fs.getTraceMask() | PAFFS_TRACE_TREECACHE);
 
     // fill areas
     for (i = 0; !full; i++)

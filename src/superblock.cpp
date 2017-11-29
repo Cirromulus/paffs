@@ -53,8 +53,8 @@ SuperIndex::deserializeFromBuffer(Device* dev, const char* buf)
         if (areaSummaryPositions[i] > areasNo)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Entry asPosition[%" PRIareapos "] is unplausible! "
-                      "(was %" PRIareapos ", should > %" PRIareapos,
+                      "Entry asPosition[%" pType_areapos "] is unplausible! "
+                      "(was %" pType_areapos ", should > %" pType_areapos,
                       i,
                       areaSummaryPositions[i],
                       areasNo);
@@ -111,7 +111,7 @@ SuperIndex::deserializeFromBuffer(Device* dev, const char* buf)
     if (pointer != getNeededBytes(asCount))
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Read bytes (%" PRIareapos ") differs from calculated (%" PRIareapos ")!",
+                  "Read bytes (%" pType_areapos ") differs from calculated (%" pType_areapos ")!",
                   pointer,
                   getNeededBytes(asCount));
         return Result::bug;
@@ -164,11 +164,11 @@ SuperIndex::serializeToBuffer(char* buf)
         pointer += BitList<dataPagesPerArea>::getByteUsage();
     }
 
-    PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "%" PRIareapos " bytes have been written to Buffer", pointer);
+    PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "%" pType_areapos " bytes have been written to Buffer", pointer);
     if (pointer != getNeededBytes())
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Written bytes (%" PRIareapos ") differ from calculated (%" PRIareapos ")!",
+                  "Written bytes (%" pType_areapos ") differ from calculated (%" pType_areapos ")!",
                   pointer,
                   getNeededBytes());
         return Result::bug;
@@ -180,12 +180,12 @@ void
 SuperIndex::print()
 {
     printf("No:\t\t%" PRIu32 "\n", no);
-    printf("Rootnode addr.: \t%" PRIareapos ":%" PRIareapos "\n", extractLogicalArea(rootNode), extractPageOffs(rootNode));
-    printf("Used Areas: %" PRIareapos "\n", usedAreas);
+    printf("Rootnode addr.: \t%" pType_areapos ":%" pType_areapos "\n", extractLogicalArea(rootNode), extractPageOffs(rootNode));
+    printf("Used Areas: %" pType_areapos "\n", usedAreas);
     printf("areaMap:\n");
     for (AreaPos i = 0; i < areasNo && i < 128; i++)
     {
-        printf("\t%02" PRIareapos "->%02" PRIareapos, i, areaMap[i].position);
+        printf("\t%02" pType_areapos "->%02" pType_areapos, i, areaMap[i].position);
         printf(" %10s", areaNames[areaMap[i].type]);
         bool found = false;
         for (uint8_t asOffs = 0; asOffs < 2; asOffs++)
@@ -209,7 +209,7 @@ SuperIndex::print()
                         dirty++;
                     }
                 }
-                printf("\tFree/Used/Dirty Pages: %" PRIareapos "/%" PRIareapos "/%" PRIareapos "", free, used, dirty);
+                printf("\tFree/Used/Dirty Pages: %" pType_areapos "/%" pType_areapos "/%" pType_areapos "", free, used, dirty);
                 asOffs++;
             }
         }
@@ -223,7 +223,7 @@ SuperIndex::print()
     printf("activeAreas:\n");
     for (uint16_t i = 0; i < AreaType::no; i++)
     {
-        printf("%10s: %" PRIareapos "\n", areaNames[i], activeAreas[i]);
+        printf("%10s: %" pType_areapos "\n", areaNames[i], activeAreas[i]);
     }
     printf("Overall deletions: %" PRIu64 "\n", overallDeletions);
 }
@@ -356,7 +356,7 @@ Superblock::readSuperIndex(SuperIndex* index)
         PAFFS_DBG(PAFFS_TRACE_ERROR,
                   "Determined Address of last SuperIndex, but its SerialNo was empty!");
         PAFFS_DBG_S(PAFFS_TRACE_ERROR,
-                    "Area %" PRIareapos ", page %" PRIareapos,
+                    "Area %" pType_areapos ", page %" pType_areapos,
                     extractLogicalArea(pathToSuperIndexDirect[jumpPadNo + 1]),
                     extractPageOffs(pathToSuperIndexDirect[jumpPadNo + 1]));
         return Result::bug;
@@ -367,7 +367,7 @@ Superblock::readSuperIndex(SuperIndex* index)
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Could not read Anchor Entry at %" PRIareapos ":%" PRIareapos,
+                  "Could not read Anchor Entry at %" pType_areapos ":%" pType_areapos,
                   extractLogicalArea(pathToSuperIndexDirect[0]),
                   extractPageOffs(pathToSuperIndexDirect[0]));
         return r;
@@ -390,7 +390,7 @@ Superblock::readSuperIndex(SuperIndex* index)
     Addr addr = pathToSuperIndexDirect[superChainElems - 1];
 
     PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
-                "Found Super Index at %" PRIareapos ":%" PRIareapos "\n",
+                "Found Super Index at %" pType_areapos ":%" pType_areapos "\n",
                 extractLogicalArea(addr),
                 extractPageOffs(addr));
 
@@ -412,7 +412,7 @@ Superblock::readSuperIndex(SuperIndex* index)
     {
         PAFFS_DBG_S(PAFFS_TRACE_ERROR,
                     "Position of area 0 may never be different than 0 "
-                    "(was %" PRIareapos ")",
+                    "(was %" pType_areapos ")",
                     index->areaMap[0].position);
         return Result::fail;
     }
@@ -453,7 +453,7 @@ Superblock::readSuperIndex(SuperIndex* index)
         if (index->areaMap[i].position > areasNo)
         {
             PAFFS_DBG_S(PAFFS_TRACE_ERROR,
-                        "Position of area %" PRIareapos " unplausible! (%" PRIareapos ")",
+                        "Position of area %" pType_areapos " unplausible! (%" pType_areapos ")",
                         i,
                         index->areaMap[i].position);
             return Result::fail;
@@ -461,7 +461,7 @@ Superblock::readSuperIndex(SuperIndex* index)
         if (index->areaMap[i].type >= AreaType::no)
         {
             PAFFS_DBG_S(PAFFS_TRACE_ERROR,
-                        "Type of area %" PRIareapos " unplausible! (%" PRIareapos ")",
+                        "Type of area %" pType_areapos " unplausible! (%" pType_areapos ")",
                         i,
                         static_cast<unsigned int>(index->areaMap[i].type));
             return Result::fail;
@@ -469,7 +469,7 @@ Superblock::readSuperIndex(SuperIndex* index)
         if (index->areaMap[i].status > AreaStatus::empty)
         {
             PAFFS_DBG_S(PAFFS_TRACE_ERROR,
-                        "Status of area %" PRIareapos " unplausible! (%" PRIareapos ")",
+                        "Status of area %" pType_areapos " unplausible! (%" pType_areapos ")",
                         i,
                         static_cast<unsigned int>(index->areaMap[i].status));
             return Result::fail;
@@ -480,7 +480,7 @@ Superblock::readSuperIndex(SuperIndex* index)
     {
         PAFFS_DBG_S(PAFFS_TRACE_ERROR,
                     "Rootnode address does not point to index area"
-                    " (Area %" PRIareapos ", page %" PRIareapos ")",
+                    " (Area %" pType_areapos ", page %" pType_areapos ")",
                     extractLogicalArea(index->rootNode),
                     extractPageOffs(index->rootNode));
         return Result::fail;
@@ -491,7 +491,7 @@ Superblock::readSuperIndex(SuperIndex* index)
     {
         PAFFS_DBG_S(PAFFS_TRACE_ERROR,
                     "Anchor Area stated it would have been "
-                    "moved to log. %" PRIareapos ", which is not allowed.",
+                    "moved to log. %" pType_areapos ", which is not allowed.",
                     logPrev[0]);
         return Result::fail;
     }
@@ -502,7 +502,7 @@ Superblock::readSuperIndex(SuperIndex* index)
         if (logPrev[i] != 0)
         {
             PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
-                        "Chain Area %" PRId16 " (phys. %" PRIareapos ") changed its location to log. %" PRIareapos,
+                        "Chain Area %" PRId16 " (phys. %" pType_areapos ") changed its location to log. %" pType_areapos,
                         i,
                         extractLogicalArea(pathToSuperIndexDirect[i]),
                         logPrev[i]);
@@ -599,7 +599,7 @@ Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew)
         {
             PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
                         "Committing superindex "
-                        "at phys. area %" PRIareapos " was enough!",
+                        "at phys. area %" pType_areapos " was enough!",
                         lastArea);
             rootnode_dirty = false;
             return Result::ok;
@@ -624,7 +624,7 @@ Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew)
         {
             PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
                         "Committing jumpPad no. %" PRId16 " "
-                        "at phys. area %" PRIareapos "was enough!",
+                        "at phys. area %" pType_areapos "was enough!",
                         i,
                         lastArea);
             rootnode_dirty = false;
@@ -648,8 +648,8 @@ Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew)
     if (lastArea != directAreas[1])
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Anchor entry (%" PRIareapos ") may never "
-                  "change its previous area (%" PRIareapos ")!",
+                  "Anchor entry (%" pType_areapos ") may never "
+                  "change its previous area (%" pType_areapos ")!",
                   directAreas[1],
                   lastArea);
         return Result::bug;
@@ -702,7 +702,7 @@ Superblock::fillPathWithFirstSuperblockAreas(Addr directPath[superChainElems])
     if (foundElems != superChainElems)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Could not find enough superBlocks path! got %" PRId16 ", should %" PRIareapos "",
+                  "Could not find enough superBlocks path! got %" PRId16 ", should %" pType_areapos "",
                   foundElems,
                   superChainElems);
         return Result::fail;
@@ -733,7 +733,7 @@ Superblock::findFirstFreeEntryInArea(AreaPos area, PageOffs* outPos, PageOffs re
         }
         else if (r != Result::ok)
         {
-            PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free Entry in phys. Area %" PRIareapos, area);
+            PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find free Entry in phys. Area %" pType_areapos, area);
             return r;
         }
         else
@@ -809,7 +809,7 @@ Superblock::getPathToMostRecentSuperIndex(Addr path[superChainElems],
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not find a Superpage in Area %" PRIareapos,
+                      "Could not find a Superpage in Area %" pType_areapos,
                       extractLogicalArea(path[i]));
             return r;
         }
@@ -820,19 +820,19 @@ Superblock::getPathToMostRecentSuperIndex(Addr path[superChainElems],
         }
         PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
                     "Found Chain Elem %" PRIu16 " at phys. area "
-                    "%" PRIareapos " with index %" PRIu32,
+                    "%" pType_areapos " with index %" PRIu32,
                     i,
                     extractLogicalArea(path[i]),
                     indexes[i]);
         if (i < superChainElems - 1)
         {
             PAFFS_DBG_S(
-                    PAFFS_TRACE_SUPERBLOCK, "\tpointing to phys. area %" PRIareapos, areaPath[i + 1]);
+                    PAFFS_TRACE_SUPERBLOCK, "\tpointing to phys. area %" pType_areapos, areaPath[i + 1]);
         }
         if (logPrev[i] != 0)
         {
             PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
-                        "The previously used log. area was %" PRIareapos,
+                        "The previously used log. area was %" pType_areapos,
                         logPrev[i]);
         }
     }
@@ -852,7 +852,7 @@ Superblock::readMostRecentEntryInArea(
         {
             PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
                         "Found most recent entry in "
-                        "phys. area %" PRIareapos " block %" PRId16 " (abs page %" PRIareapos ")",
+                        "phys. area %" pType_areapos " block %" PRId16 " (abs page %" pType_areapos ")",
                         area,
                         i,
                         pos);
@@ -898,8 +898,9 @@ Superblock::readMostRecentEntryInBlock(AreaPos area,
                 return r;
             }
         }
-        SerialNo* no = reinterpret_cast<SerialNo*>(buf);
-        if (*no == emptySerial)
+        SerialNo no;
+        memcpy(&no, buf, sizeof(SerialNo));
+        if (no == emptySerial)
         {
             // Unprogrammed, therefore empty
             if (*maximum != 0 || overflow)
@@ -909,11 +910,11 @@ Superblock::readMostRecentEntryInBlock(AreaPos area,
             return Result::notFound;
         }
 
-        if (*no > *maximum || *no == 0)
+        if (no > *maximum || no == 0)
         {  //==0 if overflow occured
-            overflow = *no == 0;
+            overflow = no == 0;
             *outPos = page + basePage;
-            *maximum = *no;
+            *maximum = no;
             memcpy(logPrev, &buf[sizeof(SerialNo)], sizeof(AreaPos));
             memcpy(next, &buf[sizeof(SerialNo) + sizeof(AreaPos)], sizeof(AreaPos));
         }
@@ -973,8 +974,8 @@ Superblock::insertNewAnchorEntry(Addr logPrev, AreaPos* directArea, AnchorEntry*
         return r;
     }
     PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
-                "Writing Anchor to phys. Area %" PRIareapos ", "
-                "page %" PRIareapos " pointing to area %" PRIareapos,
+                "Writing Anchor to phys. Area %" pType_areapos ", "
+                "page %" pType_areapos " pointing to area %" pType_areapos,
                 *directArea,
                 page,
                 entry->jumpPadArea);
@@ -988,7 +989,7 @@ Superblock::readAnchorEntry(Addr addr, AnchorEntry* entry)
     if (sizeof(AnchorEntry) > dataBytesPerPage)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "AnchorEntry bigger than dataBytes per Page! (%zu, %" PRIareapos ")",
+                  "AnchorEntry bigger than dataBytes per Page! (%zu, %" pType_areapos ")",
                   sizeof(AnchorEntry),
                   dataBytesPerPage);
         return Result::nimpl;
@@ -996,13 +997,13 @@ Superblock::readAnchorEntry(Addr addr, AnchorEntry* entry)
     if (traceMask & PAFFS_TRACE_SUPERBLOCK && extractLogicalArea(addr) != 0)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Read Anchor entry at phys. area %" PRIareapos ", "
+                  "Read Anchor entry at phys. area %" pType_areapos ", "
                   "but must only be in area 0!",
                   extractLogicalArea(addr));
         return Result::bug;
     }
     PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
-                "Reading Anchor entry at phys. area %" PRIareapos " page %" PRIareapos,
+                "Reading Anchor entry at phys. area %" pType_areapos " page %" pType_areapos,
                 extractLogicalArea(addr),
                 extractPageOffs(addr));
     // No check of areaType because we may not have an AreaMap
@@ -1059,7 +1060,7 @@ Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos* directArea, JumpPadEntr
             entry->logPrev = extractLogicalArea(logPrev);
             PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
                         "Moving JumpPad area from "
-                        "log. %" PRIareapos " to log. %" PRIareapos,
+                        "log. %" pType_areapos " to log. %" pType_areapos,
                         entry->logPrev,
                         p);
             *directArea = device->areaMgmt.getPos(p);
@@ -1083,8 +1084,8 @@ Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos* directArea, JumpPadEntr
         return r;
     }
     PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
-                "Writing jumpPad to phys. Area %" PRIareapos ", "
-                "page %" PRIareapos " pointing to area %" PRIareapos,
+                "Writing jumpPad to phys. Area %" pType_areapos ", "
+                "page %" pType_areapos " pointing to area %" pType_areapos,
                 *directArea,
                 page,
                 entry->nextArea);
@@ -1142,7 +1143,7 @@ Superblock::insertNewSuperIndex(Addr logPrev, AreaPos* directArea, SuperIndex* e
             entry->logPrev = extractLogicalArea(logPrev);
             PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
                         "Moving Superindex area from "
-                        "log. %" PRIareapos " to log. %" PRIareapos,
+                        "log. %" pType_areapos " to log. %" pType_areapos,
                         entry->logPrev,
                         p);
             *directArea = device->areaMgmt.getPos(p);
@@ -1167,7 +1168,7 @@ Superblock::insertNewSuperIndex(Addr logPrev, AreaPos* directArea, SuperIndex* e
     }
 
     PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
-                "Writing superIndex to phys. Area %" PRIareapos ", page %" PRIareapos,
+                "Writing superIndex to phys. Area %" pType_areapos ", page %" pType_areapos,
                 *directArea,
                 page);
     return writeSuperPageIndex(*directArea * totalPagesPerArea + page, entry);
@@ -1241,15 +1242,15 @@ Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap)
     if (extractPageOffs(addr) > totalPagesPerArea)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Read SuperPage at page %" PRIpageoffs " of area %" PRIareapos ", "
-                  "but an area is only %" PRIareapos " pages wide!",
+                  "Read SuperPage at page %" pType_pageoffs " of area %" pType_areapos ", "
+                  "but an area is only %" pType_areapos " pages wide!",
                   extractPageOffs(addr),
                   extractLogicalArea(addr),
                   totalPagesPerArea);
     }
 
     PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
-                "Reading SuperIndex at phys. area %" PRIareapos " page %" PRIpageoffs,
+                "Reading SuperIndex at phys. area %" pType_areapos " page %" pType_pageoffs,
                 extractLogicalArea(addr),
                 extractPageOffs(addr));
     // TODO: Just read the appropiate number of area Summaries
@@ -1293,7 +1294,7 @@ Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
                       "Got empty SerialNo during SuperPage read! "
-                      "PageBase: %" PRIpageabs ", page: %" PRIpageoffs,
+                      "PageBase: %" pType_pageabs ", page: %" pType_pageoffs,
                       pageBase,
                       page);
             return Result::bug;
@@ -1335,8 +1336,8 @@ Superblock::handleBlockOverflow(PageAbs newPage, Addr logPrev, SerialNo* serial)
     {
         // reset serial no if we start a new block
         PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
-                    "Deleting phys. Area %" PRIareapos ", block %" PRIpageoffs ""
-                    " (abs: %" PRIblockabs ", new abs on %" PRIblockabs ") for chain Entry",
+                    "Deleting phys. Area %" pType_areapos ", block %" pType_pageoffs ""
+                    " (abs: %" pType_blockabs ", new abs on %" pType_blockabs ") for chain Entry",
                     extractLogicalArea(logPrev),
                     extractPageOffs(logPrev) / pagesPerBlock,
                     getBlockNumber(logPrev, *device),
@@ -1347,7 +1348,7 @@ Superblock::handleBlockOverflow(PageAbs newPage, Addr logPrev, SerialNo* serial)
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not delete block of chain Entry! BlockAbs: %" PRIblockabs,
+                      "Could not delete block of chain Entry! BlockAbs: %" pType_blockabs,
                       getBlockNumber(logPrev, *device));
             return r;
         }
@@ -1371,7 +1372,7 @@ Superblock::deleteSuperBlock(AreaPos area, uint8_t block)
         device->areaMgmt.setType(area, AreaType::unset);
         device->areaMgmt.decreaseUsedAreas();
         PAFFS_DBG_S(PAFFS_TRACE_AREA,
-                    "Info: FREED Superblock Area %" PRIareapos " at pos. %" PRIareapos ".",
+                    "Info: FREED Superblock Area %" pType_areapos " at pos. %" pType_areapos ".",
                     area,
                     device->areaMgmt.getPos(area));
     }
@@ -1384,7 +1385,7 @@ AreaPos
 Superblock::findBestNextFreeArea(AreaPos logPrev)
 {
     PAFFS_DBG_S(
-            PAFFS_TRACE_SUPERBLOCK, "log. Area %" PRIareapos " is full, finding new one...", logPrev);
+            PAFFS_TRACE_SUPERBLOCK, "log. Area %" pType_areapos " is full, finding new one...", logPrev);
     for (AreaPos i = 1; i < areasNo; i++)
     {
         if (device->areaMgmt.getStatus(i) == AreaStatus::empty)
@@ -1402,12 +1403,12 @@ Superblock::findBestNextFreeArea(AreaPos logPrev)
             device->areaMgmt.setStatus(logPrev, AreaStatus::empty);
             // Unset is postponed till actual deletion
 
-            PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found log. %" PRIareapos, i);
+            PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found log. %" pType_areapos, i);
             return i;
         }
     }
     PAFFS_DBG(PAFFS_TRACE_ERROR,
-              "Warning: Using same area (log. %" PRIareapos ") for new cycle!",
+              "Warning: Using same area (log. %" pType_areapos ") for new cycle!",
               logPrev);
     return logPrev;
 }

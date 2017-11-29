@@ -90,7 +90,7 @@ Paffs::printCacheSizes()
     PAFFS_DBG_S(PAFFS_TRACE_INFO, "-----------Devices: %" PRIu8 "-----------", maxNumberOfDevices);
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
                 "TreeNode size: %zu Byte, TreeCacheNode size: %zu Byte. Cachable Nodes: %" PRIu8 ".\n"
-                "\tBranch order: %" PRIu32 ", Leaf order: %" PRIu32 "\n"
+                "\tBranch order: %" PRIu16 ", Leaf order: %" PRIu16 "\n"
                 "\tOverall TreeCache size: %zu Byte.",
                 sizeof(TreeNode),
                 sizeof(TreeCacheNode),
@@ -107,7 +107,7 @@ Paffs::printCacheSizes()
                 (dataPagesPerArea / 4 + 2 + sizeof(PageOffs)) * areaSummaryCacheSize);
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "Size of AreaMap Entry: %zu Byte. Areas: %" PRIareapos ".\n"
+                "Size of AreaMap Entry: %zu Byte. Areas: %" pType_areapos ".\n"
                 "\tOverall AreaMap Size: %zu Byte.",
                 sizeof(Area),
                 areasNo,

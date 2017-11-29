@@ -24,21 +24,21 @@
 // Die Anzahl freier Speicherplätze, die mindestens vorhanden sein müssen, um die Warteschlange zu
 // verkleinern.
 
-typedef struct queue_s
+struct TreeQueue
 {
     void** data;
     size_t front;
     size_t back;
     size_t size;
-} queue_s;
+};
 
 int
-queue_destroy(queue_s* queue);
+queueDestroy(TreeQueue* queue);
 int
-queue_empty(queue_s* queue);
-queue_s*
-queue_new(void);
+queueEmpty(TreeQueue* queue);
+TreeQueue*
+queueNew(void);
 void*
-queue_dequeue(queue_s* queue);
+queueDequeue(TreeQueue* queue);
 int
-queue_enqueue(queue_s* queue, void* data);
+queue_enqueue(TreeQueue* queue, void* data);

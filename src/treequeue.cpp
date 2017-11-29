@@ -24,7 +24,7 @@
 #define TRUE 1
 
 int
-queue_destroy(queue_s* queue)
+queueDestroy(TreeQueue* queue)
 {
     if (queue == NULL)
     {
@@ -36,7 +36,7 @@ queue_destroy(queue_s* queue)
 }
 
 int
-queue_empty(queue_s* queue)
+queueEmpty(TreeQueue* queue)
 {
     if (queue == NULL || queue->front == queue->back)
     {
@@ -48,10 +48,10 @@ queue_empty(queue_s* queue)
     }
 }
 
-queue_s*
-queue_new(void)
+TreeQueue*
+queueNew(void)
 {
-    queue_s* queue = static_cast<queue_s*>(malloc(sizeof(*queue)));
+    TreeQueue* queue = static_cast<TreeQueue*>(malloc(sizeof(*queue)));
     if (queue == NULL)
     {
         return NULL;
@@ -68,7 +68,7 @@ queue_new(void)
 }
 
 void*
-queue_dequeue(queue_s* queue)
+queueDequeue(TreeQueue* queue)
 {
     if (queue == NULL || queue->front == queue->back)
     {
@@ -113,7 +113,7 @@ queue_dequeue(queue_s* queue)
 }
 
 int
-queue_enqueue(queue_s* queue, void* data)
+queue_enqueue(TreeQueue* queue, void* data)
 {
     if (queue == NULL)
     {

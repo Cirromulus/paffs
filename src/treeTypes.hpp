@@ -18,14 +18,14 @@
 namespace paffs
 {
 // Calculates how many pointers a node can hold in one page
-// Note that this struct is not packed.
-static constexpr uint32_t branchOrder =
+static constexpr uint16_t branchOrder =
         (dataBytesPerPage - sizeof(Addr) - sizeof(bool) - sizeof(unsigned char))
         / (sizeof(Addr) + sizeof(InodeNo));
-static constexpr uint32_t leafOrder =
+static constexpr uint16_t leafOrder =
         (dataBytesPerPage - sizeof(Addr) - sizeof(bool) - sizeof(unsigned char))
         / (sizeof(Inode) + sizeof(InodeNo));
 
+// Note that this struct is not packed.
 struct TreeNode
 {
     union As {
@@ -41,9 +41,9 @@ struct TreeNode
         } leaf;
     } as;
     Addr self;               // If '0', it is not committed yet
-    bool isLeaf : 1;
-    uint16_t keys : 7;  // If leaf:   Number of pInodes
-                             // If Branch: Number of addresses - 1
+    bool isLeaf;
+    uint16_t keys;   // If leaf:   Number of pInodes
+                     // If Branch: Number of addresses - 1
 };
 
 static_assert(sizeof(TreeNode) <= dataBytesPerPage, "At least one treenode must fit in a page");

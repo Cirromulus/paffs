@@ -176,7 +176,7 @@ rtems_task task_system_init(rtems_task_argument)
         }
         if (br != inf.size)
         {
-            printf("Error reading file, size differs (%" PRIfilsize ")\n", br);
+            printf("Error reading file, size differs (%" pType_filsize ")\n", br);
             goto idle;
         }
         printf("----------\n%s\n----------\n", rbuf);

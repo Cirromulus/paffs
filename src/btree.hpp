@@ -66,7 +66,7 @@ private:
     void
     printLeaves(TreeCacheNode& c);
     void
-    printQueuedKeysRecursively(queue_s* q);
+    printQueuedKeysRecursively(TreeQueue* q);
     void
     printKeys(TreeCacheNode& c);
 
@@ -82,12 +82,6 @@ private:
     // Path is root first, child last
     Result
     pathFromRoot(TreeCacheNode& child, Addr* path, unsigned int& lengthOut);
-    int
-    findRange(TreeCacheNode& root,
-              InodeNo key_start,
-              InodeNo key_end,
-              int returned_keys[],
-              void* returned_pointers[]);
     Result
     findBranch(TreeCacheNode& target, TreeCacheNode*& outtreeCacheNode);
     Result
@@ -96,22 +90,22 @@ private:
     findInLeaf(TreeCacheNode& leaf, InodeNo key, Inode& outInode);
     Result
     find(InodeNo key, Inode& outInode);
-    int
-    cut(int length);
+    uint16_t
+    cut(uint16_t length);
 
     // Insertion.
 
-    int
+    uint16_t
     getLeftIndex(TreeCacheNode& parent, TreeCacheNode& left);
     Result
     insertIntoLeaf(TreeCacheNode& leaf, const Inode& pointer);
     Result
     insertIntoLeafAfterSplitting(TreeCacheNode& leaf, const Inode& newInode);
     Result
-    insertIntoNode(TreeCacheNode& newNode, int left_index, InodeNo key, TreeCacheNode& right);
+    insertIntoNode(TreeCacheNode& newNode, uint16_t leftIndex, InodeNo key, TreeCacheNode& right);
     Result
     insertIntoNodeAfterSplitting(TreeCacheNode& old_node,
-                                 unsigned int left_index,
+                                 uint16_t leftIndex,
                                  InodeNo key,
                                  TreeCacheNode& right);
     Result
@@ -128,14 +122,14 @@ private:
     Result
     coalesceNodes(TreeCacheNode& n,
                    TreeCacheNode& neighbor,
-                   int neighbor_index,
-                   unsigned int k_prime);
+                   int16_t  neighborIndex,
+                   uint16_t kPrime);
     Result
     redistributeNodes(TreeCacheNode& n,
                       TreeCacheNode& neighbor,
-                      int neighbor_index,
-                      unsigned int k_prime_index,
-                      unsigned int k_prime);
+                      int16_t  neighborIndex,
+                      uint16_t kPrimeIndex,
+                      uint16_t kPrime);
     Result
     deleteEntry(TreeCacheNode& n, InodeNo key);
     Result

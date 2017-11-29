@@ -47,7 +47,7 @@ AreaSummaryElem::getStatus(PageOffs page)
     if (page >= dataPagesPerArea)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Tried to read page %" PRIpageoffs ", but allowed < %" PRIpageoffs "!",
+                  "Tried to read page %" pType_pageoffs ", but allowed < %" pType_pageoffs "!",
                   page,
                   dataPagesPerArea);
         return SummaryEntry::error;
@@ -72,7 +72,7 @@ AreaSummaryElem::setStatus(PageOffs page, SummaryEntry value)
     if (page >= dataPagesPerArea)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Tried to set page %" PRIpageoffs ", but allowed < %" PRIpageoffs "!",
+                  "Tried to set page %" pType_pageoffs ", but allowed < %" pType_pageoffs "!",
                   page,
                   dataPagesPerArea);
         return;
@@ -183,8 +183,8 @@ AreaSummaryElem::setArea(AreaPos areaPos)
     if (isUsed())
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Tried to set areaPos %" PRIareapos ", but "
-                  "SummaryElem is set to area %" PRIareapos "!",
+                  "Tried to set areaPos %" pType_areapos ", but "
+                  "SummaryElem is set to area %" pType_areapos "!",
                   areaPos,
                   mArea);
         return;
@@ -244,8 +244,8 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition)
         {
             PageOffs dirtyPages = countDirtyPages(cachePos);
             PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
-                        "Checking Area %" PRIareapos " "
-                        "with %" PRIpageoffs " dirty pages",
+                        "Checking Area %" pType_areapos " "
+                        "with %" pType_pageoffs " dirty pages",
                         it.first,
                         dirtyPages);
             if (dirtyPages >= favDirtyPages)
@@ -258,7 +258,7 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition)
         else
         {
             PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
-                        "Ignored Area %" PRIareapos " "
+                        "Ignored Area %" pType_areapos " "
                         "at cache pos %" PRIu16,
                         it.first,
                         it.second);
@@ -299,8 +299,8 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition)
     cachePos = translation[favouriteArea];
 
     PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
-                "Commit Hard swaps GC Area %" PRIareapos " (on %" PRIareapos ")"
-                " from %" PRIareapos " (on %" PRIareapos ")",
+                "Commit Hard swaps GC Area %" pType_areapos " (on %" pType_areapos ")"
+                " from %" pType_areapos " (on %" pType_areapos ")",
                 dev->areaMgmt.getActiveArea(AreaType::garbageBuffer),
                 dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(AreaType::garbageBuffer)),
                 favouriteArea,
@@ -376,7 +376,7 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
     if (page > dataPagesPerArea)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Tried to access page out of bounds! (was: %" PRIpageoffs ", should: < %" PRIpageoffs ")",
+                  "Tried to access page out of bounds! (was: %" pType_pageoffs ", should: < %" pType_pageoffs ")",
                   page,
                   dataPagesPerArea);
         return Result::invalidInput;
@@ -384,7 +384,7 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
     if (state == SummaryEntry::free)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Area %" PRIareapos " was set to empty, "
+                  "Area %" pType_areapos " was set to empty, "
                   "but apperarently not by deleting it!",
                   area);
     }
@@ -401,7 +401,7 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "Tried setting Pagestatus on UNSET area "
-                  "%" PRIareapos " (on %" PRIareapos ", status %" PRIu8 ")",
+                  "%" pType_areapos " (on %" pType_areapos ", status %" PRIu8 ")",
                   area,
                   dev->areaMgmt.getPos(area),
                   dev->areaMgmt.getStatus(area));
@@ -435,8 +435,8 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
                           "DirtyPages differ from actual count! "
-                          "(Area %" PRIareapos " on %" PRIareapos " was: %" PRIpageoffs ","
-                                  " thought %" PRIpageoffs ")",
+                          "(Area %" pType_areapos " on %" pType_areapos " was: %" pType_pageoffs ","
+                                  " thought %" pType_pageoffs ")",
                           area,
                           dev->areaMgmt.getPos(area),
                           dirtyPagesCheck,
@@ -663,8 +663,8 @@ SummaryCache::loadAreaSummaries()
 
             unsigned char summary[totalBytesPerPage];
             PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
-                        "Checking for an AS at area %" PRIareapos " (phys. %" PRIareapos ", "
-                        "abs. page %" PRIpageabs ")",
+                        "Checking for an AS at area %" pType_areapos " (phys. %" pType_areapos ", "
+                        "abs. page %" pType_pageabs ")",
                         index.areaSummaryPositions[i],
                         dev->areaMgmt.getPos(index.areaSummaryPositions[i]),
                         getPageNumber(combineAddress(index.areaSummaryPositions[i], dataPagesPerArea),
@@ -677,7 +677,7 @@ SummaryCache::loadAreaSummaries()
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR,
                           "Could not check if AS was already written on "
-                          "area %" PRIareapos,
+                          "area %" pType_areapos,
                           index.areaSummaryPositions[i]);
                 return r;
             }
@@ -911,14 +911,14 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
                 {
                     // Dirty, but it was not properly deleted?
                     PAFFS_DBG(PAFFS_TRACE_BUG,
-                              "Area %" PRIareapos " is dirty, but was "
+                              "Area %" pType_areapos " is dirty, but was "
                               "not set to an status (Type %s)",
                               summaryCache[i].getArea(),
                               areaNames[dev->areaMgmt.getType(summaryCache[i].getArea())]);
                 }
                 PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                             "Deleted non-dirty cache entry "
-                            "of area %" PRIareapos,
+                            "of area %" pType_areapos,
                             summaryCache[i].getArea());
                 translation.erase(summaryCache[i].getArea());
                 summaryCache[i].clear();
@@ -1143,7 +1143,7 @@ SummaryCache::writeAreasummary(uint16_t pos)
                 {
                     PAFFS_DBG(PAFFS_TRACE_BUG,
                               "Tried to write AreaSummary over an existing one at "
-                              "Area %" PRIareapos,
+                              "Area %" pType_areapos,
                               summaryCache[pos].getArea());
                     return Result::bug;
                 }
