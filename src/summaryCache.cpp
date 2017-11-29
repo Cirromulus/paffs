@@ -1178,7 +1178,6 @@ SummaryCache::writeAreasummary(AreaSummaryElem& elem)
             if (static_cast<uint8_t>(readbuf[i]) != 0xFF)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
-                          "Tried to write AreaSummary over an existing one at "
                           "Area %" PTYPE_AREAPOS,
                           elem.getArea());
                 return Result::bug;
