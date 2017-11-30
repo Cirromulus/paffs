@@ -636,9 +636,10 @@ Btree::insertIntoNodeAfterSplitting(TreeCacheNode& oldNode,
                 leftIndex);
     uint16_t i, j, split, kPrime;
     TreeCacheNode* new_node;
-    InodeNo temp_keys[branchOrder + 1];
-    TreeCacheNode* temp_RAMaddresses[branchOrder + 1];
-    Addr temp_addresses[branchOrder + 1];
+    //FIXME: High stack usage
+    InodeNo tempKeys[branchOrder + 1];
+    TreeCacheNode* tempRAMaddresses[branchOrder + 1];
+    Addr tempAddresses[branchOrder + 1];
 
     mCache.lockTreeCacheNode(oldNode);
     mCache.lockTreeCacheNode(right);
@@ -662,20 +663,20 @@ Btree::insertIntoNodeAfterSplitting(TreeCacheNode& oldNode,
         {
             j++;
         }
-        temp_addresses[j] = oldNode.raw.as.branch.pointers[i];
-        temp_RAMaddresses[j] = oldNode.pointers[i];
+        tempAddresses[j] = oldNode.raw.as.branch.pointers[i];
+        tempRAMaddresses[j] = oldNode.pointers[i];
     }
 
     for (i = 0, j = 0; i < oldNode.raw.keys; i++, j++)
     {
         if (j == leftIndex)
             j++;
-        temp_keys[j] = oldNode.raw.as.branch.keys[i];
+        tempKeys[j] = oldNode.raw.as.branch.keys[i];
     }
 
-    temp_addresses[leftIndex + 1] = right.raw.self;
-    temp_RAMaddresses[leftIndex + 1] = &right;
-    temp_keys[leftIndex] = key;
+    tempAddresses[leftIndex + 1] = right.raw.self;
+    tempRAMaddresses[leftIndex + 1] = &right;
+    tempKeys[leftIndex] = key;
 
     /* Create the new TreeCacheNode and copy
      * half the keys and pointers to the
@@ -686,19 +687,19 @@ Btree::insertIntoNodeAfterSplitting(TreeCacheNode& oldNode,
     oldNode.raw.keys = 0;
     for (i = 0; i < split - 1; i++)
     {
-        oldNode.raw.as.branch.pointers[i] = temp_addresses[i];
-        oldNode.pointers[i] = temp_RAMaddresses[i];
-        oldNode.raw.as.branch.keys[i] = temp_keys[i];
+        oldNode.raw.as.branch.pointers[i] = tempAddresses[i];
+        oldNode.pointers[i] = tempRAMaddresses[i];
+        oldNode.raw.as.branch.keys[i] = tempKeys[i];
         oldNode.raw.keys++;
     }
-    oldNode.raw.as.branch.pointers[i] = temp_addresses[i];
-    oldNode.pointers[i] = temp_RAMaddresses[i];
-    kPrime = temp_keys[split - 1];
+    oldNode.raw.as.branch.pointers[i] = tempAddresses[i];
+    oldNode.pointers[i] = tempRAMaddresses[i];
+    kPrime = tempKeys[split - 1];
     for (++i, j = 0; i < branchOrder; i++, j++)
     {
-        new_node->pointers[j] = temp_RAMaddresses[i];
-        new_node->raw.as.branch.pointers[j] = temp_addresses[i];
-        new_node->raw.as.branch.keys[j] = temp_keys[i];
+        new_node->pointers[j] = tempRAMaddresses[i];
+        new_node->raw.as.branch.pointers[j] = tempAddresses[i];
+        new_node->raw.as.branch.keys[j] = tempKeys[i];
         new_node->raw.keys++;
         if (new_node->pointers[j] != nullptr)
         {
@@ -713,8 +714,8 @@ Btree::insertIntoNodeAfterSplitting(TreeCacheNode& oldNode,
         }
     }
 
-    new_node->pointers[j] = temp_RAMaddresses[i];
-    new_node->raw.as.branch.pointers[j] = temp_addresses[i];
+    new_node->pointers[j] = tempRAMaddresses[i];
+    new_node->raw.as.branch.pointers[j] = tempAddresses[i];
     if (new_node->pointers[j] != nullptr)
     {
         new_node->pointers[j]->parent = new_node;

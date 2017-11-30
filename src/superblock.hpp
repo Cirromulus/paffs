@@ -63,7 +63,7 @@ struct SuperIndex
     uint64_t overallDeletions;
     //"internal"
     AreaPos areaSummaryPositions[2];
-    SummaryEntry* areaSummary[2];
+    TwoBitList<dataPagesPerArea>* summaries[2];
     static constexpr uint16_t
     getNeededBytes(const uint16_t numberOfAreaSummaries)
     {
@@ -77,7 +77,7 @@ struct SuperIndex
                sizeof(uint64_t) +                // overallDeletions
                2 * sizeof(AreaPos)
                +  // Area Summary Positions
-               ceil(numberOfAreaSummaries * dataPagesPerArea / 8.)
+               numberOfAreaSummaries * TwoBitList<dataPagesPerArea>::byteUsage
                /* One bit per entry, two entrys for INDEX and DATA section*/
         : 0;
     }
@@ -96,10 +96,10 @@ struct SuperIndex
     }
 
     Result
-    deserializeFromBuffer(Device* dev, const char* buf);
+    deserializeFromBuffer(Device* dev, const uint8_t* buf);
 
     Result
-    serializeToBuffer(char* buf);
+    serializeToBuffer(uint8_t* buf);
 
     void
     print();
@@ -116,7 +116,7 @@ class Superblock : public JournalTopic
 
     //This buffer is only used for reading/writing the superindex.
     //TODO: Use another pagebuf that is unused during superindex commit
-    char buf[SuperIndex::getNeededBytes(2)];
+    uint8_t buf[SuperIndex::getNeededBytes(2)];
 
 public:
     Superblock(Device* mdev) : device(mdev){};

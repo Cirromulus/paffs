@@ -75,11 +75,11 @@ OfficeModelNexys3Driver::writePage(PageAbs page,
 	    memcpy(buf, data, dataLen);
 	}
 
-    unsigned char* p = reinterpret_cast<unsigned char*>(&buf[dataBytesPerPage+2]);
+	uint8_t* p = &buf[dataBytesPerPage+2];
     for(int i = 0; i < dataBytesPerPage; i+=256, p+=3)
-        YaffsEcc::calc(reinterpret_cast<unsigned char*>(&buf[i]), p);
+        YaffsEcc::calc(&buf[i], p);
 
-	mNand->writePage(mBank, mDevice, page, reinterpret_cast<uint8_t*>(buf));
+	mNand->writePage(mBank, mDevice, page, buf);
 	return Result::ok;
 }
 Result
@@ -93,12 +93,12 @@ OfficeModelNexys3Driver::readPage(PageAbs page,
 	}
 
 	mNand->readPage(mBank, mDevice, page, reinterpret_cast<uint8_t*>(buf));
-    unsigned char read_ecc[3];
-    unsigned char *p = reinterpret_cast<unsigned char*>(&buf[dataBytesPerPage + 2]);
+	uint8_t read_ecc[3];
+	uint8_t *p = &buf[dataBytesPerPage + 2];
     Result ret = Result::ok;
     for(int i = 0; i < dataBytesPerPage; i+=256, p+=3) {
-        YaffsEcc::calc(reinterpret_cast<unsigned char*>(buf) + i, read_ecc);
-        Result r = YaffsEcc::correct(reinterpret_cast<unsigned char*>(buf), p, read_ecc);
+        YaffsEcc::calc(buf + i, read_ecc);
+        Result r = YaffsEcc::correct(buf, p, read_ecc);
         //ok < corrected < notcorrected
         if (r > ret)
             ret = r;
@@ -122,7 +122,7 @@ OfficeModelNexys3Driver::markBad(BlockAbs block)
 	memset(buf, 0, totalBytesPerPage);
     for (size_t page = 0; page < 2; ++page){
         size_t pageNumber = block * pagesPerBlock + page;
-        mNand->writePage(mBank, mDevice, pageNumber, reinterpret_cast<uint8_t*>(buf));
+        mNand->writePage(mBank, mDevice, pageNumber, buf);
     }
     return Result::ok;
 }
@@ -132,7 +132,7 @@ OfficeModelNexys3Driver::checkBad(BlockAbs block)
 {
     for (size_t page = 0; page < 2; ++page){
         size_t pageNumber = block * pagesPerBlock + page;
-        mNand->readPage(mBank, mDevice, pageNumber, reinterpret_cast<uint8_t*>(buf));
+        mNand->readPage(mBank, mDevice, pageNumber, buf);
         if (static_cast<uint8_t>(buf[4096]) != 0xFF)
             return Result::badflash;
     }

@@ -37,6 +37,11 @@ else:
     buildfolder = os.path.join(buildpath, 'debug')
     envGlobal['CCFLAGS_optimize'] = ['-O0']
     envGlobal.ParseFlags('-DDEBUG')
+    envGlobal.Append(CXXFLAGS=[
+        '-fstack-usage',
+        '-fstack-protector-all',
+    ])
+
 
 envGlobal.Tool('settings_buildpath')
 buildfolder = os.path.join(buildfolder, 'it')

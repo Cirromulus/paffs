@@ -487,7 +487,7 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         return Result::notFound;
     }
 
-    std::unique_ptr<char[]> buf(new char[folder.size]);
+    std::unique_ptr<uint8_t[]> buf(new uint8_t[folder.size]);
     FileSize bytesRead = 0;
     Result r = dataIO.readInodeData(folder, 0, folder.size, &bytesRead, buf.get());
     if (r != Result::ok || bytesRead != folder.size)
@@ -651,7 +651,7 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
     DirEntryLength direntryl = sizeof(DirEntryLength) + sizeof(InodeNo)
                                + elemNameL;  // Size of the new directory entry
 
-    unsigned char buf[direntryl];
+    uint8_t buf[direntryl];
     buf[0] = direntryl;
     memcpy(&buf[sizeof(DirEntryLength)], &newElem.no, sizeof(InodeNo));
 
@@ -660,7 +660,7 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
     if (contDir.size == 0)
         contDir.size = sizeof(DirEntryCount);  // To hold the Number of Entries
 
-    std::unique_ptr<char[]> dirData(new char[contDir.size + direntryl]);
+    std::unique_ptr<uint8_t[]> dirData(new uint8_t[contDir.size + direntryl]);
     FileSize bytes = 0;
     Result r;
     if (contDir.reservedPages > 0)
@@ -727,7 +727,7 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
 Result
 Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
 {
-    std::unique_ptr<char[]> dirData(new char[contDir.size]);
+    std::unique_ptr<uint8_t[]> dirData(new uint8_t[contDir.size]);
     FileSize bytes = 0;
     Result r;
     if (contDir.reservedPages > 0)
@@ -859,12 +859,11 @@ Device::openDir(const char* path)
         lasterr = r;
         return nullptr;
     }
-
-    char* dirData = new char[dirPinode->size];
+    std::unique_ptr<uint8_t[]> dirData(new uint8_t[dirPinode->size]);
     FileSize br = 0;
     if (dirPinode->reservedPages > 0)
     {
-        r = dataIO.readInodeData(*dirPinode, 0, dirPinode->size, &br, dirData);
+        r = dataIO.readInodeData(*dirPinode, 0, dirPinode->size, &br, dirData.get());
         if (r != Result::ok || br != dirPinode->size)
         {
             lasterr = r;
@@ -873,7 +872,7 @@ Device::openDir(const char* path)
     }
     else
     {
-        memset(dirData, 0, dirPinode->size);
+        memset(dirData.get(), 0, dirPinode->size);
     }
 
     Dir* dir = new Dir;
@@ -899,7 +898,6 @@ Device::openDir(const char* path)
             PAFFS_DBG(PAFFS_TRACE_BUG, "Dirname length was bigger than possible "
                     "(%" pType_filnamepos ")!", dirnamel);
             delete[] dir->childs;
-            delete[] dirData;
             delete dir->self;
             delete dir;
             lasterr = Result::bug;
@@ -916,8 +914,6 @@ Device::openDir(const char* path)
         dir->childs[entry].parent = dir->self;
         p += dirnamel;
     }
-
-    delete[] dirData;
 
     if (entry != dir->entries)
     {
@@ -1240,7 +1236,7 @@ Device::getObjInfo(const char* fullPath, ObjInfo& nfo)
 }
 
 Result
-Device::read(Obj& obj, char* buf, FileSize bytesToRead, FileSize* bytesRead)
+Device::read(Obj& obj, void* buf, FileSize bytesToRead, FileSize* bytesRead)
 {
     if (!mounted)
     {
@@ -1263,7 +1259,8 @@ Device::read(Obj& obj, char* buf, FileSize bytesToRead, FileSize* bytesRead)
         return Result::ok;
     }
 
-    Result r = dataIO.readInodeData(*obj.dirent.node, obj.fp, bytesToRead, bytesRead, buf);
+    Result r = dataIO.readInodeData(*obj.dirent.node, obj.fp, bytesToRead,
+                                    bytesRead, static_cast<uint8_t*>(buf));
     if (r != Result::ok)
     {
         return r;
@@ -1275,7 +1272,7 @@ Device::read(Obj& obj, char* buf, FileSize bytesToRead, FileSize* bytesRead)
 }
 
 Result
-Device::write(Obj& obj, const char* buf, FileSize bytesToWrite,
+Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
               FileSize* bytesWritten)
 {
     *bytesWritten = 0;
@@ -1310,7 +1307,8 @@ Device::write(Obj& obj, const char* buf, FileSize bytesToWrite,
         return Result::noperm;
     }
 
-    Result r = dataIO.writeInodeData(*obj.dirent.node, obj.fp, bytesToWrite, bytesWritten, buf);
+    Result r = dataIO.writeInodeData(*obj.dirent.node, obj.fp,
+                                     bytesToWrite, bytesWritten, static_cast<const uint8_t*>(buf));
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,

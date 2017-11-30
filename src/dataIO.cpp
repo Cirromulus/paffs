@@ -29,7 +29,7 @@ DataIO::writeInodeData(Inode& inode,
                        FileSize offs,
                        FileSize bytes,
                        FileSize* bytesWritten,
-                       const char* data)
+                       const uint8_t* data)
 {
     if (dev->readOnly)
     {
@@ -92,7 +92,7 @@ DataIO::readInodeData(Inode& inode,
                       FileSize offs,
                       FileSize bytes,
                       FileSize* bytesRead,
-                      char* data)
+                      uint8_t* data)
 {
     if (offs + bytes == 0)
     {
@@ -110,8 +110,8 @@ DataIO::readInodeData(Inode& inode,
     }
 
     *bytesRead = 0;
-    unsigned int pageFrom = offs / dataBytesPerPage;
-    unsigned int toPage = (offs + bytes) / dataBytesPerPage;
+    PageAbs pageFrom = offs / dataBytesPerPage;
+    PageAbs toPage = (offs + bytes) / dataBytesPerPage;
     if ((offs + bytes) % dataBytesPerPage == 0)
     {
         toPage--;
@@ -241,7 +241,7 @@ DataIO::writePageData(PageAbs  pageFrom,
                       PageAbs  toPage,
                       FileSize offs,
                       FileSize bytes,
-                      const char* data,
+                      const uint8_t* data,
                       PageAddressCache& ac,
                       FileSize* bytesWritten,
                       FileSize filesize,
@@ -319,7 +319,7 @@ DataIO::writePageData(PageAbs  pageFrom,
             btw = dataBytesPerPage - offs;
         }
 
-        char* buf = dev->driver.getPageBuffer();
+        uint8_t* buf = dev->driver.getPageBuffer();
 
         // start misaligned || End Misaligned
         if (offs > 0 ||
@@ -380,8 +380,8 @@ DataIO::writePageData(PageAbs  pageFrom,
         if (res != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "ERR: write returned FAIL at phy.P: %llu",
-                      static_cast<long long unsigned int>(getPageNumber(pageAddress, *dev)));
+                      "ERR: write returned FAIL at phy.P: %" pType_pageabs,
+                      getPageNumber(pageAddress, *dev));
             return res;
         }
         res = dev->sumCache.setPageStatus(
@@ -442,7 +442,7 @@ DataIO::readPageData(PageAbs  pageFrom,
                      PageAbs  toPage,
                      FileSize offs,
                      FileSize bytes,
-                     char* data,
+                     uint8_t* data,
                      PageAddressCache& ac,
                      FileSize* bytesRead)
 {
@@ -484,7 +484,7 @@ DataIO::readPageData(PageAbs  pageFrom,
         }
 
         PageAbs addr = getPageNumber(pageAddr, *dev);
-        char* buf = dev->driver.getPageBuffer();
+        uint8_t* buf = dev->driver.getPageBuffer();
         r = dev->driver.readPage(addr, buf, btr);
         if (r != Result::ok)
         {

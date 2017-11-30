@@ -21,7 +21,7 @@ namespace paffs{
 
 class Driver {
 protected:
-    char buf[totalBytesPerPage];
+    uint8_t buf[totalBytesPerPage];
 public:
 	Driver(){};
 	virtual ~Driver(){};
@@ -30,7 +30,7 @@ public:
 	initializeNand() = 0;
 	virtual Result
 	deInitializeNand() = 0;
-	virtual char*
+	virtual uint8_t*
 	getPageBuffer()
 	{
 	    return buf;

@@ -23,7 +23,7 @@
 namespace paffs
 {
 Result
-SuperIndex::deserializeFromBuffer(Device* dev, const char* buf)
+SuperIndex::deserializeFromBuffer(Device* dev, const uint8_t* buf)
 {
     uint16_t pointer = 0;
     uint8_t pagebuf[dataBytesPerPage];
@@ -120,7 +120,7 @@ SuperIndex::deserializeFromBuffer(Device* dev, const char* buf)
 }
 
 Result
-SuperIndex::serializeToBuffer(char* buf)
+SuperIndex::serializeToBuffer(uint8_t* buf)
 {
     if (areaMap == nullptr)
     {
@@ -1269,7 +1269,7 @@ Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap)
     uint32_t pointer = 0;
     PageAbs pageBase = getPageNumberFromDirect(addr);
     entry->no = emptySerial;
-    char* pagebuf = device->driver.getPageBuffer();
+    uint8_t* pagebuf = device->driver.getPageBuffer();
     SerialNo localSerialTmp;
     for (PageOffs page = 0; page < neededPages; page++)
     {

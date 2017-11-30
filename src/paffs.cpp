@@ -82,7 +82,7 @@ const char* resultMsg[] = {
 const char*
 err_msg(Result pr)
 {
-    return resultMsg[static_cast<int>(pr)];
+    return resultMsg[static_cast<uint8_t>(pr)];
 }
 
 void
@@ -364,19 +364,19 @@ Paffs::getObjInfo(const char* fullPath, ObjInfo& nfo)
 }
 
 Result
-Paffs::read(Obj& obj, char* buf, FileSize bytesToRead, FileSize* bytesRead)
+Paffs::read(Obj& obj, void* buf, FileSize bytesToRead, FileSize* bytesRead)
 {
     return devices[0]->read(obj, buf, bytesToRead, bytesRead);
 }
 
 Result
-Paffs::write(Obj& obj, const char* buf, FileSize bytesToWrite, FileSize* bytesWritten)
+Paffs::write(Obj& obj, const void* buf, FileSize bytesToWrite, FileSize* bytesWritten)
 {
     return devices[0]->write(obj, buf, bytesToWrite, bytesWritten);
 }
 
 Result
-Paffs::seek(Obj& obj, int m, Seekmode mode)
+Paffs::seek(Obj& obj, FileSizeDiff m, Seekmode mode)
 {
     return devices[0]->seek(obj, m, mode);
 }

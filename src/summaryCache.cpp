@@ -658,11 +658,10 @@ SummaryCache::loadAreaSummaries()
     }
 
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "cleared summary Cache");
-    SummaryEntry tmp[2][dataPagesPerArea];  // High Stack usage, FIXME?
     SuperIndex index;
     memset(&index, 0, sizeof(SuperIndex));
-    index.areaSummary[0] = tmp[0];
-    index.areaSummary[1] = tmp[1];
+    index.summaries[0] = mSummaryCache[0].exposeSummary();
+    index.summaries[1] = mSummaryCache[1].exposeSummary();
 
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Inited SuperIndex");
 
@@ -675,17 +674,16 @@ SummaryCache::loadAreaSummaries()
     dev->areaMgmt.setUsedAreas(index.usedAreas);
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "read superIndex successfully");
 
-    for (int i = 0; i < 2; i++)
+    for (uint8_t i = 0; i < 2; i++)
     {
         if (index.areaSummaryPositions[i] > 0)
         {
             mTranslation[index.areaSummaryPositions[i]] = i;
             mSummaryCache[i].setArea(index.areaSummaryPositions[i]);
-            packStatusArray(i, index.areaSummary[i]);
             mSummaryCache[i].setDirtyPages(countDirtyPages(i));
             mSummaryCache[i].setLoadedFromSuperPage();
 
-            unsigned char summary[totalBytesPerPage];
+            uint8_t summary[totalBytesPerPage];
             PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                         "Checking for an AS at area %" pType_areapos " (phys. %" pType_areapos ", "
                         "abs. page %" pType_pageabs ")",
@@ -751,8 +749,8 @@ SummaryCache::commitAreaSummaries(bool createNew)
     SummaryEntry tmp[2][dataPagesPerArea];  // FIXME high Stack usage
     SuperIndex index;
     memset(&index, 0, sizeof(SuperIndex));
-    index.areaSummary[0] = tmp[0];
-    index.areaSummary[1] = tmp[1];
+    index.summaries[0] = tmp[0];
+    index.summaries[1] = tmp[1];
     // Rest of members are inited in superblock.cpp
 
     bool someDirty = false;
@@ -1126,15 +1124,15 @@ SummaryCache::writeAreasummary(AreaSummaryElem& elem)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to commit elem with existing AS Commit!");
         return Result::bug;
     }
-    char* summary;
+    uint8_t* summary;
     if(areaSummaryIsPacked)
     {
         BitList<dataPagesPerArea> packedSummary;
-        if(packedSummary.getByteUsage() != static_cast<unsigned>(areaSummarySizePacked - 1))
+        if(packedSummary.byteUsage != static_cast<size_t>(areaSummarySizePacked - 1))
         {
             PAFFS_DBG(PAFFS_TRACE_BUG, "Calculated Bytes for areaSummary differ!"
                     "(BitList: %zu, autocalc: %" PRIu16 ")",
-                    packedSummary.getByteUsage(), areaSummarySizePacked - 1);
+                    packedSummary.byteUsage, areaSummarySizePacked - 1);
             return Result::bug;
         }
         // TODO: Check if areaOOB is clean, and maybe Verify written data
@@ -1168,7 +1166,7 @@ SummaryCache::writeAreasummary(AreaSummaryElem& elem)
 
     if (traceMask & PAFFS_TRACE_VERIFY_AS)
     {
-        char* readbuf = dev->driver.getPageBuffer();
+        uint8_t* readbuf = dev->driver.getPageBuffer();
         r = dev->driver.readPage(page, readbuf, totalBytesPerPage);
         for(uint16_t i = 0; i < totalBytesPerPage; i++)
         {
@@ -1182,7 +1180,7 @@ SummaryCache::writeAreasummary(AreaSummaryElem& elem)
             }
         }
     }
-    char* writebuf = dev->driver.getPageBuffer();
+    uint8_t* writebuf = dev->driver.getPageBuffer();
     writebuf[0] = 0;
     memcpy(&writebuf[sizeof(uint8_t)], summary, btw - 1);
     r = dev->driver.writePage(page, writebuf, btw);
@@ -1210,7 +1208,7 @@ SummaryCache::readAreasummary(AreaPos area, TwoBitList<dataPagesPerArea>& elem, 
     {
         btr = areaSummarySizeUnpacked;
     }
-    char* readbuf = dev->driver.getPageBuffer();
+    uint8_t* readbuf = dev->driver.getPageBuffer();
     r = dev->driver.readPage(basePage, readbuf, btr);
     if (r != Result::ok)
     {
@@ -1235,7 +1233,7 @@ SummaryCache::readAreasummary(AreaPos area, TwoBitList<dataPagesPerArea>& elem, 
 
     if(areaSummaryIsPacked)
     {
-        char summary[areaSummarySizePacked - 1];
+        uint8_t summary[areaSummarySizePacked - 1];
         memcpy(summary, &readbuf[1], areaSummarySizePacked - 1);
         for (uint16_t i = 0; i < dataPagesPerArea; i++)
         {
@@ -1264,7 +1262,7 @@ SummaryCache::readAreasummary(AreaPos area, TwoBitList<dataPagesPerArea>& elem, 
                     bool containsData = false;
                     for (uint16_t byte = 0; byte < totalBytesPerPage; byte++)
                     {
-                        if (static_cast<uint8_t>(readbuf[byte]) != 0xFF)
+                        if (readbuf[byte] != 0xFF)
                         {
                             containsData = true;
                             break;

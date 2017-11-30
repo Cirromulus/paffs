@@ -36,13 +36,13 @@ public:
                    FileSize offs,
                    FileSize bytes,
                    FileSize* bytesWritten,
-                   const char* data);
+                   const uint8_t* data);
     Result
     readInodeData(Inode& inode,
                   FileSize offs,
                   FileSize bytes,
                   FileSize* bytesRead,
-                  char* data);
+                  uint8_t* data);
     Result
     deleteInodeData(Inode& inode, unsigned int offs);
 
@@ -55,7 +55,7 @@ private:
                   PageAbs  pageTo,
                   FileSize offs,
                   FileSize bytes,
-                  const char* data,
+                  const uint8_t* data,
                   PageAddressCache& ac,
                   FileSize* bytes_written,
                   FileSize filesize,
@@ -65,7 +65,7 @@ private:
                  PageAbs  pageTo,
                  FileSize offs,
                  FileSize bytes,
-                 char* data,
+                 uint8_t* data,
                  PageAddressCache& ac,
                  FileSize* bytes_read);
 

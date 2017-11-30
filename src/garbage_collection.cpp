@@ -287,7 +287,7 @@ GarbageCollection::collectGarbage(AreaType targetType)
 
         if (traceMask & PAFFS_TRACE_VERIFY_AS)
         {
-            for (unsigned int j = 0; j < dataPagesPerArea; j++)
+            for (uint16_t j = 0; j < dataPagesPerArea; j++)
             {
                 if (summary[j] > SummaryEntry::dirty)
                     PAFFS_DBG(PAFFS_TRACE_BUG, "Summary of %" PRIu16 " contains invalid Entries!", j);

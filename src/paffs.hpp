@@ -26,7 +26,7 @@ extern TraceMask traceMask;
 class Paffs
 {
     Device* devices[maxNumberOfDevices] = {};
-    char deviceMemory[maxNumberOfDevices][sizeof(Device)];
+    uint8_t deviceMemory[maxNumberOfDevices][sizeof(Device)];
     bool validDevices[maxNumberOfDevices] = {};
     void
     printCacheSizes();
@@ -76,11 +76,11 @@ public:
     Result
     getObjInfo(const char* fullPath, ObjInfo& nfo);
     Result
-    read(Obj& obj, char* buf, FileSize bytesToRead, FileSize* bytesRead);
+    read(Obj& obj, void* buf, FileSize bytesToRead, FileSize* bytesRead);
     Result
-    write(Obj& obj, const char* buf, FileSize bytesToWrite, FileSize* bytesWritten);
+    write(Obj& obj, const void* buf, FileSize bytesToWrite, FileSize* bytesWritten);
     Result
-    seek(Obj& obj, int m, Seekmode mode = Seekmode::set);
+    seek(Obj& obj, FileSizeDiff m, Seekmode mode = Seekmode::set);
     Result
     flush(Obj& obj);
     Result

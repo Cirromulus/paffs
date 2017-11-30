@@ -21,9 +21,11 @@ namespace paffs
 template <size_t numberOfElements>
 class BitList
 {
-    char mList[(numberOfElements + 7) / 8];
+    uint8_t mList[(numberOfElements + 7) / 8];
 
 public:
+    static constexpr size_t byteUsage = (numberOfElements + 7) / 8;
+
     inline
     BitList()
     {
@@ -37,7 +39,7 @@ public:
     }
 
     static inline void
-    setBit(unsigned n, char* list)
+    setBit(size_t n, uint8_t* list)
     {
         if (n < numberOfElements)
         {
@@ -45,18 +47,18 @@ public:
         }
         else
         {
-            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Bit at %" PRIu16 ", but size is %zu", n, numberOfElements);
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Bit at %zu, but size is %zu", n, numberOfElements);
         }
     }
 
     inline void
-    setBit(unsigned n)
+    setBit(size_t n)
     {
         setBit(n, mList);
     }
 
     static inline void
-    resetBit(unsigned n, char* list)
+    resetBit(size_t n, uint8_t* list)
     {
         if (n < numberOfElements)
         {
@@ -64,35 +66,35 @@ public:
         }
         else
         {
-            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to reset Bit at %" PRIu16 ", but size is %zu", n, numberOfElements);
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to reset Bit at %zu, but size is %zu", n, numberOfElements);
         }
     }
 
     inline void
-    resetBit(unsigned n)
+    resetBit(size_t n)
     {
         resetBit(n, mList);
     }
 
     static inline bool
-    getBit(unsigned n, const char* list)
+    getBit(size_t n, const uint8_t* list)
     {
         if (n < numberOfElements)
         {
             return list[n / 8] & 1 << n % 8;
         }
-        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Bit at %" PRIu16 ", but size is %zu", n, numberOfElements);
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Bit at %zu, but size is %zu", n, numberOfElements);
         return false;
     }
 
     inline bool
-    getBit(unsigned n)
+    getBit(size_t n)
     {
         return getBit(n, mList);
     }
 
     static inline size_t
-    findFirstFree(const char* list)
+    findFirstFree(const uint8_t* list)
     {
         for (unsigned i = 0; i <= numberOfElements / 8; i++)
         {
@@ -117,9 +119,9 @@ public:
     }
 
     static inline bool
-    isSetSomewhere(const char* list)
+    isSetSomewhere(const uint8_t* list)
     {
-        for (unsigned i = 0; i <= numberOfElements / 8; i++)
+        for (size_t i = 0; i <= numberOfElements / 8; i++)
         {
             if (list[i])
             {
@@ -136,10 +138,10 @@ public:
     }
 
     static inline size_t
-    countSetBits(const char* list)
+    countSetBits(const uint8_t* list)
     {
         size_t count = 0;
-        for (unsigned i = 0; i < numberOfElements; i++)
+        for (size_t i = 0; i < numberOfElements; i++)
         {
             if (getBit(i, list))
             {
@@ -155,13 +157,7 @@ public:
         return countSetBits(mList);
     }
 
-    static inline size_t
-    getByteUsage()
-    {
-        return (numberOfElements + 7) / 8;
-    }
-
-    inline char*
+    inline uint8_t*
     expose()
     {
         return mList;
@@ -170,7 +166,7 @@ public:
     inline void
     printStatus()
     {
-        for (unsigned i = 0; i < numberOfElements; i++)
+        for (size_t i = 0; i < numberOfElements; i++)
         {
             printf("%s", getBit(i) ? "1" : "0");
         }
@@ -180,7 +176,7 @@ public:
     inline bool
     operator==(BitList<numberOfElements>& rhs) const
     {
-        for (unsigned i = 0; i <= numberOfElements / 8; i++)
+        for (size_t i = 0; i <= numberOfElements / 8; i++)
         {
             if (mList[i] != rhs.mList[i])
             {
@@ -200,8 +196,11 @@ public:
 template <size_t numberOfElements>
 class TwoBitList
 {
-    char mList[(numberOfElements + 3) / 4];
+    uint8_t mList[(numberOfElements + 3) / 4];
 public:
+    static constexpr size_t
+    byteUsage = (numberOfElements + 3) / 4;
+
     inline
     TwoBitList()
     {
@@ -227,7 +226,9 @@ public:
         return (mList[pos / 4] & (0b11 << (pos % 4) * 2))
             >> (pos % 4) * 2;
     }
-    char* expose()
+
+    inline uint8_t*
+    expose()
     {
         return mList;
     }

@@ -90,9 +90,9 @@ public:
     Result
     getObjInfo(const char* fullPath, ObjInfo& nfo);
     Result
-    read(Obj& obj, char* buf, FileSize bytesToRead, FileSize* bytesRead);
+    read(Obj& obj, void* buf, FileSize bytesToRead, FileSize* bytesRead);
     Result
-    write(Obj& obj, const char* buf, FileSize bytesToWrite, FileSize* bytesWritten);
+    write(Obj& obj, const void* buf, FileSize bytesToWrite, FileSize* bytesWritten);
     Result
     seek(Obj& obj, FileSizeDiff m, Seekmode mode);
     Result
