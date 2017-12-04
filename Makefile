@@ -16,7 +16,7 @@ EMBEDDEDINTEGRATIONDIR=./it/office_model
 INTEGRATIONDIR=./it/logic
 MISCDIR=./it/misc
 
-all: build-integration-debug
+all: build-integration-bigflash-debug
 
 build-embedded:
 	@scons $(MAKEJOBS) -C $(EMBEDDEDINTEGRATIONDIR)
