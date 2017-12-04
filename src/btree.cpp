@@ -184,11 +184,13 @@ Btree::calculateMaxNeededNewNodesForInsertion(const TreeCacheNode& insertTarget)
             if(insertTarget.parent != &insertTarget)
             {   //we are a normal leaf
                 return 1 + calculateMaxNeededNewNodesForInsertion(*insertTarget.parent);
-            }else
+            }
+            else
             {   //Rootnode splits into brother and parent is new rootnode
                 return 2;
             }
-        }else
+        }
+        else
         {
             return 0;
         }
@@ -199,11 +201,13 @@ Btree::calculateMaxNeededNewNodesForInsertion(const TreeCacheNode& insertTarget)
             if(insertTarget.parent != &insertTarget)
             {   //we are a normal branch
                 return 1 + calculateMaxNeededNewNodesForInsertion(*insertTarget.parent);
-            }else
+            }
+            else
             {   //Rootnode splits into brother and parent is new rootnode
                 return 2;
             }
-        }else
+        }
+        else
         {
             return 0;
         }
@@ -278,7 +282,7 @@ Btree::height(TreeCacheNode& root)
     {
         return h;
     }
-    //This calculation is very mCache unfriendly, so only use if no better possibility exists
+    //This calculation is very cache unfriendly, so only use if no better possibility exists
     TreeCacheNode* curr = &root;
     while (!curr->raw.isLeaf)
     {
@@ -312,7 +316,7 @@ Btree::lengthToRoot(TreeCacheNode& child)
 /* Traces the path from the root to a branch, searching
  * by key.
  * Returns the branch containing the given key.
- * This function is used to build up mCache to a given leaf after a mCache clean.
+ * This function is used to build up cache to a given leaf after a cache clean.
  */
 Result
 Btree::findBranch(TreeCacheNode& target, TreeCacheNode*& outtreeCacheNode)
@@ -457,11 +461,19 @@ Btree::getLeftIndex(TreeCacheNode& parent, TreeCacheNode& left)
     while (leftIndex < parent.raw.keys)
     {
         if (parent.raw.as.branch.pointers[leftIndex] != 0)
+        {
             if (parent.raw.as.branch.pointers[leftIndex] == left.raw.self)
+            {
                 break;
+            }
+        }
         if (parent.pointers[leftIndex] != 0)
+        {
             if (parent.pointers[leftIndex] == &left)
+            {
                 break;
+            }
+        }
         leftIndex++;
     }
     return leftIndex;
@@ -479,7 +491,9 @@ Btree::insertIntoLeaf(TreeCacheNode& leaf, const Inode& newInode)
     insertionPoint = 0;
     while (insertionPoint < leaf.raw.keys
            && leaf.raw.as.leaf.keys[insertionPoint] < newInode.no)
+    {
         insertionPoint++;
+    }
 
     for (i = leaf.raw.keys; i > insertionPoint; i--)
     {
@@ -1235,7 +1249,7 @@ Btree::printTree()
 
 /* Prints the bottom row of keys
  * of the tree (with their respective
- * pointers, if the verbose_output flag is set.
+ * pointers
  */
 void
 Btree::printLeaves(TreeCacheNode& c)
@@ -1266,7 +1280,7 @@ Btree::printLeaves(TreeCacheNode& c)
 }
 
 /**
- * This only works to depth 'n' if RAM mCache is big enough to at least hold all nodes in Path to
+ * This only works to depth 'n' if RAM cache is big enough to at least hold all nodes in Path to
  * depth 'n-1'
  */
 void
@@ -1283,12 +1297,12 @@ Btree::printQueuedKeysRecursively(TreeQueue* q)
             {
                 // next node
                 TreeCacheNode* nn = nullptr;
-                // cache version of the copy of the former mCache entry...
+                // cache version of the copy of the former cache entry...
                 TreeCacheNode* nCache = nullptr;
 
-                // Build up mCache to current branch.
+                // Build up cache to current branch.
                 // This is not very efficient, but doing that once per branch would require
-                // mCache to fit all child nodes of the current branch.
+                // cache to fit all child nodes of the current branch.
                 Result r = findBranch(*n, nCache);
                 if (r != Result::ok)
                 {
@@ -1301,9 +1315,9 @@ Btree::printQueuedKeysRecursively(TreeQueue* q)
                     printf("%s!\n", err_msg(r));
                     return;
                 }
-                TreeCacheNode* nn_copy = new TreeCacheNode;
-                *nn_copy = *nn;
-                queue_enqueue(newQ, nn_copy);
+                TreeCacheNode* nnCopy = new TreeCacheNode;
+                *nnCopy = *nn;
+                queue_enqueue(newQ, nnCopy);
                 if (i == 0)
                     printf(".");
                 if (i < n->raw.keys)
@@ -1332,9 +1346,9 @@ void
 Btree::printKeys(TreeCacheNode& c)
 {
     TreeQueue* q = queueNew();
-    TreeCacheNode* c_copy = new TreeCacheNode;
-    *c_copy = c;
-    queue_enqueue(q, c_copy);
+    TreeCacheNode* cCopy = new TreeCacheNode;
+    *cCopy = c;
+    queue_enqueue(q, cCopy);
     printQueuedKeysRecursively(q);
 }
 }
