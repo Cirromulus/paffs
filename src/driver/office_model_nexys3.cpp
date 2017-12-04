@@ -64,7 +64,7 @@ OfficeModelNexys3Driver::writePage(PageAbs page,
 		return Result::invalidInput;
 	}
 
-	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "Write %" PRIu16 " bytes at page %" pType_pageabs, dataLen, page);
+	PAFFS_DBG_S(PAFFS_TRACE_WRITE, "Write %" PRIu16 " bytes at page %" PTYPE_PAGEABS, dataLen, page);
 
 	if(totalBytesPerPage != dataLen)
 	{
@@ -86,7 +86,7 @@ Result
 OfficeModelNexys3Driver::readPage(PageAbs page,
                                   void* data, uint16_t dataLen)
 {
-	PAFFS_DBG_S(PAFFS_TRACE_READ, "Read %" PRIu16 " bytes at page %" pType_pageabs, dataLen, page);
+	PAFFS_DBG_S(PAFFS_TRACE_READ, "Read %" PRIu16 " bytes at page %" PTYPE_PAGEABS, dataLen, page);
 	if(dataLen == 0 || dataLen > totalBytesPerPage){
 		PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid read size (%u)", dataLen);
 		return Result::invalidInput;

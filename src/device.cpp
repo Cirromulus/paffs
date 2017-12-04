@@ -75,20 +75,20 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Deleting all areas.\n");
     }
 
-    unsigned char hadAreaType = 0;
-    unsigned char hadSuperblocks = 0;
+    BitList<AreaType::no> hadAreaType;
+    uint8_t hadSuperblocks = 0;
 
     for (BlockAbs block = 0; block < badBlockList.mSize; block++)
     {
         AreaPos area = badBlockList[block] / blocksPerArea;
         PAFFS_DBG_S(
-                PAFFS_TRACE_BAD_BLOCKS, "Retiring Area %" pType_areapos " because of given List", area);
+                PAFFS_TRACE_BAD_BLOCKS, "Retiring Area %" PTYPE_AREAPOS " because of given List", area);
 
         if (badBlockList[block] > blocksTotal)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
                       "Invalid Bad Block given! "
-                      "was %" pType_blockabs " area %" pType_areapos ", should < %" pType_blockabs,
+                      "was %" PTYPE_BLOCKABS " area %" PTYPE_AREAPOS ", should < %" PTYPE_BLOCKABS,
                       badBlockList[block],
                       area,
                       blocksTotal);
@@ -121,8 +121,8 @@ Device::format(const BadBlockList& badBlockList, bool complete)
             if (driver.checkBad(area * blocksPerArea + block) != Result::ok)
             {
                 PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
-                            "Found marked bad block %" pType_blockabs " during formatting, "
-                            "retiring area %" pType_areapos,
+                            "Found marked bad block %" PTYPE_BLOCKABS " during formatting, "
+                            "retiring area %" PTYPE_AREAPOS,
                             area * blocksPerArea + block,
                             area);
                 anyBlockInAreaBad = true;
@@ -134,10 +134,9 @@ Device::format(const BadBlockList& badBlockList, bool complete)
             continue;
         }
 
-        if (hadAreaType & (1 << AreaType::superblock |
-                           // 1 << AreaType::journal |
-                           1 << AreaType::garbageBuffer)
-            || complete)
+        if (complete ||
+                !(hadAreaType.getBit(AreaType::superblock) &&
+                  hadAreaType.getBit(AreaType::garbageBuffer)))
         {
             for (BlockAbs p = 0; p < blocksPerArea; p++)
             {
@@ -145,8 +144,8 @@ Device::format(const BadBlockList& badBlockList, bool complete)
                 if (r != Result::ok)
                 {
                     PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
-                                "Found non-marked bad block %" pType_blockabs " during formatting, "
-                                "retiring area %" pType_areapos,
+                                "Found non-marked bad block %" PTYPE_BLOCKABS " during formatting, "
+                                "retiring area %" PTYPE_AREAPOS,
                                 p + area * blocksPerArea,
                                 area);
                     areaMgmt.setType(area, AreaType::retired);
@@ -161,31 +160,31 @@ Device::format(const BadBlockList& badBlockList, bool complete)
             }
         }
 
-        if (!(hadAreaType & 1 << AreaType::superblock))
+        if (!hadAreaType.getBit(AreaType::superblock))
         {
             areaMgmt.initAreaAs(area, AreaType::superblock);
             areaMgmt.setActiveArea(AreaType::superblock, 0);
             if (++hadSuperblocks == superChainElems)
             {
-                hadAreaType |= 1 << AreaType::superblock;
+                hadAreaType.setBit(AreaType::superblock);
             }
             continue;
         }
 
         if(useJournal)
         {
-            if(!(hadAreaType & 1 << AreaType::journal))
+            if(!hadAreaType.getBit(AreaType::journal))
             {
                 areaMgmt.initAreaAs(area, AreaType::journal);
-                hadAreaType |= 1 << AreaType::journal;
+                hadAreaType.setBit(AreaType::journal);
                 continue;
             }
         }
 
-        if (!(hadAreaType & 1 << AreaType::garbageBuffer))
+        if (!hadAreaType.getBit(AreaType::garbageBuffer))
         {
             areaMgmt.initAreaAs(area, AreaType::garbageBuffer);
-            hadAreaType |= 1 << AreaType::garbageBuffer;
+            hadAreaType.setBit(AreaType::garbageBuffer);
             continue;
         }
 
@@ -318,7 +317,7 @@ Device::unmnt()
         while (it != inodePool.map.end())
         {
             PAFFS_DBG_S(PAFFS_TRACE_ALWAYS,
-                        "Commit Inode %" pType_inodeno " with %" PRIu8 " references",
+                        "Commit Inode %" PTYPE_INODENO " with %" PRIu8 " references",
                         it->first,
                         it->second.second);
             // TODO: Later, we would choose the actual pac instance (or the PAC will choose the
@@ -355,10 +354,10 @@ Device::unmnt()
 
     if (traceMask & PAFFS_TRACE_AREA)
     {
-        printf("Info: \n\t%" pType_areapos " used Areas\n", areaMgmt.getUsedAreas());
+        printf("Info: \n\t%" PTYPE_AREAPOS " used Areas\n", areaMgmt.getUsedAreas());
         for (AreaPos i = 0; i < areasNo; i++)
         {
-            printf("\tArea %03" pType_areapos " on %03" pType_areapos " as %10s from page %4" pType_areapos " %s\n",
+            printf("\tArea %03" PTYPE_AREAPOS " on %03" PTYPE_AREAPOS " as %10s from page %4" PTYPE_AREAPOS " %s\n",
                    i,
                    areaMgmt.getPos(i),
                    areaNames[areaMgmt.getType(i)],
@@ -366,7 +365,7 @@ Device::unmnt()
                    areaStatusNames[areaMgmt.getStatus(i)]);
             if (i > 128)
             {
-                printf("\n -- truncated 128-%" pType_areapos " Areas.\n", areasNo);
+                printf("\n -- truncated 128-%" PTYPE_AREAPOS " Areas.\n", areasNo);
                 break;
             }
         }
@@ -502,8 +501,8 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         if (direntryl < sizeof(DirEntryLength) + sizeof(InodeNo))
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "Directory entry size of Folder %" pType_inodeno " is unplausible! "
-                              "(was: %" pType_direntrylen ", should: >%zu)",
+                      "Directory entry size of Folder %" PTYPE_INODENO " is unplausible! "
+                              "(was: %" PTYPE_DIRENTRYLEN ", should: >%zu)",
                       folder.no,
                       direntryl,
                       sizeof(DirEntryLength) + sizeof(InodeNo));
@@ -512,8 +511,8 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         if (direntryl > folder.size)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "BUG: direntry length of Folder %" pType_inodeno " not plausible "
-                              "(was: %" pType_direntrylen ", should: >%" pType_filsize ")!",
+                      "BUG: direntry length of Folder %" PTYPE_INODENO " not plausible "
+                              "(was: %" PTYPE_DIRENTRYLEN ", should: >%" PTYPE_FILSIZE ")!",
                       folder.no,
                       direntryl,
                       folder.size);
@@ -523,8 +522,8 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         if (dirnamel > folder.size)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "BUG: dirname length of Inode %" pType_inodeno " not plausible "
-                              "(was: %" pType_filsize ", should: >%" pType_filsize ")!",
+                      "BUG: dirname length of Inode %" PTYPE_INODENO " not plausible "
+                              "(was: %" PTYPE_FILSIZE ", should: >%" PTYPE_FILSIZE ")!",
                       folder.no,
                       folder.size,
                       p + dirnamel);
@@ -765,7 +764,7 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
 
             if (restByte > 0 && restByte < 4)  // should either be 0 (no entries left) or bigger
             {                                  // than 4 (minimum size for one entry)
-                PAFFS_DBG(PAFFS_TRACE_BUG, "Something is fishy! (%" pType_filsize ")", restByte);
+                PAFFS_DBG(PAFFS_TRACE_BUG, "Something is fishy! (%" PTYPE_FILSIZE ")", restByte);
             }
             if (newSize == 0)
             {
@@ -896,7 +895,7 @@ Device::openDir(const char* path)
         {
             // We have an error while reading
             PAFFS_DBG(PAFFS_TRACE_BUG, "Dirname length was bigger than possible "
-                    "(%" pType_filnamepos ")!", dirnamel);
+                    "(%" PTYPE_FILNAMEPOS ")!", dirnamel);
             delete[] dir->childs;
             delete dir->self;
             delete dir;
@@ -918,7 +917,7 @@ Device::openDir(const char* path)
     if (entry != dir->entries)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Directory stated it had %" pType_direntrycount " entries, but has actually %" pType_direntrycount "!",
+                  "Directory stated it had %" PTYPE_DIRENTRYCOUNT " entries, but has actually %" PTYPE_DIRENTRYCOUNT "!",
                   dir->entries,
                   entry);
         lasterr = Result::bug;
@@ -1312,7 +1311,7 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Could not write %" pType_filsize " of %" pType_filsize " bytes at %" pType_filsize "",
+                  "Could not write %" PTYPE_FILSIZE " of %" PTYPE_FILSIZE " bytes at %" PTYPE_FILSIZE "",
                   bytesToWrite - *bytesWritten,
                   bytesToWrite, obj.fp);
         if (*bytesWritten > 0)
@@ -1331,7 +1330,7 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
     if (*bytesWritten != bytesToWrite)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Could not write Inode Data in whole! (Should: %" pType_filsize ", was: %" pType_filsize ")",
+                  "Could not write Inode Data in whole! (Should: %" PTYPE_FILSIZE ", was: %" PTYPE_FILSIZE ")",
                   bytesToWrite,
                   *bytesWritten);
         // TODO: Handle error, maybe rewrite
@@ -1599,7 +1598,7 @@ Device::initializeDevice()
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
                   "'blocksPerArea' does not divide "
-                  "%" pType_blockabs " blocks evenly! (define %" pType_blockabs ", rest: %" pType_blockabs ")",
+                  "%" PTYPE_BLOCKABS " blocks evenly! (define %" PTYPE_BLOCKABS ", rest: %" PTYPE_BLOCKABS ")",
                   blocksTotal,
                   blocksPerArea,
                   blocksTotal % blocksPerArea);

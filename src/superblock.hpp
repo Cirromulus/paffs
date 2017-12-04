@@ -16,6 +16,7 @@
 
 #include "commonTypes.hpp"
 #include "journalTopic.hpp"
+#include "bitlist.hpp"
 #include <inttypes.h>
 #include <stdint.h>
 
@@ -59,10 +60,11 @@ struct SuperIndex
     Addr rootNode;
     AreaPos usedAreas;
     Area* areaMap;
-    AreaPos* activeAreas;
+    AreaPos* activeArea;
     uint64_t overallDeletions;
     //"internal"
     AreaPos areaSummaryPositions[2];
+    //! may contain non-active areaSummaries.
     TwoBitList<dataPagesPerArea>* summaries[2];
     static constexpr uint16_t
     getNeededBytes(const uint16_t numberOfAreaSummaries)
@@ -72,13 +74,13 @@ struct SuperIndex
                sizeof(AreaPos) +                 // LogPrev
                sizeof(Addr) +                    // rootNode
                sizeof(AreaPos) +                 // usedAreas
-               areasNo * sizeof(Area) +          // AreaMap
-               AreaType::no * sizeof(AreaPos) +  // ActiveAreas
+               sizeof(Area) * areasNo +          // AreaMap
+               sizeof(AreaPos) * AreaType::no +  // ActiveAreas
                sizeof(uint64_t) +                // overallDeletions
-               2 * sizeof(AreaPos)
+               sizeof(AreaPos) * 2
                +  // Area Summary Positions
-               numberOfAreaSummaries * TwoBitList<dataPagesPerArea>::byteUsage
-               /* One bit per entry, two entrys for INDEX and DATA section*/
+               TwoBitList<dataPagesPerArea>::byteUsage * numberOfAreaSummaries
+               /* two entries for INDEX and DATA section*/
         : 0;
     }
 
@@ -96,10 +98,13 @@ struct SuperIndex
     }
 
     Result
-    deserializeFromBuffer(Device* dev, const uint8_t* buf);
+    deserializeFromBuffer(const uint8_t* buf);
 
     Result
     serializeToBuffer(uint8_t* buf);
+
+    bool
+    isPlausible();
 
     void
     print();
@@ -108,8 +113,8 @@ struct SuperIndex
 class Superblock : public JournalTopic
 {
     Device* device;
-    Addr rootnode_addr = 0;
-    bool rootnode_dirty = 0;
+    Addr mRootnodeAddr = 0;
+    bool mRootnodeDirty = 0;
     Addr pathToSuperIndexDirect[superChainElems];  // Direct Addresses
     SerialNo superChainIndexes[superChainElems];
     bool testmode = false;

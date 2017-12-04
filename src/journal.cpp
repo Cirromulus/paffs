@@ -41,7 +41,7 @@ Journal::addEvent(const JournalEntry& entry)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not append Entry to persistence");
         return r;
     }
-    if ((traceMask & PAFFS_TRACE_JOURNAL) & (traceMask & PAFFS_TRACE_VERBOSE))
+    if ((traceMask & PAFFS_TRACE_JOURNAL) &  PAFFS_TRACE_VERBOSE)
     {
         printMeaning(entry);
     }
@@ -94,7 +94,7 @@ Journal::processBuffer()
 
     do
     {
-        if (traceMask & (PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE))
+        if ((traceMask & PAFFS_TRACE_JOURNAL) &  PAFFS_TRACE_VERBOSE)
         {
             printMeaning(entry.base);
         }
@@ -205,7 +205,7 @@ Journal::applyCheckpointedJournalEntries(
             {
                 if (persistence.tell() >= firstUnsuccededEntry[toUnderlying(worker->getTopic())])
                 {
-                    if (traceMask & (PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE))
+                    if ((traceMask & PAFFS_TRACE_JOURNAL) &  PAFFS_TRACE_VERBOSE)
                     {
                         printf("Processing entry ");
                         printMeaning(entry.base, false);
@@ -290,7 +290,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         switch (static_cast<const journalEntry::Superblock*>(&entry)->type)
         {
         case journalEntry::Superblock::Type::rootnode:
-            printf("rootnode change to %" pType_areapos ":%" pType_pageoffs,
+            printf("rootnode change to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
                    extractLogicalArea(
                            static_cast<const journalEntry::superblock::Rootnode*>(&entry)->rootnode),
                    extractPageOffs(static_cast<const journalEntry::superblock::Rootnode*>(&entry)
@@ -298,7 +298,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             found = true;
             break;
         case journalEntry::Superblock::Type::areaMap:
-            printf("AreaMap %" pType_areapos " ",
+            printf("AreaMap %" PTYPE_AREAPOS " ",
                    static_cast<const journalEntry::superblock::AreaMap*>(&entry)->offs);
             switch (static_cast<const journalEntry::superblock::AreaMap*>(&entry)->operation)
             {
@@ -336,12 +336,12 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             }
             break;
         case journalEntry::Superblock::Type::activeArea:
-            printf("Set ActiveArea of %s to %" pType_areapos "\n",
+            printf("Set ActiveArea of %s to %" PTYPE_AREAPOS "\n",
                    areaNames[static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->type],
                    static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->area);
             break;
         case journalEntry::Superblock::Type::usedAreas:
-            printf("Set used Areas to %" pType_areapos "\n",
+            printf("Set used Areas to %" PTYPE_AREAPOS "\n",
                    static_cast<const journalEntry::superblock::UsedAreas*>(&entry)->usedAreas);
             break;
         }
@@ -367,7 +367,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         }
         break;
     case JournalEntry::Topic::summaryCache:
-        printf("SummaryCache Area %" pType_areapos " ",
+        printf("SummaryCache Area %" PTYPE_AREAPOS " ",
                static_cast<const journalEntry::SummaryCache*>(&entry)->area);
         switch (static_cast<const journalEntry::SummaryCache*>(&entry)->subtype)
         {
@@ -380,7 +380,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             found = true;
             break;
         case journalEntry::SummaryCache::Subtype::setStatus:
-            printf("set Page %" pType_pageoffs " to %s",
+            printf("set Page %" PTYPE_PAGEOFFS " to %s",
                    static_cast<const journalEntry::summaryCache::SetStatus*>(&entry)->page,
                    summaryEntryNames[static_cast<unsigned>(
                            static_cast<const journalEntry::summaryCache::SetStatus*>(&entry)

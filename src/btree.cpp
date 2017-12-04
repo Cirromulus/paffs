@@ -29,7 +29,7 @@ Btree::insertInode(const Inode& inode)
     TreeCacheNode* node = nullptr;
     Result r;
 
-    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert Inode n° %" pType_inodeno, inode.no);
+    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert Inode n° %" PTYPE_INODENO, inode.no);
 
     r = findLeaf(inode.no, node);
     if (r != Result::ok)
@@ -44,7 +44,7 @@ Btree::insertInode(const Inode& inode)
         {
             if (node->raw.as.branch.keys[i] == inode.no)
             {
-                PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Inode already existing with n° %" pType_inodeno "", inode.no);
+                PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Inode already existing with n° %" PTYPE_INODENO "", inode.no);
                 return Result::bug;
             }
         }
@@ -85,7 +85,7 @@ Btree::getInode(InodeNo number, Inode& outInode)
 Result
 Btree::updateExistingInode(const Inode& inode)
 {
-    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Update existing inode n° %" pType_inodeno "", inode.no);
+    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Update existing inode n° %" PTYPE_INODENO "", inode.no);
     if(traceMask & PAFFS_TRACE_VERIFY_TC)
     {
         if(!mCache.isTreeCacheValid())
@@ -112,7 +112,7 @@ Btree::updateExistingInode(const Inode& inode)
     if (pos == node->raw.keys)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Tried to update existing Inode %" pType_inodeno ","
+                  "Tried to update existing Inode %" PTYPE_INODENO ","
                   "but could not find it!",
                   inode.no);
         return Result::bug;  // This Key did not exist
@@ -513,11 +513,14 @@ Btree::insertIntoLeaf(TreeCacheNode& leaf, const Inode& newInode)
  * to a new Inode into a leaf so as to exceed
  * the tree's order, causing the leaf to be split
  * in half.
+ * \warn High Stack usage linear with page width
  */
 Result
 Btree::insertIntoLeafAfterSplitting(TreeCacheNode& leaf, const Inode& newInode)
 {
     PAFFS_DBG_S(PAFFS_TRACE_TREE, "Insert into leaf after splitting");
+
+    //FIXME: High Stack usage linear with page width
     InodeNo tempKeys[leafOrder + 1];
     Inode tempInodes[leafOrder + 1];
     uint16_t insertionIndex, split, newKey, i, j;
@@ -623,6 +626,7 @@ Btree::insertIntoNode(TreeCacheNode& node, uint16_t leftIndex, InodeNo key, Tree
 /* Inserts a new key and pointer to a TreeCacheNode
  * into a TreeCacheNode, causing the TreeCacheNode's size to exceed
  * the order, and causing the TreeCacheNode to split into two.
+ * \warn High stack usage scaling linear with page width
  */
 Result
 Btree::insertIntoNodeAfterSplitting(TreeCacheNode& oldNode,
@@ -635,7 +639,7 @@ Btree::insertIntoNodeAfterSplitting(TreeCacheNode& oldNode,
                 key,
                 leftIndex);
     uint16_t i, j, split, kPrime;
-    TreeCacheNode* new_node;
+    TreeCacheNode* newNode;
     //FIXME: High stack usage
     InodeNo tempKeys[branchOrder + 1];
     TreeCacheNode* tempRAMaddresses[branchOrder + 1];
@@ -643,7 +647,7 @@ Btree::insertIntoNodeAfterSplitting(TreeCacheNode& oldNode,
 
     mCache.lockTreeCacheNode(oldNode);
     mCache.lockTreeCacheNode(right);
-    Result r = mCache.addNewCacheNode(new_node);
+    Result r = mCache.addNewCacheNode(newNode);
     if (r != Result::ok)
         return r;
     mCache.unlockTreeCacheNode(oldNode);
@@ -697,13 +701,13 @@ Btree::insertIntoNodeAfterSplitting(TreeCacheNode& oldNode,
     kPrime = tempKeys[split - 1];
     for (++i, j = 0; i < branchOrder; i++, j++)
     {
-        new_node->pointers[j] = tempRAMaddresses[i];
-        new_node->raw.as.branch.pointers[j] = tempAddresses[i];
-        new_node->raw.as.branch.keys[j] = tempKeys[i];
-        new_node->raw.keys++;
-        if (new_node->pointers[j] != nullptr)
+        newNode->pointers[j] = tempRAMaddresses[i];
+        newNode->raw.as.branch.pointers[j] = tempAddresses[i];
+        newNode->raw.as.branch.keys[j] = tempKeys[i];
+        newNode->raw.keys++;
+        if (newNode->pointers[j] != nullptr)
         {
-            new_node->pointers[j]->parent = new_node;
+            newNode->pointers[j]->parent = newNode;
         }
         // cleanup
         oldNode.pointers[i] = 0;
@@ -714,23 +718,23 @@ Btree::insertIntoNodeAfterSplitting(TreeCacheNode& oldNode,
         }
     }
 
-    new_node->pointers[j] = tempRAMaddresses[i];
-    new_node->raw.as.branch.pointers[j] = tempAddresses[i];
-    if (new_node->pointers[j] != nullptr)
+    newNode->pointers[j] = tempRAMaddresses[i];
+    newNode->raw.as.branch.pointers[j] = tempAddresses[i];
+    if (newNode->pointers[j] != nullptr)
     {
-        new_node->pointers[j]->parent = new_node;
+        newNode->pointers[j]->parent = newNode;
     }
-    new_node->parent = oldNode.parent;
+    newNode->parent = oldNode.parent;
 
     oldNode.dirty = true;
-    new_node->dirty = true;
+    newNode->dirty = true;
 
     /* Insert a new key into the parent of the two
      * nodes resulting from the split, with
      * the old TreeCacheNode to the left and the new to the right.
      */
 
-    return insertIntoParent(oldNode, kPrime, *new_node);
+    return insertIntoParent(oldNode, kPrime, *newNode);
 }
 
 /* Inserts a new TreeCacheNode (leaf or internal TreeCacheNode) into the B+ tree.

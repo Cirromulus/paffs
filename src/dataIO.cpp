@@ -380,7 +380,7 @@ DataIO::writePageData(PageAbs  pageFrom,
         if (res != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "ERR: write returned FAIL at phy.P: %" pType_pageabs,
+                      "ERR: write returned FAIL at phy.P: %" PTYPE_PAGEABS,
                       getPageNumber(pageAddress, *dev));
             return res;
         }
@@ -409,7 +409,7 @@ DataIO::writePageData(PageAbs  pageFrom,
                           "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!",
                           resultMsg[static_cast<int>(res)]);
                 PAFFS_DBG_S(PAFFS_TRACE_WRITE,
-                            "At pagelistindex %" pType_pageabs ", oldArea: %" pType_areapos ", oldPage: %" pType_pageoffs,
+                            "At pagelistindex %" PTYPE_PAGEABS ", oldArea: %" PTYPE_AREAPOS ", oldPage: %" PTYPE_PAGEOFFS,
                             page + pageFrom,
                             oldArea,
                             oldPage);
@@ -429,7 +429,7 @@ DataIO::writePageData(PageAbs  pageFrom,
         }
 
         PAFFS_DBG_S(PAFFS_TRACE_WRITE,
-                    "write r.P: %" pType_pageoffs "/%" pType_pageabs ", phy.P: %" pType_pageabs,
+                    "write r.P: %" PTYPE_PAGEOFFS "/%" PTYPE_PAGEABS ", phy.P: %" PTYPE_PAGEABS,
                     page + 1,
                     toPage + 1,
                     getPageNumber(pageAddress, *dev));
@@ -514,7 +514,7 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
     if (dev->areaMgmt.getType(extractLogicalArea(pageAddr)) != AreaType::data)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "READ INODE operation of invalid area at %" pType_areapos ":%" pType_pageoffs,
+                  "READ INODE operation of invalid area at %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
                   extractLogicalArea(pageAddr),
                   extractPageOffs(pageAddr));
         return false;
@@ -523,12 +523,11 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
     if (traceMask & PAFFS_TRACE_VERIFY_AS)
     {
         Result r;
-        SummaryEntry e = dev->sumCache.getPageStatus(
-                extractLogicalArea(pageAddr), extractPageOffs(pageAddr), &r);
+        SummaryEntry e = dev->sumCache.getPageStatus(pageAddr, &r);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not load AreaSummary of area %" pType_areapos " for verification!",
+                      "Could not load AreaSummary of area %" PTYPE_AREAPOS " for verification!",
                       extractLogicalArea(pageAddr));
             return false;
         }
@@ -537,7 +536,7 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
             if (e == SummaryEntry::dirty)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
-                          "READ INODE operation of outdated (dirty) data at %" pType_areapos ":%" pType_pageoffs "",
+                          "READ INODE operation of outdated (dirty) data at %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "",
                           extractLogicalArea(pageAddr),
                           extractPageOffs(pageAddr));
                 return false;
@@ -546,7 +545,7 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
             if (e == SummaryEntry::free)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
-                          "READ INODE operation of invalid (free) data at %" pType_areapos ":%" pType_pageoffs "",
+                          "READ INODE operation of invalid (free) data at %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "",
                           extractLogicalArea(pageAddr),
                           extractPageOffs(pageAddr));
                 return false;
@@ -555,7 +554,7 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
             if (e >= SummaryEntry::error)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
-                          "READ INODE operation of data with invalid AreaSummary at area %" pType_areapos "!",
+                          "READ INODE operation of data with invalid AreaSummary at area %" PTYPE_AREAPOS "!",
                           extractLogicalArea(pageAddr));
                 return false;
             }

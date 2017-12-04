@@ -52,14 +52,14 @@ TEST_F(SuperBlock, multipleRemounts)
     r = fs.touch("/a");
     ASSERT_EQ(r, paffs::Result::notMounted);
 
-    for (unsigned int i = 0;
+    for (uint32_t i = 0;
          i < paffs::totalPagesPerArea + pow(paffs::totalPagesPerArea, paffs::superChainElems - 1);
          i++)
     {
         r = fs.mount();
         if (r != paffs::Result::ok)
         {
-            printf("Error during round %d!\n", i);
+            printf("Error during round %u!\n", i);
             printf("mount: %s\n", paffs::err_msg(r));
         }
         ASSERT_EQ(r, paffs::Result::ok);
@@ -67,7 +67,7 @@ TEST_F(SuperBlock, multipleRemounts)
         fil = fs.open("/file", paffs::FC);
         if (fil == nullptr)
         {
-            printf("Error in Run %u\n", i);
+            printf("Error in round %u\n", i);
             printf("open: %s\n", paffs::err_msg(fs.getLastErr()));
         }
         ASSERT_NE(fil, nullptr);
@@ -100,6 +100,7 @@ TEST_F(SuperBlock, multipleRemounts)
             printf("Close Dir: %s!\n", paffs::err_msg(r));
         }
         ASSERT_EQ(r, paffs::Result::ok);
+
         r = fs.unmount();
         if (r != paffs::Result::ok)
         {

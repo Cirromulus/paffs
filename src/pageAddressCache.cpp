@@ -166,7 +166,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
     if (traceMask & PAFFS_TRACE_VERBOSE)
     {
         PAFFS_DBG_S(PAFFS_TRACE_PACACHE,
-                    "SetPage to %" pType_areapos ":%" pType_pageoffs " at %" PRIu32,
+                    "SetPage to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " at %" PRIu32,
                     extractLogicalArea(addr),
                     extractPageOffs(addr),
                     page);
@@ -580,7 +580,7 @@ PageAddressCache::readAddrList(Addr from, Addr list[addrsPerPage])
         return Result::bug;
     }
     PAFFS_DBG_S(PAFFS_TRACE_PACACHE,
-                "loadCacheElem from %" pType_areapos ":%" pType_pageoffs,
+                "loadCacheElem from %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
                 extractLogicalArea(from),
                 extractPageOffs(from));
     Result res = device.driver.readPage(getPageNumber(from, device), list, addrsPerPage * sizeof(Addr));
@@ -685,7 +685,7 @@ PageAddressCache::isAddrListPlausible(Addr* addrList, size_t elems)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
                       "PageList elem %" PRIu32 " Page is higher than possible "
-                      "(was %" pType_pageoffs ", should < %" pType_pageoffs ")",
+                      "(was %" PTYPE_PAGEOFFS ", should < %" PTYPE_PAGEOFFS ")",
                       i,
                       extractPageOffs(addrList[i]),
                       dataPagesPerArea);
@@ -695,7 +695,7 @@ PageAddressCache::isAddrListPlausible(Addr* addrList, size_t elems)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
                       "PageList elem %" PRIu32 " Area is 0, "
-                      "but Page is not (%" pType_pageoffs ")",
+                      "but Page is not (%" PTYPE_PAGEOFFS ")",
                       i,
                       extractPageOffs(addrList[i]));
             return false;

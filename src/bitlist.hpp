@@ -25,6 +25,11 @@ class BitList
 
 public:
     static constexpr size_t byteUsage = (numberOfElements + 7) / 8;
+    static inline size_t
+    getByteUsage()
+    {
+        return byteUsage;
+    }
 
     inline
     BitList()
@@ -174,9 +179,9 @@ public:
     }
 
     inline bool
-    operator==(BitList<numberOfElements>& rhs) const
+    operator==(const BitList<numberOfElements>& rhs) const
     {
-        for (size_t i = 0; i <= numberOfElements / 8; i++)
+        for (size_t i = 0; i < (numberOfElements + 7) / 8; i++)
         {
             if (mList[i] != rhs.mList[i])
             {
@@ -187,7 +192,7 @@ public:
     }
 
     inline bool
-    operator!=(BitList<numberOfElements>& rhs) const
+    operator!=(const BitList<numberOfElements>& rhs) const
     {
         return !(*this == rhs);
     }
@@ -212,25 +217,54 @@ public:
     {
         memset(mList, 0, sizeof(mList));
     }
+    static inline void
+    setValue(size_t pos, uint8_t value, uint8_t list[(numberOfElements + 3) / 4])
+    {
+        //First mask bitfield byte leaving active bytes to zero, then insert value
+        list[pos / 4] = (list[pos / 4] & ~(0b11 << (pos % 4) * 2))
+              | (static_cast<uint8_t>(value) << (pos % 4) * 2);
+    }
     inline void
     setValue(size_t pos, uint8_t value)
     {
-        //First mask bitfield byte leaving active bytes to zero, then insert value
-        mList[pos / 4] = (mList[pos / 4] & ~(0b11 << (pos % 4) * 2))
-              | (static_cast<uint8_t>(value) << (pos % 4) * 2);
+        setValue(pos, value, mList);
+    }
+    static inline uint8_t
+    getValue(size_t pos, const uint8_t list[(numberOfElements + 3) / 4])
+    {
+        //Mask bitfield byte leaving inactive bytes to zero, then right shift to bottom
+        return (list[pos / 4] & (0b11 << (pos % 4) * 2))
+            >> (pos % 4) * 2;
     }
     inline uint8_t
     getValue(size_t pos)
     {
-        //Mask bitfield byte leaving inactive bytes to zero, then right shift to bottom
-        return (mList[pos / 4] & (0b11 << (pos % 4) * 2))
-            >> (pos % 4) * 2;
+        return getValue(pos, mList);
     }
 
     inline uint8_t*
     expose()
     {
         return mList;
+    }
+
+    inline bool
+    operator==(const TwoBitList<numberOfElements>& rhs) const
+    {
+        for (size_t i = 0; i < (numberOfElements + 3) / 4; i++)
+        {
+            if (mList[i] != rhs.mList[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    inline bool
+    operator!=(const TwoBitList<numberOfElements>& rhs) const
+    {
+        return !(*this == rhs);
     }
 };
 };

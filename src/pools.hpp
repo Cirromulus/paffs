@@ -129,7 +129,7 @@ struct InodePool : InodePoolBase
         }
         Inode* inode = it->second.first;  // Inode Pointer
         it->second.second++;              // Inode Refcount
-        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Increased Refcount of %" pType_inodeno " to %" PRIu8 "", no, it->second.second);
+        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Increased Refcount of %" PTYPE_INODENO " to %" PRIu8 "", no, it->second.second);
         target.setInode(*inode, *this);
         return Result::ok;
     }
@@ -174,7 +174,7 @@ struct InodePool : InodePoolBase
             return Result::bug;
         }
         it->second.second--;  // Inode refcount
-        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Decreased Refcount of %" pType_inodeno " to %" PRIu8 "", no, it->second.second);
+        PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Decreased Refcount of %" PTYPE_INODENO " to %" PRIu8 "", no, it->second.second);
         if (it->second.second == 0)
         {
             PAFFS_DBG_S(PAFFS_TRACE_BUFFERS, "Freeing Inode %" PRIu32 "", it->first);

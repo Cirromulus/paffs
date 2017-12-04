@@ -98,27 +98,27 @@ struct Param
 extern const Param stdParam;
 
 typedef uint32_t Addr;           // Contains logical area and relative page
-#define pType_addr PRIu32
+#define PTYPE_ADDR PRIu32
 typedef uint16_t AreaPos;        // Has to address total areas
-#define pType_areapos PRIu16
+#define PTYPE_AREAPOS PRIu16
 typedef uint16_t PageOffs;       // Has to address pages per area
-#define pType_pageoffs PRIu16
+#define PTYPE_PAGEOFFS PRIu16
 typedef Addr     PageAbs;        // has to address all pages in a device
-#define pType_pageabs pType_addr
+#define PTYPE_PAGEABS PTYPE_ADDR
 typedef uint16_t BlockAbs;       // has to address all blocks in a device
-#define pType_blockabs PRIu16
+#define PTYPE_BLOCKABS PRIu16
 typedef uint32_t FileSize;       //~ 4 GB per file
-#define pType_filsize PRIu32
+#define PTYPE_FILSIZE PRIu32
 typedef int64_t  FileSizeDiff;
-#define pType_filsizediff PRId64
+#define PTYPE_FILSIZEDIFF PRId64
 typedef uint16_t FileNamePos;
-#define pType_filnamepos PRIu16
+#define PTYPE_FILNAMEPOS PRIu16
 typedef uint32_t InodeNo;        //~ 4 Million files
-#define pType_inodeno PRIu32
+#define PTYPE_INODENO PRIu32
 typedef uint16_t DirEntryCount;  // 65,535 Entries per Directory
-#define pType_direntrycount PRIu16
+#define PTYPE_DIRENTRYCOUNT PRIu16
 typedef uint8_t DirEntryLength;  // 255 characters per Directory entry
-#define pType_direntrylen PRIu8
+#define PTYPE_DIRENTRYLEN PRIu8
 static constexpr DirEntryLength maxDirEntryLength = 255;
 
 struct BadBlockList

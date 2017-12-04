@@ -108,7 +108,7 @@ Paffs::printCacheSizes()
                 (dataPagesPerArea / 4 + 2 + sizeof(PageOffs)) * areaSummaryCacheSize);
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO,
-                "Size of AreaMap Entry: %zu Byte. Areas: %" pType_areapos ".\n"
+                "Size of AreaMap Entry: %zu Byte. Areas: %" PTYPE_AREAPOS ".\n"
                 "\tOverall AreaMap Size: %zu Byte.",
                 sizeof(Area),
                 areasNo,
