@@ -564,7 +564,7 @@ PageAddressCache::writeCacheElem(Addr& source, AddrListCacheElem& elem)
 Result
 PageAddressCache::readAddrList(Addr from, Addr list[addrsPerPage])
 {
-    if (from == 0 || from == combineAddress(0, unusedMarker))
+    if (from == 0)
     {
         // This data was not used yet
         PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "load empty CacheElem (new)");
@@ -676,7 +676,7 @@ PageAddressCache::isAddrListPlausible(Addr* addrList, size_t elems)
 {
     for (uint32_t i = 0; i < elems; i++)
     {
-        if (extractPageOffs(addrList[i]) == unusedMarker)
+        if (extractPageOffs(addrList[i]) == 0)
         {
             continue;
         }

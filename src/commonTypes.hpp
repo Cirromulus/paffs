@@ -121,9 +121,6 @@ typedef uint8_t DirEntryLength;  // 255 characters per Directory entry
 #define pType_direntrylen PRIu8
 static constexpr DirEntryLength maxDirEntryLength = 255;
 
-// Together with area = 0, it is used to mark an unused page in Inode
-static constexpr PageOffs unusedMarker = 0xFFFF;
-
 struct BadBlockList
 {
     BlockAbs* mList;

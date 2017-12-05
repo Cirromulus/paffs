@@ -40,7 +40,9 @@ TEST_F(PageAddressCacheTest, seekReadWrite)
      */
     Obj* fil;
     Result r;
-    char txt[] = "Hallo";
+    char txt[] = "This test uses the behavior of Paffs to "
+                 "jump over unused pages without writing them.\n"
+                 "We can write a file at higher positions than the flash size would allow it.";
     char buf[sizeof(txt)];
 
 
@@ -70,6 +72,8 @@ TEST_F(PageAddressCacheTest, seekReadWrite)
     if (fs.getLastErr() != Result::ok)
         printf("%s!\n", err_msg(fs.getLastErr()));
     ASSERT_NE(fil, nullptr);
+
+    fs.setTraceMask(fs.getTraceMask() | PAFFS_TRACE_PACACHE);
 
     seekAndWriteTo(fs, fil, direct-strlen(txt), txt, strlen(txt));
 

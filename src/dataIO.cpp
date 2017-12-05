@@ -43,8 +43,8 @@ DataIO::writeInodeData(Inode& inode,
     }
 
     // todo: use pageFrom as offset to reduce memory usage and IO
-    unsigned int pageFrom = offs / dataBytesPerPage;
-    unsigned int toPage = (offs + bytes) / dataBytesPerPage;
+    FileSize pageFrom = offs / dataBytesPerPage;
+    FileSize toPage = (offs + bytes) / dataBytesPerPage;
     if ((offs + bytes) % dataBytesPerPage == 0)
     {
         toPage--;
@@ -64,11 +64,6 @@ DataIO::writeInodeData(Inode& inode,
         if (inode.size % dataBytesPerPage > 0)
         {
             lastUsedPage++;
-        }
-
-        for (unsigned i = lastUsedPage; i < pageFrom; i++)
-        {
-            pac.setPage(i, combineAddress(0, unusedMarker));
         }
     }
 
@@ -331,7 +326,7 @@ DataIO::writePageData(PageAbs  pageFrom,
            (btw + offs < dataBytesPerPage && page * dataBytesPerPage + btw < filesize))
         {
             // we are misaligned, so fill write buffer with valid Data
-            unsigned int btr = dataBytesPerPage;
+            uint16_t btr = dataBytesPerPage;
 
             // limit maximum bytes to read if file is smaller than actual page
             if ((pageFrom + 1 + page) * dataBytesPerPage > filesize)
@@ -346,8 +341,7 @@ DataIO::writePageData(PageAbs  pageFrom,
                 }
             }
 
-            if (pageAddr != 0  // not an empty page TODO: doubled code
-                && pageAddr != combineAddress(0, unusedMarker))
+            if (pageAddr != 0)  // not an empty page TODO: doubled code)
             {  // not a skipped page (thus containing no information)
                 // We are overriding real data, not just empty space
                 FileSize bytesRead = 0;
@@ -401,9 +395,8 @@ DataIO::writePageData(PageAbs  pageFrom,
         ac.setPage(page + pageFrom, pageAddress);
 
         // if we have overwriting existing data...
-        if (pageAddr != 0  // not an empty page
-            && pageAddr != combineAddress(0, unusedMarker))
-        {  // not a skipped page (thus containing no information)
+        if (pageAddr != 0)  // not an empty page
+        {
             // Mark old pages dirty
             // mark old Page in Areamap
             AreaPos  oldArea = extractLogicalArea(pageAddr);
@@ -474,7 +467,7 @@ DataIO::readPageData(PageAbs  pageFrom,
             btr = dataBytesPerPage;
         }
 
-        if (pageAddr == combineAddress(0, unusedMarker))
+        if (pageAddr == 0)
         {
             // This Page is currently not written to flash
             // because it contains just empty space
