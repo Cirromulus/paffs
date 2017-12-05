@@ -630,20 +630,24 @@ TreeCache::commitCache()
     bool unreachableNodesExisting = false;
     for(uint16_t node = 0; node < treeNodeCacheSize; node++)
     {
-        if(mCache[node].dirty && !mCache[node].locked)
+        if(mCacheUsage.getBit(node) && mCache[node].dirty)
         {
             //We could start a desperate mode, committing non-locked nodes in floating tree.
             //But this is dangerous for powerloss, leaving tree in inconsistent state.
-            PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Commit did not affect floating node %" PRIu16, node);
+            PAFFS_DBG_S(PAFFS_TRACE_ALWAYS, "Commit did not affect node %" PRIu16, node);
             unreachableNodesExisting = true;
         }
     }
 
-    if(!unreachableNodesExisting)
+    if(unreachableNodesExisting)
     {
-        dev->journal.addEvent(journalEntry::Success(JournalEntry::Topic::tree));
+        PAFFS_DBG(PAFFS_TRACE_BUG, "There were used, but uncommitted nodes in commit.\n"
+                  "This is unacceptable in case of sudden powerlosses!");
+        //Since we are now in strict mode for journal, this may not be allowed
+        return Result::bug;
     }
 
+    dev->journal.addEvent(journalEntry::Success(JournalEntry::Topic::tree));
     return Result::ok;
 }
 
@@ -917,6 +921,7 @@ TreeCache::getTreeNodeAtIndexFrom(uint16_t index, TreeCacheNode& parent, TreeCac
 Result
 TreeCache::removeNode(TreeCacheNode& tcn)
 {
+    mCache[getIndexFromPointer(tcn)].dirty = false;
     setIndexFree(getIndexFromPointer(tcn));
     if (tcn.raw.self != 0)
     {
