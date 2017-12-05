@@ -73,15 +73,13 @@ TEST_F(FileTest, seekReadWrite)
     ASSERT_EQ(r, paffs::Result::ok);
 }
 
-TEST_F(FileTest, DISABLED_createReadWriteDeleteFile)
+TEST_F(FileTest, createReadWriteDeleteFile)
 {
-    //FIXME: filesize would have to be extraordinary big to fit second indirection completely with huge pages
-    // operate on indirection layer
-    const paffs::FileSize filesize = (paffs::addrsPerPage * 2) * paffs::dataBytesPerPage + 50;
+    const paffs::FileSize filesize = 5 * paffs::dataBytesPerPage + 50;
     char t[] = ".                         Text";  // 30 chars
 
-    std::unique_ptr<char> tlB(new char[filesize]);
-    std::unique_ptr<char> bufB(new char[filesize]);
+    std::unique_ptr<char[]> tlB(new char[filesize]);
+    std::unique_ptr<char[]> bufB(new char[filesize]);
     char* tl = tlB.get();
     char* buf = bufB.get();
     char quer[] = "..--";
@@ -98,8 +96,7 @@ TEST_F(FileTest, DISABLED_createReadWriteDeleteFile)
     paffs::Obj* fil = fs.open("/file", paffs::FW | paffs::FC);
     ASSERT_NE(fil, nullptr);
 
-    // write
-    unsigned int bytes = 0;
+    paffs::FileSize bytes = 0;
     r = fs.write(*fil, tl, filesize, &bytes);
     EXPECT_EQ(bytes, filesize);
     ASSERT_EQ(r, paffs::Result::ok);
