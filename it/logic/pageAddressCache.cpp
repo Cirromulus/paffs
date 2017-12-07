@@ -73,8 +73,6 @@ TEST_F(PageAddressCacheTest, seekReadWrite)
         printf("%s!\n", err_msg(fs.getLastErr()));
     ASSERT_NE(fil, nullptr);
 
-    fs.setTraceMask(fs.getTraceMask() | PAFFS_TRACE_PACACHE);
-
     seekAndWriteTo(fs, fil, direct-strlen(txt), txt, strlen(txt));
 
     if(canTestSingl)
