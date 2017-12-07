@@ -436,11 +436,11 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
     {
         if (traceMask & PAFFS_WRITE_VERIFY_AS)
         {
-            char buf[totalBytesPerPage];
-            memset(buf, 0xFF, dataBytesPerPage);
-            memset(&buf[dataBytesPerPage], 0x0A, oobBytesPerPage);
+            uint8_t* writebuf = dev->driver.getPageBuffer();
+            memset(writebuf, 0xFF, dataBytesPerPage);
+            memset(&writebuf[dataBytesPerPage], 0x0A, oobBytesPerPage);
             Addr addr = combineAddress(area, page);
-            dev->driver.writePage(getPageNumber(addr, *dev), buf, totalBytesPerPage);
+            dev->driver.writePage(getPageNumber(addr, *dev), writebuf, totalBytesPerPage);
         }
 
         if (traceMask & PAFFS_TRACE_VERIFY_AS)
