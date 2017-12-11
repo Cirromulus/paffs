@@ -58,13 +58,15 @@ TEST_F(TreeTest, handleMoreThanCacheLimit)
     }
 }
 
-TEST_F(TreeTest, coalesceAndRedistributeTree)
+TEST_F(TreeTest, coalesceTree)
 {
     paffs::Device* d = fs.getDevice(0);
     paffs::Result r;
+    const unsigned numberOfNodes = paffs::leafOrder * paffs::branchOrder + 1;
+
 
     // insert
-    for (unsigned int i = 1; i <= paffs::leafOrder * 3; i++)
+    for (unsigned int i = 1; i <= numberOfNodes; i++)
     {
         paffs::Inode test;
         memset(&test, 0, sizeof(paffs::Inode));
@@ -75,8 +77,77 @@ TEST_F(TreeTest, coalesceAndRedistributeTree)
         ASSERT_EQ(paffs::Result::ok, r);
     }
 
+    fs.setTraceMask(fs.getTraceMask()
+                    | PAFFS_TRACE_VERBOSE
+                    | PAFFS_TRACE_TREE
+                    | PAFFS_TRACE_TREECACHE
+                    );
+
+    // delete reverse
+    for (unsigned int i = numberOfNodes; i > 0; i--)
+    {
+        r = d->tree.deleteInode(i);
+        if (r != paffs::Result::ok)
+            std::cerr << paffs::err_msg(r) << std::endl;
+        ASSERT_EQ(paffs::Result::ok, r);
+    }
+
+    // insert
+    for (unsigned int i = 1; i <= numberOfNodes; i++)
+    {
+        paffs::Inode test;
+        memset(&test, 0, sizeof(paffs::Inode));
+        test.no = i;
+        r = d->tree.insertInode(test);
+        if (r != paffs::Result::ok)
+            std::cerr << paffs::err_msg(r) << std::endl;
+        ASSERT_EQ(paffs::Result::ok, r);
+    }
+
+    // delete forward
+    for (unsigned int i = 1; i <= numberOfNodes; i++)
+    {
+        r = d->tree.deleteInode(i);
+        if (r != paffs::Result::ok)
+            std::cerr << paffs::err_msg(r) << std::endl;
+        ASSERT_EQ(paffs::Result::ok, r);
+    }
+}
+
+TEST_F(TreeTest, redistributeTree)
+{
+    paffs::Device* d = fs.getDevice(0);
+    paffs::Result r;
+
+    // insert
+    for (unsigned int i = 1; i <= paffs::leafOrder; i++)
+    {
+        paffs::Inode test;
+        memset(&test, 0, sizeof(paffs::Inode));
+        test.no = i * paffs::branchOrder;
+        r = d->tree.insertInode(test);
+        if (r != paffs::Result::ok)
+            std::cerr << paffs::err_msg(r) << std::endl;
+        ASSERT_EQ(paffs::Result::ok, r);
+    }
+
+    for (unsigned int i = 1; i <= paffs::leafOrder * paffs::branchOrder; i++)
+    {
+        if(i % paffs::branchOrder == 0)
+        {
+            continue;
+        }
+        paffs::Inode test;
+        memset(&test, 0, sizeof(paffs::Inode));
+        test.no = i;
+        r = d->tree.insertInode(test);
+        if (r != paffs::Result::ok)
+            std::cerr << paffs::err_msg(r) << std::endl;
+        ASSERT_EQ(paffs::Result::ok, r);
+    }
+
     // delete
-    for (unsigned int i = paffs::leafOrder * 3; i > 0; i--)
+    for (unsigned int i = paffs::leafOrder * paffs::branchOrder; i > 0; i--)
     {
         r = d->tree.deleteInode(i);
         if (r != paffs::Result::ok)

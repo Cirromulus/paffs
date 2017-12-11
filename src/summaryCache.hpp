@@ -164,7 +164,7 @@ private:
     /**
      * @Brief uses garbageCollection-buffer to swap a whole Area,
      * committing its new AS.
-     * @warn Decreases wear-off efficiency if used regularly.
+     * @warn Decreases wear leveling if used regularly.
      */
     Result
     commitAreaSummaryHard(int& clearedAreaCachePosition);

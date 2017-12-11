@@ -577,7 +577,9 @@ AreaManagement::deleteAreaContents(AreaPos area)
     }
     increaseErasecount(area);
     if (dev->sumCache.isCached(area))
+    {
         dev->sumCache.resetASWritten(area);
+    }
 
     if (r == Result::badflash)
     {

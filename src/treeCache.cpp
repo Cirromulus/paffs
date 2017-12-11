@@ -30,6 +30,11 @@ TreeCache::setIndexUsed(uint16_t index)
 void
 TreeCache::setIndexFree(uint16_t index)
 {
+    if(traceMask & PAFFS_TRACE_VERBOSE)
+    {
+        PAFFS_DBG_S(PAFFS_TRACE_TREECACHE, "freed cache node %" PRIu16, index);
+    }
+
     mCacheUsage.resetBit(index);
 }
 
@@ -49,7 +54,7 @@ TreeCache::findFirstFreeIndex()
 uint16_t
 TreeCache::getIndexFromPointer(TreeCacheNode& tcn)
 {
-    if (&tcn - mCache > treeNodeCacheSize)
+    if (&tcn - mCache >= treeNodeCacheSize)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Index from Pointer not inside array (%p)!", &tcn);
         dev->lasterr = Result::bug;
@@ -259,6 +264,12 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
     }
     else
     {
+        if(node.raw.keys > branchOrder - 1)
+        {   //Keep in mind that branchorder is number of Values. Keys must be one less.
+            PAFFS_DBG(PAFFS_TRACE_BUG,
+                      "Node n° %" PRIu16 "' contains %" PRIu16 " keys (allowed < %" PRIu16 ")",
+                      getIndexFromPointer(node), node.raw.keys, branchOrder);
+        }
         for (int i = 0; i <= node.raw.keys; i++)
         {
             if (i < node.raw.keys)
@@ -306,6 +317,12 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
 
             if (node.pointers[i] != nullptr)
             {
+                if (node.pointers[i] - mCache >= treeNodeCacheSize)
+                {
+                    PAFFS_DBG(PAFFS_TRACE_BUG, "Node %" PRIu16 " contains invalid non-zero child at %" PRIu16,
+                              getIndexFromPointer(node), i);
+                    return false;
+                }
                 if (node.pointers[i]->parent != &node)
                 {
                     PAFFS_DBG(PAFFS_TRACE_BUG,
@@ -354,7 +371,13 @@ TreeCache::isTreeCacheValid()
                 {
                     // it is allowed if we are moving a parent around
                     bool parentLocked = false;
-                    TreeCacheNode*& par = mCache[i].parent;
+                    TreeCacheNode* par = mCache[i].parent;
+                    if(par == nullptr)
+                    {
+                        PAFFS_DBG(PAFFS_TRACE_BUG, "Cache entry %" PRIu16 " parent is null!", i);
+                        valid = false;
+                        break;
+                    }
                     while (par != par->parent)
                     {
                         if (par->locked)
@@ -975,7 +998,8 @@ TreeCache::getCacheMisses()
 void
 TreeCache::printNode(TreeCacheNode& node)
 {
-    printf("[ID: %d PAR: %d %s%s%s|",
+    printf("[%sID: %d PAR: %d %s%s%s|",
+               mCacheUsage.getBit(getIndexFromPointer(node)) ? "" : "X ",
                getIndexFromPointer(node),
                getIndexFromPointer(*node.parent),
                node.dirty ? "d" : "-",
@@ -1041,18 +1065,28 @@ TreeCache::printSubtree(int layer, BitList<treeNodeCacheSize>& reached, TreeCach
 void
 TreeCache::printTreeCache()
 {
-    printf("-----------------\n");
+    printf("-----(%02" PRIu16 "/%02" PRIu16 ")-----\n",
+           getCacheUsage(), getCacheSize());
     if (isIndexUsed(mCacheRoot))
     {
         BitList<treeNodeCacheSize> reached;
         printSubtree(0, reached, mCache[mCacheRoot]);
-        printf("- - floating: - -\n");
-        for(uint16_t node = 0; node < treeNodeCacheSize; node++)
+        if(reached != mCacheUsage)
         {
-            if(!reached.getBit(node) && mCacheUsage.getBit(node))
+            printf("- - floating: - -\n");
+            for(uint16_t node = 0; node < treeNodeCacheSize; node++)
             {
-                printf("~ ");
-                printNode(mCache[node]);
+                if(!reached.getBit(node) && mCacheUsage.getBit(node))
+                {
+                    printf("~ ");
+                    printNode(mCache[node]);
+                }
+                else
+                if(reached.getBit(node) && !mCacheUsage.getBit(node))
+                {
+                    printf("! ");
+                    printNode(mCache[node]);
+                }
             }
         }
     }

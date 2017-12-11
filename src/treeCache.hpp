@@ -113,7 +113,8 @@ public:
     getCacheMisses();
     void
     printTreeCache();
-
+    uint16_t
+    getIndexFromPointer(TreeCacheNode& tcn);
 private:
 
     Result
@@ -152,8 +153,6 @@ private:
     printSubtree(int layer, BitList<treeNodeCacheSize>& reached, TreeCacheNode& node);
     int16_t
     findFirstFreeIndex();
-    uint16_t
-    getIndexFromPointer(TreeCacheNode& tcn);
     bool
     hasLockedChilds(TreeCacheNode& tcn);
     bool

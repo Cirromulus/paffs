@@ -55,6 +55,42 @@ TraceMask traceMask =
         // PAFFS_TRACE_GC_DETAIL |
         0;
 
+const char* traceDescription[] =
+   {
+       "INFO",
+       "OS",
+       "ALLOCATE",
+       "SCAN",
+       "BAD_BLOCKS",
+       "ERASE",
+       "GC",
+       "WRITE",
+       "TRACING",
+       "DELETION",
+       "BUFFERS",
+       "NANDACCESS",
+       "GC_DETAIL",
+       "SCAN_DEBUG",
+       "AREA",
+       "PACACHE",
+       "VERIFY_TC",
+       "VERIFY_NAND",
+       "VERIFY_AS",
+       "PAFFS_WRITE_VERIFY_AS",
+       "VERIFY_ALL",
+       "SUPERBLOCK",
+       "TREECACHE",
+       "TREE",
+       "MOUNT",
+       "ASCACHE",
+       "VERBOSE",
+       "READ",
+       "JOURNAL",
+       "ERROR",
+       "BUG",
+       "ALWAYS"
+   };
+
 const char* resultMsg[] = {
     "ok",
     "Biterror could be corrected by ECC",

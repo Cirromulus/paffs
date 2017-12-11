@@ -333,13 +333,13 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition)
         clearedAreaCachePosition = -1;
         return r;
     }
-    dev->areaMgmt.deleteArea(favouriteArea);
+    //deletes a cache position here, resets AsWritten
+    dev->areaMgmt.deleteAreaContents(favouriteArea);
     // swap logical position of areas to keep addresses valid
     dev->areaMgmt.swapAreaPosition(favouriteArea,
                                    dev->areaMgmt.getActiveArea(AreaType::garbageBuffer));
-    packStatusArray(cachePos, summary);
-    // AsWritten gets reset in delete Area, and dont set dirty bc now the AS is not committed, soley
-    // in RAM
+
+    setSummaryStatus(favouriteArea, summary);
 
     return Result::ok;
 }
@@ -598,7 +598,7 @@ SummaryCache::deleteSummary(AreaPos area)
 {
     if (mTranslation.find(area) == mTranslation.end())
     {
-        // This is not a bug, because an uncached area can be deleted
+        // This is not a bug, because an uncached area may also be deleted
         PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Tried to delete nonexisting Area %" PRId16 "", area);
         return Result::ok;
     }

@@ -12,8 +12,7 @@
  */
 // ----------------------------------------------------------------------------
 
-#ifndef DS_PAFFS_PAFFS_TRACE_H_
-#define DS_PAFFS_PAFFS_TRACE_H_
+#pragma once
 
 #include <signal.h>
 #include <stdio.h>
@@ -24,25 +23,27 @@ namespace paffs
 {
 typedef uint64_t TraceMask;
 extern TraceMask traceMask;
+extern const char* traceDescription[];
 }
 
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
-#define PAFFS_DBG(mask, msg, ...)                                  \
-    do                                                             \
-    {                                                              \
-        if (((mask) & traceMask) || ((mask) & PAFFS_TRACE_ALWAYS)) \
-        {                                                          \
-            fprintf(stderr,                                        \
-                    "paffs: " msg "\n\t-line %" PRId16 ", file %s\n",       \
-                    ##__VA_ARGS__,                                 \
-                    __LINE__,                                      \
-                    __FILENAME__);                                 \
-            if ((mask)&PAFFS_TRACE_BUG)                            \
-            {                                                      \
-                raise(SIGINT);                                     \
-            }                                                      \
-        }                                                          \
+#define PAFFS_DBG(mask, msg, ...)                                           \
+    do                                                                      \
+    {                                                                       \
+        if (((mask) & traceMask) || ((mask) & PAFFS_TRACE_ALWAYS))          \
+        {                                                                   \
+            fprintf(stderr,                                                 \
+                    "paffs %s: " msg "\n\t-line %" PRId16 ", file %s\n",    \
+                    traceDescription[ffs(mask)],                            \
+                    ##__VA_ARGS__,                                          \
+                    __LINE__,                                               \
+                    __FILENAME__);                                          \
+            if ((mask)&PAFFS_TRACE_BUG)                                     \
+            {                                                               \
+                raise(SIGINT);                                              \
+            }                                                               \
+        }                                                                   \
     } while (0)
 
 #define PAFFS_DBG_S(mask, msg, ...)                                \
@@ -50,7 +51,8 @@ extern TraceMask traceMask;
     {                                                              \
         if (((mask) & traceMask) || ((mask) & PAFFS_TRACE_ALWAYS)) \
         {                                                          \
-            fprintf(stderr, "paffs: " msg "\n", ##__VA_ARGS__);    \
+            fprintf(stderr, "paffs %s: " msg "\n",                 \
+                    traceDescription[ffs(mask)], ##__VA_ARGS__);   \
         }                                                          \
     } while (0)
 
@@ -94,5 +96,3 @@ extern TraceMask traceMask;
 #define PAFFS_TRACE_SOME        0xC0050071
 
 // clang-format on
-
-#endif /* DS_PAFFS_PAFFS_TRACE_H_ */

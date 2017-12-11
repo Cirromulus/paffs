@@ -144,8 +144,24 @@ Btree::deleteInode(InodeNo number)
         return r;
     }
 
+    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Delete Inode %" PTYPE_INODENO, number);
+    if(traceMask & PAFFS_TRACE_VERBOSE)
+    {
+        mCache.printTreeCache();
+    }
+
     dev->journal.addEvent(journalEntry::btree::Remove(number));
-    return deleteEntry(*keyLeaf, number);
+    r = deleteEntry(*keyLeaf, number);
+    if(traceMask & PAFFS_TRACE_VERIFY_TC)
+    {
+        if(!mCache.isTreeCacheValid())
+        {
+            mCache.printTreeCache();
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Delete Inode %" PTYPE_INODENO " failed!", number);
+            return Result::bug;
+        }
+    }
+    return r;
 }
 
 Result
@@ -944,18 +960,27 @@ Btree::coalesceNodes(TreeCacheNode& n,
 {
     uint16_t i, j, neighborInsertionIndex, nEnd;
     TreeCacheNode* tmp;
+    TreeCacheNode* from;
+    TreeCacheNode* to;
 
-    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Coalesce nodes at %" PRIu16 "", kPrime);
+    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Move Keys from node %" PRIu16 " to node %" PRIu16 " at %" PRIu16,
+                mCache.getIndexFromPointer(n), mCache.getIndexFromPointer(neighbor), kPrime);
 
     /* Swap neighbor with TreeCacheNode if TreeCacheNode is on the
      * extreme left and neighbor is to its right.
      */
 
+
     if (neighborIndex == -1)
     {
-        tmp = &n;
-        n = neighbor;
-        neighbor = *tmp;
+        from = &neighbor;
+        to = &n;
+        PAFFS_DBG_S(PAFFS_TRACE_TREE, "Node is leftmost, so positions swap");
+    }
+    else
+    {
+        from = &n;
+        to = &neighbor;
     }
 
     /* Starting point in the neighbor for copying
@@ -964,70 +989,72 @@ Btree::coalesceNodes(TreeCacheNode& n,
      * in the special case of n being a leftmost child.
      */
 
-    neighborInsertionIndex = neighbor.raw.keys;
+    neighborInsertionIndex = to->raw.keys;
 
     /* Case:  nonleaf TreeCacheNode.
      * Append k_prime and the following pointer.
-     * Append all pointers and keys from the neighbor.
+     * Append all pointers and keys from the to->
      */
 
-    if (!n.raw.isLeaf)
+    if (!from->raw.isLeaf)
     {
         /* Append k_prime.
          */
 
-        neighbor.raw.as.branch.keys[neighborInsertionIndex] = kPrime;
-        neighbor.raw.keys++;
+        to->raw.as.branch.keys[neighborInsertionIndex] = kPrime;
+        to->raw.keys++;
 
-        nEnd = n.raw.keys;
+        nEnd = from->raw.keys;
 
         for (i = neighborInsertionIndex + 1, j = 0; j < nEnd; i++, j++)
         {
-            neighbor.raw.as.branch.keys[i] = n.raw.as.branch.keys[j];
-            neighbor.raw.as.branch.pointers[i] = n.raw.as.branch.pointers[j];
-            neighbor.pointers[i] = n.pointers[j];
-            neighbor.raw.keys++;
-            n.raw.keys--;
+            to->raw.as.branch.keys[i] = from->raw.as.branch.keys[j];
+            to->raw.as.branch.pointers[i] = from->raw.as.branch.pointers[j];
+            to->pointers[i] = from->pointers[j];
+            to->raw.keys++;
+            from->raw.keys--;
         }
 
         /* The number of pointers is always
          * one more than the number of keys.
          */
 
-        neighbor.raw.as.branch.pointers[i] = n.raw.as.branch.pointers[j];
-        neighbor.pointers[i] = n.pointers[j];
+        to->raw.as.branch.pointers[i] = from->raw.as.branch.pointers[j];
+        to->pointers[i] = from->pointers[j];
 
         /* All children must now point up to the same parent.
          */
-
-        for (i = 0; i < neighbor.raw.keys + 1; i++)
+        for (i = 0; i < to->raw.keys + 1; i++)
         {
-            tmp = neighbor.pointers[i];
-            tmp->parent = &neighbor;
+            tmp = to->pointers[i];
+            if(tmp != nullptr)
+            {
+                tmp->parent = to;
+            }
         }
     }
 
     /* In a leaf, append the keys and pointers of
-     * n to the neighbor.
+     * n to the to->
      */
 
     else
     {
-        for (i = neighborInsertionIndex, j = 0; j < n.raw.keys; i++, j++)
+        for (i = neighborInsertionIndex, j = 0; j < from->raw.keys; i++, j++)
         {
-            neighbor.raw.as.leaf.keys[i] = n.raw.as.leaf.keys[j];
-            neighbor.raw.as.leaf.pInodes[i] = n.raw.as.leaf.pInodes[j];
-            neighbor.raw.keys++;
+            to->raw.as.leaf.keys[i] = from->raw.as.leaf.keys[j];
+            to->raw.as.leaf.pInodes[i] = from->raw.as.leaf.pInodes[j];
+            to->raw.keys++;
         }
     }
 
-    neighbor.dirty = true;
+    to->dirty = true;
 
-    Result r = deleteEntry(*n.parent, kPrime);
+    Result r = mCache.removeNode(*from);
     if (r != Result::ok)
         return r;
 
-    return mCache.removeNode(n);
+    return deleteEntry(*from->parent, kPrime);
 }
 
 /* Redistributes entries between two nodes when
@@ -1050,7 +1077,6 @@ Btree::redistributeNodes(TreeCacheNode& n,
      * Pull the neighbor's last key-pointer pair over
      * from the neighbor's right end to n's left end.
      */
-
     if (neighborIndex != -1)
     {
         if (!n.raw.isLeaf)
@@ -1119,7 +1145,10 @@ Btree::redistributeNodes(TreeCacheNode& n,
             n.raw.as.branch.keys[n.raw.keys] = kPrime;
             n.pointers[n.raw.keys + 1] = neighbor.pointers[0];
             n.raw.as.branch.pointers[n.raw.keys + 1] = neighbor.raw.as.branch.pointers[0];
-            n.pointers[n.raw.keys + 1]->parent = &n;
+            if(n.pointers[n.raw.keys + 1] != nullptr)
+            {
+                n.pointers[n.raw.keys + 1]->parent = &n;
+            }
             n.parent->raw.as.branch.keys[kPrimeIndex] = neighbor.raw.as.branch.keys[0];
             for (i = 0; i < neighbor.raw.keys - 1; i++)
             {
@@ -1214,8 +1243,10 @@ Btree::deleteEntry(TreeCacheNode& n, InodeNo key)
     neighborIndex = getNeighborIndex(n);
     kPrimeIndex = neighborIndex == -1 ? 0 : neighborIndex;
     kPrime = n.parent->raw.as.branch.keys[kPrimeIndex];
+    mCache.lockTreeCacheNode(n);
     r = neighborIndex == -1 ? mCache.getTreeNodeAtIndexFrom(1, *n.parent, neighbor)
                              : mCache.getTreeNodeAtIndexFrom(neighborIndex, *n.parent, neighbor);
+    mCache.unlockTreeCacheNode(n);
     if (r != Result::ok)
     {
         return r;

@@ -63,21 +63,23 @@ GarbageCollection::findNextBestArea(AreaType target,
                           i);
                 return 0;
             }
-            if (dirtyPages == dataPagesPerArea
-                && (dev->areaMgmt.getOverallDeletions() < areasNo ||  // Some wear leveling
-                    dev->areaMgmt.getErasecount(i) < dev->areaMgmt.getOverallDeletions() / areasNo))
-            {
-                // We can't find a block with more dirty pages in it
-                *srcAreaContainsData = false;
-                memcpy(summaryOut, curr, dataPagesPerArea);
-                return i;
-            }
-
             if (target != AreaType::unset)
             {
                 // normal case
+                if (dirtyPages == dataPagesPerArea
+                    && (dev->areaMgmt.getOverallDeletions() < areasNo ||  // Some wear leveling
+                        dev->areaMgmt.getErasecount(i) < dev->areaMgmt.getOverallDeletions() / areasNo))
+                {
+                    // We can't find a block with more dirty pages in it
+                    *srcAreaContainsData = false;
+                    memcpy(summaryOut, curr, dataPagesPerArea);
+                    return i;
+                }
+
                 if (dev->areaMgmt.getType(i) != target)
+                {
                     continue;  // We cant change types if area is not completely empty
+                }
 
                 if (dirtyPages > favDirtyPages
                     || (dirtyPages != 0 && dirtyPages == favDirtyPages
@@ -120,14 +122,14 @@ GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea, Summ
                 dev->areaMgmt.getPos(srcArea),
                 dstArea,
                 dev->areaMgmt.getPos(dstArea));
-    for (unsigned long page = 0; page < dataPagesPerArea; page++)
+    for (PageOffs page = 0; page < dataPagesPerArea; page++)
     {
         if (summary[page] == SummaryEntry::used)
         {
-            uint64_t src = dev->areaMgmt.getPos(srcArea) * totalPagesPerArea + page;
-            uint64_t dst = dev->areaMgmt.getPos(dstArea) * totalPagesPerArea + page;
+            PageAbs src = dev->areaMgmt.getPos(srcArea) * totalPagesPerArea + page;
+            PageAbs dst = dev->areaMgmt.getPos(dstArea) * totalPagesPerArea + page;
 
-            char buf[totalBytesPerPage];
+            uint8_t* buf = dev->driver.getPageBuffer();
             Result r = dev->driver.readPage(src, buf, totalBytesPerPage);
             // Any Biterror gets corrected here by being moved
             if (r != Result::ok && r != Result::biterrorCorrected)
@@ -241,7 +243,7 @@ GarbageCollection::collectGarbage(AreaType targetType)
 
             /* If lastArea contained data, it is already copied to gc_buffer. 'summary' is untouched
              * and valid.
-             * It it did not contain data (or this is the first round), 'summary' contains
+             * If it did not contain data (or this is the first round), 'summary' contains
              * {SummaryEntry::free}.
              */
             if (lastDeletionTarget == 0)
