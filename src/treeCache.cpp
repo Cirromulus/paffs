@@ -878,22 +878,25 @@ TreeCache::getTreeNodeAtIndexFrom(uint16_t index, TreeCacheNode& parent, TreeCac
         }
     }
 
-    TreeCacheNode* target = parent.pointers[index];
-    // To make sure parent and child can point to the same address, target is used as tmp buffer
-
     if (parent.raw.isLeaf)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Node from leaf!");
         return Result::bug;
     }
+
+    TreeCacheNode* target = parent.pointers[index];
+    // To make sure parent and child can point to the same address, target is used as tmp buffer
     if (target != nullptr)
     {
         child = target;
         mCacheHits++;
-            PAFFS_DBG_S((PAFFS_TRACE_TREECACHE | PAFFS_TRACE_VERBOSE),
+        if(traceMask & PAFFS_TRACE_VERBOSE)
+        {
+            PAFFS_DBG_S(PAFFS_TRACE_TREECACHE,
                         "Cache hit, found target %p (position %" PRIu16 ")",
                         target,
                         getIndexFromPointer(*target));
+        }
         return Result::ok;  // mCache hit
     }
 
@@ -937,6 +940,10 @@ TreeCache::getTreeNodeAtIndexFrom(uint16_t index, TreeCacheNode& parent, TreeCac
     {
         child->dirty = true;
         return Result::ok;
+    }
+    if(traceMask & PAFFS_TRACE_TREE && traceMask & PAFFS_TRACE_TREECACHE)
+    {
+        printTreeCache();
     }
     return r;
 }

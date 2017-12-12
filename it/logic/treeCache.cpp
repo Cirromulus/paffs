@@ -77,12 +77,6 @@ TEST_F(TreeTest, coalesceTree)
         ASSERT_EQ(paffs::Result::ok, r);
     }
 
-    fs.setTraceMask(fs.getTraceMask()
-                    | PAFFS_TRACE_VERBOSE
-                    | PAFFS_TRACE_TREE
-                    | PAFFS_TRACE_TREECACHE
-                    );
-
     // delete reverse
     for (unsigned int i = numberOfNodes; i > 0; i--)
     {
@@ -118,22 +112,27 @@ TEST_F(TreeTest, redistributeTree)
 {
     paffs::Device* d = fs.getDevice(0);
     paffs::Result r;
+    const unsigned numberOfNodes = paffs::leafOrder * (paffs::branchOrder + 1);
 
-    // insert
-    for (unsigned int i = 1; i <= paffs::leafOrder; i++)
+    // insert odd numbers
+    for (unsigned int i = 1; i <= numberOfNodes; i++)
     {
+        if(i & 0b1)
+        {
+            continue;
+        }
         paffs::Inode test;
         memset(&test, 0, sizeof(paffs::Inode));
-        test.no = i * paffs::branchOrder;
+        test.no = i;
         r = d->tree.insertInode(test);
         if (r != paffs::Result::ok)
             std::cerr << paffs::err_msg(r) << std::endl;
         ASSERT_EQ(paffs::Result::ok, r);
     }
-
-    for (unsigned int i = 1; i <= paffs::leafOrder * paffs::branchOrder; i++)
+    //insert even numbers to fill the nodes to a maximum (not just halves)
+    for (unsigned int i = 1; i <= numberOfNodes; i++)
     {
-        if(i % paffs::branchOrder == 0)
+        if((i & 0b1) == 0)
         {
             continue;
         }
@@ -147,7 +146,7 @@ TEST_F(TreeTest, redistributeTree)
     }
 
     // delete
-    for (unsigned int i = paffs::leafOrder * paffs::branchOrder; i > 0; i--)
+    for (unsigned int i = numberOfNodes; i > 0; i--)
     {
         r = d->tree.deleteInode(i);
         if (r != paffs::Result::ok)

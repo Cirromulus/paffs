@@ -993,7 +993,7 @@ Btree::coalesceNodes(TreeCacheNode& n,
 
     /* Case:  nonleaf TreeCacheNode.
      * Append k_prime and the following pointer.
-     * Append all pointers and keys from the to->
+     * Append all pointers and keys.
      */
 
     if (!from->raw.isLeaf)
@@ -1072,7 +1072,8 @@ Btree::redistributeNodes(TreeCacheNode& n,
 {
     uint16_t i;
 
-    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Redistribute Nodes at kPrime %" PRIu16 "", kPrime);
+    PAFFS_DBG_S(PAFFS_TRACE_TREE, "Redistribute Keys between %" PRIu16 " and %" PRIu16 " at kPrime %" PRIu16 "",
+                mCache.getIndexFromPointer(n), mCache.getIndexFromPointer(neighbor), kPrime);
     /* Case: n has a neighbor to the left.
      * Pull the neighbor's last key-pointer pair over
      * from the neighbor's right end to n's left end.
@@ -1105,7 +1106,10 @@ Btree::redistributeNodes(TreeCacheNode& n,
                                                                        // needed, nullptr is also
                                                                        // allowed
             n.raw.as.branch.pointers[0] = neighbor.raw.as.branch.pointers[neighbor.raw.keys];
-            n.pointers[0]->parent = &n;
+            if(n.pointers[0] != nullptr)
+            {
+                n.pointers[0]->parent = &n;
+            }
             neighbor.pointers[neighbor.raw.keys] = nullptr;
             neighbor.raw.as.branch.pointers[neighbor.raw.keys] = 0;
             n.raw.as.branch.keys[0] = kPrime;
@@ -1252,7 +1256,9 @@ Btree::deleteEntry(TreeCacheNode& n, InodeNo key)
         return r;
     }
 
-    capacity = neighbor->raw.isLeaf ? leafOrder : branchOrder - 1;
+    //Branch order tells number of values. Keys is one less.
+    //Also, coalesce appends the kPrime in the keys, so actually we have two less
+    capacity = neighbor->raw.isLeaf ? leafOrder : branchOrder - 2;
 
     //Coalescence
     if (neighbor->raw.keys + n.raw.keys <= capacity)
