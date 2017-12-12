@@ -20,62 +20,65 @@
 #include <stdlib.h> /* srand, rand */
 #include <time.h>   /* time */
 #include <memory>
+#include <string>
 
 class FileTest : public InitFs
 {
 };
 
+using namespace paffs;
+
 TEST_F(FileTest, seekReadWrite)
 {
-    paffs::Obj* fil;
-    paffs::Result r;
+    Obj* fil;
+    Result r;
     char txt[] = "Hallo";
     char buf[6];
     unsigned int bw;
 
-    fil = fs.open("/file", paffs::FW | paffs::FC);
-    if (fs.getLastErr() != paffs::Result::ok)
-        printf("%s!\n", paffs::err_msg(fs.getLastErr()));
+    fil = fs.open("/file", FW | FC);
+    if (fs.getLastErr() != Result::ok)
+        printf("%s!\n", err_msg(fs.getLastErr()));
     ASSERT_NE(fil, nullptr);
 
-    r = fs.seek(*fil, paffs::dataBytesPerPage + 20, paffs::Seekmode::set);
-    ASSERT_EQ(r, paffs::Result::ok);
+    r = fs.seek(*fil, dataBytesPerPage + 20, Seekmode::set);
+    ASSERT_EQ(r, Result::ok);
 
     r = fs.write(*fil, txt, strlen(txt), &bw);
     EXPECT_EQ(bw, strlen(txt));
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
-    r = fs.seek(*fil, -strlen(txt), paffs::Seekmode::cur);
-    ASSERT_EQ(r, paffs::Result::ok);
+    r = fs.seek(*fil, -strlen(txt), Seekmode::cur);
+    ASSERT_EQ(r, Result::ok);
 
     r = fs.read(*fil, buf, strlen(txt), &bw);
     EXPECT_EQ(bw, strlen(txt));
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     ASSERT_TRUE(ArraysMatch(txt, buf, strlen(txt)));
 
-    r = fs.seek(*fil, 20, paffs::Seekmode::set);
-    ASSERT_EQ(r, paffs::Result::ok);
+    r = fs.seek(*fil, 20, Seekmode::set);
+    ASSERT_EQ(r, Result::ok);
 
     r = fs.read(*fil, buf, 1, &bw);
     EXPECT_EQ(bw, static_cast<unsigned int>(1));
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     ASSERT_EQ(buf[0], 0);
 
-    r = fs.seek(*fil, -strlen(txt), paffs::Seekmode::end);
-    ASSERT_EQ(r, paffs::Result::ok);
+    r = fs.seek(*fil, -strlen(txt), Seekmode::end);
+    ASSERT_EQ(r, Result::ok);
 
     r = fs.read(*fil, buf, strlen(txt), &bw);
     EXPECT_EQ(bw, strlen(txt));
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     ASSERT_TRUE(ArraysMatch(txt, buf, strlen(txt)));
 
     r = fs.close(*fil);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 }
 
 TEST_F(FileTest, createReadWriteDeleteFile)
 {
-    const paffs::FileSize filesize = 5 * paffs::dataBytesPerPage + 50;
+    const FileSize filesize = 5 * dataBytesPerPage + 50;
     char t[] = ".                         Text";  // 30 chars
 
     std::unique_ptr<char[]> tlB(new char[filesize]);
@@ -83,8 +86,8 @@ TEST_F(FileTest, createReadWriteDeleteFile)
     char* tl = tlB.get();
     char* buf = bufB.get();
     char quer[] = "..--";
-    paffs::Result r;
-    paffs::ObjInfo info;
+    Result r;
+    ObjInfo info;
     int i;
     for (i = 0; (i + 1) * strlen(t) < filesize; i++)
     {
@@ -93,170 +96,273 @@ TEST_F(FileTest, createReadWriteDeleteFile)
     // fill Rest
     memset(&tl[i * strlen(t)], 0xAA, filesize - i * strlen(t));
 
-    paffs::Obj* fil = fs.open("/file", paffs::FW | paffs::FC);
+    Obj* fil = fs.open("/file", FW | FC);
     ASSERT_NE(fil, nullptr);
 
-    paffs::FileSize bytes = 0;
+    FileSize bytes = 0;
     r = fs.write(*fil, tl, filesize, &bytes);
     EXPECT_EQ(bytes, filesize);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
     r = fs.getObjInfo("/file", info);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     ASSERT_EQ(info.isDir, false);
     ASSERT_EQ(info.size, filesize);
 
     // read
-    r = fs.seek(*fil, 0, paffs::Seekmode::set);
-    ASSERT_EQ(r, paffs::Result::ok);
+    r = fs.seek(*fil, 0, Seekmode::set);
+    ASSERT_EQ(r, Result::ok);
     r = fs.read(*fil, buf, filesize, &bytes);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     ASSERT_EQ(bytes, filesize);
     EXPECT_TRUE(ArraysMatch(buf, tl, filesize));
 
     // misaligned write
-    memcpy(&tl[paffs::dataBytesPerPage - strlen(quer) / 2], quer, strlen(quer));
-    r = fs.seek(*fil, paffs::dataBytesPerPage - strlen(quer) / 2, paffs::Seekmode::set);
-    ASSERT_EQ(r, paffs::Result::ok);
+    memcpy(&tl[dataBytesPerPage - strlen(quer) / 2], quer, strlen(quer));
+    r = fs.seek(*fil, dataBytesPerPage - strlen(quer) / 2, Seekmode::set);
+    ASSERT_EQ(r, Result::ok);
     r = fs.write(*fil, quer, strlen(quer), &bytes);
     EXPECT_EQ(bytes, strlen(quer));
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
     // read
-    r = fs.seek(*fil, 0, paffs::Seekmode::set);
-    ASSERT_EQ(r, paffs::Result::ok);
+    r = fs.seek(*fil, 0, Seekmode::set);
+    ASSERT_EQ(r, Result::ok);
     r = fs.read(*fil, buf, filesize, &bytes);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     ASSERT_EQ(bytes, filesize);
     EXPECT_TRUE(ArraysMatch(buf, tl, filesize));
 
     r = fs.close(*fil);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
     r = fs.remove("/file");
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
+}
+
+TEST_F(FileTest, createReadWriteDeleteManyFiles)
+{
+    static constexpr unsigned int blocksize = 1000;
+    static constexpr unsigned int numberOfFiles = 500;
+    static constexpr unsigned int maxFilesize = 4000;
+    Result r;
+
+    unsigned int filesize[numberOfFiles];
+    char block[blocksize];
+
+    memset(filesize, 0, numberOfFiles * sizeof(unsigned int));
+    for(unsigned i = 0; i < blocksize; i++)
+    {
+        block[i] = rand();
+    }
+
+    for(unsigned accesses = 0; accesses < numberOfFiles * 10; accesses++)
+    {
+        unsigned int fileNo = accesses % numberOfFiles;
+
+        //Check if every file that should exist actually does exist
+        for(unsigned file = 0; file < numberOfFiles; file++)
+        {
+            if(filesize[file] > 0)
+            {
+                ObjInfo info;
+                std::string filename("file");
+                filename.append(std::to_string(file));
+                r = fs.getObjInfo(filename.c_str(), info);
+                if(r != Result::ok)
+                {
+                    printf("File %u: %s\n", file, err_msg(r));
+                }
+                ASSERT_EQ(r, Result::ok);
+                ASSERT_EQ(info.size, filesize[file]);
+            }
+        }
+
+        if(accesses == 478)
+        {
+            printf("Beware of the bug!\n");
+            traceMask |= PAFFS_TRACE_DEVICE | PAFFS_TRACE_VERBOSE;
+        }
+
+        std::string filename("file");
+        filename.append(std::to_string(fileNo));
+        Obj* fd;
+        fd = fs.open(filename.c_str(), FC | FR | FW);
+        ASSERT_NE(fd, nullptr);
+
+        //Check that current file has right contents
+        for(unsigned i = 0; i < filesize[fileNo]; i += blocksize)
+        {
+            char buf[blocksize];
+            unsigned int br;
+            r = fs.read(*fd, buf, blocksize, &br);
+            ASSERT_EQ(r, Result::ok);
+            ASSERT_EQ(br, blocksize);
+
+            if(memcmp(block, buf, blocksize))
+            {
+                fprintf(stderr, "\nFile %u: contents at %u wrong!\n", fileNo, i);
+                for(unsigned j = 0; j < blocksize / 5; j += 5)
+                {
+                    printf("%02X%02X%02X%02X%02X - %02X%02X%02X%02X%02X",
+                           static_cast<uint8_t>(block[j]), static_cast<uint8_t>(block[j+1]), static_cast<uint8_t>(block[j+2]), static_cast<uint8_t>(block[j+3]), static_cast<uint8_t>(block[j+4]),
+                           static_cast<uint8_t>(buf[j]), static_cast<uint8_t>(buf[j+1]), static_cast<uint8_t>(buf[j+2]), static_cast<uint8_t>(buf[j+3]), static_cast<uint8_t>(buf[j+4]));
+                    if(memcmp(&block[j], &buf[j], 5))
+                    {
+                        printf(" <");
+                    }
+                    printf("\n");
+                }
+                ASSERT_EQ(true, false);
+            }
+        }
+
+        if(filesize[fileNo] >= maxFilesize)
+        {
+            //delete
+            fs.close(*fd);
+            if(fileNo == 1)
+            {
+                printf("Beware of the bug\n");
+                traceMask |= PAFFS_TRACE_VERBOSE;
+            }
+            r = fs.remove(filename.c_str());
+            ASSERT_EQ(r, Result::ok);
+            filesize[fileNo] = 0;
+        }
+        else
+        {
+            //append
+            unsigned int bw;
+            r = fs.write(*fd, block, blocksize, &bw);
+            ASSERT_EQ(r, Result::ok);
+            filesize[fileNo] += bw;
+            r = fs.close(*fd);
+            ASSERT_EQ(r, Result::ok);
+        }
+    }
 }
 
 TEST_F(FileTest, directoryReadWrite)
 {
-    paffs::Permission p = paffs::R | paffs::W;
-    paffs::Result r;
+    Permission p = R | W;
+    Result r;
     r = fs.mkDir("/a", p);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     r = fs.mkDir("/b", p);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     r = fs.mkDir("/a/1", p);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     r = fs.touch("/a/1/file1");
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     r = fs.mkDir("/b/c", p);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     r = fs.touch("/b/file2");
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
-    paffs::Dir* dir;
-    paffs::Dirent* entr;
+    Dir* dir;
+    Dirent* entr;
 
     // root
     dir = fs.openDir("/");
     ASSERT_NE(dir, nullptr);
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
-    ASSERT_EQ(entr->node->type, paffs::InodeType::dir);
+    ASSERT_EQ(entr->node->type, InodeType::dir);
     EXPECT_TRUE(StringsMatch(entr->name, "a/"));
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
-    ASSERT_EQ(entr->node->type, paffs::InodeType::dir);
+    ASSERT_EQ(entr->node->type, InodeType::dir);
     EXPECT_TRUE(StringsMatch(entr->name, "b/"));
     entr = fs.readDir(*dir);
     ASSERT_EQ(entr, nullptr);
     r = fs.closeDir(dir);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
     // a
     dir = fs.openDir("/a");
     ASSERT_NE(dir, nullptr);
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
-    ASSERT_EQ(entr->node->type, paffs::InodeType::dir);
+    ASSERT_EQ(entr->node->type, InodeType::dir);
     EXPECT_TRUE(StringsMatch(entr->name, "1/"));
     r = fs.closeDir(dir);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
     // a/b
     dir = fs.openDir("/a/1");
     ASSERT_NE(dir, nullptr);
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
-    ASSERT_EQ(entr->node->type, paffs::InodeType::file);
+    ASSERT_EQ(entr->node->type, InodeType::file);
     EXPECT_TRUE(StringsMatch(entr->name, "file1"));
     r = fs.closeDir(dir);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
     // b
     dir = fs.openDir("/b");
     ASSERT_NE(dir, nullptr);
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
-    ASSERT_EQ(entr->node->type, paffs::InodeType::dir);
+    ASSERT_EQ(entr->node->type, InodeType::dir);
     EXPECT_TRUE(StringsMatch(entr->name, "c/"));
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
-    ASSERT_EQ(entr->node->type, paffs::InodeType::file);
+    ASSERT_EQ(entr->node->type, InodeType::file);
     EXPECT_TRUE(StringsMatch(entr->name, "file2"));
     r = fs.closeDir(dir);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 }
 
 TEST_F(FileTest, permissions)
 {
-    paffs::Obj* fil;
-    paffs::Result r;
+    Obj* fil;
+    Result r;
     char txt[] = "Hallo";
     unsigned int bw;
 
-    fil = fs.open("/file", paffs::FR);
+    fil = fs.open("/file", FR);
     EXPECT_EQ(fil, nullptr);
-    EXPECT_EQ(fs.getLastErr(), paffs::Result::notFound);
+    EXPECT_EQ(fs.getLastErr(), Result::notFound);
     fs.resetLastErr();
 
-    fil = fs.open("/file", paffs::FR | paffs::FC);
+    fil = fs.open("/file", FR | FC);
     ASSERT_NE(fil, nullptr);
 
     r = fs.write(*fil, txt, strlen(txt), &bw);
     EXPECT_EQ(bw, strlen(txt));
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
     r = fs.close(*fil);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
-    r = fs.chmod("/file", paffs::R);
-    ASSERT_EQ(r, paffs::Result::ok);
+    r = fs.chmod("/file", R);
+    ASSERT_EQ(r, Result::ok);
 
-    fil = fs.open("/file", paffs::FW);
-    EXPECT_EQ(fs.getLastErr(), paffs::Result::noperm);
+    fil = fs.open("/file", FW);
+    EXPECT_EQ(fs.getLastErr(), Result::noperm);
     ASSERT_EQ(fil, nullptr);
     fs.resetLastErr();
 
-    fil = fs.open("/file", paffs::FR);
+    fil = fs.open("/file", FR);
     ASSERT_NE(fil, nullptr);
 
     r = fs.write(*fil, txt, strlen(txt), &bw);
     EXPECT_EQ(bw, static_cast<unsigned int>(0));
-    ASSERT_EQ(r, paffs::Result::noperm);
+    ASSERT_EQ(r, Result::noperm);
 
     r = fs.close(*fil);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 }
 
 TEST_F(FileTest, maxFilesize)
 {
-    paffs::Obj* fil;
-    paffs::Result r;
+    Obj* fil;
+    Result r;
     char txt[] = "Hallo";
     unsigned int bw;
     unsigned int wordsize = sizeof(txt);
-    unsigned int blocksize = paffs::dataBytesPerPage * 1.5;
+    unsigned int blocksize = dataBytesPerPage * 1.5;
     char block[blocksize];
     char blockcopy[blocksize];
     unsigned int i = 0, maxFileSize = 0;
@@ -267,45 +373,45 @@ TEST_F(FileTest, maxFilesize)
     if (blocksize - i > 0)
         memcpy(&block[i], txt, blocksize - i);
 
-    fil = fs.open("/file", paffs::FW | paffs::FR | paffs::FC);
-    if (fs.getLastErr() != paffs::Result::ok)
-        printf("%s!\n", paffs::err_msg(fs.getLastErr()));
+    fil = fs.open("/file", FW | FR | FC);
+    if (fs.getLastErr() != Result::ok)
+        printf("%s!\n", err_msg(fs.getLastErr()));
     ASSERT_NE(fil, nullptr);
     i = 0;
     while (true)
     {
         r = fs.write(*fil, block, blocksize, &bw);
         i += bw;
-        if (r == paffs::Result::nospace)
+        if (r == Result::nospace)
             break;
-        if (r != paffs::Result::ok)
+        if (r != Result::ok)
         {
-            printf("Could not write file at %u because %s\n", fil->fp, paffs::err_msg(r));
+            printf("Could not write file at %u because %s\n", fil->fp, err_msg(r));
         }
-        ASSERT_EQ(r, paffs::Result::ok);
+        ASSERT_EQ(r, Result::ok);
         EXPECT_EQ(bw, blocksize);
 
-        fs.seek(*fil, -bw, paffs::Seekmode::cur);
+        fs.seek(*fil, -bw, Seekmode::cur);
         r = fs.read(*fil, blockcopy, blocksize, &bw);
-        ASSERT_EQ(r, paffs::Result::ok);
+        ASSERT_EQ(r, Result::ok);
         ASSERT_TRUE(ArraysMatch(block, blockcopy, blocksize));
     }
     maxFileSize = i;
     r = fs.close(*fil);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     r = fs.unmount();
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     r = fs.mount();
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
-    paffs::ObjInfo info;
+    ObjInfo info;
     fs.resetLastErr();
     fs.getObjInfo("/file", info);
-    ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
+    ASSERT_EQ(fs.getLastErr(), Result::ok);
     ASSERT_EQ(maxFileSize, info.size);
-    fil = fs.open("/file", paffs::FW);
-    if (fs.getLastErr() != paffs::Result::ok)
-        printf("%s!\n", paffs::err_msg(fs.getLastErr()));
+    fil = fs.open("/file", FW);
+    if (fs.getLastErr() != Result::ok)
+        printf("%s!\n", err_msg(fs.getLastErr()));
     ASSERT_NE(fil, nullptr);
 
     i = 0;
@@ -313,7 +419,7 @@ TEST_F(FileTest, maxFilesize)
     {
         memset(blockcopy, 0, blocksize);
         r = fs.read(*fil, blockcopy, blocksize, &bw);
-        ASSERT_EQ(r, paffs::Result::ok);
+        ASSERT_EQ(r, Result::ok);
         if (maxFileSize - i >= blocksize)
         {
             ASSERT_EQ(bw, blocksize);
@@ -328,27 +434,27 @@ TEST_F(FileTest, maxFilesize)
     }
 
     r = fs.close(*fil);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
     r = fs.truncate("/file", maxFileSize / 2);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     fs.resetLastErr();
     fs.getObjInfo("/file", info);
-    ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
+    ASSERT_EQ(fs.getLastErr(), Result::ok);
     ASSERT_EQ(maxFileSize / 2, info.size);
 
-    fil = fs.open("/file", paffs::FR);
-    if (fs.getLastErr() != paffs::Result::ok)
-        printf("%s!\n", paffs::err_msg(fs.getLastErr()));
+    fil = fs.open("/file", FR);
+    if (fs.getLastErr() != Result::ok)
+        printf("%s!\n", err_msg(fs.getLastErr()));
     ASSERT_NE(fil, nullptr);
     r = fs.seek(*fil, maxFileSize / 2 - blocksize / 2);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
     memset(blockcopy, 0, blocksize);
     std::cout << "Intentionally reading over Filesize" << std::endl;
     r = fs.read(*fil, blockcopy, blocksize, &bw);
     EXPECT_EQ(bw, blocksize / 2);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     unsigned blockStart = (maxFileSize / 2 - blocksize / 2) % blocksize;
     unsigned overRun = blocksize - blockStart;
     if (overRun < bw)
@@ -361,15 +467,17 @@ TEST_F(FileTest, maxFilesize)
         EXPECT_TRUE(ArraysMatch(blockcopy, &block[blockStart], bw));
     }
 
+    traceMask |= PAFFS_TRACE_DEVICE;
+
     r = fs.remove("/file");
-    ASSERT_EQ(r, paffs::Result::invalidInput);
+    ASSERT_EQ(r, Result::invalidInput);
     r = fs.close(*fil);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     r = fs.remove("/file");
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
     // Check if file is missing
-    paffs::Dir* dir;
+    Dir* dir;
 
     // root
     dir = fs.openDir("/");
@@ -377,7 +485,7 @@ TEST_F(FileTest, maxFilesize)
     ASSERT_EQ(dir->entries, 0);
 
     r = fs.closeDir(dir);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 }
 
 TEST_F(FileTest, multiplePointersToSameFile)
@@ -386,9 +494,9 @@ TEST_F(FileTest, multiplePointersToSameFile)
     char elemIn[elemsize + 1], elemOut[elemsize + 1];
     unsigned ringBufSize = 0, maxRingBufSize = 500;
     unsigned runningNumberIn = 0, runningNumberOut = 0;
-    paffs::Obj *inFil, *outFil;
+    Obj *inFil, *outFil;
     unsigned int b;
-    paffs::Result r;
+    Result r;
 
     /**
      * critical seeds:
@@ -398,13 +506,13 @@ TEST_F(FileTest, multiplePointersToSameFile)
     std::cout << "Random seed :" << seed << std::endl;
     srand(seed);
     // open file with different modes
-    outFil = fs.open("/file", paffs::FW | paffs::FC);
-    if (fs.getLastErr() != paffs::Result::ok)
-        printf("%s!\n", paffs::err_msg(fs.getLastErr()));
+    outFil = fs.open("/file", FW | FC);
+    if (fs.getLastErr() != Result::ok)
+        printf("%s!\n", err_msg(fs.getLastErr()));
     ASSERT_NE(outFil, nullptr);
-    inFil = fs.open("/file", paffs::FR);
-    if (fs.getLastErr() != paffs::Result::ok)
-        printf("%s!\n", paffs::err_msg(fs.getLastErr()));
+    inFil = fs.open("/file", FR);
+    if (fs.getLastErr() != Result::ok)
+        printf("%s!\n", err_msg(fs.getLastErr()));
     ASSERT_NE(inFil, nullptr);
 
     while (runningNumberOut < 5000)
@@ -417,12 +525,12 @@ TEST_F(FileTest, multiplePointersToSameFile)
             sprintf(elemIn, "%0*u", elemsize, runningNumberIn++);
             r = fs.write(*inFil, elemIn, elemsize, &b);
             EXPECT_EQ(b, elemsize);
-            ASSERT_EQ(r, paffs::Result::ok);
+            ASSERT_EQ(r, Result::ok);
             // printf("Wrote elem %4s\n", elemIn);
             if (inFil->fp >= maxRingBufSize * elemsize)
             {
-                r = fs.seek(*inFil, 0, paffs::Seekmode::set);
-                ASSERT_EQ(r, paffs::Result::ok);
+                r = fs.seek(*inFil, 0, Seekmode::set);
+                ASSERT_EQ(r, Result::ok);
             }
             ringBufSize++;
         }
@@ -433,92 +541,92 @@ TEST_F(FileTest, multiplePointersToSameFile)
                 continue;
             r = fs.read(*outFil, elemOut, elemsize, &b);
             EXPECT_EQ(b, elemsize);
-            ASSERT_EQ(r, paffs::Result::ok);
+            ASSERT_EQ(r, Result::ok);
             // printf("Read elem %.*s\n",elemsize, elemOut);
             sprintf(elemIn, "%0*u", elemsize, runningNumberOut++);
             ASSERT_EQ(strncmp(elemIn, elemOut, elemsize), 0);
             if (outFil->fp >= maxRingBufSize * elemsize)
             {
-                r = fs.seek(*outFil, 0, paffs::Seekmode::set);
-                ASSERT_EQ(r, paffs::Result::ok);
+                r = fs.seek(*outFil, 0, Seekmode::set);
+                ASSERT_EQ(r, Result::ok);
             }
             ringBufSize--;
         }
     }
     ASSERT_EQ(fs.getNumberOfOpenFiles(), 2);
-    paffs::Obj* list[2];
+    Obj* list[2];
     r = fs.getListOfOpenFiles(list);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     ASSERT_EQ(list[1], inFil);
     ASSERT_EQ(list[0], outFil);
 
     r = fs.close(*inFil);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     r = fs.close(*outFil);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 }
 
 TEST_F(FileTest, readOnlyChecks)
 {
-    paffs::Permission p = paffs::R | paffs::W;
+    Permission p = R | W;
     char word[] = "Hallo1";
     unsigned int wordlen = 6;
     char buf[wordlen];
-    paffs::Result r;
-    paffs::Obj* fil;
-    paffs::Dir* dir;
-    paffs::Dirent* entr;
+    Result r;
+    Obj* fil;
+    Dir* dir;
+    Dirent* entr;
 
     unsigned int bw = 0;
     r = fs.mkDir("/a", p);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     r = fs.mkDir("/a/b", p);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     r = fs.touch("/a/b/file1");
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     r = fs.mkDir("/b", p);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     r = fs.mkDir("/b/c", p);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     r = fs.touch("/b/file2");
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
-    fil = fs.open("/a/b/file1", paffs::FW);
-    ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
+    fil = fs.open("/a/b/file1", FW);
+    ASSERT_EQ(fs.getLastErr(), Result::ok);
     ASSERT_NE(fil, nullptr);
     r = fs.write(*fil, word, wordlen, &bw);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     ASSERT_EQ(bw, wordlen);
     r = fs.close(*fil);
 
     r = fs.unmount();
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     r = fs.mount(true);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
     // normal read
-    fil = fs.open("/a/b/file1", paffs::FR);
-    ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
+    fil = fs.open("/a/b/file1", FR);
+    ASSERT_EQ(fs.getLastErr(), Result::ok);
     ASSERT_NE(fil, nullptr);
     r = fs.read(*fil, buf, wordlen, &bw);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     ASSERT_EQ(bw, wordlen);
     ASSERT_TRUE(ArraysMatch(buf, word, 6));
     r = fs.close(*fil);
 
     // Write try
-    fil = fs.open("/a/b/file1", paffs::FW);
-    ASSERT_EQ(fs.getLastErr(), paffs::Result::readonly);
+    fil = fs.open("/a/b/file1", FW);
+    ASSERT_EQ(fs.getLastErr(), Result::readonly);
     ASSERT_EQ(fil, nullptr);
     fs.resetLastErr();
 
     // existing File
     r = fs.touch("/a/b/file1");
-    ASSERT_EQ(r, paffs::Result::readonly);
+    ASSERT_EQ(r, Result::readonly);
 
     // new file
     r = fs.touch("/a/b/fileNEW");
-    ASSERT_EQ(r, paffs::Result::readonly);
+    ASSERT_EQ(r, Result::readonly);
 
     // existing Dirs
     // root
@@ -526,53 +634,53 @@ TEST_F(FileTest, readOnlyChecks)
     ASSERT_NE(dir, nullptr);
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
-    ASSERT_EQ(entr->node->type, paffs::InodeType::dir);
+    ASSERT_EQ(entr->node->type, InodeType::dir);
     EXPECT_TRUE(StringsMatch(entr->name, "a/"));
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
-    ASSERT_EQ(entr->node->type, paffs::InodeType::dir);
+    ASSERT_EQ(entr->node->type, InodeType::dir);
     EXPECT_TRUE(StringsMatch(entr->name, "b/"));
     r = fs.closeDir(dir);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
     // a
     dir = fs.openDir("/a");
     ASSERT_NE(dir, nullptr);
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
-    ASSERT_EQ(entr->node->type, paffs::InodeType::dir);
+    ASSERT_EQ(entr->node->type, InodeType::dir);
     EXPECT_TRUE(StringsMatch(entr->name, "b/"));
     r = fs.closeDir(dir);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
     // a/b
     dir = fs.openDir("/a/b");
     ASSERT_NE(dir, nullptr);
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
-    ASSERT_EQ(entr->node->type, paffs::InodeType::file);
+    ASSERT_EQ(entr->node->type, InodeType::file);
     EXPECT_TRUE(StringsMatch(entr->name, "file1"));
     r = fs.closeDir(dir);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
     // b
     dir = fs.openDir("/b");
     ASSERT_NE(dir, nullptr);
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
-    ASSERT_EQ(entr->node->type, paffs::InodeType::dir);
+    ASSERT_EQ(entr->node->type, InodeType::dir);
     EXPECT_TRUE(StringsMatch(entr->name, "c/"));
     entr = fs.readDir(*dir);
     ASSERT_NE(entr, nullptr);
-    ASSERT_EQ(entr->node->type, paffs::InodeType::file);
+    ASSERT_EQ(entr->node->type, InodeType::file);
     EXPECT_TRUE(StringsMatch(entr->name, "file2"));
     r = fs.closeDir(dir);
-    ASSERT_EQ(r, paffs::Result::ok);
+    ASSERT_EQ(r, Result::ok);
 
     // new Dir
     r = fs.mkDir("/c/");
-    ASSERT_EQ(r, paffs::Result::readonly);
+    ASSERT_EQ(r, Result::readonly);
 
     // delete dir
     r = fs.remove("/a/b");
-    ASSERT_EQ(r, paffs::Result::readonly);
+    ASSERT_EQ(r, Result::readonly);
 }

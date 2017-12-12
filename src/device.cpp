@@ -485,7 +485,7 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         // Just contains a zero for "No entries"
         return Result::notFound;
     }
-
+    DirEntryLength nameLength = strlen(name);
     std::unique_ptr<uint8_t[]> buf(new uint8_t[folder.size]);
     FileSize bytesRead = 0;
     Result r = dataIO.readInodeData(folder, 0, folder.size, &bytesRead, buf.get());
@@ -494,55 +494,55 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         return r == Result::ok ? Result::bug : r;
     }
 
+    PAFFS_DBG_S(PAFFS_TRACE_DEVICE,
+                "Searching for '%s' in Inode %" PTYPE_INODENO " (%" PTYPE_DIRENTRYCOUNT " entries)",
+                name, folder.no, *reinterpret_cast<DirEntryCount*>(buf.get()));
+
     FileSize p = sizeof(DirEntryCount);  // skip directory entry count
+    DirEntryCount entryNo = 0;
     while (p < folder.size)
     {
         DirEntryLength direntryl = buf[p];
-        if (direntryl < sizeof(DirEntryLength) + sizeof(InodeNo))
+        if (direntryl < sizeof(DirEntryLength) + sizeof(InodeNo) + 1)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "Directory entry size of Folder %" PTYPE_INODENO " is unplausible! "
+                      "Folder %" PTYPE_INODENO ": Directory entry %" PTYPE_DIRENTRYCOUNT " size is unplausible! "
                               "(was: %" PTYPE_DIRENTRYLEN ", should: >%zu)",
-                      folder.no,
-                      direntryl,
-                      sizeof(DirEntryLength) + sizeof(InodeNo));
+                      folder.no, entryNo, direntryl,
+                      sizeof(DirEntryLength) + sizeof(InodeNo) + 1);
             return Result::bug;
         }
         if (direntryl > folder.size)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "BUG: direntry length of Folder %" PTYPE_INODENO " not plausible "
+                      "Folder %" PTYPE_INODENO ": Directory entry %" PTYPE_DIRENTRYCOUNT " length not plausible "
                               "(was: %" PTYPE_DIRENTRYLEN ", should: >%" PTYPE_FILSIZE ")!",
-                      folder.no,
-                      direntryl,
+                      folder.no, entryNo, direntryl,
                       folder.size);
             return Result::bug;
         }
         FileNamePos dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
-        if (dirnamel > folder.size)
-        {
-            PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "BUG: dirname length of Inode %" PTYPE_INODENO " not plausible "
-                              "(was: %" PTYPE_FILSIZE ", should: >%" PTYPE_FILSIZE ")!",
-                      folder.no,
-                      folder.size,
-                      p + dirnamel);
-            return Result::bug;
-        }
         p += sizeof(DirEntryLength);
-        InodeNo tmp_no;
-        memcpy(&tmp_no, &buf[p], sizeof(InodeNo));
         p += sizeof(InodeNo);
-        char tmpname[dirnamel + 1];
-        memcpy(tmpname, &buf[p], dirnamel);
-        tmpname[dirnamel] = 0;
-        p += dirnamel;
-        if (strcmp(name, tmpname) == 0)
+        if (dirnamel == nameLength && memcmp(name, &buf[p], dirnamel) == 0)
         {
             // Eintrag gefunden
-            outInode = tmp_no;
+            memcpy(&outInode, &buf[p - sizeof(InodeNo)], sizeof(InodeNo));
+            PAFFS_DBG_S(PAFFS_TRACE_DEVICE,
+                        "Found '%.*s' with Inode %" PTYPE_INODENO " at offs %" PTYPE_FILSIZE,
+                        dirnamel, &buf[p], outInode,
+                        static_cast<FileSize>(p - sizeof(InodeNo) - sizeof(DirEntryLength)));
             return Result::ok;
         }
+        if(traceMask & PAFFS_TRACE_VERBOSE)
+        {
+            PAFFS_DBG_S(PAFFS_TRACE_DEVICE,
+                        "Not '%.*s' (length %" PTYPE_DIRENTRYLEN ") with Inode %" PTYPE_INODENO " at offs %" PTYPE_FILSIZE,
+                        dirnamel, &buf[p], direntryl, outInode,
+                        static_cast<FileSize>(p - sizeof(InodeNo) - sizeof(DirEntryLength)));
+        }
+        p += dirnamel;
+        entryNo++;
     }
     return Result::notFound;
 }
@@ -577,6 +577,7 @@ Device::getInodeOfElem(SmartInodePtr& outInode, const char* fullPath)
 
         if (curr->type != InodeType::dir)
         {
+            PAFFS_DBG(PAFFS_TRACE_ERROR, "Inode %" PTYPE_INODENO " is not a directory!", curr->no);
             return Result::invalidInput;
         }
 
@@ -657,7 +658,9 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
     memcpy(&buf[sizeof(DirEntryLength) + sizeof(InodeNo)], name, elemNameL);
 
     if (contDir.size == 0)
+    {
         contDir.size = sizeof(DirEntryCount);  // To hold the Number of Entries
+    }
 
     std::unique_ptr<uint8_t[]> dirData(new uint8_t[contDir.size + direntryl]);
     FileSize bytes = 0;
@@ -682,6 +685,11 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
     memcpy(&directoryEntryCount, dirData.get(), sizeof(DirEntryCount));
     directoryEntryCount++;
     memcpy(dirData.get(), &directoryEntryCount, sizeof(DirEntryCount));
+
+    PAFFS_DBG_S(PAFFS_TRACE_DEVICE,
+                "Appending '%.*s' to Inode %" PTYPE_INODENO " at %" PTYPE_FILSIZE
+                " (now %" PTYPE_DIRENTRYCOUNT " entries)",
+                elemNameL, name, contDir.no, contDir.size, directoryEntryCount);
 
     // TODO: If write more than one page, split in start and end page to reduce
     // unnecessary writes on intermediate pages.
@@ -743,23 +751,31 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
         return Result::notFound;  // did not find directory entry, because dir is empty
     }
 
+
     DirEntryCount entries = 0;
     memcpy(&entries, &dirData[0], sizeof(DirEntryCount));
     FileSize pointer = sizeof(DirEntryCount);
+
+    PAFFS_DBG_S(PAFFS_TRACE_DEVICE,
+                "Deleting from Inode %" PTYPE_INODENO " (%" PTYPE_DIRENTRYCOUNT " entries)",
+                contDir.no, entries);
+
     while (pointer < contDir.size)
     {
         DirEntryLength entryl = static_cast<DirEntryLength>(dirData[pointer]);
         if (memcmp(&dirData[pointer + sizeof(DirEntryLength)], &elem, sizeof(InodeNo)) == 0)
         {
             // Found
+            PAFFS_DBG_S(PAFFS_TRACE_DEVICE, "Found entry '%.*s' at offs %" PTYPE_FILSIZE,
+                        static_cast<int>(entryl - sizeof(InodeNo) - 1),
+                        &dirData[pointer + sizeof(DirEntryLength) + sizeof(InodeNo)],
+                        pointer);
+
             FileSize newSize = contDir.size - entryl;
             FileSize restByte = newSize - pointer;
             if (newSize == sizeof(DirEntryCount))
-                newSize = 0;
-
-            if ((r = dataIO.deleteInodeData(contDir, newSize)) != Result::ok)
             {
-                return r;
+                newSize = 0;
             }
 
             if (restByte > 0 && restByte < 4)  // should either be 0 (no entries left) or bigger
@@ -769,8 +785,16 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
             if (newSize == 0)
             {
                 // This was the last entry
+                if ((r = dataIO.deleteInodeData(contDir, 0)) != Result::ok)
+                {
+                    return r;
+                }
                 return dataIO.pac.commit();
             }
+
+            PAFFS_DBG_S(PAFFS_TRACE_DEVICE, "Slicing folder from %" PTYPE_FILSIZE " "
+                    "to %" PTYPE_FILSIZE " at %" PTYPE_FILSIZE " (moving %" PTYPE_FILSIZE " Bytes to left)",
+                    contDir.size, newSize, pointer, restByte);
 
             entries--;
             memcpy(&dirData[0], &entries, sizeof(DirEntryCount));
@@ -781,6 +805,11 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update Inode Data");
+                return r;
+            }
+
+            if ((r = dataIO.deleteInodeData(contDir, newSize)) != Result::ok)
+            {
                 return r;
             }
             return dataIO.pac.commit();

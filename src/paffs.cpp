@@ -57,9 +57,10 @@ TraceMask traceMask =
 
 const char* traceDescription[] =
    {
+       "INVALID",
        "INFO",
        "OS",
-       "ALLOCATE",
+       "DEVICE",
        "SCAN",
        "BAD_BLOCKS",
        "ERASE",
@@ -76,8 +77,7 @@ const char* traceDescription[] =
        "VERIFY_TC",
        "VERIFY_NAND",
        "VERIFY_AS",
-       "PAFFS_WRITE_VERIFY_AS",
-       "VERIFY_ALL",
+       "WRITE_VERIFY_AS",
        "SUPERBLOCK",
        "TREECACHE",
        "TREE",
