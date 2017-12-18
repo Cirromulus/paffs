@@ -758,7 +758,6 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
         return Result::notFound;  // did not find directory entry, because dir is empty
     }
 
-
     DirEntryCount entries = 0;
     memcpy(&entries, &dirData[0], sizeof(DirEntryCount));
     FileSize pointer = sizeof(DirEntryCount);
@@ -805,7 +804,8 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
 
             entries--;
             memcpy(&dirData[0], &entries, sizeof(DirEntryCount));
-            memcpy(&dirData[pointer], &dirData[pointer + entryl], restByte);
+            //source and destination may overlap if there more than one entry behind us
+            memmove(&dirData[pointer], &dirData[pointer + entryl], restByte);
 
             FileSize bw = 0;
             r = dataIO.writeInodeData(contDir, 0, newSize, &bw, dirData.get());

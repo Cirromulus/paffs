@@ -367,11 +367,15 @@ TEST_F(FileTest, maxFilesize)
         memcpy(&block[i], txt, wordsize);
     }
     if (blocksize - i > 0)
+    {
         memcpy(&block[i], txt, blocksize - i);
+    }
 
     fil = fs.open("/file", FW | FR | FC);
     if (fs.getLastErr() != Result::ok)
+    {
         printf("%s!\n", err_msg(fs.getLastErr()));
+    }
     ASSERT_NE(fil, nullptr);
     i = 0;
     while (true)
