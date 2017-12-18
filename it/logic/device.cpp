@@ -144,7 +144,7 @@ TEST_F(FileTest, createReadWriteDeleteManyFiles)
 {
     static constexpr unsigned int blocksize = 1000;
     static constexpr unsigned int numberOfFiles = 500;
-    static constexpr unsigned int maxFilesize = 4000;
+    static constexpr unsigned int maxFilesize = 2000;
     Result r;
 
     unsigned int filesize[numberOfFiles];
@@ -156,89 +156,85 @@ TEST_F(FileTest, createReadWriteDeleteManyFiles)
         block[i] = rand();
     }
 
-    for(unsigned accesses = 0; accesses < numberOfFiles * 10; accesses++)
+    for(unsigned round = 0; round < 3; round++)
     {
-        unsigned int fileNo = accesses % numberOfFiles;
-
-        //Check if every file that should exist actually does exist
-        for(unsigned file = 0; file < numberOfFiles; file++)
+        for(unsigned fileNo = 0; fileNo < numberOfFiles; fileNo++)
         {
-            if(filesize[file] > 0)
+            //Check if every file that should exist actually does exist
+            for(unsigned file = 0; file < numberOfFiles; file++)
             {
-                ObjInfo info;
-                std::string filename("file");
-                filename.append(std::to_string(file));
-                r = fs.getObjInfo(filename.c_str(), info);
-                if(r != Result::ok)
+                if(filesize[file] > 0)
                 {
-                    printf("File %u: %s\n", file, err_msg(r));
+                    ObjInfo info;
+                    std::string filename("file");
+                    filename.append(std::to_string(file));
+                    r = fs.getObjInfo(filename.c_str(), info);
+                    if(r != Result::ok)
+                    {
+                        printf("File %u: %s\n", file, err_msg(r));
+                    }
+                    ASSERT_EQ(r, Result::ok);
+                    ASSERT_EQ(info.size, filesize[file]);
+                }
+            }
+
+            std::string filename("file");
+            filename.append(std::to_string(fileNo));
+            Obj* fd;
+            fd = fs.open(filename.c_str(), FC | FR | FW);
+            ASSERT_NE(fd, nullptr);
+
+            //Check that current file has right contents
+            for(unsigned i = 0; i < filesize[fileNo]; i += blocksize)
+            {
+                char buf[blocksize];
+                unsigned int br;
+                r = fs.read(*fd, buf, blocksize, &br);
+                ASSERT_EQ(r, Result::ok);
+                ASSERT_EQ(br, blocksize);
+
+                if(memcmp(block, buf, blocksize))
+                {
+                    fprintf(stderr, "\nFile %u: contents at %u wrong!\n", fileNo, i);
+                    for(unsigned j = 0; j < blocksize / 5; j += 5)
+                    {
+                        printf("%02X%02X%02X%02X%02X - %02X%02X%02X%02X%02X",
+                               static_cast<uint8_t>(block[j]), static_cast<uint8_t>(block[j+1]), static_cast<uint8_t>(block[j+2]), static_cast<uint8_t>(block[j+3]), static_cast<uint8_t>(block[j+4]),
+                               static_cast<uint8_t>(buf[j]), static_cast<uint8_t>(buf[j+1]), static_cast<uint8_t>(buf[j+2]), static_cast<uint8_t>(buf[j+3]), static_cast<uint8_t>(buf[j+4]));
+                        if(memcmp(&block[j], &buf[j], 5))
+                        {
+                            printf(" <");
+                        }
+                        printf("\n");
+                    }
+                    ASSERT_EQ(true, false);
+                }
+            }
+
+            if(filesize[fileNo] >= maxFilesize)
+            {
+                //delete
+                fs.close(*fd);
+                r = fs.remove(filename.c_str());
+                ASSERT_EQ(r, Result::ok);
+                filesize[fileNo] = 0;
+            }
+            else
+            {
+                //append
+                unsigned int bw;
+                r = fs.write(*fd, block, blocksize, &bw);
+                if(r == Result::nospace)
+                {
+                    r = fs.close(*fd);
+                    ASSERT_EQ(r, Result::ok);
+                    return;
                 }
                 ASSERT_EQ(r, Result::ok);
-                ASSERT_EQ(info.size, filesize[file]);
+                filesize[fileNo] += bw;
+                r = fs.close(*fd);
+                ASSERT_EQ(r, Result::ok);
             }
-        }
-
-        if(accesses == 478)
-        {
-            printf("Beware of the bug!\n");
-            traceMask |= PAFFS_TRACE_DEVICE | PAFFS_TRACE_VERBOSE;
-        }
-
-        std::string filename("file");
-        filename.append(std::to_string(fileNo));
-        Obj* fd;
-        fd = fs.open(filename.c_str(), FC | FR | FW);
-        ASSERT_NE(fd, nullptr);
-
-        //Check that current file has right contents
-        for(unsigned i = 0; i < filesize[fileNo]; i += blocksize)
-        {
-            char buf[blocksize];
-            unsigned int br;
-            r = fs.read(*fd, buf, blocksize, &br);
-            ASSERT_EQ(r, Result::ok);
-            ASSERT_EQ(br, blocksize);
-
-            if(memcmp(block, buf, blocksize))
-            {
-                fprintf(stderr, "\nFile %u: contents at %u wrong!\n", fileNo, i);
-                for(unsigned j = 0; j < blocksize / 5; j += 5)
-                {
-                    printf("%02X%02X%02X%02X%02X - %02X%02X%02X%02X%02X",
-                           static_cast<uint8_t>(block[j]), static_cast<uint8_t>(block[j+1]), static_cast<uint8_t>(block[j+2]), static_cast<uint8_t>(block[j+3]), static_cast<uint8_t>(block[j+4]),
-                           static_cast<uint8_t>(buf[j]), static_cast<uint8_t>(buf[j+1]), static_cast<uint8_t>(buf[j+2]), static_cast<uint8_t>(buf[j+3]), static_cast<uint8_t>(buf[j+4]));
-                    if(memcmp(&block[j], &buf[j], 5))
-                    {
-                        printf(" <");
-                    }
-                    printf("\n");
-                }
-                ASSERT_EQ(true, false);
-            }
-        }
-
-        if(filesize[fileNo] >= maxFilesize)
-        {
-            //delete
-            fs.close(*fd);
-            if(fileNo == 1)
-            {
-                printf("Beware of the bug\n");
-                traceMask |= PAFFS_TRACE_VERBOSE;
-            }
-            r = fs.remove(filename.c_str());
-            ASSERT_EQ(r, Result::ok);
-            filesize[fileNo] = 0;
-        }
-        else
-        {
-            //append
-            unsigned int bw;
-            r = fs.write(*fd, block, blocksize, &bw);
-            ASSERT_EQ(r, Result::ok);
-            filesize[fileNo] += bw;
-            r = fs.close(*fd);
-            ASSERT_EQ(r, Result::ok);
         }
     }
 }
@@ -466,8 +462,6 @@ TEST_F(FileTest, maxFilesize)
     {
         EXPECT_TRUE(ArraysMatch(blockcopy, &block[blockStart], bw));
     }
-
-    traceMask |= PAFFS_TRACE_DEVICE;
 
     r = fs.remove("/file");
     ASSERT_EQ(r, Result::invalidInput);

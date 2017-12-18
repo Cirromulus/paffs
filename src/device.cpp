@@ -536,6 +536,7 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         }
         if(traceMask & PAFFS_TRACE_VERBOSE)
         {
+            memcpy(&outInode, &buf[p - sizeof(InodeNo)], sizeof(InodeNo));
             PAFFS_DBG_S(PAFFS_TRACE_DEVICE,
                         "Not '%.*s' (length %" PTYPE_DIRENTRYLEN ") with Inode %" PTYPE_INODENO " at offs %" PTYPE_FILSIZE,
                         dirnamel, &buf[p], direntryl, outInode,
@@ -721,7 +722,13 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
         return r;
     }
 
-    r = tree.updateExistingInode(contDir);
+    //FIXME Dirty hack. Actually, the Problem is with the inode reference.
+    //      Inode target is located in Tree, which may have cleared the node until we commit PAC.
+    //      This may be fixed either by locking the Inode (potentially filling cache, bad)
+    //      Or by committing PAC as soon as it gets deleted (Add pac reference to Inode)
+
+    //PAC commit also updates tree
+    r = dataIO.pac.commit();
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update Inode after directory insert!");
