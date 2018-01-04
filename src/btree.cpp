@@ -1035,7 +1035,7 @@ Btree::coalesceNodes(TreeCacheNode& n,
     }
 
     /* In a leaf, append the keys and pointers of
-     * n to the to->
+     * n to the neighbor.
      */
 
     else

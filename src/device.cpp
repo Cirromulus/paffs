@@ -524,7 +524,7 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         FileNamePos dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
         p += sizeof(DirEntryLength);
         p += sizeof(InodeNo);
-        if (dirnamel == nameLength && memcmp(name, &buf[p], dirnamel) == 0)
+        if ((dirnamel == nameLength) && (memcmp(name, &buf[p], dirnamel) == 0))
         {
             // Eintrag gefunden
             memcpy(&outInode, &buf[p - sizeof(InodeNo)], sizeof(InodeNo));

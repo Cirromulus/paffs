@@ -67,8 +67,8 @@ GarbageCollection::findNextBestArea(AreaType target,
             {
                 // normal case
                 if (dirtyPages == dataPagesPerArea
-                    && (dev->areaMgmt.getOverallDeletions() < areasNo ||  // Some wear leveling
-                        dev->areaMgmt.getErasecount(i) < dev->areaMgmt.getOverallDeletions() / areasNo))
+                    && ((dev->areaMgmt.getOverallDeletions() < areasNo) ||  // Some wear leveling
+                        (dev->areaMgmt.getErasecount(i) < dev->areaMgmt.getOverallDeletions() / areasNo)))
                 {
                     // We can't find a block with more dirty pages in it
                     *srcAreaContainsData = false;
