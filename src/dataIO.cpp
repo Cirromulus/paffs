@@ -82,7 +82,7 @@ DataIO::writeInodeData(Inode& inode,
         inode.size = *bytesWritten + offs;
     }
 
-    // the Tree UpdateExistingInode has to be done by high level functions,
+    // FIXME the Tree UpdateExistingInode has to be done by high level functions,
     // bc they may modify it by themselves
     return res;
 }

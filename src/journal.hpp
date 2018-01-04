@@ -24,7 +24,7 @@ class Journal
     JournalTopic* topics[3];
 
     JournalPersistence& persistence;
-    bool disabled;
+    bool disabled;  //TODO: remove this for securing mount process
 
 public:
     Journal(JournalPersistence& _persistence,
@@ -44,8 +44,6 @@ public:
     Result
     addEvent(const JournalEntry& entry);
     Result
-    checkpoint();
-    Result
     clear();
     Result
     processBuffer();
@@ -58,12 +56,7 @@ public:
 
 private:
     Result
-    applyCheckpointedJournalEntries(
-            EntryIdentifier& from,
-            EntryIdentifier& to,
-            EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics]);
-    Result
-    applyUncheckpointedJournalEntries(EntryIdentifier& from);
+    applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEntry::numberOfTopics]);
     PageAbs
     getSizeFromMax(const journalEntry::Max& entry);
 };

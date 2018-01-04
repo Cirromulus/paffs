@@ -67,7 +67,7 @@ smallTest()
     dev->journal.addEvent(journalEntry::btree::Insert(dir));
     Inode node;
     node.type = InodeType::dir;
-    dev->journal.addEvent(journalEntry::inode::Add(node.no));
+    dev->journal.addEvent(journalEntry::pac::Add(node.no));
 
     dev->journal.addEvent(journalEntry::btree::Insert(fil));
     dev->journal.addEvent(journalEntry::superblock::Rootnode(1234));

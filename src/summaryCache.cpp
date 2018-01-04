@@ -784,7 +784,7 @@ SummaryCache::commitAreaSummaries(bool createNew)
         return r;
     }
 
-    dev->journal.addEvent(journalEntry::Success(JournalEntry::Topic::summaryCache));
+    dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::summaryCache));
 
     for (std::pair<AreaPos, uint16_t> cacheElem : mTranslation)
     {
@@ -802,13 +802,13 @@ SummaryCache::getTopic()
     return JournalEntry::Topic::summaryCache;
 }
 
-void
+Result
 SummaryCache::processEntry(JournalEntry& entry)
 {
     if (entry.topic != getTopic())
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
-        return;
+        return Result::invalidInput;
     }
     auto e = static_cast<const journalEntry::SummaryCache*>(&entry);
     switch (e->subtype)
@@ -830,41 +830,19 @@ SummaryCache::processEntry(JournalEntry& entry)
         setPageStatus(s->area, s->page, s->status);
         break;
     }
+    default:
+        return Result::nimpl;
     }
+
+    return Result::ok;
 }
 
 void
-SummaryCache::processUncheckpointedEntry(JournalEntry& entry)
+SummaryCache::signalEndOfLog()
 {
-    if (entry.topic != getTopic())
-    {
-        PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
-        return;
-    }
-    const journalEntry::SummaryCache* e = static_cast<const journalEntry::SummaryCache*>(&entry);
-    switch (e->subtype)
-    {
-    case journalEntry::SummaryCache::Subtype::commit:
-    case journalEntry::SummaryCache::Subtype::remove:
-        // TODO: Is it Ok if nothing happens here?
-        // B.c. we are overwriting 'used' pages
-        break;
-    case journalEntry::SummaryCache::Subtype::setStatus:
-    {
-        // TODO activate some failsafe that checks for invalid writes during this setPages
-        auto s = static_cast<const journalEntry::summaryCache::SetStatus*>(&entry);
-        if (s->status == SummaryEntry::used)
-        {
-            setPageStatus(s->area, s->page, SummaryEntry::dirty);
-        }
-        if (s->status == SummaryEntry::dirty)
-        {
-            setPageStatus(s->area, s->page, SummaryEntry::used);
-        }
-        break;
-    }
-    }
+    PAFFS_DBG(PAFFS_TRACE_ERROR, "Not implemented");
 }
+
 
 Result
 SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent)

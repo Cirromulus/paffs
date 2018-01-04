@@ -280,12 +280,16 @@ Device::mnt(bool readOnlyMode)
         PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not enable Journal!");
         return r;
     }
-    r = journal.processBuffer();
+
+    //This is skippeduntil journal is somewhat finished
+    /*r = journal.processBuffer();
     if (r != Result::ok)
     {
+
         PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not process journal!");
         return r;
     }
+    */
 
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Replayed Journal if needed");
 
@@ -372,7 +376,6 @@ Device::unmnt()
         printf("\t----------------------\n");
     }
 
-    journal.checkpoint();
     journal.clear();
 
     destroyDevice();
@@ -633,6 +636,7 @@ Device::findOrLoadInode(InodeNo no, SmartInodePtr& target)
 Result
 Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
 {
+    journal.addEvent(journalEntry::device::MkObjInode(contDir.no));
     FileNamePos elemNameL = strlen(name);
     if (name[elemNameL - 1] == '/')
     {
@@ -856,16 +860,22 @@ Device::mkDir(const char* fullPath, Permission mask)
         return Result::objNameTooLong;
     }
 
+
     SmartInodePtr newDir;
     Result r = createDirInode(newDir, mask);
     if (r != Result::ok)
+    {
         return r;
+    }
+    journal.addEvent(journalEntry::device::MkObjInode(newDir->no));
     r = tree.insertInode(*newDir);
     if (r != Result::ok)
+    {
         return r;
-
+    }
+    //Journal log is included in insertInodeInDir
     r = insertInodeInDir(&fullPath[lastSlash], *parDir, *newDir);
-    journal.checkpoint();
+
     return r;
 }
 
@@ -1082,16 +1092,16 @@ Device::createFile(SmartInodePtr& outFile, const char* fullPath, Permission mask
         return res;
     }
 
-    //==== critical zone
+    journal.addEvent(journalEntry::device::MkObjInode(outFile->no));
     res = tree.insertInode(*outFile);
     if (res != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert Inode into tree: %s", err_msg(res));
         return res;
     }
-
+    //Journal log is included in insertInodeInDir
     res = insertInodeInDir(&fullPath[lastSlash], *parDir, *outFile);
-    journal.checkpoint();
+
     //==================
 
     return res;
@@ -1243,7 +1253,7 @@ Device::touch(const char* path)
                             .timeSinceEpoch()
                             .milliseconds();
         r = tree.updateExistingInode(*file);
-        journal.checkpoint();
+
         return r;
     }
 }
@@ -1342,6 +1352,9 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
         return Result::noperm;
     }
 
+    //TODO: Is inconsistent between write and update filsize.
+    //TODO: Maybe include in dataIO!
+
     Result r = dataIO.writeInodeData(*obj.dirent.node, obj.fp,
                                      bytesToWrite, bytesWritten, static_cast<const uint8_t*>(buf));
     if (r != Result::ok)
@@ -1393,7 +1406,7 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update existing inode");
         return r;
     }
-    journal.checkpoint();
+
     return r;
 }
 
@@ -1451,7 +1464,7 @@ Device::flush(Obj& obj)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Inode!");
         return r;
     }
-    journal.checkpoint();
+
     return Result::ok;
 }
 
@@ -1499,7 +1512,7 @@ Device::truncate(const char* path, FileSize newLength)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit PAC");
     }
-    journal.checkpoint();
+
     return r;
 }
 
@@ -1531,7 +1544,11 @@ Device::remove(const char* path)
     SmartInodePtr parentDir;
     uint16_t lastSlash = 0;
     if ((r = getParentDir(path, parentDir, &lastSlash)) != Result::ok)
+    {
         return r;
+    }
+
+    journal.addEvent(journalEntry::device::RemoveObj(object->no, parentDir->no));
 
     if ((r = removeInodeFromDir(*parentDir, object->no)) != Result::ok)
     {
@@ -1544,7 +1561,7 @@ Device::remove(const char* path)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete Inode");
         return r;
     }
-    journal.checkpoint();
+
     return Result::ok;
 }
 
@@ -1568,7 +1585,7 @@ Device::chmod(const char* path, Permission perm)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update Inode");
         return r;
     }
-    journal.checkpoint();
+
     return r;
 }
 

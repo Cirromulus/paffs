@@ -132,10 +132,10 @@ public:
 
     JournalEntry::Topic
     getTopic() override;
-    void
+    Result
     processEntry(JournalEntry& entry) override;
     void
-    processUncheckpointedEntry(JournalEntry& entry) override;
+    signalEndOfLog() override;
 
     // returns PAFFS_NF if no superindex is in flash
     Result

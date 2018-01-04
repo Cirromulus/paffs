@@ -273,81 +273,27 @@ Superblock::getTopic()
     return JournalEntry::Topic::superblock;
 }
 
-void
+Result
 Superblock::processEntry(JournalEntry& entry)
 {
     if (entry.topic != getTopic())
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
-        return;
+        return Result::invalidInput;
     }
     auto e = static_cast<const journalEntry::Superblock*>(&entry);
     switch (e->type)
     {
-    case journalEntry::Superblock::Type::rootnode:
-    {
-        auto r = static_cast<const journalEntry::superblock::Rootnode*>(&entry);
-        registerRootnode(r->rootnode);
-        break;
+    default:
+        return Result::nimpl;
     }
-    case journalEntry::Superblock::Type::areaMap:
-    {
-        auto a = static_cast<const journalEntry::superblock::AreaMap*>(&entry);
-        switch (a->operation)
-        {
-        case journalEntry::superblock::AreaMap::Operation::type:
-            device->areaMgmt.setType(
-                    a->offs,
-                    static_cast<const journalEntry::superblock::areaMap::Type*>(&entry)->type);
-            break;
-        case journalEntry::superblock::AreaMap::Operation::status:
-            device->areaMgmt.setStatus(
-                    a->offs,
-                    static_cast<const journalEntry::superblock::areaMap::Status*>(&entry)->status);
-            break;
-        case journalEntry::superblock::AreaMap::Operation::increaseErasecount:
-            device->areaMgmt.increaseErasecount(a->offs);
-            break;
-        case journalEntry::superblock::AreaMap::Operation::position:
-            device->areaMgmt.setPos(
-                    a->offs,
-                    static_cast<const journalEntry::superblock::areaMap::Position*>(&entry)
-                            ->position);
-            break;
-        case journalEntry::superblock::AreaMap::Operation::swap:
-            device->areaMgmt.swapAreaPosition(
-                    a->offs,
-                    static_cast<const journalEntry::superblock::areaMap::Swap*>(&entry)->b);
-            break;
-        }
-        break;
-    }
-    case journalEntry::Superblock::Type::activeArea:
-        device->areaMgmt.setActiveArea(
-                static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->type,
-                static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->area);
-        break;
-    case journalEntry::Superblock::Type::usedAreas:
-        device->areaMgmt.setUsedAreas(
-                static_cast<const journalEntry::superblock::UsedAreas*>(&entry)->usedAreas);
-        break;
-    }
+    return Result::ok;
 }
 
 void
-Superblock::processUncheckpointedEntry(JournalEntry& entry)
+Superblock::signalEndOfLog()
 {
-    if (entry.topic != getTopic())
-    {
-        PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
-        return;
-    }
-    // TODO: If swap occurs, check if it was successful.
-    if (static_cast<journalEntry::Superblock*>(&entry)->type
-        == journalEntry::Superblock::Type::areaMap)
-    {
-        processEntry(entry);
-    }
+    PAFFS_DBG(PAFFS_TRACE_ERROR, "Not implemented");
 }
 
 Result
@@ -694,7 +640,7 @@ Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew)
         return Result::bug;
     }
 
-    device->journal.addEvent(journalEntry::Success(getTopic()));
+    device->journal.addEvent(journalEntry::Checkpoint(getTopic()));
     mRootnodeDirty = false;
     return Result::ok;
 }

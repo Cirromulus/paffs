@@ -26,7 +26,6 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
     {
     case JournalEntry::Topic::invalid: size = 0; break;
     case JournalEntry::Topic::checkpoint: size = sizeof(journalEntry::Checkpoint); break;
-    case JournalEntry::Topic::success: size = sizeof(journalEntry::Success); break;
     case JournalEntry::Topic::superblock:
         switch (static_cast<const journalEntry::Superblock*>(&entry)->type)
         {
@@ -89,18 +88,18 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
             break;
         }
         break;
-    case JournalEntry::Topic::inode:
-        switch (static_cast<const journalEntry::Inode*>(&entry)->operation)
+    case JournalEntry::Topic::pac:
+        switch (static_cast<const journalEntry::PAC*>(&entry)->operation)
         {
-        case journalEntry::Inode::Operation::add: size = sizeof(journalEntry::inode::Add); break;
-        case journalEntry::Inode::Operation::write:
-            size = sizeof(journalEntry::inode::Write);
+        case journalEntry::PAC::Operation::add: size = sizeof(journalEntry::pac::Add); break;
+        case journalEntry::PAC::Operation::write:
+            size = sizeof(journalEntry::pac::Write);
             break;
-        case journalEntry::Inode::Operation::remove:
-            size = sizeof(journalEntry::inode::Remove);
+        case journalEntry::PAC::Operation::remove:
+            size = sizeof(journalEntry::pac::Remove);
             break;
-        case journalEntry::Inode::Operation::commit:
-            size = sizeof(journalEntry::inode::Commit);
+        case journalEntry::PAC::Operation::commit:
+            size = sizeof(journalEntry::pac::Commit);
             break;
         }
     }

@@ -248,13 +248,13 @@ Btree::getTopic()
     return JournalEntry::Topic::tree;
 }
 
-void
+Result
 Btree::processEntry(JournalEntry& entry)
 {
     if (entry.topic != getTopic())
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
-        return;
+        return Result::invalidInput;
     }
     const journalEntry::BTree* e = static_cast<const journalEntry::BTree*>(&entry);
     switch (e->op)
@@ -268,7 +268,16 @@ Btree::processEntry(JournalEntry& entry)
     case journalEntry::BTree::Operation::remove:
         deleteInode(static_cast<const journalEntry::btree::Remove*>(&entry)->no);
         break;
+    default:
+        return Result::nimpl;
     }
+    return Result::ok;
+}
+
+void
+Btree::signalEndOfLog()
+{
+    PAFFS_DBG(PAFFS_TRACE_ERROR, "Not implemented");
 }
 
 /**

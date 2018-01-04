@@ -49,12 +49,6 @@ Journal::addEvent(const JournalEntry& entry)
 }
 
 Result
-Journal::checkpoint()
-{
-    return addEvent(journalEntry::Checkpoint());
-}
-
-Result
 Journal::clear()
 {
     return persistence.clear();
@@ -64,15 +58,15 @@ Result
 Journal::processBuffer()
 {
     journalEntry::Max entry;
-    EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics];
+    EntryIdentifier firstUncheckpointedEntry[JournalEntry::numberOfTopics];
 
     Result r = persistence.rewind();
     if (r != Result::ok)
     {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read rewind Journal!");
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not rewind Journal!");
         return r;
     }
-    for (EntryIdentifier& id : firstUnsuccededEntry)
+    for (EntryIdentifier& id : firstUncheckpointedEntry)
     {
         id = persistence.tell();
     }
@@ -90,17 +84,20 @@ Journal::processBuffer()
 
     disabled = true;
     PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Replay of Journal needed");
-    PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE), "Scanning for success entries...");
+    if(traceMask & PAFFS_TRACE_VERBOSE)
+    {
+        PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Scanning for success entries...");
+    }
 
     do
     {
-        if ((traceMask & PAFFS_TRACE_JOURNAL) &  PAFFS_TRACE_VERBOSE)
+        if ((traceMask & PAFFS_TRACE_JOURNAL) & PAFFS_TRACE_VERBOSE)
         {
             printMeaning(entry.base);
         }
-        if (entry.base.topic == JournalEntry::Topic::success)
+        if (entry.base.topic == JournalEntry::Topic::checkpoint)
         {
-            firstUnsuccededEntry[static_cast<unsigned>(entry.success.target)] = persistence.tell();
+            firstUncheckpointedEntry[entry.checkpoint.target] = persistence.tell();
         }
     } while ((r = persistence.readNextElem(entry)) == Result::ok);
     if (r != Result::notFound)
@@ -109,160 +106,91 @@ Journal::processBuffer()
         return r;
     }
 
-    if (traceMask & (PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE))
+    if ((traceMask & PAFFS_TRACE_JOURNAL) & PAFFS_TRACE_VERBOSE)
     {
-        printf("FirstUnsucceededEntry:\n");
+        printf("FirstUncheckpointedEntry:\n");
         for (unsigned i = 0; i < JournalEntry::numberOfTopics; i++)
         {
             printf("\t%s: %" PRIu32 ".%" PRIu16 "\n",
                    topicNames[i],
-                   firstUnsuccededEntry[i].flash.addr,
-                   firstUnsuccededEntry[i].flash.offs);
+                   firstUncheckpointedEntry[i].flash.addr,
+                   firstUncheckpointedEntry[i].flash.offs);
         }
     }
-    PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE), "Scanning for checkpoints...");
 
-    r = persistence.rewind();
+    PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Applying log...");
+
+    r = applyJournalEntries(firstUncheckpointedEntry);
+    if(r != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not apply Journal Entries!");
+        return r;
+    }
+
+    disabled = false;
+    return Result::ok;
+}
+
+Result
+Journal::applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEntry::numberOfTopics])
+{
+    Result r = persistence.rewind();
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not rewind Journal!");
         return r;
     }
 
-    EntryIdentifier firstUnprocessedEntry = persistence.tell();
-
-    while ((r = persistence.readNextElem(entry)) == Result::ok)
-    {
-        if (entry.base.topic == JournalEntry::Topic::checkpoint)
-        {
-            EntryIdentifier curr = persistence.tell();
-            r = applyCheckpointedJournalEntries(firstUnprocessedEntry, curr, firstUnsuccededEntry);
-            if (r != Result::ok)
-            {
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not apply checkpointed Entries!");
-                return r;
-            }
-            firstUnprocessedEntry = curr;
-        }
-    }
-    if (r != Result::notFound)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read Journal!");
-        return r;
-    }
-
-    if (firstUnprocessedEntry != persistence.tell())
-    {
-        PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Uncheckpointed Entries exist");
-        r = applyUncheckpointedJournalEntries(firstUnprocessedEntry);
-        if (r != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not apply UNcheckpointed Entries!");
-            return r;
-        }
-    }
-    disabled = false;
-    return Result::ok;
-}
-
-Result
-Journal::applyCheckpointedJournalEntries(
-        EntryIdentifier& from,
-        EntryIdentifier& to,
-        EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics])
-{
-    PAFFS_DBG_S(PAFFS_TRACE_JOURNAL,
-                "Applying Checkpointed Entries "
-                "from %" PRIu32 ".%" PRIu16 " to %" PRIu32 ".%" PRIu16,
-                from.flash.addr,
-                from.flash.offs,
-                to.flash.addr,
-                to.flash.offs);
-    EntryIdentifier restore = persistence.tell();
-    Result r = persistence.seek(from);
-    if (r != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not seek persistence!");
-        return r;
-    }
     while (true)
     {
         journalEntry::Max entry;
         r = persistence.readNextElem(entry);
+        if (r == Result::notFound)
+        {
+            break;
+        }
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG, "Could not read journal to target end");
             return r;
         }
-        if (persistence.tell() == to)
-        {
-            break;
-        }
 
         for (JournalTopic* worker : topics)
         {
             if (entry.base.topic == worker->getTopic())
             {
-                if (persistence.tell() >= firstUnsuccededEntry[toUnderlying(worker->getTopic())])
+                if (persistence.tell() >= firstUncheckpointedEntry[worker->getTopic()])
                 {
                     if ((traceMask & PAFFS_TRACE_JOURNAL) &  PAFFS_TRACE_VERBOSE)
                     {
                         printf("Processing entry ");
                         printMeaning(entry.base, false);
-                        printf(" by %s\n",
-                               topicNames[toUnderlying(worker->getTopic())]);
+                        printf(" by %s ",
+                               topicNames[worker->getTopic()]);
+                        printf("at %" PRIu32 ".%" PRIu16 "\n",
+                               persistence.tell().flash.addr,
+                               persistence.tell().flash.offs);
                     }
-                    worker->processEntry(entry.base);
+                    r = worker->processEntry(entry.base);
+                    if(r != Result::ok)
+                    {
+                        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not apply entry at %" PRIu32 ".%" PRIu16,
+                        persistence.tell().flash.addr,
+                        persistence.tell().flash.offs);
+                        printMeaning(entry.base);
+                        return r;
+                    }
                 }
             }
         }
     }
-    r = persistence.seek(restore);
-    if (r != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not restore pointer in persistence!");
-        return r;
-    }
-    return Result::ok;
-}
 
-Result
-Journal::applyUncheckpointedJournalEntries(EntryIdentifier& from)
-{
-    PAFFS_DBG_S(PAFFS_TRACE_JOURNAL,
-                "Applying UNcheckpointed Entries "
-                "from %" PRIu32 ".%" PRIu16,
-                from.flash.addr,
-                from.flash.offs);
-    EntryIdentifier restore = persistence.tell();
-    Result r = persistence.seek(from);
-    if (r != Result::ok)
+    PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Signalling end of Log");
+    for (JournalTopic* worker : topics)
     {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not seek persistence!");
-        return r;
+        worker->signalEndOfLog();
     }
-    journalEntry::Max entry;
-    while ((r = persistence.readNextElem(entry)) == Result::ok)
-    {
-        for (JournalTopic* worker : topics)
-        {
-            if (entry.base.topic == worker->getTopic())
-            {
-                worker->processUncheckpointedEntry(entry.base);
-            }
-        }
-    }
-    if (r != Result::notFound)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read Entry!");
-        return r;
-    }
-    r = persistence.seek(restore);
-    if (r != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not restore pointer in persistence!");
-        return r;
-    }
+
     return Result::ok;
 }
 
@@ -277,13 +205,8 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         found = true;
         break;
     case JournalEntry::Topic::checkpoint:
-        printf("\tCheckpoint");
-        found = true;
-        break;
-    case JournalEntry::Topic::success:
-        printf("\tCommit success at %s",
-               topicNames[toUnderlying(
-                       static_cast<const journalEntry::Success*>(&entry)->target)]);
+        printf("\tcheckpoint of %s",
+               topicNames[static_cast<const journalEntry::Checkpoint*>(&entry)->target]);
         found = true;
         break;
     case JournalEntry::Topic::superblock:
@@ -389,22 +312,22 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             break;
         }
         break;
-    case JournalEntry::Topic::inode:
-        switch (static_cast<const journalEntry::Inode*>(&entry)->operation)
+    case JournalEntry::Topic::pac:
+        switch (static_cast<const journalEntry::PAC*>(&entry)->operation)
         {
-        case journalEntry::Inode::Operation::add:
+        case journalEntry::PAC::Operation::add:
             printf("Inode add");
             found = true;
             break;
-        case journalEntry::Inode::Operation::write:
+        case journalEntry::PAC::Operation::write:
             printf("Inode write");
             found = true;
             break;
-        case journalEntry::Inode::Operation::remove:
+        case journalEntry::PAC::Operation::remove:
             printf("Inode remove");
             found = true;
             break;
-        case journalEntry::Inode::Operation::commit:
+        case journalEntry::PAC::Operation::commit:
             printf("Inode commit");
             found = true;
             break;

@@ -59,8 +59,10 @@ public:
     wipeCache();
     JournalEntry::Topic
     getTopic() override;
-    void
+    Result
     processEntry(JournalEntry& entry) override;
+    void
+    signalEndOfLog() override;
 
 private:
     void

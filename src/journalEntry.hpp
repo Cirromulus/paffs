@@ -27,18 +27,18 @@ toUnderlying(E e) noexcept
 
 struct JournalEntry
 {
-    enum class Topic : uint8_t
+    enum Topic : uint8_t
     {
         invalid = 0,
         checkpoint,
-        success,
         superblock,
         tree,
         summaryCache,
-        inode,
+        pac,
+        device,
     };
 
-    static constexpr const unsigned char numberOfTopics = 6;
+    static constexpr const unsigned char numberOfTopics = 7;
     Topic topic;
 
 protected:
@@ -50,16 +50,10 @@ namespace journalEntry
 {
     struct Checkpoint : public JournalEntry
     {
-        inline
-        Checkpoint() : JournalEntry(Topic::checkpoint){};
-    };
-
-    struct Success : public JournalEntry
-    {
         // Target should only be Superblock and Tree.
         Topic target;
         inline
-        Success(Topic _target) : JournalEntry(Topic::success), target(_target){};
+        Checkpoint(Topic _target) : JournalEntry(Topic::checkpoint), target(_target){};
     };
 
     struct Superblock : public JournalEntry
@@ -189,13 +183,13 @@ namespace journalEntry
     {
         struct Insert : public BTree
         {
-            paffs::Inode inode;
+            Inode inode;
             inline
             Insert(Inode _inode) : BTree(Operation::insert), inode(_inode){};
         };
         struct Update : public BTree
         {
-            paffs::Inode inode;
+            Inode inode;
             inline
             Update(Inode _inode) : BTree(Operation::update), inode(_inode){};
         };
@@ -260,7 +254,7 @@ namespace journalEntry
         };
     }
 
-    struct Inode : public JournalEntry
+    struct PAC : public JournalEntry
     {
     enum class Operation : uint8_t
     {
@@ -274,34 +268,34 @@ namespace journalEntry
 
     protected:
         inline
-        Inode(Operation _operation, InodeNo _inode) :
-            JournalEntry(Topic::inode), operation(_operation), inode(_inode){};
+        PAC(Operation _operation, InodeNo _inode) :
+            JournalEntry(Topic::pac), operation(_operation), inode(_inode){};
     };
 
-    namespace inode
+    namespace pac
     {
         // TODO
-        struct Add : public Inode
+        struct Add : public PAC
         {
             inline
-            Add(InodeNo _inode) : Inode(Operation::add, _inode){};
+            Add(InodeNo _inode) : PAC(Operation::add, _inode){};
         };
 
-        struct Write : public Inode
+        struct Write : public PAC
         {
             inline
-            Write(InodeNo _inode) : Inode(Operation::write, _inode){};
+            Write(InodeNo _inode) : PAC(Operation::write, _inode){};
         };
 
-        struct Remove : public Inode
+        struct Remove : public PAC
         {
             inline
-            Remove(InodeNo _inode) : Inode(Operation::remove, _inode){};
+            Remove(InodeNo _inode) : PAC(Operation::remove, _inode){};
         };
-        struct Commit : public Inode
+        struct Commit : public PAC
         {
             inline
-            Commit(InodeNo _inode) : Inode(Operation::commit, _inode){};
+            Commit(InodeNo _inode) : PAC(Operation::commit, _inode){};
         };
 
         union Max {
@@ -311,19 +305,75 @@ namespace journalEntry
             Commit commit;
         };
     }
+
+    struct Device : public JournalEntry
+    {
+        enum Action : uint8_t
+        {
+            mkObjInode,
+            insertIntoDir,
+            removeObj,
+        };
+
+        Action action;
+    protected:
+        inline
+        Device(Action _action) :
+            JournalEntry(Topic::device), action(_action){};
+    };
+
+    namespace device
+    {
+        struct MkObjInode : public Device
+        {
+            InodeNo inode;
+        public:
+            inline
+            MkObjInode(InodeNo _inode) : Device(Action::mkObjInode), inode(_inode){};
+        };
+
+        struct InsertIntoDir : public Device
+        {
+            InodeNo inode;
+        public:
+            inline
+            InsertIntoDir(InodeNo _inode) : Device(Action::insertIntoDir), inode(_inode){};
+        };
+
+        struct RemoveObj : public Device
+        {
+            InodeNo obj;
+            InodeNo parDir;
+        public:
+            inline
+            RemoveObj(InodeNo _obj, InodeNo _parDir) : Device(Action::removeObj),
+                obj(_obj), parDir(_parDir){};
+        };
+
+
+        union Max
+        {
+            MkObjInode mkObjInode;
+            InsertIntoDir insertIntoDir;
+            RemoveObj removeObj;
+
+        };
+    }
+
     union Max {
         JournalEntry base;  // Not nice?
 
         Checkpoint checkpoint;
-        Success success;
         Superblock superblock;
         superblock::Max superblock_;
         BTree btree;
         btree::Max btree_;
         SummaryCache summaryCache;
         summaryCache::Max summaryCache_;
-        Inode inode;
-        inode::Max inode_;
+        PAC inode;
+        pac::Max inode_;
+        Device device;
+        device::Max device_;
         inline
         Max()
         {

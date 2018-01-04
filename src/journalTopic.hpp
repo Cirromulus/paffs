@@ -23,11 +23,12 @@ class JournalTopic
 {
 public:
     virtual ~JournalTopic(){};
+
     virtual JournalEntry::Topic
     getTopic() = 0;
-    virtual void
+    virtual Result
     processEntry(JournalEntry& entry) = 0;
-    virtual void
-    processUncheckpointedEntry(JournalEntry&){};
+    virtual inline void
+    signalEndOfLog(){};
 };
 }

@@ -155,10 +155,10 @@ public:
 
     JournalEntry::Topic
     getTopic() override;
-    void
+    Result
     processEntry(JournalEntry& entry) override;
     void
-    processUncheckpointedEntry(JournalEntry& entry) override;
+    signalEndOfLog() override;
 
 private:
     /**

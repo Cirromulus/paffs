@@ -670,7 +670,7 @@ TreeCache::commitCache()
         return Result::bug;
     }
 
-    dev->journal.addEvent(journalEntry::Success(JournalEntry::Topic::tree));
+    dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::tree));
     return Result::ok;
 }
 
