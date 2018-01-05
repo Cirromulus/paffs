@@ -31,7 +31,7 @@ struct JournalEntry
     {
         invalid = 0,
         checkpoint,
-        superblock,
+        areaMgmt,
         tree,
         summaryCache,
         pac,
@@ -56,7 +56,7 @@ namespace journalEntry
         Checkpoint(Topic _target) : JournalEntry(Topic::checkpoint), target(_target){};
     };
 
-    struct Superblock : public JournalEntry
+    struct AreaMgmt : public JournalEntry
     {
         enum class Type : uint8_t
         {
@@ -69,19 +69,18 @@ namespace journalEntry
 
     protected:
         inline
-        Superblock(Type _type) : JournalEntry(Topic::superblock), type(_type){};
+        AreaMgmt(Type _type) : JournalEntry(Topic::areaMgmt), type(_type){};
     };
 
-    namespace superblock
+    namespace areaMgmt
     {
-        struct Rootnode : public Superblock
+        struct Rootnode : public AreaMgmt
         {
             Addr rootnode;
-            inline
-            Rootnode(Addr _rootnode) : Superblock(Type::rootnode), rootnode(_rootnode){};
+            Rootnode(Addr _rootnode) : AreaMgmt(Type::rootnode), rootnode(_rootnode){};
         };
 
-        struct AreaMap : public Superblock
+        struct AreaMap : public AreaMgmt
         {
             enum class Operation : uint8_t
             {
@@ -97,7 +96,7 @@ namespace journalEntry
         protected:
             inline
             AreaMap(AreaPos _offs, Operation _operation) :
-                Superblock(Superblock::Type::areaMap), offs(_offs), operation(_operation){};
+                AreaMgmt(AreaMgmt::Type::areaMap), offs(_offs), operation(_operation){};
         };
 
         namespace areaMap
@@ -141,24 +140,23 @@ namespace journalEntry
             };
         };
 
-        struct ActiveArea : public Superblock
+        struct ActiveArea : public AreaMgmt
         {
             AreaType type;
             AreaPos area;
             inline
             ActiveArea(AreaType _type, AreaPos _area) :
-                Superblock(Type::activeArea), type(_type), area(_area){};
+                AreaMgmt(Type::activeArea), type(_type), area(_area){};
         };
 
-        struct UsedAreas : public Superblock
+        struct UsedAreas : public AreaMgmt
         {
             AreaPos usedAreas;
             inline
-            UsedAreas(AreaPos _usedAreas) : Superblock(Type::usedAreas), usedAreas(_usedAreas){};
+            UsedAreas(AreaPos _usedAreas) : AreaMgmt(Type::usedAreas), usedAreas(_usedAreas){};
         };
 
         union Max {
-            Rootnode rootnode;
             AreaMap areaMap;
             areaMap::Max areaMap_;
         };
@@ -171,6 +169,7 @@ namespace journalEntry
             insert,
             update,
             remove,
+            commit,
         };
         Operation op;
 
@@ -200,10 +199,62 @@ namespace journalEntry
             Remove(InodeNo _no) : BTree(Operation::remove), no(_no){};
         };
 
+        struct Commit : public BTree
+        {
+            enum class Action : uint8_t
+            {
+                setNewPage,
+                setOldPage,
+                setRootnode,
+                invalidateOld,
+            };
+            Action action;
+            Addr address;
+        protected:
+            Commit(Action _action, Addr _address) : BTree(Operation::commit),
+                    action(_action), address(_address){};
+        };
+
+        namespace commit
+        {
+            struct SetNewPage : public Commit
+            {
+                inline
+                SetNewPage(Addr newPage) : Commit(Action::setNewPage, newPage){};
+            };
+
+            struct SetOldPage : public Commit
+            {
+                inline
+                SetOldPage(Addr oldPage) : Commit(Action::setOldPage, oldPage){};
+            };
+
+            struct SetRootnode : public Commit
+            {
+                inline
+                SetRootnode(Addr rootnode) : Commit(Action::setRootnode, rootnode){};
+            };
+
+            struct InvalidateOld : public Commit
+            {
+                inline
+                InvalidateOld() : Commit(Action::invalidateOld, 0){};
+            };
+
+            union Max {
+                SetNewPage setNewPage;
+                SetOldPage setOldPage;
+                SetRootnode setRootnode;
+                InvalidateOld invalidateOld;
+            };
+        }
+
         union Max {
             Insert insert;
             Update update;
             Remove remove;
+            Commit commit;
+            commit::Max commit_;
         };
     };
 
@@ -242,15 +293,14 @@ namespace journalEntry
         {
             PageOffs page;
             SummaryEntry status;
-            inline
-            SetStatus(AreaPos _area, PageOffs _page, SummaryEntry _status) :
-                SummaryCache(_area, Subtype::setStatus), page(_page), status(_status){};
+            inline SetStatus(AreaPos _area, PageOffs _page, SummaryEntry _status) :
+                    SummaryCache(_area, Subtype::setStatus), page(_page), status(_status){};
         };
 
         union Max
         {
             Commit commit;
-            SetStatus setStatus;
+            Remove remove;
         };
     }
 
@@ -364,8 +414,8 @@ namespace journalEntry
         JournalEntry base;  // Not nice?
 
         Checkpoint checkpoint;
-        Superblock superblock;
-        superblock::Max superblock_;
+        AreaMgmt superblock;
+        areaMgmt::Max superblock_;
         BTree btree;
         btree::Max btree_;
         SummaryCache summaryCache;

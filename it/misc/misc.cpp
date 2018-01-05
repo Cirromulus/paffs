@@ -70,9 +70,9 @@ smallTest()
     dev->journal.addEvent(journalEntry::pac::Add(node.no));
 
     dev->journal.addEvent(journalEntry::btree::Insert(fil));
-    dev->journal.addEvent(journalEntry::superblock::Rootnode(1234));
+    dev->journal.addEvent(journalEntry::areaMgmt::Rootnode(1234));
     dev->journal.checkpoint();
-    dev->journal.addEvent(journalEntry::superblock::Rootnode(5678));
+    dev->journal.addEvent(journalEntry::areaMgmt::Rootnode(5678));
 
     // whoops, power went out without write (and Status::success misses)
     dev->journal.processBuffer();

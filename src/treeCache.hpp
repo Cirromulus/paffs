@@ -16,6 +16,7 @@
 #include "bitlist.hpp"
 #include "commonTypes.hpp"
 #include "treeTypes.hpp"
+#include "journalEntry.hpp"
 
 namespace paffs
 {
@@ -28,6 +29,17 @@ class TreeCache
     TreeCacheNode mCache[treeNodeCacheSize];
 
     BitList<treeNodeCacheSize> mCacheUsage;
+
+    Addr newPageList[treeNodeCacheSize];
+    uint16_t newPageListPointer = 0;
+    Addr oldPageList[treeNodeCacheSize];
+    uint16_t oldPageListPointer = 0;
+    enum class JournalState : uint8_t
+    {
+        ok,
+        invalid,
+        recover,
+    } journalState = JournalState::ok;
 
     // Just for debug/tuning purposes
     uint16_t mCacheHits = 0;
@@ -102,6 +114,11 @@ public:
     bool
     isTreeCacheValid();
 
+    Result
+    processEntry(const journalEntry::btree::Commit& commit);
+    void
+    signalEndOfLog();
+
     // debug
     uint16_t
     getCacheUsage();
@@ -159,6 +176,12 @@ private:
     isParentPathClean(TreeCacheNode& tcn);
     Result
     updateFlashAddressInParent(TreeCacheNode& node);
+    Result
+    markPageUsed(Addr addr);
+    Result
+    markPageOld(Addr addr);
+    Result
+    invalidateOldPages();
     /**
      * returns true if any sibling is dirty
      * stops at first occurrence.

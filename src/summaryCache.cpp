@@ -72,13 +72,16 @@ AreaSummaryElem::setStatus(PageOffs page, SummaryEntry value)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set Status of unused cache elem!");
         return;
     }
+    if(getStatus(page) != value)
+    {
+        setDirty();
+        setLoadedFromSuperPage(false);
+    }
     setStatus(page, value, mEntries);
     if (value == SummaryEntry::dirty)
     {
         mDirtyPages++;
     }
-    setDirty();
-    setLoadedFromSuperPage(false);
 }
 void
 AreaSummaryElem::setStatus(PageOffs page, SummaryEntry value, TwoBitList<dataPagesPerArea>& list)

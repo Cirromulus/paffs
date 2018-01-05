@@ -209,63 +209,60 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
                topicNames[static_cast<const journalEntry::Checkpoint*>(&entry)->target]);
         found = true;
         break;
-    case JournalEntry::Topic::superblock:
-        switch (static_cast<const journalEntry::Superblock*>(&entry)->type)
+    case JournalEntry::Topic::areaMgmt:
+        switch (static_cast<const journalEntry::AreaMgmt*>(&entry)->type)
         {
-        case journalEntry::Superblock::Type::rootnode:
-            printf("rootnode change to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
-                   extractLogicalArea(
-                           static_cast<const journalEntry::superblock::Rootnode*>(&entry)->rootnode),
-                   extractPageOffs(static_cast<const journalEntry::superblock::Rootnode*>(&entry)
-                                           ->rootnode));
-            found = true;
+        case journalEntry::AreaMgmt::Type::rootnode:
+            printf("Rootnode to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+                   extractLogicalArea(static_cast<const journalEntry::areaMgmt::Rootnode*>(&entry)->rootnode),
+                   extractPageOffs(static_cast<const journalEntry::areaMgmt::Rootnode*>(&entry)->rootnode));
             break;
-        case journalEntry::Superblock::Type::areaMap:
+        case journalEntry::AreaMgmt::Type::areaMap:
             printf("AreaMap %" PTYPE_AREAPOS " ",
-                   static_cast<const journalEntry::superblock::AreaMap*>(&entry)->offs);
-            switch (static_cast<const journalEntry::superblock::AreaMap*>(&entry)->operation)
+                   static_cast<const journalEntry::areaMgmt::AreaMap*>(&entry)->offs);
+            switch (static_cast<const journalEntry::areaMgmt::AreaMap*>(&entry)->operation)
             {
-            case journalEntry::superblock::AreaMap::Operation::type:
+            case journalEntry::areaMgmt::AreaMap::Operation::type:
                 printf("set Type to %s",
-                       areaNames[static_cast<const journalEntry::superblock::areaMap::Type*>(&entry)
+                       areaNames[static_cast<const journalEntry::areaMgmt::areaMap::Type*>(&entry)
                                          ->type]);
                 found = true;
                 break;
-            case journalEntry::superblock::AreaMap::Operation::status:
+            case journalEntry::areaMgmt::AreaMap::Operation::status:
                 printf("set Status to %s",
-                       areaStatusNames[static_cast<const journalEntry::superblock::areaMap::Status*>(
+                       areaStatusNames[static_cast<const journalEntry::areaMgmt::areaMap::Status*>(
                                                &entry)
                                                ->status]);
                 found = true;
                 break;
-            case journalEntry::superblock::AreaMap::Operation::increaseErasecount:
+            case journalEntry::areaMgmt::AreaMap::Operation::increaseErasecount:
                 printf("set Erasecount");
                 found = true;
                 break;
-            case journalEntry::superblock::AreaMap::Operation::position:
+            case journalEntry::areaMgmt::AreaMap::Operation::position:
             {
-                const journalEntry::superblock::areaMap::Position* p =
-                        static_cast<const journalEntry::superblock::areaMap::Position*>(&entry);
+                const journalEntry::areaMgmt::areaMap::Position* p =
+                        static_cast<const journalEntry::areaMgmt::areaMap::Position*>(&entry);
                 printf("set Position to %02X:%03X",
                        extractLogicalArea(p->position),
                        extractPageOffs(p->position));
                 found = true;
                 break;
             }
-            case journalEntry::superblock::AreaMap::Operation::swap:
+            case journalEntry::areaMgmt::AreaMap::Operation::swap:
                 printf("Swap");
                 found = true;
                 break;
             }
             break;
-        case journalEntry::Superblock::Type::activeArea:
-            printf("Set ActiveArea of %s to %" PTYPE_AREAPOS "\n",
-                   areaNames[static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->type],
-                   static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->area);
+        case journalEntry::AreaMgmt::Type::activeArea:
+            printf("Set ActiveArea of %s to %" PTYPE_AREAPOS,
+                   areaNames[static_cast<const journalEntry::areaMgmt::ActiveArea*>(&entry)->type],
+                   static_cast<const journalEntry::areaMgmt::ActiveArea*>(&entry)->area);
             break;
-        case journalEntry::Superblock::Type::usedAreas:
-            printf("Set used Areas to %" PTYPE_AREAPOS "\n",
-                   static_cast<const journalEntry::superblock::UsedAreas*>(&entry)->usedAreas);
+        case journalEntry::AreaMgmt::Type::usedAreas:
+            printf("Set used Areas to %" PTYPE_AREAPOS,
+                   static_cast<const journalEntry::areaMgmt::UsedAreas*>(&entry)->usedAreas);
             break;
         }
         break;
@@ -286,6 +283,28 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         case journalEntry::BTree::Operation::remove:
             printf("remove %" PRIu32, static_cast<const journalEntry::btree::Remove*>(&entry)->no);
             found = true;
+            break;
+        case journalEntry::BTree::Operation::commit:
+            printf("commit %" PTYPE_ADDR " ", static_cast<const journalEntry::btree::Commit*>(&entry)->address);
+            switch(static_cast<const journalEntry::btree::Commit*>(&entry)->action)
+            {
+                case journalEntry::btree::Commit::Action::setNewPage:
+                    printf("SetNewPage");
+                    found = true;
+                    break;
+                case journalEntry::btree::Commit::Action::setOldPage:
+                    printf("SetOldPage");
+                    found = true;
+                    break;
+                case journalEntry::btree::Commit::Action::setRootnode:
+                    printf("SetRootnode");
+                    found = true;
+                    break;
+                case journalEntry::btree::Commit::Action::invalidateOld:
+                    printf("Invalidate");
+                    found = true;
+                    break;
+            }
             break;
         }
         break;
@@ -332,6 +351,9 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             found = true;
             break;
         }
+        break;
+    case JournalEntry::Topic::device:
+        //todo: add things and stuff.
         break;
     }
     if (!found)

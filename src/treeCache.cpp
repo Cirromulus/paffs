@@ -403,6 +403,87 @@ TreeCache::isTreeCacheValid()
     return valid;
 }
 
+
+Result
+TreeCache::processEntry(const journalEntry::btree::Commit& commit)
+{
+    switch (journalState)
+    {
+    case JournalState::ok:
+        switch(commit.action)
+        {
+            case journalEntry::btree::Commit::Action::setNewPage:
+                newPageList[newPageListPointer++] = commit.address;
+                journalState = JournalState::invalid;
+                break;
+            default:
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid operation in state OK");
+                return Result::bug;
+        }
+        break;
+    case JournalState::invalid:
+        switch(commit.action)
+        {
+            case journalEntry::btree::Commit::Action::setNewPage:
+                newPageList[newPageListPointer++] = commit.address;
+                break;
+            case journalEntry::btree::Commit::Action::setOldPage:
+                oldPageList[oldPageListPointer++] = commit.address;
+                break;
+            case journalEntry::btree::Commit::Action::setRootnode:
+                dev->superblock.registerRootnode(commit.address);
+                journalState = JournalState::recover;
+                break;
+            case journalEntry::btree::Commit::Action::invalidateOld:
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid operation in state INVALID");
+                return Result::bug;
+        }
+        break;
+    case JournalState::recover:
+        switch(commit.action)
+        {
+            case journalEntry::btree::Commit::Action::setNewPage:
+            case journalEntry::btree::Commit::Action::setOldPage:
+            case journalEntry::btree::Commit::Action::setRootnode:
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid operation in state RECOVER");
+                return Result::bug;
+            case journalEntry::btree::Commit::Action::invalidateOld:
+                //The only time we should see this is if we broke down before setting checkpoint
+                //TODO: Should we produce a checkpoint now?
+                journalState = JournalState::ok;
+                dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::tree));
+                newPageListPointer = 0;
+                oldPageListPointer = 0;
+                break;
+        }
+        break;
+    }
+    return Result::ok;
+}
+
+void
+TreeCache::signalEndOfLog()
+{
+    switch (journalState)
+    {
+    case JournalState::ok:
+        break;
+    case JournalState::invalid:
+        for(uint16_t i = 0; i <= newPageListPointer; i++)
+        {
+            dev->sumCache.setPageStatus(newPageList[i], SummaryEntry::dirty);
+        }
+        break;
+    case JournalState::recover:
+        for(uint16_t i = 0; i <= oldPageListPointer; i++)
+        {
+            dev->sumCache.setPageStatus(oldPageList[i], SummaryEntry::dirty);
+        }
+        break;
+    }
+}
+
+
 /**
  * returns true if path contains dirty elements
  * traverses through all paths and marks them
@@ -587,13 +668,47 @@ TreeCache::updateFlashAddressInParent(TreeCacheNode& node)
               getIndexFromPointer(*node.parent));
     return Result::notFound;
 }
-
+Result
+TreeCache::markPageUsed(Addr addr)
+{
+    newPageList[newPageListPointer++] = addr;
+    //TODO: unify both journal events saying the same thing
+    dev->journal.addEvent(journalEntry::btree::commit::SetNewPage(addr));
+    return dev->sumCache.setPageStatus(addr, SummaryEntry::used);
+}
+Result
+TreeCache::markPageOld(Addr addr)
+{
+    oldPageList[oldPageListPointer++] = addr;
+    dev->journal.addEvent(journalEntry::btree::commit::SetOldPage(addr));
+    return Result::ok;
+}
+Result
+TreeCache::invalidateOldPages()
+{
+    Result r;
+    for(uint16_t i = 0; i <= oldPageListPointer; i++)
+    {
+        r = dev->sumCache.setPageStatus(oldPageList[i], SummaryEntry::dirty);
+        if(r != Result::ok)
+        {
+            //TODO: rewind
+            return r;
+        }
+    }
+    dev->journal.addEvent(journalEntry::btree::commit::InvalidateOld());
+    oldPageListPointer = 0;
+    newPageListPointer = 0;
+    return Result::ok;
+}
 
 Result
 TreeCache::commitNodesRecursively(TreeCacheNode& node)
 {
     if (!node.dirty)
+    {
         return Result::ok;
+    }
     Result r;
     if (node.raw.isLeaf)
     {
@@ -642,7 +757,9 @@ TreeCache::commitCache()
     dev->lasterr = Result::ok;
     resolveDirtyPaths(mCache[mCacheRoot]);
     if (dev->lasterr != Result::ok)
+    {
         return dev->lasterr;
+    }
     Result r = commitNodesRecursively(mCache[mCacheRoot]);
     if (r != Result::ok)
     {
@@ -668,6 +785,13 @@ TreeCache::commitCache()
                   "This is unacceptable in case of sudden powerlosses!");
         //Since we are now in strict mode for journal, this may not be allowed
         return Result::bug;
+    }
+
+    r = invalidateOldPages();
+    if(r != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate all old pages!");
+        return r;
     }
 
     dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::tree));
@@ -1146,19 +1270,17 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
     Addr oldSelf = node.raw.self;
     node.raw.self = addr;
 
-    Result r = dev->driver.writePage(getPageNumber(node.raw.self, *dev), &node, sizeof(TreeNode));
+    // Mark Page as used
+    Result r = markPageUsed(addr);
+    if(r != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark tree node page used");
+    }
+
+    r = dev->driver.writePage(getPageNumber(node.raw.self, *dev), &node, sizeof(TreeNode));
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write TreeNode to page");
-        return r;
-    }
-
-    // Mark Page as used
-    r = dev->sumCache.setPageStatus(
-            dev->areaMgmt.getActiveArea(AreaType::index), firstFreePage, SummaryEntry::used);
-    if (r != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
         return r;
     }
 
@@ -1169,19 +1291,9 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
         return r;
     }
 
-    /*
-     * NOTE: For best space efficiency, this would be done before finding new Area.
-     * However, this would lead to invalidated valid data if something during write fails.
-     */
     if (oldSelf != 0)
     {
-        // invalidate former position
-        r = dev->sumCache.setPageStatus(oldSelf, SummaryEntry::dirty);
-        if (r != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not invalidate old Page! Ignoring Errors to continue...");
-        }
+        markPageOld(oldSelf);
     }
 
     r = dev->areaMgmt.manageActiveAreaFull(AreaType::index);

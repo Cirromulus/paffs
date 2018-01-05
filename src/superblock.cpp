@@ -270,7 +270,7 @@ SuperIndex::print()
 JournalEntry::Topic
 Superblock::getTopic()
 {
-    return JournalEntry::Topic::superblock;
+    return JournalEntry::Topic::areaMgmt;
 }
 
 Result
@@ -281,7 +281,7 @@ Superblock::processEntry(JournalEntry& entry)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
         return Result::invalidInput;
     }
-    auto e = static_cast<const journalEntry::Superblock*>(&entry);
+    auto e = static_cast<const journalEntry::AreaMgmt*>(&entry);
     switch (e->type)
     {
     default:
@@ -300,10 +300,18 @@ Result
 Superblock::registerRootnode(Addr addr)
 {
     if (addr == 0)
+    {
         PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Tried to set Rootnode to 0");
+    }
+    if(addr == mRootnodeAddr)
+    {
+        //This should only happen if log is replayed, because some actions are doubled
+        return Result::ok;
+    }
+
     mRootnodeAddr = addr;
     mRootnodeDirty = true;
-    device->journal.addEvent(journalEntry::superblock::Rootnode(addr));
+    device->journal.addEvent(journalEntry::areaMgmt::Rootnode(addr));
     return Result::ok;
 }
 

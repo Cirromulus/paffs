@@ -57,6 +57,7 @@ public:
     commitCache();
     void
     wipeCache();
+
     JournalEntry::Topic
     getTopic() override;
     Result

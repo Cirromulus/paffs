@@ -268,8 +268,11 @@ Btree::processEntry(JournalEntry& entry)
     case journalEntry::BTree::Operation::remove:
         deleteInode(static_cast<const journalEntry::btree::Remove*>(&entry)->no);
         break;
-    default:
-        return Result::nimpl;
+    //Cache operations
+    case journalEntry::BTree::Operation::commit:
+        auto commit = static_cast<const journalEntry::btree::Commit*>(&entry);
+        mCache.processEntry(*commit);
+        break;
     }
     return Result::ok;
 }
@@ -277,7 +280,7 @@ Btree::processEntry(JournalEntry& entry)
 void
 Btree::signalEndOfLog()
 {
-    PAFFS_DBG(PAFFS_TRACE_ERROR, "Not implemented");
+    mCache.signalEndOfLog();
 }
 
 /**

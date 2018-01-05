@@ -21,56 +21,59 @@ namespace paffs
 uint16_t
 JournalPersistence::getSizeFromJE(const JournalEntry& entry)
 {
-    uint16_t size = 0;
     switch (entry.topic)
     {
-    case JournalEntry::Topic::invalid: size = 0; break;
-    case JournalEntry::Topic::checkpoint: size = sizeof(journalEntry::Checkpoint); break;
-    case JournalEntry::Topic::superblock:
-        switch (static_cast<const journalEntry::Superblock*>(&entry)->type)
+    case JournalEntry::Topic::invalid:
+        return 0;
+    case JournalEntry::Topic::checkpoint:
+        return sizeof(journalEntry::Checkpoint);
+    case JournalEntry::Topic::areaMgmt:
+        switch (static_cast<const journalEntry::AreaMgmt*>(&entry)->type)
         {
-        case journalEntry::Superblock::Type::rootnode:
-            size = sizeof(journalEntry::superblock::Rootnode);
-            break;
-        case journalEntry::Superblock::Type::areaMap:
-            switch (static_cast<const journalEntry::superblock::AreaMap*>(&entry)->operation)
+        case journalEntry::AreaMgmt::Type::rootnode:
+            return sizeof(journalEntry::areaMgmt::Rootnode);
+        case journalEntry::AreaMgmt::Type::areaMap:
+            switch (static_cast<const journalEntry::areaMgmt::AreaMap*>(&entry)->operation)
             {
-            case journalEntry::superblock::AreaMap::Operation::type:
-                size = sizeof(journalEntry::superblock::areaMap::Type);
-                break;
-            case journalEntry::superblock::AreaMap::Operation::status:
-                size = sizeof(journalEntry::superblock::areaMap::Status);
-                break;
-            case journalEntry::superblock::AreaMap::Operation::increaseErasecount:
-                size = sizeof(journalEntry::superblock::areaMap::IncreaseErasecount);
-                break;
-            case journalEntry::superblock::AreaMap::Operation::position:
-                size = sizeof(journalEntry::superblock::areaMap::Type);
-                break;
-            case journalEntry::superblock::AreaMap::Operation::swap:
-                size = sizeof(journalEntry::superblock::areaMap::Swap);
-                break;
+            case journalEntry::areaMgmt::AreaMap::Operation::type:
+                return sizeof(journalEntry::areaMgmt::areaMap::Type);
+            case journalEntry::areaMgmt::AreaMap::Operation::status:
+                return sizeof(journalEntry::areaMgmt::areaMap::Status);
+            case journalEntry::areaMgmt::AreaMap::Operation::increaseErasecount:
+                return sizeof(journalEntry::areaMgmt::areaMap::IncreaseErasecount);
+            case journalEntry::areaMgmt::AreaMap::Operation::position:
+                return sizeof(journalEntry::areaMgmt::areaMap::Type);
+            case journalEntry::areaMgmt::AreaMap::Operation::swap:
+                return sizeof(journalEntry::areaMgmt::areaMap::Swap);
             }
             break;
-        case journalEntry::Superblock::Type::activeArea:
-            size = sizeof(journalEntry::superblock::ActiveArea);
-            break;
-        case journalEntry::Superblock::Type::usedAreas:
-            size = sizeof(journalEntry::superblock::UsedAreas);
-            break;
+        case journalEntry::AreaMgmt::Type::activeArea:
+            return sizeof(journalEntry::areaMgmt::ActiveArea);
+        case journalEntry::AreaMgmt::Type::usedAreas:
+            return sizeof(journalEntry::areaMgmt::UsedAreas);
         }
         break;
     case JournalEntry::Topic::tree:
         switch (static_cast<const journalEntry::BTree*>(&entry)->op)
         {
         case journalEntry::BTree::Operation::insert:
-            size = sizeof(journalEntry::btree::Insert);
-            break;
+            return sizeof(journalEntry::btree::Insert);
         case journalEntry::BTree::Operation::update:
-            size = sizeof(journalEntry::btree::Update);
-            break;
+            return sizeof(journalEntry::btree::Update);
         case journalEntry::BTree::Operation::remove:
-            size = sizeof(journalEntry::btree::Remove);
+            return sizeof(journalEntry::btree::Remove);
+        case journalEntry::BTree::Operation::commit:
+            switch(static_cast<const journalEntry::btree::Commit*>(&entry)->action)
+            {
+                case journalEntry::btree::Commit::Action::setNewPage:
+                    return sizeof(journalEntry::btree::commit::SetNewPage);
+                case journalEntry::btree::Commit::Action::setOldPage:
+                    return sizeof(journalEntry::btree::commit::SetOldPage);
+                case journalEntry::btree::Commit::Action::setRootnode:
+                    return sizeof(journalEntry::btree::commit::SetRootnode);
+                case journalEntry::btree::Commit::Action::invalidateOld:
+                    return sizeof(journalEntry::btree::commit::InvalidateOld);
+            }
             break;
         }
         break;
@@ -78,32 +81,39 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
         switch (static_cast<const journalEntry::SummaryCache*>(&entry)->subtype)
         {
         case journalEntry::SummaryCache::Subtype::commit:
-            size = sizeof(journalEntry::summaryCache::Commit);
-            break;
+            return sizeof(journalEntry::summaryCache::Commit);
         case journalEntry::SummaryCache::Subtype::remove:
-            size = sizeof(journalEntry::summaryCache::Remove);
-            break;
+            return sizeof(journalEntry::summaryCache::Remove);
         case journalEntry::SummaryCache::Subtype::setStatus:
-            size = sizeof(journalEntry::summaryCache::SetStatus);
-            break;
+            return sizeof(journalEntry::summaryCache::SetStatus);
         }
         break;
     case JournalEntry::Topic::pac:
         switch (static_cast<const journalEntry::PAC*>(&entry)->operation)
         {
-        case journalEntry::PAC::Operation::add: size = sizeof(journalEntry::pac::Add); break;
+        case journalEntry::PAC::Operation::add:
+            return sizeof(journalEntry::pac::Add);
         case journalEntry::PAC::Operation::write:
-            size = sizeof(journalEntry::pac::Write);
-            break;
+            return sizeof(journalEntry::pac::Write);
         case journalEntry::PAC::Operation::remove:
-            size = sizeof(journalEntry::pac::Remove);
-            break;
+            return sizeof(journalEntry::pac::Remove);
         case journalEntry::PAC::Operation::commit:
-            size = sizeof(journalEntry::pac::Commit);
-            break;
+            return sizeof(journalEntry::pac::Commit);
         }
+        break;
+    case JournalEntry::Topic::device:
+        switch (static_cast<const journalEntry::Device*>(&entry)->action)
+        {
+            case journalEntry::Device::Action::mkObjInode:
+                return sizeof(journalEntry::device::MkObjInode);
+            case journalEntry::Device::Action::insertIntoDir:
+                return sizeof(journalEntry::device::InsertIntoDir);
+            case journalEntry::Device::Action::removeObj:
+                return sizeof(journalEntry::device::RemoveObj);
+        }
+        break;
     }
-    return size;
+    return 0;
 }
 
 uint16_t
