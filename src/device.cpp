@@ -281,7 +281,7 @@ Device::mnt(bool readOnlyMode)
         return r;
     }
 
-    //This is skippeduntil journal is somewhat finished
+    //This is skipped until journal is somewhat finished
     /*r = journal.processBuffer();
     if (r != Result::ok)
     {

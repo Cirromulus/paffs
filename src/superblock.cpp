@@ -867,9 +867,9 @@ Superblock::readMostRecentEntryInBlock(AreaPos area,
     PageAbs basePage = pagesPerBlock * (block + area * blocksPerArea);
     for (PageOffs page = 0; page < pagesPerBlock; page++)
     {
-        memset(buf, 0, sizeof(SerialNo) + sizeof(AreaPos) + sizeof(AreaPos));
+        memset(mBuf, 0, sizeof(SerialNo) + sizeof(AreaPos) + sizeof(AreaPos));
         Result r = device->driver.readPage(
-                page + basePage, buf, sizeof(SerialNo) + sizeof(AreaPos) + sizeof(AreaPos));
+                page + basePage, mBuf, sizeof(SerialNo) + sizeof(AreaPos) + sizeof(AreaPos));
         if (r != Result::ok)
         {
             if (r == Result::biterrorCorrected)
@@ -884,7 +884,7 @@ Superblock::readMostRecentEntryInBlock(AreaPos area,
             }
         }
         SerialNo no;
-        memcpy(&no, buf, sizeof(SerialNo));
+        memcpy(&no, mBuf, sizeof(SerialNo));
         if (no == emptySerial)
         {
             // Unprogrammed, therefore empty
@@ -900,8 +900,8 @@ Superblock::readMostRecentEntryInBlock(AreaPos area,
             overflow = no == 0;
             *outPos = page + basePage;
             *maximum = no;
-            memcpy(logPrev, &buf[sizeof(SerialNo)], sizeof(AreaPos));
-            memcpy(next, &buf[sizeof(SerialNo) + sizeof(AreaPos)], sizeof(AreaPos));
+            memcpy(logPrev, &mBuf[sizeof(SerialNo)], sizeof(AreaPos));
+            memcpy(next, &mBuf[sizeof(SerialNo) + sizeof(AreaPos)], sizeof(AreaPos));
         }
     }
 
@@ -1176,9 +1176,9 @@ Superblock::writeSuperPageIndex(PageAbs pageStart, SuperIndex* entry)
                 neededPages,
                 neededBytes);
 
-    memset(buf, 0, neededBytes);
+    memset(mBuf, 0, neededBytes);
     Result r;
-    r = entry->serializeToBuffer(buf);
+    r = entry->serializeToBuffer(mBuf);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not serialize Superpage to buffer!");
@@ -1194,7 +1194,7 @@ Superblock::writeSuperPageIndex(PageAbs pageStart, SuperIndex* entry)
                                     : neededBytes - pointer;
         // This inserts the serial number at the first Bytes in every page
         memcpy(pagebuf, &entry->no, sizeof(SerialNo));
-        memcpy(&pagebuf[sizeof(SerialNo)], &buf[pointer], btw);
+        memcpy(&pagebuf[sizeof(SerialNo)], &mBuf[pointer], btw);
         r = device->driver.writePage(pageStart + page, pagebuf, btw + sizeof(SerialNo));
         if (r != Result::ok)
             return r;
@@ -1248,7 +1248,7 @@ Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap)
                 neededPages,
                 neededBytes);
 
-    memset(buf, 0, neededBytes);
+    memset(mBuf, 0, neededBytes);
 
     uint32_t pointer = 0;
     PageAbs pageBase = getPageNumberFromDirect(addr);
@@ -1297,13 +1297,13 @@ Superblock::readSuperPageIndex(Addr addr, SuperIndex* entry, bool withAreaMap)
             entry->no = localSerialTmp;
         }
 
-        memcpy(&buf[pointer], &pagebuf[sizeof(SerialNo)], btr);
+        memcpy(&mBuf[pointer], &pagebuf[sizeof(SerialNo)], btr);
         pointer += btr;
     }
     // buffer ready
     PAFFS_DBG_S(PAFFS_TRACE_WRITE, "SuperIndex Buffer was filled with %" PRIu32 " Bytes.", pointer);
 
-    r = entry->deserializeFromBuffer(buf);
+    r = entry->deserializeFromBuffer(mBuf);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not deserialize Superpage from buffer");

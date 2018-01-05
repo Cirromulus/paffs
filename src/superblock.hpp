@@ -121,7 +121,7 @@ class Superblock : public JournalTopic
 
     //This buffer is only used for reading/writing the superindex.
     //TODO: Use another pagebuf that is unused during superindex commit
-    uint8_t buf[SuperIndex::getNeededBytes(2)];
+    uint8_t mBuf[SuperIndex::getNeededBytes(2)];
 
 public:
     Superblock(Device* mdev) : device(mdev){};
