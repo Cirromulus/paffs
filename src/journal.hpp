@@ -38,7 +38,7 @@ public:
         topics[2] = &tree;
         // TODO Inode
 
-        disabled = true;
+        disabled = false;
     }
 
     Result

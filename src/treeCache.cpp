@@ -668,6 +668,7 @@ TreeCache::updateFlashAddressInParent(TreeCacheNode& node)
               getIndexFromPointer(*node.parent));
     return Result::notFound;
 }
+
 Result
 TreeCache::markPageUsed(Addr addr)
 {
@@ -676,6 +677,7 @@ TreeCache::markPageUsed(Addr addr)
     dev->journal.addEvent(journalEntry::btree::commit::SetNewPage(addr));
     return dev->sumCache.setPageStatus(addr, SummaryEntry::used);
 }
+
 Result
 TreeCache::markPageOld(Addr addr)
 {
@@ -683,6 +685,7 @@ TreeCache::markPageOld(Addr addr)
     dev->journal.addEvent(journalEntry::btree::commit::SetOldPage(addr));
     return Result::ok;
 }
+
 Result
 TreeCache::invalidateOldPages()
 {
@@ -1243,6 +1246,7 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
     {
         return dev->lasterr;
     }
+
     // Handle Areas
     if (dev->areaMgmt.getStatus(dev->areaMgmt.getActiveArea(AreaType::index)) != AreaStatus::active)
     {
@@ -1254,7 +1258,27 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
         PAFFS_DBG(PAFFS_TRACE_BUG, "WRITE TREE NODE findWritableArea returned 0");
         return Result::bug;
     }
-
+    Result r;
+    if(node.raw.self != 0)
+    {
+        SummaryEntry s = dev->sumCache.getPageStatus(node.raw.self, &r);
+        if (s == SummaryEntry::free)
+        {
+            PAFFS_DBG(PAFFS_TRACE_BUG,
+                      "WRITE operation on FREE data at %X:%X",
+                      extractLogicalArea(node.raw.self),
+                      extractPageOffs(node.raw.self));
+            return Result::bug;
+        }
+        if (s == SummaryEntry::dirty)
+        {
+            PAFFS_DBG(PAFFS_TRACE_BUG,
+                      "WRITE operation on DIRTY data at %X:%X",
+                      extractLogicalArea(node.raw.self),
+                      extractPageOffs(node.raw.self));
+            return Result::bug;
+        }
+    }
     PageOffs firstFreePage = 0;
     if (dev->areaMgmt.findFirstFreePage(firstFreePage,
                                         dev->areaMgmt.getActiveArea(AreaType::index))
@@ -1271,7 +1295,7 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
     node.raw.self = addr;
 
     // Mark Page as used
-    Result r = markPageUsed(addr);
+    r = markPageUsed(addr);
     if(r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark tree node page used");
@@ -1298,7 +1322,9 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
 
     r = dev->areaMgmt.manageActiveAreaFull(AreaType::index);
     if (r != Result::ok)
+    {
         return r;
+    }
 
     return Result::ok;
 }

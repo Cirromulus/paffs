@@ -21,7 +21,7 @@
 
 namespace paffs
 {
-typedef uint64_t TraceMask;
+typedef uint32_t TraceMask;
 extern TraceMask traceMask;
 extern const char* traceDescription[];
 }

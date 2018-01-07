@@ -41,7 +41,7 @@ Journal::addEvent(const JournalEntry& entry)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not append Entry to persistence");
         return r;
     }
-    if ((traceMask & PAFFS_TRACE_JOURNAL) &  PAFFS_TRACE_VERBOSE)
+    if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
     {
         printMeaning(entry);
     }
@@ -259,10 +259,12 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             printf("Set ActiveArea of %s to %" PTYPE_AREAPOS,
                    areaNames[static_cast<const journalEntry::areaMgmt::ActiveArea*>(&entry)->type],
                    static_cast<const journalEntry::areaMgmt::ActiveArea*>(&entry)->area);
+            found = true;
             break;
         case journalEntry::AreaMgmt::Type::usedAreas:
             printf("Set used Areas to %" PTYPE_AREAPOS,
                    static_cast<const journalEntry::areaMgmt::UsedAreas*>(&entry)->usedAreas);
+            found = true;
             break;
         }
         break;
@@ -285,7 +287,9 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             found = true;
             break;
         case journalEntry::BTree::Operation::commit:
-            printf("commit %" PTYPE_ADDR " ", static_cast<const journalEntry::btree::Commit*>(&entry)->address);
+            printf("commit %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " ",
+                    extractLogicalArea(static_cast<const journalEntry::btree::Commit*>(&entry)->address),
+                    extractPageOffs(static_cast<const journalEntry::btree::Commit*>(&entry)->address));
             switch(static_cast<const journalEntry::btree::Commit*>(&entry)->action)
             {
                 case journalEntry::btree::Commit::Action::setNewPage:

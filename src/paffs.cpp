@@ -36,11 +36,13 @@ const Param stdParam{totalBytesPerPage,
 };
 
 TraceMask traceMask =
-        // PAFFS_TRACE_VERBOSE |
+        PAFFS_TRACE_VERBOSE |
+        PAFFS_TRACE_JOURNAL |
         // PAFFS_TRACE_READ |
         PAFFS_TRACE_INFO |
         // PAFFS_TRACE_AREA |
-        PAFFS_TRACE_ERROR | PAFFS_TRACE_BUG |
+        PAFFS_TRACE_ERROR |
+        PAFFS_TRACE_BUG |
         // PAFFS_TRACE_TREE |
         // PAFFS_TRACE_TREECACHE |
         // PAFFS_TRACE_ASCACHE |
@@ -272,6 +274,19 @@ Paffs::format(const BadBlockList badBlockList[maxNumberOfDevices], bool complete
                 superChainElems);
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------\n");
+
+    if(traceMask & PAFFS_TRACE_INFO)
+    {
+        printf("Tracing ");
+        for(uint8_t i = 0; i < sizeof(TraceMask) * 8; i++)
+        {
+            if(1 << i & traceMask)
+            {
+                printf("%s ", traceDescription[i + 1]);
+            }
+        }
+        printf("\n");
+    }
 
     Result globalReturn = Result::ok;
     for (uint8_t i = 0; i < maxNumberOfDevices; i++)
