@@ -80,7 +80,8 @@ import()
         cout << "Could not mount filesystem!" << endl;
         return;
     }
-    //fs.setTraceMask(fs.getTraceMask() & ~(PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE));
+
+    fs.setTraceMask(fs.getTraceMask() & ~(PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE));
 
     ObjInfo info;
     r = fs.getObjInfo(filename, info);

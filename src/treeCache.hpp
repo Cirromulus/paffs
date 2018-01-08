@@ -17,6 +17,7 @@
 #include "commonTypes.hpp"
 #include "treeTypes.hpp"
 #include "journalEntry.hpp"
+#include "journalPageStatemachine.hpp"
 
 namespace paffs
 {
@@ -29,24 +30,14 @@ class TreeCache
     TreeCacheNode mCache[treeNodeCacheSize];
 
     BitList<treeNodeCacheSize> mCacheUsage;
-
-    Addr newPageList[treeNodeCacheSize];
-    uint16_t newPageListHWM = 0;
-    Addr oldPageList[treeNodeCacheSize];
-    uint16_t oldPageListHWM = 0;
-    enum class JournalState : uint8_t
-    {
-        ok,
-        invalid,
-        recover,
-    } journalState = JournalState::ok;
+    PageStateMachine<treeNodeCacheSize, JournalEntry::Topic::tree> statemachine;
 
     // Just for debug/tuning purposes
     uint16_t mCacheHits = 0;
     uint16_t mCacheMisses = 0;
 
 public:
-    TreeCache(Device* mdev) : dev(mdev){};
+    TreeCache(Device* mdev);
 
     /**
      * Commits complete Tree to Flash
@@ -59,13 +50,19 @@ public:
      */
     Result
     reserveNodes(uint16_t neededNodes);
-    //--------------------------------------
 
     /**
      * Clears all internal Memory Structures
      */
     void
     clear();
+
+    Result
+    processEntry(const journalEntry::Max& entry);
+
+    void
+    signalEndOfLog();
+
 
     /**
      * This locks specified treeCache node and its path to Rootnode
@@ -113,11 +110,6 @@ public:
                    InodeNo keyMax);
     bool
     isTreeCacheValid();
-
-    Result
-    processEntry(const journalEntry::Max& commit);
-    void
-    signalEndOfLog();
 
     // debug
     uint16_t
@@ -176,12 +168,7 @@ private:
     isParentPathClean(TreeCacheNode& tcn);
     Result
     updateFlashAddressInParent(TreeCacheNode& node);
-    Result
-    markPageUsed(Addr addr);
-    Result
-    markPageOld(Addr addr);
-    Result
-    invalidateOldPages();
+
     /**
      * returns true if any sibling is dirty
      * stops at first occurrence.
