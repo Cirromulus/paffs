@@ -26,10 +26,12 @@ class DataIO
 {
     Device* dev;
 
+    PageStateMachine<maxPagesPerWrite, JournalEntry::Topic::dataIO> statemachine;
+
 public:
     PageAddressCache pac;
 
-    DataIO(Device* mdev) : dev(mdev), pac(*mdev){};
+    DataIO(Device* mdev);
     // Updates changes to treeCache as well
     Result
     writeInodeData(Inode& inode,

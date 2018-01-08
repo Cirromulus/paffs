@@ -23,6 +23,9 @@
 
 namespace paffs
 {
+
+DataIO::DataIO(Device *mdev) : dev(mdev), statemachine(mdev->journal, mdev->sumCache), pac(*mdev){};
+
 // modifies inode->size and inode->reserved size as well
 Result
 DataIO::writeInodeData(Inode& inode,
@@ -83,7 +86,7 @@ DataIO::writeInodeData(Inode& inode,
     }
 
     // FIXME the Tree UpdateExistingInode has to be done by high level functions,
-    // bc they may modify it by themselves
+    // bc they may modify it by themselves. This leads to doubled journal Messages
     return res;
 }
 
@@ -298,12 +301,12 @@ DataIO::writePageData(PageAbs  pageFrom,
                       dev->areaMgmt.getActiveArea(AreaType::data));
             return Result::bug;
         }
-        Addr pageAddress =
+        Addr newAddress =
                 combineAddress(dev->areaMgmt.getActiveArea(AreaType::data), firstFreePage);
 
-        Addr pageAddr;
+        Addr oldAddr;
         //GetPage may overwrite our driver buffer
-        res = ac.getPage(page + pageFrom, &pageAddr);
+        res = ac.getPage(page + pageFrom, &oldAddr);
         if (res != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
@@ -341,7 +344,7 @@ DataIO::writePageData(PageAbs  pageFrom,
                 }
             }
 
-            if (pageAddr != 0)  // not an empty page TODO: doubled code)
+            if (oldAddr != 0)  // not an empty page TODO: doubled code)
             {  // not a skipped page (thus containing no information)
                 // We are overriding real data, not just empty space
                 FileSize bytesRead = 0;
@@ -376,44 +379,29 @@ DataIO::writePageData(PageAbs  pageFrom,
             *bytesWritten += btw;
         }
 
-        res = dev->driver.writePage(getPageNumber(pageAddress, *dev), buf, btw);
-        if (res != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "ERR: write returned FAIL at phy.P: %" PTYPE_PAGEABS,
-                      getPageNumber(pageAddress, *dev));
-            return res;
-        }
-        res = dev->sumCache.setPageStatus(
-                dev->areaMgmt.getActiveArea(AreaType::data), firstFreePage, SummaryEntry::used);
+        res = statemachine.markPageUsed(newAddress);
         if (res != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
                       "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!",
                       resultMsg[static_cast<int>(res)]);
         }
-        ac.setPage(page + pageFrom, pageAddress);
+
+        res = dev->driver.writePage(getPageNumber(newAddress, *dev), buf, btw);
+        if (res != Result::ok)
+        {
+            PAFFS_DBG(PAFFS_TRACE_ERROR,
+                      "ERR: write returned FAIL at phy.P: %" PTYPE_PAGEABS,
+                      getPageNumber(newAddress, *dev));
+            return res;
+        }
+
+        ac.setPage(page + pageFrom, newAddress);
 
         // if we have overwriting existing data...
-        if (pageAddr != 0)  // not an empty page
+        if (oldAddr != 0)  // not an empty page
         {
-            // Mark old pages dirty
-            // mark old Page in Areamap
-            AreaPos  oldArea = extractLogicalArea(pageAddr);
-            PageOffs oldPage = extractPageOffs(pageAddr);
-
-            res = dev->sumCache.setPageStatus(oldArea, oldPage, SummaryEntry::dirty);
-            if (res != Result::ok)
-            {
-                PAFFS_DBG(PAFFS_TRACE_ERROR,
-                          "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!",
-                          resultMsg[static_cast<int>(res)]);
-                PAFFS_DBG_S(PAFFS_TRACE_WRITE,
-                            "At pagelistindex %" PTYPE_PAGEABS ", oldArea: %" PTYPE_AREAPOS ", oldPage: %" PTYPE_PAGEOFFS,
-                            page + pageFrom,
-                            oldArea,
-                            oldPage);
-            }
+            statemachine.markPageOld(oldAddr);
         }
         else
         {
@@ -432,7 +420,14 @@ DataIO::writePageData(PageAbs  pageFrom,
                     "write r.P: %" PTYPE_PAGEOFFS "/%" PTYPE_PAGEABS ", phy.P: %" PTYPE_PAGEABS,
                     page + 1,
                     toPage + 1,
-                    getPageNumber(pageAddress, *dev));
+                    getPageNumber(newAddress, *dev));
+    }
+    res = statemachine.invalidateOldPages();
+    if (res != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR,
+                  "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!",
+                  resultMsg[static_cast<int>(res)]);
     }
     return Result::ok;
 }

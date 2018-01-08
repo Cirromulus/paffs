@@ -26,4 +26,5 @@ static constexpr uint8_t  areaSummaryCacheSize = 8;		//Currently  2 Bit per data
 static constexpr uint8_t  maxNumberOfDevices = 1;
 static constexpr uint8_t  maxNumberOfInodes = 10;		//limits simultaneously open files/folders excluding duplicates
 static constexpr uint8_t  maxNumberOfFiles = 10;		//limits simultaneously open files including duplicates
+static constexpr uint16_t maxPagesPerWrite     = 256;   //limits the size of a single write to a file or folder
 };
