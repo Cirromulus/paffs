@@ -274,26 +274,57 @@ Superblock::getTopic()
 }
 
 Result
-Superblock::processEntry(JournalEntry& entry)
+Superblock::processEntry(const journalEntry::Max& entry)
 {
-    if (entry.topic != getTopic())
+    if (entry.base.topic != getTopic())
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
         return Result::invalidInput;
     }
-    auto e = static_cast<const journalEntry::AreaMgmt*>(&entry);
+    auto e = &entry.areaMgmt;
     switch (e->type)
     {
+        case journalEntry::AreaMgmt::Type::rootnode:
+            registerRootnode(entry.areaMgmt_.rootnode.addr);
+            break;
+        case journalEntry::AreaMgmt::Type::areaMap:
+            {
+            auto a = &entry.areaMgmt_.areaMap;
+            switch(a->operation)
+            {
+                case journalEntry::areaMgmt::AreaMap::Operation::type:
+                    device->areaMgmt.setType(a->offs, entry.areaMgmt_.areaMap_.type.type);
+                    break;
+                case journalEntry::areaMgmt::AreaMap::Operation::status:
+                    device->areaMgmt.setStatus(a->offs, entry.areaMgmt_.areaMap_.status.status);
+                    break;
+                case journalEntry::areaMgmt::AreaMap::Operation::increaseErasecount:
+                    device->areaMgmt.increaseErasecount(a->offs);
+                    break;
+                case journalEntry::areaMgmt::AreaMap::Operation::position:
+                    device->areaMgmt.setPos(a->offs, entry.areaMgmt_.areaMap_.position.position);
+                    break;
+                case journalEntry::areaMgmt::AreaMap::Operation::swap:
+                    device->areaMgmt.swapAreaPosition(a->offs, entry.areaMgmt_.areaMap_.swap.b);
+                    break;
+                default:
+                    return Result::bug;
+            }
+            break;
+            }
+        case journalEntry::AreaMgmt::Type::activeArea:
+            {
+            auto aa = &entry.areaMgmt_.activeArea;
+            device->areaMgmt.setActiveArea(aa->type, aa->area);
+            break;
+            }
+        case journalEntry::AreaMgmt::Type::usedAreas:
+            device->areaMgmt.setUsedAreas(entry.areaMgmt_.usedAreas.usedAreas);
+            break;
     default:
-        return Result::nimpl;
+        return Result::bug;
     }
     return Result::ok;
-}
-
-void
-Superblock::signalEndOfLog()
-{
-    PAFFS_DBG(PAFFS_TRACE_ERROR, "Not implemented");
 }
 
 Result
@@ -594,6 +625,7 @@ Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew)
                         "Committing superindex "
                         "at phys. area %" PTYPE_AREAPOS " was enough!",
                         lastArea);
+            device->journal.addEvent(journalEntry::Checkpoint(getTopic()));
             mRootnodeDirty = false;
             return Result::ok;
         }
@@ -620,6 +652,7 @@ Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew)
                         "at phys. area %" PTYPE_AREAPOS "was enough!",
                         i,
                         lastArea);
+            device->journal.addEvent(journalEntry::Checkpoint(getTopic()));
             mRootnodeDirty = false;
             return Result::ok;
         }

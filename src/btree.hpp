@@ -61,7 +61,7 @@ public:
     JournalEntry::Topic
     getTopic() override;
     Result
-    processEntry(JournalEntry& entry) override;
+    processEntry(const journalEntry::Max& entry) override;
     void
     signalEndOfLog() override;
 

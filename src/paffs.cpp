@@ -59,7 +59,7 @@ TraceMask traceMask =
 
 const char* traceDescription[] =
    {
-       "INVALID",
+       "ALWAYS",
        "INFO",
        "OS",
        "DEVICE",
@@ -90,7 +90,6 @@ const char* traceDescription[] =
        "JOURNAL",
        "ERROR",
        "BUG",
-       "ALWAYS"
    };
 
 const char* resultMsg[] = {

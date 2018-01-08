@@ -26,9 +26,6 @@ char exportFlash[] = "export_flash.bin";
 char exportMram[] = "export_mram.bin";
 
 void
-smallTest();
-
-void
 exportLog();
 
 void
@@ -47,37 +44,6 @@ main(int argc, char** argv)
     {
         import();
     }
-}
-
-void
-smallTest()
-{
-    std::vector<paffs::Driver*> drv;
-    drv.push_back(paffs::getDriver(0));
-
-    Paffs fs(drv);
-    Device* dev = fs.getDevice(0);
-
-    Inode fil, dir;
-    dir.type = InodeType::dir;
-    dir.no = 0;
-    fil.type = InodeType::file;
-    fil.no = 1;
-
-    dev->journal.addEvent(journalEntry::btree::Insert(dir));
-    Inode node;
-    node.type = InodeType::dir;
-    dev->journal.addEvent(journalEntry::pac::Add(node.no));
-
-    dev->journal.addEvent(journalEntry::btree::Insert(fil));
-    dev->journal.addEvent(journalEntry::areaMgmt::Rootnode(1234));
-    dev->journal.checkpoint();
-    dev->journal.addEvent(journalEntry::areaMgmt::Rootnode(5678));
-
-    // whoops, power went out without write (and Status::success misses)
-    dev->journal.processBuffer();
-
-    printf("Rootnode Addr: %lu\n", dev->superblock.getRootnodeAddr());
 }
 
 void
@@ -114,7 +80,7 @@ import()
         cout << "Could not mount filesystem!" << endl;
         return;
     }
-    fs.setTraceMask(fs.getTraceMask() & ~(PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE));
+    //fs.setTraceMask(fs.getTraceMask() & ~(PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE));
 
     ObjInfo info;
     r = fs.getObjInfo(filename, info);
@@ -156,7 +122,10 @@ exportLog()
 
     BadBlockList bbl[maxNumberOfDevices];
     fs.format(bbl);
-    fs.setTraceMask(fs.getTraceMask() | PAFFS_TRACE_ERROR | PAFFS_TRACE_BUG | PAFFS_TRACE_INFO
+    fs.setTraceMask(fs.getTraceMask()
+                    | PAFFS_TRACE_ERROR
+                    | PAFFS_TRACE_BUG
+                    | PAFFS_TRACE_INFO
                     | PAFFS_TRACE_JOURNAL);
 
     fs.mount();
@@ -185,8 +154,8 @@ exportLog()
     mram->serialize(em);
     em.close();
 
-    // fs.close(*fil);
-    // fs.unmount();
+    fs.close(*fil);
+    fs.unmount();
 
     delete fc;
     delete mram;

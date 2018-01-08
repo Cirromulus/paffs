@@ -115,7 +115,7 @@ public:
     isTreeCacheValid();
 
     Result
-    processEntry(const journalEntry::btree::Commit& commit);
+    processEntry(const journalEntry::Max& commit);
     void
     signalEndOfLog();
 

@@ -249,32 +249,44 @@ Btree::getTopic()
 }
 
 Result
-Btree::processEntry(JournalEntry& entry)
+Btree::processEntry(const journalEntry::Max& entry)
 {
-    if (entry.topic != getTopic())
+    if (entry.base.topic == getTopic())
+    {   //normal operations
+        switch (entry.btree.op)
+        {
+        case journalEntry::BTree::Operation::insert:
+            insertInode(entry.btree_.insert.inode);
+            break;
+        case journalEntry::BTree::Operation::update:
+            updateExistingInode(entry.btree_.update.inode);
+            break;
+        case journalEntry::BTree::Operation::remove:
+            deleteInode(entry.btree_.remove.no);
+            break;
+        //Cache operations
+        case journalEntry::BTree::Operation::setRootnode:
+            {
+            dev->superblock.registerRootnode(entry.btree_.setRootnode.address);
+            journalEntry::Max success;
+            success.pagestate_.success = journalEntry::pagestate::Success(getTopic());
+            mCache.processEntry(success);
+            break;
+            }
+        }
+        return Result::ok;
+    }
+    else if(entry.base.topic == JournalEntry::Topic::pagestate &&
+            entry.pagestate.target == getTopic())
+    {   //statemachine operations
+        mCache.processEntry(entry);
+        return Result::ok;
+    }
+    else
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
         return Result::invalidInput;
     }
-    const journalEntry::BTree* e = static_cast<const journalEntry::BTree*>(&entry);
-    switch (e->op)
-    {
-    case journalEntry::BTree::Operation::insert:
-        insertInode(static_cast<const journalEntry::btree::Insert*>(&entry)->inode);
-        break;
-    case journalEntry::BTree::Operation::update:
-        updateExistingInode(static_cast<const journalEntry::btree::Update*>(&entry)->inode);
-        break;
-    case journalEntry::BTree::Operation::remove:
-        deleteInode(static_cast<const journalEntry::btree::Remove*>(&entry)->no);
-        break;
-    //Cache operations
-    case journalEntry::BTree::Operation::commit:
-        auto commit = static_cast<const journalEntry::btree::Commit*>(&entry);
-        mCache.processEntry(*commit);
-        break;
-    }
-    return Result::ok;
 }
 
 void

@@ -82,16 +82,13 @@ Journal::processBuffer()
         return r;
     }
 
-    disabled = true;
+    disabled = true;  //FIXME: just while journal does not have write and read pointer
     PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Replay of Journal needed");
-    if(traceMask & PAFFS_TRACE_VERBOSE)
-    {
-        PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Scanning for success entries...");
-    }
+    PAFFS_DBG_S(PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL, "Scanning for success entries...");
 
     do
     {
-        if ((traceMask & PAFFS_TRACE_JOURNAL) & PAFFS_TRACE_VERBOSE)
+        if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
         {
             printMeaning(entry.base);
         }
@@ -106,7 +103,7 @@ Journal::processBuffer()
         return r;
     }
 
-    if ((traceMask & PAFFS_TRACE_JOURNAL) & PAFFS_TRACE_VERBOSE)
+    if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
     {
         printf("FirstUncheckpointedEntry:\n");
         for (unsigned i = 0; i < JournalEntry::numberOfTopics; i++)
@@ -157,11 +154,13 @@ Journal::applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEnt
 
         for (JournalTopic* worker : topics)
         {
-            if (entry.base.topic == worker->getTopic())
+            if (entry.base.topic == worker->getTopic() ||
+                    (entry.base.topic == JournalEntry::Topic::pagestate
+                     && entry.pagestate.target == worker->getTopic()))
             {
                 if (persistence.tell() >= firstUncheckpointedEntry[worker->getTopic()])
                 {
-                    if ((traceMask & PAFFS_TRACE_JOURNAL) &  PAFFS_TRACE_VERBOSE)
+                    if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
                     {
                         printf("Processing entry ");
                         printMeaning(entry.base, false);
@@ -171,12 +170,14 @@ Journal::applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEnt
                                persistence.tell().flash.addr,
                                persistence.tell().flash.offs);
                     }
-                    r = worker->processEntry(entry.base);
+                    r = worker->processEntry(entry);
                     if(r != Result::ok)
                     {
-                        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not apply entry at %" PRIu32 ".%" PRIu16,
-                        persistence.tell().flash.addr,
-                        persistence.tell().flash.offs);
+                        PAFFS_DBG(PAFFS_TRACE_ERROR, "%s: Could not apply %s entry at %" PRIu32 ".%" PRIu16,
+                                  err_msg(r),
+                                  topicNames[worker->getTopic()],
+                                  persistence.tell().flash.addr,
+                                  persistence.tell().flash.offs);
                         printMeaning(entry.base);
                         return r;
                     }
@@ -209,13 +210,42 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
                topicNames[static_cast<const journalEntry::Checkpoint*>(&entry)->target]);
         found = true;
         break;
+    case JournalEntry::Topic::pagestate:
+    {
+        auto ps = static_cast<const journalEntry::Pagestate*>(&entry);
+        printf("Pagestate for %s ", topicNames[ps->target]);
+        switch(ps->type)
+        {
+            case journalEntry::Pagestate::Type::pageUsed:
+                printf("setPageused %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+                       extractLogicalArea(static_cast<const journalEntry::pagestate::PageUsed*>(&entry)->addr),
+                       extractPageOffs(static_cast<const journalEntry::pagestate::PageUsed*>(&entry)->addr));
+                found = true;
+                break;
+            case journalEntry::Pagestate::Type::pagePending:
+                printf("setPagePending %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+                       extractLogicalArea(static_cast<const journalEntry::pagestate::PagePending*>(&entry)->addr),
+                       extractPageOffs(static_cast<const journalEntry::pagestate::PagePending*>(&entry)->addr));
+                found = true;
+                break;
+            case journalEntry::Pagestate::Type::success:
+                printf("success");
+                found = true;
+                break;
+            case journalEntry::Pagestate::Type::invalidateOldPages:
+                printf("invalidateAllOldPages");
+                found = true;
+                break;
+        }
+        break;
+    }
     case JournalEntry::Topic::areaMgmt:
         switch (static_cast<const journalEntry::AreaMgmt*>(&entry)->type)
         {
         case journalEntry::AreaMgmt::Type::rootnode:
             printf("Rootnode to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
-                   extractLogicalArea(static_cast<const journalEntry::areaMgmt::Rootnode*>(&entry)->rootnode),
-                   extractPageOffs(static_cast<const journalEntry::areaMgmt::Rootnode*>(&entry)->rootnode));
+                   extractLogicalArea(static_cast<const journalEntry::areaMgmt::Rootnode*>(&entry)->addr),
+                   extractPageOffs(static_cast<const journalEntry::areaMgmt::Rootnode*>(&entry)->addr));
             found = true;
             break;
         case journalEntry::AreaMgmt::Type::areaMap:
@@ -287,29 +317,11 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             printf("remove %" PRIu32, static_cast<const journalEntry::btree::Remove*>(&entry)->no);
             found = true;
             break;
-        case journalEntry::BTree::Operation::commit:
-            printf("commit %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " ",
-                    extractLogicalArea(static_cast<const journalEntry::btree::Commit*>(&entry)->address),
-                    extractPageOffs(static_cast<const journalEntry::btree::Commit*>(&entry)->address));
-            switch(static_cast<const journalEntry::btree::Commit*>(&entry)->action)
-            {
-                case journalEntry::btree::Commit::Action::setNewPage:
-                    printf("SetNewPage");
-                    found = true;
-                    break;
-                case journalEntry::btree::Commit::Action::setOldPage:
-                    printf("SetOldPage");
-                    found = true;
-                    break;
-                case journalEntry::btree::Commit::Action::setRootnode:
-                    printf("SetRootnode");
-                    found = true;
-                    break;
-                case journalEntry::btree::Commit::Action::invalidateOld:
-                    printf("Invalidate");
-                    found = true;
-                    break;
-            }
+        case journalEntry::BTree::Operation::setRootnode:
+            printf("SetRootnode to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+                   extractLogicalArea(static_cast<const journalEntry::btree::SetRootnode*>(&entry)->address),
+                   extractPageOffs(static_cast<const journalEntry::btree::SetRootnode*>(&entry)->address));
+            found = true;
             break;
         }
         break;

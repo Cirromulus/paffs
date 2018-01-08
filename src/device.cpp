@@ -248,9 +248,8 @@ Device::mnt(bool readOnlyMode)
     {
         return Result::alrMounted;
     }
-
+    journal.disable();
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "not yet mounted");
-
     Result r = initializeDevice();
     if (r != Result::ok)
         return r;
@@ -285,14 +284,13 @@ Device::mnt(bool readOnlyMode)
     }
 
     //This is skipped until journal is somewhat finished
-    /*r = journal.processBuffer();
+    r = journal.processBuffer();
     if (r != Result::ok)
     {
 
         PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not process journal!");
         return r;
     }
-    */
 
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Replayed Journal if needed");
 

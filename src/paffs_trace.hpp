@@ -28,10 +28,12 @@ extern const char* traceDescription[];
 
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
+// clang-format off
+
 #define PAFFS_DBG(mask, msg, ...)                                           \
     do                                                                      \
     {                                                                       \
-        if (((mask) & traceMask) || ((mask) & PAFFS_TRACE_ALWAYS))          \
+        if (((mask) & traceMask) == (mask))                                 \
         {                                                                   \
             fprintf(stderr,                                                 \
                     "paffs %s: " msg "\n\t-line %" PRId16 ", file %s\n",    \
@@ -46,17 +48,17 @@ extern const char* traceDescription[];
         }                                                                   \
     } while (0)
 
-#define PAFFS_DBG_S(mask, msg, ...)                                \
-    do                                                             \
-    {                                                              \
-        if (((mask) & traceMask) || ((mask) & PAFFS_TRACE_ALWAYS)) \
-        {                                                          \
-            fprintf(stderr, "%s: " msg "\n",                 \
-                    traceDescription[ffs(mask)], ##__VA_ARGS__);   \
-        }                                                          \
+#define PAFFS_DBG_S(mask, msg, ...)                                         \
+    do                                                                      \
+    {                                                                       \
+        if (((mask) & traceMask) == (mask))                                 \
+        {                                                                   \
+            fprintf(stderr, "%s: " msg "\n",                                \
+                    traceDescription[ffs(mask)], ##__VA_ARGS__);            \
+        }                                                                   \
     } while (0)
 
-// clang-format off
+#define PAFFS_TRACE_ALWAYS      0x00000000
 #define PAFFS_TRACE_INFO        0x00000001
 #define PAFFS_TRACE_OS          0x00000002
 #define PAFFS_TRACE_DEVICE      0x00000004
@@ -91,7 +93,6 @@ extern const char* traceDescription[];
 
 #define PAFFS_TRACE_ERROR       0x10000000
 #define PAFFS_TRACE_BUG         0x20000000
-#define PAFFS_TRACE_ALWAYS      0x40000000
 #define PAFFS_TRACE_ALL         0xfff7ffff
 #define PAFFS_TRACE_SOME        0xC0050071
 

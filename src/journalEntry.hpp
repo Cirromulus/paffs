@@ -14,31 +14,25 @@
 
 #pragma once
 #include "commonTypes.hpp"
-#include <type_traits>
 
 namespace paffs
 {
-template <typename E>
-constexpr typename std::underlying_type<E>::type
-toUnderlying(E e) noexcept
-{
-    return static_cast<typename std::underlying_type<E>::type>(e);
-}
-
 struct JournalEntry
 {
     enum Topic : uint8_t
     {
         invalid = 0,
         checkpoint,
+        pagestate,
         areaMgmt,
         tree,
         summaryCache,
         pac,
+        dataIO,
         device,
     };
 
-    static constexpr const unsigned char numberOfTopics = 7;
+    static constexpr const unsigned char numberOfTopics = 8;
     Topic topic;
 
 protected:
@@ -56,9 +50,61 @@ namespace journalEntry
         Checkpoint(Topic _target) : JournalEntry(Topic::checkpoint), target(_target){};
     };
 
+    struct Pagestate : public JournalEntry
+    {
+        enum Type : uint8_t
+        {
+            pageUsed,
+            pagePending,
+            success,    ///> Warn: This is not to be written into journal, only interpreted by topic from other actions
+            invalidateOldPages,
+        };
+        Topic target;
+        Type type;
+    protected:
+        inline
+        Pagestate(Topic _target, Type _type) : JournalEntry(Topic::pagestate),
+        target(_target), type(_type){};
+    };
+
+    namespace pagestate
+    {
+        struct PageUsed : public Pagestate
+        {
+            Addr addr;
+            inline
+            PageUsed(Topic _target, Addr _addr) : Pagestate(_target, Type::pageUsed), addr(_addr){};
+        };
+
+        struct PagePending : public Pagestate
+        {
+            Addr addr;
+            inline
+            PagePending(Topic _target, Addr _addr) : Pagestate(_target, Type::pagePending), addr(_addr){};
+        };
+        struct Success : public Pagestate
+        {
+            inline
+            Success(Topic _target) : Pagestate(_target, Type::success){};
+        };
+        struct InvalidateOldPages : public Pagestate
+        {
+            inline
+            InvalidateOldPages(Topic _target) : Pagestate(_target, Type::invalidateOldPages){};
+        };
+
+        union Max
+        {
+            PageUsed pageUsed;
+            PagePending pagePending;
+            Success success;
+            InvalidateOldPages invalidateOldPages;
+        };
+    }
+
     struct AreaMgmt : public JournalEntry
     {
-        enum class Type : uint8_t
+        enum Type : uint8_t
         {
             rootnode,
             areaMap,
@@ -76,8 +122,8 @@ namespace journalEntry
     {
         struct Rootnode : public AreaMgmt
         {
-            Addr rootnode;
-            Rootnode(Addr _rootnode) : AreaMgmt(Type::rootnode), rootnode(_rootnode){};
+            Addr addr;
+            Rootnode(Addr _addr) : AreaMgmt(Type::rootnode), addr(_addr){};
         };
 
         struct AreaMap : public AreaMgmt
@@ -137,6 +183,7 @@ namespace journalEntry
                 Status status;
                 IncreaseErasecount erasecount;
                 Position position;
+                Swap swap;
             };
         };
 
@@ -157,8 +204,11 @@ namespace journalEntry
         };
 
         union Max {
+            Rootnode rootnode;
             AreaMap areaMap;
             areaMap::Max areaMap_;
+            ActiveArea activeArea;
+            UsedAreas usedAreas;
         };
     };
 
@@ -169,7 +219,7 @@ namespace journalEntry
             insert,
             update,
             remove,
-            commit,
+            setRootnode,
         };
         Operation op;
 
@@ -199,62 +249,18 @@ namespace journalEntry
             Remove(InodeNo _no) : BTree(Operation::remove), no(_no){};
         };
 
-        struct Commit : public BTree
+        struct SetRootnode : public BTree
         {
-            enum class Action : uint8_t
-            {
-                setNewPage,
-                setOldPage,
-                setRootnode,
-                invalidateOld,
-            };
-            Action action;
             Addr address;
         protected:
-            Commit(Action _action, Addr _address) : BTree(Operation::commit),
-                    action(_action), address(_address){};
+            SetRootnode(Addr _address) : BTree(Operation::setRootnode), address(_address){};
         };
-
-        namespace commit
-        {
-            struct SetNewPage : public Commit
-            {
-                inline
-                SetNewPage(Addr newPage) : Commit(Action::setNewPage, newPage){};
-            };
-
-            struct SetOldPage : public Commit
-            {
-                inline
-                SetOldPage(Addr oldPage) : Commit(Action::setOldPage, oldPage){};
-            };
-
-            struct SetRootnode : public Commit
-            {
-                inline
-                SetRootnode(Addr rootnode) : Commit(Action::setRootnode, rootnode){};
-            };
-
-            struct InvalidateOld : public Commit
-            {
-                inline
-                InvalidateOld() : Commit(Action::invalidateOld, 0){};
-            };
-
-            union Max {
-                SetNewPage setNewPage;
-                SetOldPage setOldPage;
-                SetRootnode setRootnode;
-                InvalidateOld invalidateOld;
-            };
-        }
 
         union Max {
             Insert insert;
             Update update;
             Remove remove;
-            Commit commit;
-            commit::Max commit_;
+            SetRootnode setRootnode;
         };
     };
 
@@ -301,6 +307,7 @@ namespace journalEntry
         {
             Commit commit;
             Remove remove;
+            SetStatus setStatus;
         };
     }
 
@@ -414,8 +421,10 @@ namespace journalEntry
         JournalEntry base;  // Not nice?
 
         Checkpoint checkpoint;
-        AreaMgmt superblock;
-        areaMgmt::Max superblock_;
+        Pagestate pagestate;
+        pagestate::Max pagestate_;
+        AreaMgmt areaMgmt;
+        areaMgmt::Max areaMgmt_;
         BTree btree;
         btree::Max btree_;
         SummaryCache summaryCache;

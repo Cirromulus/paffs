@@ -405,15 +405,16 @@ TreeCache::isTreeCacheValid()
 
 
 Result
-TreeCache::processEntry(const journalEntry::btree::Commit& commit)
+TreeCache::processEntry(const journalEntry::Max& entry)
 {
+    const journalEntry::pagestate::Max& action = entry.pagestate_;
     switch (journalState)
     {
     case JournalState::ok:
-        switch(commit.action)
+        switch(entry.pagestate.type)
         {
-            case journalEntry::btree::Commit::Action::setNewPage:
-                newPageList[newPageListHWM++] = commit.address;
+            case journalEntry::Pagestate::Type::pageUsed:
+                newPageList[newPageListHWM++] = action.pageUsed.addr;
                 journalState = JournalState::invalid;
                 break;
             default:
@@ -422,32 +423,31 @@ TreeCache::processEntry(const journalEntry::btree::Commit& commit)
         }
         break;
     case JournalState::invalid:
-        switch(commit.action)
+        switch(entry.pagestate.type)
         {
-            case journalEntry::btree::Commit::Action::setNewPage:
-                newPageList[newPageListHWM++] = commit.address;
+            case journalEntry::Pagestate::Type::pageUsed:
+                newPageList[newPageListHWM++] = action.pageUsed.addr;
                 break;
-            case journalEntry::btree::Commit::Action::setOldPage:
-                oldPageList[oldPageListHWM++] = commit.address;
+            case journalEntry::Pagestate::Type::pagePending:
+                oldPageList[oldPageListHWM++] = action.pagePending.addr;
                 break;
-            case journalEntry::btree::Commit::Action::setRootnode:
-                dev->superblock.registerRootnode(commit.address);
+            case journalEntry::Pagestate::Type::success:
                 journalState = JournalState::recover;
                 break;
-            case journalEntry::btree::Commit::Action::invalidateOld:
+            case journalEntry::Pagestate::Type::invalidateOldPages:
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid operation in state INVALID");
                 return Result::bug;
         }
         break;
     case JournalState::recover:
-        switch(commit.action)
+        switch(entry.pagestate.type)
         {
-            case journalEntry::btree::Commit::Action::setNewPage:
-            case journalEntry::btree::Commit::Action::setOldPage:
-            case journalEntry::btree::Commit::Action::setRootnode:
+            case journalEntry::Pagestate::Type::pageUsed:
+            case journalEntry::Pagestate::Type::pagePending:
+            case journalEntry::Pagestate::Type::success:
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid operation in state RECOVER");
                 return Result::bug;
-            case journalEntry::btree::Commit::Action::invalidateOld:
+            case journalEntry::Pagestate::Type::invalidateOldPages:
                 //The only time we should see this is if we broke down before setting checkpoint
                 //TODO: Should we produce a checkpoint now?
                 journalState = JournalState::ok;
@@ -469,18 +469,24 @@ TreeCache::signalEndOfLog()
     case JournalState::ok:
         break;
     case JournalState::invalid:
-        for(uint16_t i = 0; i <= newPageListHWM; i++)
+        for(uint16_t i = 0; i < newPageListHWM; i++)
         {
             dev->sumCache.setPageStatus(newPageList[i], SummaryEntry::dirty);
         }
         break;
     case JournalState::recover:
-        for(uint16_t i = 0; i <= oldPageListHWM; i++)
+        for(uint16_t i = 0; i < oldPageListHWM; i++)
         {
             dev->sumCache.setPageStatus(oldPageList[i], SummaryEntry::dirty);
         }
+        for(uint16_t i = 0; i < treeNodeCacheSize; i++)
+        {
+            mCache[i].dirty = false;
+        }
         break;
     }
+    newPageListHWM = 0;
+    oldPageListHWM = 0;
 }
 
 
@@ -674,7 +680,7 @@ TreeCache::markPageUsed(Addr addr)
 {
     newPageList[newPageListHWM++] = addr;
     //TODO: unify both journal events saying the same thing
-    dev->journal.addEvent(journalEntry::btree::commit::SetNewPage(addr));
+    dev->journal.addEvent(journalEntry::pagestate::PageUsed(JournalEntry::Topic::tree, addr));
     return dev->sumCache.setPageStatus(addr, SummaryEntry::used);
 }
 
@@ -682,7 +688,7 @@ Result
 TreeCache::markPageOld(Addr addr)
 {
     oldPageList[oldPageListHWM++] = addr;
-    dev->journal.addEvent(journalEntry::btree::commit::SetOldPage(addr));
+    dev->journal.addEvent(journalEntry::pagestate::PagePending(JournalEntry::Topic::tree, addr));
     return Result::ok;
 }
 
@@ -704,7 +710,7 @@ TreeCache::invalidateOldPages()
             return r;
         }
     }
-    dev->journal.addEvent(journalEntry::btree::commit::InvalidateOld());
+    dev->journal.addEvent(journalEntry::pagestate::InvalidateOldPages(JournalEntry::Topic::tree));
     oldPageListHWM = 0;
     newPageListHWM = 0;
     return Result::ok;

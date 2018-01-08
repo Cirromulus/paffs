@@ -13,10 +13,12 @@ namespace paffs
 static constexpr const char* topicNames[] = {
         "INVALID",
         "CHECKPOINT",
+        "PAGESTATUS",
         "AREAMGMT",
         "TREE",
         "SUMMARY CACHE",
-        "INODE",
+        "PAC",
+        "DATAIO"
         "DEVICE",
 };
 }

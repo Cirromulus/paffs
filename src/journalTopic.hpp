@@ -27,7 +27,7 @@ public:
     virtual JournalEntry::Topic
     getTopic() = 0;
     virtual Result
-    processEntry(JournalEntry& entry) = 0;
+    processEntry(const journalEntry::Max& entry) = 0;
     virtual inline void
     signalEndOfLog(){};
 };

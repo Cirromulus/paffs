@@ -787,7 +787,7 @@ SummaryCache::commitAreaSummaries(bool createNew)
         return r;
     }
 
-    dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::summaryCache));
+    dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
 
     for (std::pair<AreaPos, uint16_t> cacheElem : mTranslation)
     {
@@ -806,46 +806,35 @@ SummaryCache::getTopic()
 }
 
 Result
-SummaryCache::processEntry(JournalEntry& entry)
+SummaryCache::processEntry(const journalEntry::Max& entry)
 {
-    if (entry.topic != getTopic())
+    if (entry.base.topic != getTopic())
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
         return Result::invalidInput;
     }
-    auto e = static_cast<const journalEntry::SummaryCache*>(&entry);
-    switch (e->subtype)
+    switch (entry.summaryCache.subtype)
     {
     case journalEntry::SummaryCache::Subtype::commit:
     case journalEntry::SummaryCache::Subtype::remove:
         PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                     "Deleting cache "
                     "entry of area %" PRId16 "",
-                    mSummaryCache[e->area].getArea());
-        mSummaryCache[e->area].setDirty(false);
-        mTranslation.erase(mSummaryCache[e->area].getArea());
-        mSummaryCache[e->area].clear();
+                    mSummaryCache[entry.summaryCache.area].getArea());
+        mSummaryCache[entry.summaryCache.area].setDirty(false);
+        mTranslation.erase(mSummaryCache[entry.summaryCache.area].getArea());
+        mSummaryCache[entry.summaryCache.area].clear();
         break;
     case journalEntry::SummaryCache::Subtype::setStatus:
-    {
-        // TODO activate some failsafe that checks for invalid writes during this setPages
-        auto s = static_cast<const journalEntry::summaryCache::SetStatus*>(&entry);
-        setPageStatus(s->area, s->page, s->status);
+        setPageStatus(entry.summaryCache_.setStatus.area, entry.summaryCache_.setStatus.page,
+                      entry.summaryCache_.setStatus.status);
         break;
-    }
     default:
         return Result::nimpl;
     }
 
     return Result::ok;
 }
-
-void
-SummaryCache::signalEndOfLog()
-{
-    PAFFS_DBG(PAFFS_TRACE_ERROR, "Not implemented");
-}
-
 
 Result
 SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent)
