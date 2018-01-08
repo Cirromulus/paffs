@@ -216,6 +216,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             printf("Rootnode to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
                    extractLogicalArea(static_cast<const journalEntry::areaMgmt::Rootnode*>(&entry)->rootnode),
                    extractPageOffs(static_cast<const journalEntry::areaMgmt::Rootnode*>(&entry)->rootnode));
+            found = true;
             break;
         case journalEntry::AreaMgmt::Type::areaMap:
             printf("AreaMap %" PTYPE_AREAPOS " ",

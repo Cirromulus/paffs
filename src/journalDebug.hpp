@@ -11,7 +11,13 @@
 namespace paffs
 {
 static constexpr const char* topicNames[] = {
-        "INVALID", "CHECKPOINT", "SUCCEED", "SUPERBLOCK", "TREE", "SUMMARY CACHE", "INODE",
+        "INVALID",
+        "CHECKPOINT",
+        "AREAMGMT",
+        "TREE",
+        "SUMMARY CACHE",
+        "INODE",
+        "DEVICE",
 };
 }
 

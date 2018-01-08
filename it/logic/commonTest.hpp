@@ -44,8 +44,7 @@ public:
                         PAFFS_WRITE_VERIFY_AS |
                         PAFFS_TRACE_BUG |
                         PAFFS_TRACE_ERROR |
-                        PAFFS_TRACE_VERBOSE |
-                        PAFFS_TRACE_JOURNAL
+                        0
                         );
         if (r != paffs::Result::ok)
             std::cerr << "Could not format device!" << std::endl;

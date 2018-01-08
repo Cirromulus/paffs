@@ -413,7 +413,7 @@ TreeCache::processEntry(const journalEntry::btree::Commit& commit)
         switch(commit.action)
         {
             case journalEntry::btree::Commit::Action::setNewPage:
-                newPageList[newPageListPointer++] = commit.address;
+                newPageList[newPageListHWM++] = commit.address;
                 journalState = JournalState::invalid;
                 break;
             default:
@@ -425,10 +425,10 @@ TreeCache::processEntry(const journalEntry::btree::Commit& commit)
         switch(commit.action)
         {
             case journalEntry::btree::Commit::Action::setNewPage:
-                newPageList[newPageListPointer++] = commit.address;
+                newPageList[newPageListHWM++] = commit.address;
                 break;
             case journalEntry::btree::Commit::Action::setOldPage:
-                oldPageList[oldPageListPointer++] = commit.address;
+                oldPageList[oldPageListHWM++] = commit.address;
                 break;
             case journalEntry::btree::Commit::Action::setRootnode:
                 dev->superblock.registerRootnode(commit.address);
@@ -452,8 +452,8 @@ TreeCache::processEntry(const journalEntry::btree::Commit& commit)
                 //TODO: Should we produce a checkpoint now?
                 journalState = JournalState::ok;
                 dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::tree));
-                newPageListPointer = 0;
-                oldPageListPointer = 0;
+                newPageListHWM = 0;
+                oldPageListHWM = 0;
                 break;
         }
         break;
@@ -469,13 +469,13 @@ TreeCache::signalEndOfLog()
     case JournalState::ok:
         break;
     case JournalState::invalid:
-        for(uint16_t i = 0; i <= newPageListPointer; i++)
+        for(uint16_t i = 0; i <= newPageListHWM; i++)
         {
             dev->sumCache.setPageStatus(newPageList[i], SummaryEntry::dirty);
         }
         break;
     case JournalState::recover:
-        for(uint16_t i = 0; i <= oldPageListPointer; i++)
+        for(uint16_t i = 0; i <= oldPageListHWM; i++)
         {
             dev->sumCache.setPageStatus(oldPageList[i], SummaryEntry::dirty);
         }
@@ -672,7 +672,7 @@ TreeCache::updateFlashAddressInParent(TreeCacheNode& node)
 Result
 TreeCache::markPageUsed(Addr addr)
 {
-    newPageList[newPageListPointer++] = addr;
+    newPageList[newPageListHWM++] = addr;
     //TODO: unify both journal events saying the same thing
     dev->journal.addEvent(journalEntry::btree::commit::SetNewPage(addr));
     return dev->sumCache.setPageStatus(addr, SummaryEntry::used);
@@ -681,7 +681,7 @@ TreeCache::markPageUsed(Addr addr)
 Result
 TreeCache::markPageOld(Addr addr)
 {
-    oldPageList[oldPageListPointer++] = addr;
+    oldPageList[oldPageListHWM++] = addr;
     dev->journal.addEvent(journalEntry::btree::commit::SetOldPage(addr));
     return Result::ok;
 }
@@ -690,8 +690,13 @@ Result
 TreeCache::invalidateOldPages()
 {
     Result r;
-    for(uint16_t i = 0; i <= oldPageListPointer; i++)
+    for(uint16_t i = 0; i < oldPageListHWM; i++)
     {
+        if(traceMask & PAFFS_TRACE_VERBOSE)
+        {
+            PAFFS_DBG(PAFFS_TRACE_TREECACHE, "Dirtyfy %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+                      extractLogicalArea(oldPageList[i]), extractPageOffs(oldPageList[i]));
+        }
         r = dev->sumCache.setPageStatus(oldPageList[i], SummaryEntry::dirty);
         if(r != Result::ok)
         {
@@ -700,8 +705,8 @@ TreeCache::invalidateOldPages()
         }
     }
     dev->journal.addEvent(journalEntry::btree::commit::InvalidateOld());
-    oldPageListPointer = 0;
-    newPageListPointer = 0;
+    oldPageListHWM = 0;
+    newPageListHWM = 0;
     return Result::ok;
 }
 
@@ -1124,11 +1129,13 @@ TreeCache::getCacheHits()
 {
     return mCacheHits;
 }
+
 uint16_t
 TreeCache::getCacheMisses()
 {
     return mCacheMisses;
 }
+
 void
 TreeCache::printNode(TreeCacheNode& node)
 {
@@ -1178,6 +1185,7 @@ TreeCache::printNode(TreeCacheNode& node)
         printf("] (%" PRIu16 "/%" PRIu16 ")\n", node.raw.keys,
                node.raw.isLeaf ? leafOrder : branchOrder-1);
 }
+
 void
 TreeCache::printSubtree(int layer, BitList<treeNodeCacheSize>& reached, TreeCacheNode& node)
 {
@@ -1196,6 +1204,7 @@ TreeCache::printSubtree(int layer, BitList<treeNodeCacheSize>& reached, TreeCach
     }
 
 }
+
 void
 TreeCache::printTreeCache()
 {
@@ -1265,7 +1274,7 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
         if (s == SummaryEntry::free)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "WRITE operation on FREE data at %X:%X",
+                      "WRITE operation, old node is FREE data at %X:%X",
                       extractLogicalArea(node.raw.self),
                       extractPageOffs(node.raw.self));
             return Result::bug;
@@ -1273,7 +1282,7 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
         if (s == SummaryEntry::dirty)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "WRITE operation on DIRTY data at %X:%X",
+                      "WRITE operation, old node is DIRTY data at %X:%X",
                       extractLogicalArea(node.raw.self),
                       extractPageOffs(node.raw.self));
             return Result::bug;

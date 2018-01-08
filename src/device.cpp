@@ -59,6 +59,8 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         return Result::alrMounted;
     }
 
+    journal.disable();
+
     Result r = initializeDevice();
     if (r != Result::ok)
     {
@@ -229,6 +231,7 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         return r;
     }
 
+    journal.enable();
     destroyDevice();
     driver.deInitializeNand();
     return Result::ok;

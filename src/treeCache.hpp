@@ -31,9 +31,9 @@ class TreeCache
     BitList<treeNodeCacheSize> mCacheUsage;
 
     Addr newPageList[treeNodeCacheSize];
-    uint16_t newPageListPointer = 0;
+    uint16_t newPageListHWM = 0;
     Addr oldPageList[treeNodeCacheSize];
-    uint16_t oldPageListPointer = 0;
+    uint16_t oldPageListHWM = 0;
     enum class JournalState : uint8_t
     {
         ok,

@@ -36,8 +36,8 @@ const Param stdParam{totalBytesPerPage,
 };
 
 TraceMask traceMask =
-        PAFFS_TRACE_VERBOSE |
-        PAFFS_TRACE_JOURNAL |
+        //PAFFS_TRACE_VERBOSE |
+        //PAFFS_TRACE_JOURNAL |
         // PAFFS_TRACE_READ |
         PAFFS_TRACE_INFO |
         // PAFFS_TRACE_AREA |
