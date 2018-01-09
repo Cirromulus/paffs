@@ -22,6 +22,7 @@
 
 namespace paffs
 {
+
 class DataIO
 {
     Device* dev;

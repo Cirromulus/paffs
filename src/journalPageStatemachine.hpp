@@ -66,6 +66,8 @@ public:
         {
             return Result::lowmem;
         }
+        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "mark %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " NEW/USED at %" PRIu16,
+                    extractLogicalArea(addr), extractPageOffs(addr), newPageListHWM);
         newPageList[newPageListHWM++] = addr;
         //TODO: unify both journal events saying the same thing
         mJournal.addEvent(journalEntry::pagestate::PageUsed(topic, addr));
@@ -79,6 +81,8 @@ public:
         {
             return Result::lowmem;
         }
+        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "mark %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " OLD at %" PRIu16,
+                    extractLogicalArea(addr), extractPageOffs(addr), oldPageListHWM);
         oldPageList[oldPageListHWM++] = addr;
         mJournal.addEvent(journalEntry::pagestate::PagePending(topic, addr));
         return Result::ok;
@@ -90,8 +94,8 @@ public:
         Result r;
         for(uint16_t i = 0; i < oldPageListHWM; i++)
         {
-            PAFFS_DBG(PAFFS_TRACE_TREECACHE | PAFFS_TRACE_VERBOSE, "Dirtyfy %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
-                      extractLogicalArea(oldPageList[i]), extractPageOffs(oldPageList[i]));
+            PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "invalidate %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " at %" PRIu16,
+                      extractLogicalArea(oldPageList[i]), extractPageOffs(oldPageList[i]), i);
             r = mSummaryCache.setPageStatus(oldPageList[i], SummaryEntry::dirty);
             if(r != Result::ok)
             {
@@ -102,6 +106,7 @@ public:
         mJournal.addEvent(journalEntry::pagestate::InvalidateOldPages(topic));
         oldPageListHWM = 0;
         newPageListHWM = 0;
+        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "invalidate done");
         return Result::ok;
     }
 

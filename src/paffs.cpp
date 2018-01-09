@@ -73,7 +73,7 @@ const char* traceDescription[] =
        "BUFFERS",
        "NANDACCESS",
        "GC_DETAIL",
-       "SCAN_DEBUG",
+       "PAGE_SM",
        "AREA",
        "PACACHE",
        "VERIFY_TC",

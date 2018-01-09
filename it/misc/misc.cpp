@@ -155,6 +155,8 @@ exportLog()
     mram->serialize(em);
     em.close();
 
+    cout << "done" << endl;
+
     fs.close(*fil);
     fs.unmount();
 

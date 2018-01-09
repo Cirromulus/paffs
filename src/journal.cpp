@@ -20,7 +20,6 @@
 #include "inttypes.h"
 
 using namespace paffs;
-using namespace std;
 
 Result
 Journal::addEvent(const JournalEntry& entry)

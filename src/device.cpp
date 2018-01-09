@@ -500,7 +500,7 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
 
 
     DirEntryCount dirEntries;
-    memcmp(&dirEntries, buf.get(), sizeof(DirEntryCount));
+    memcpy(&dirEntries, buf.get(), sizeof(DirEntryCount));
     FileSize p = sizeof(DirEntryCount);
     DirEntryCount entryNo = 0;
 
