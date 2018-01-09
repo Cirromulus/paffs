@@ -349,25 +349,29 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         }
         break;
     case JournalEntry::Topic::pac:
+        printf("pac ");
         switch (static_cast<const journalEntry::PAC*>(&entry)->operation)
         {
-        case journalEntry::PAC::Operation::add:
-            printf("Inode add");
+        case journalEntry::PAC::Operation::setInode:
+            printf("set Inode %" PTYPE_INODENO, static_cast<const journalEntry::pac::SetInode*>(&entry)->inodeNo);
             found = true;
             break;
-        case journalEntry::PAC::Operation::write:
-            printf("Inode write");
+        case journalEntry::PAC::Operation::setAddress:
+            {
+            auto sa = static_cast<const journalEntry::pac::SetAddress*>(&entry);
+            printf("set Address at %" PTYPE_PAGEOFFS " to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+                   sa->page, extractLogicalArea(sa->addr), extractPageOffs(sa->addr));
             found = true;
             break;
-        case journalEntry::PAC::Operation::remove:
-            printf("Inode remove");
-            found = true;
-            break;
-        case journalEntry::PAC::Operation::commit:
-            printf("Inode commit");
+            }
+        case journalEntry::PAC::Operation::updateAddresslist:
+            printf("update address list");
             found = true;
             break;
         }
+        break;
+    case JournalEntry::Topic::dataIO:
+        //todo: add things and stuff.
         break;
     case JournalEntry::Topic::device:
         //todo: add things and stuff.

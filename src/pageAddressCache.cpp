@@ -16,6 +16,7 @@
 #include "dataIO.hpp"
 #include "device.hpp"
 #include "driver/driver.hpp"
+#include "journalEntry.hpp"
 #include <cmath>
 #include <inttypes.h>
 
@@ -46,6 +47,9 @@ AddrListCacheElem::getAddr(PageNo pos)
     return cache[pos];
 }
 
+PageAddressCache::PageAddressCache(Device& mdev) :
+        device(mdev), inode(nullptr), statemachine(device.journal, device.sumCache){};
+
 Result
 PageAddressCache::setTargetInode(Inode& node)
 {
@@ -74,6 +78,7 @@ PageAddressCache::setTargetInode(Inode& node)
     }
     singl.active = false;
     inode = &node;
+    device.journal.addEvent(journalEntry::pac::SetInode(node.no));
     return Result::ok;
 }
 
@@ -172,15 +177,30 @@ PageAddressCache::setPage(PageNo page, Addr addr)
                     page);
     }
 
-    if (page < directAddrCount)
+    PageNo relPage = page;
+
+    if (relPage < directAddrCount)
     {
-        inode->direct[page] = addr;
+        //the event gets verz;gert until we are sure we dont have to commit
+        //or else during replay we commit before the log commits (so we would overwrite the last element)
+        device.journal.addEvent(journalEntry::pac::SetAddress(page, addr));
+        inode->direct[relPage] = addr;
         return Result::ok;
     }
-    page -= directAddrCount;
+    relPage -= directAddrCount;
     Result r;
 
-    if (page < addrsPerPage)
+    if(statemachine.getMinSpaceLeft() < 6)
+    {
+        r = commit();
+        if(r != Result::ok)
+        {
+            PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit PAC for statemachine cache!");
+            return r;
+        }
+    }
+
+    if (relPage < addrsPerPage)
     {
         // First Indirection
         if (!singl.active)
@@ -192,33 +212,36 @@ PageAddressCache::setPage(PageNo page, Addr addr)
                 return r;
             }
         }
-        singl.setAddr(page, addr);
+        device.journal.addEvent(journalEntry::pac::SetAddress(page, addr));
+        singl.setAddr(relPage, addr);
         return Result::ok;
     }
-    page -= addrsPerPage;
+    relPage -= addrsPerPage;
     PageNo addrPos;
 
-    if (page < std::pow(addrsPerPage, 2))
+    if (relPage < std::pow(addrsPerPage, 2))
     {
-        r = loadPath(inode->d_indir, page, doubl, 1, addrPos);
+        r = loadPath(inode->d_indir, relPage, doubl, 1, addrPos);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load second indirection!");
             return r;
         }
+        device.journal.addEvent(journalEntry::pac::SetAddress(page, addr));
         doubl[1].setAddr(addrPos, addr);
         return Result::ok;
     }
-    page -= std::pow(addrsPerPage, 2);
+    relPage -= std::pow(addrsPerPage, 2);
 
-    if (page < std::pow(addrsPerPage, 3))
+    if (relPage < std::pow(addrsPerPage, 3))
     {
-        r = loadPath(inode->t_indir, page, tripl, 2, addrPos);
+        r = loadPath(inode->t_indir, relPage, tripl, 2, addrPos);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load third indirection!");
             return r;
         }
+        device.journal.addEvent(journalEntry::pac::SetAddress(page, addr));
         tripl[2].setAddr(addrPos, addr);
         return Result::ok;
     }
@@ -227,6 +250,15 @@ PageAddressCache::setPage(PageNo page, Addr addr)
               "Get Page bigger than allowed! (was --, should <--)");
     // TODO: Actual calculation of values
     return Result::toobig;
+}
+
+Result
+PageAddressCache::setValid()
+{
+    //We only want to invalidate old Pages which may have been written.
+    //It is not allowed for PAC to revert new pages after DATAIO assumes the new Data having set.
+    device.journal.addEvent(journalEntry::pagestate::Success(getTopic()));
+    return statemachine.invalidateOldPages();
 }
 
 Result
@@ -266,7 +298,71 @@ PageAddressCache::commit()
         return Result::bug;
     }
 
-    return device.tree.updateExistingInode(*inode);
+    //todo: doubled code, use tree update as a signal
+
+    device.journal.addEvent(journalEntry::pac::UpdateAddressList(*inode));
+    r = device.tree.updateExistingInode(*inode);
+
+    statemachine.invalidateOldPages();
+    device.journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    return r;
+}
+
+JournalEntry::Topic
+PageAddressCache::getTopic()
+{
+    return JournalEntry::Topic::pac;
+}
+
+Result
+PageAddressCache::processEntry(const journalEntry::Max& entry)
+{
+    if (entry.base.topic == getTopic())
+    {   //normal operations
+        switch (entry.pac.operation)
+        {
+        case journalEntry::PAC::Operation::setInode:
+            device.tree.getInode(entry.pac_.setInode.inodeNo, journalInode);
+            return setTargetInode(journalInode);
+        case journalEntry::PAC::Operation::setAddress:
+            return setPage(entry.pac_.setAddress.page, entry.pac_.setAddress.addr);
+        case journalEntry::PAC::Operation::updateAddresslist:
+            {
+            Result r = device.tree.updateExistingInode(entry.pac_.updateAddressList.inode);
+            if(r != Result::ok)
+            {
+                return r;
+            }
+            journalEntry::Max success;
+            success.pagestate_.success = journalEntry::pagestate::Success(getTopic());
+            return statemachine.processEntry(success);
+            }
+        }
+        return Result::bug;
+    }
+    else if(entry.base.topic == JournalEntry::Topic::pagestate &&
+            entry.pagestate.target == getTopic())
+    {   //statemachine operations
+        return statemachine.processEntry(entry);
+    }
+    else
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
+        return Result::invalidInput;
+    }
+}
+
+void
+PageAddressCache::signalEndOfLog()
+{
+    if(statemachine.signalEndOfLog())
+    {
+        //TODO: We may want to find out which cache elements are clean to suppress double versions
+    }
+    if(inode != nullptr)
+    {
+        commit();
+    }
 }
 
 bool
@@ -414,6 +510,7 @@ PageAddressCache::loadPath(Addr& anchor,
 Result
 PageAddressCache::commitPath(Addr& anchor, AddrListCacheElem* path, unsigned char depth)
 {
+    //Journal set here
     Result r;
     for (uint16_t i = depth; i > 0; i--)
     {
@@ -464,7 +561,6 @@ PageAddressCache::commitPath(Addr& anchor, AddrListCacheElem* path, unsigned cha
             return r;
         }
     }
-
     path[0].dirty = false;
     return Result::ok;
 }
@@ -631,20 +727,19 @@ PageAddressCache::writeAddrList(Addr& source, Addr list[addrsPerPage])
     }
     Addr to = combineAddress(device.areaMgmt.getActiveArea(AreaType::index), firstFreePage);
 
+    // Mark Page as used
+    r = statemachine.markPageUsed(to);
+    if (r != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
+        return r;
+    }
+
     r = device.driver.writePage(
             getPageNumber(to, device), reinterpret_cast<char*>(list), addrsPerPage * sizeof(Addr));
     if (r != Result::ok)
     {
         // TODO: Revert Changes to PageStatus
-        return r;
-    }
-
-    // Mark Page as used
-    r = device.sumCache.setPageStatus(
-            device.areaMgmt.getActiveArea(AreaType::index), firstFreePage, SummaryEntry::used);
-    if (r != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
         return r;
     }
 
@@ -659,7 +754,7 @@ PageAddressCache::writeAddrList(Addr& source, Addr list[addrsPerPage])
 
     if (formerPosition != 0)
     {
-        r = device.sumCache.setPageStatus(formerPosition, SummaryEntry::dirty);
+        r = statemachine.markPageOld(formerPosition);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,

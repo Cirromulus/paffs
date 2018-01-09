@@ -118,6 +118,11 @@ Btree::updateExistingInode(const Inode& inode)
         return Result::bug;  // This Key did not exist
     }
 
+    if(memcmp(&node->raw.as.leaf.pInodes[pos], &inode, sizeof(Inode)) == 0)
+    {   //There is no change of the inode
+        return Result::ok;
+    }
+
     dev->journal.addEvent(journalEntry::btree::Update(inode));
 
     node->raw.as.leaf.pInodes[pos] = inode;
@@ -256,31 +261,25 @@ Btree::processEntry(const journalEntry::Max& entry)
         switch (entry.btree.op)
         {
         case journalEntry::BTree::Operation::insert:
-            insertInode(entry.btree_.insert.inode);
-            break;
+            return insertInode(entry.btree_.insert.inode);
         case journalEntry::BTree::Operation::update:
-            updateExistingInode(entry.btree_.update.inode);
-            break;
+            return updateExistingInode(entry.btree_.update.inode);
         case journalEntry::BTree::Operation::remove:
-            deleteInode(entry.btree_.remove.no);
-            break;
-        //Cache operations
+            return deleteInode(entry.btree_.remove.no);
         case journalEntry::BTree::Operation::setRootnode:
             {
             dev->superblock.registerRootnode(entry.btree_.setRootnode.address);
             journalEntry::Max success;
             success.pagestate_.success = journalEntry::pagestate::Success(getTopic());
-            mCache.processEntry(success);
-            break;
+            return mCache.processEntry(success);
             }
         }
-        return Result::ok;
+        return Result::bug;
     }
     else if(entry.base.topic == JournalEntry::Topic::pagestate &&
             entry.pagestate.target == getTopic())
     {   //statemachine operations
-        mCache.processEntry(entry);
-        return Result::ok;
+        return mCache.processEntry(entry);
     }
     else
     {

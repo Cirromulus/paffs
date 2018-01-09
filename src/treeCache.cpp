@@ -1205,7 +1205,7 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
     r = statemachine.markPageUsed(addr);
     if(r != Result::ok)
     {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark tree node page used");
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark tree node page used because %s", err_msg(r));
     }
 
     r = dev->driver.writePage(getPageNumber(node.raw.self, *dev), &node, sizeof(TreeNode));

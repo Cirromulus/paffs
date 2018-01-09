@@ -16,6 +16,7 @@
 
 #include "bitlist.hpp"
 #include "commonTypes.hpp"
+#include "journalPageStatemachine.hpp"
 
 #include <functional>
 
@@ -37,7 +38,7 @@ struct AddrListCacheElem
     getAddr(PageNo pos);
 };
 
-class PageAddressCache
+class PageAddressCache : public JournalTopic
 {
     //The three caches for each indirection layer
     AddrListCacheElem tripl[3];
@@ -45,11 +46,12 @@ class PageAddressCache
     AddrListCacheElem singl;
     Device& device;
     Inode* inode;
-    typedef std::function<void(Addr)> InformJournalFunc;
+
+    PageStateMachine<maxPagesPerWrite, JournalEntry::Topic::pac> statemachine;
+    Inode journalInode;
 
 public:
-    inline
-    PageAddressCache(Device& mdev) : device(mdev), inode(nullptr){};
+    PageAddressCache(Device& mdev);
     Result
     setTargetInode(Inode& node);
     Result
@@ -57,9 +59,18 @@ public:
     Result
     setPage(PageNo page, Addr addr);
     Result
+    setValid();
+    Result
     commit();
     bool
     isDirty();
+
+    JournalEntry::Topic
+    getTopic();
+    Result
+    processEntry(const journalEntry::Max& entry);
+    void
+    signalEndOfLog();
 
 private:
     uint16_t

@@ -85,6 +85,9 @@ DataIO::writeInodeData(Inode& inode,
         inode.size = *bytesWritten + offs;
     }
 
+
+    pac.setValid();
+
     // FIXME the Tree UpdateExistingInode has to be done by high level functions,
     // bc they may modify it by themselves. This leads to doubled journal Messages
     return res;

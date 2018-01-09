@@ -315,53 +315,55 @@ namespace journalEntry
     {
     enum class Operation : uint8_t
     {
-        add,
-        write,
-        remove,
-        commit
+        setInode,
+        setAddress,
+        updateAddresslist,
     };
     Operation operation;
-    InodeNo inode;
 
     protected:
         inline
-        PAC(Operation _operation, InodeNo _inode) :
-            JournalEntry(Topic::pac), operation(_operation), inode(_inode){};
+        PAC(Operation _operation) :
+            JournalEntry(Topic::pac), operation(_operation){};
     };
 
     namespace pac
     {
-        // TODO
-        struct Add : public PAC
+        struct SetInode : public PAC
         {
+            InodeNo inodeNo;
             inline
-            Add(InodeNo _inode) : PAC(Operation::add, _inode){};
+            SetInode(InodeNo _inodeNo) : PAC(Operation::setInode), inodeNo(_inodeNo){};
         };
 
-        struct Write : public PAC
+        struct SetAddress : public PAC
         {
+            PageOffs page;
+            Addr addr;
             inline
-            Write(InodeNo _inode) : PAC(Operation::write, _inode){};
+            SetAddress(PageOffs _page, Addr _addr) : PAC(Operation::setAddress), page(_page), addr(_addr){};
         };
 
-        struct Remove : public PAC
+        struct UpdateAddressList : public PAC
         {
+            //TODO: Build a system that allows some log entries to be received by multiple Topics
+            //This would solve many doubled messages (including this one)
+            Inode inode;
             inline
-            Remove(InodeNo _inode) : PAC(Operation::remove, _inode){};
-        };
-        struct Commit : public PAC
-        {
-            inline
-            Commit(InodeNo _inode) : PAC(Operation::commit, _inode){};
+            UpdateAddressList(Inode _inode) : PAC(Operation::updateAddresslist), inode(_inode){};
         };
 
         union Max {
-            Add add;
-            Write write;
-            Remove remove;
-            Commit commit;
+            SetInode setInode;
+            SetAddress setAddress;
+            UpdateAddressList updateAddressList;
         };
     }
+
+    struct DataIO : public JournalEntry
+    {
+
+    };
 
     struct Device : public JournalEntry
     {
@@ -429,8 +431,8 @@ namespace journalEntry
         btree::Max btree_;
         SummaryCache summaryCache;
         summaryCache::Max summaryCache_;
-        PAC inode;
-        pac::Max inode_;
+        PAC pac;
+        pac::Max pac_;
         Device device;
         device::Max device_;
         inline

@@ -53,9 +53,19 @@ public:
         oldPageListHWM = 0;
     }
 
+    inline uint16_t getMinSpaceLeft()
+    {
+        //newPageList is bigger or equal to oldPages, because we delete immediately
+        return maxPages - newPageListHWM;
+    }
+
     inline Result
     markPageUsed(Addr addr)
     {
+        if(newPageListHWM == maxPages)
+        {
+            return Result::lowmem;
+        }
         newPageList[newPageListHWM++] = addr;
         //TODO: unify both journal events saying the same thing
         mJournal.addEvent(journalEntry::pagestate::PageUsed(topic, addr));
@@ -65,6 +75,10 @@ public:
     inline Result
     markPageOld(Addr addr)
     {
+        if(oldPageListHWM == maxPages)
+        {
+            return Result::lowmem;
+        }
         oldPageList[oldPageListHWM++] = addr;
         mJournal.addEvent(journalEntry::pagestate::PagePending(topic, addr));
         return Result::ok;
@@ -136,8 +150,9 @@ public:
                     return Result::bug;
                 case journalEntry::Pagestate::Type::invalidateOldPages:
                     //The only time we should see this is if we broke down before setting checkpoint
-                    //TODO: Should we produce a checkpoint now?
-                    mJournal.addEvent(journalEntry::Checkpoint(topic));
+                    //TODO: Should we produce a checkpoint now? Maybe not, because PAC has many cycles
+                    //through statemachine until checkpoint comes
+                    //mJournal.addEvent(journalEntry::Checkpoint(topic));
                     journalState = JournalState::ok;
                     clear();
                     break;
