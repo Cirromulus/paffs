@@ -215,18 +215,17 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         printf("Pagestate for %s ", topicNames[ps->target]);
         switch(ps->type)
         {
-            case journalEntry::Pagestate::Type::pageUsed:
-                printf("setPageused %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
-                       extractLogicalArea(static_cast<const journalEntry::pagestate::PageUsed*>(&entry)->addr),
-                       extractPageOffs(static_cast<const journalEntry::pagestate::PageUsed*>(&entry)->addr));
+            case journalEntry::Pagestate::Type::replacePage:
+            {
+                auto repl = static_cast<const journalEntry::pagestate::ReplacePage*>(&entry);
+                printf("new Page: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ", old: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+                       extractLogicalArea(repl->neu),
+                       extractPageOffs(repl->neu),
+                       extractLogicalArea(repl->old),
+                       extractPageOffs(repl->old));
                 found = true;
                 break;
-            case journalEntry::Pagestate::Type::pagePending:
-                printf("setPagePending %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
-                       extractLogicalArea(static_cast<const journalEntry::pagestate::PagePending*>(&entry)->addr),
-                       extractPageOffs(static_cast<const journalEntry::pagestate::PagePending*>(&entry)->addr));
-                found = true;
-                break;
+            }
             case journalEntry::Pagestate::Type::success:
                 printf("success");
                 found = true;

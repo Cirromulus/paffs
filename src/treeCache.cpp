@@ -1197,12 +1197,12 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
                   dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(AreaType::index)));
         return dev->lasterr = Result::bug;
     }
-    Addr addr = combineAddress(dev->areaMgmt.getActiveArea(AreaType::index), firstFreePage);
+    Addr newAddr = combineAddress(dev->areaMgmt.getActiveArea(AreaType::index), firstFreePage);
     Addr oldSelf = node.raw.self;
-    node.raw.self = addr;
+    node.raw.self = newAddr;
 
     // Mark Page as used
-    r = statemachine.markPageUsed(addr);
+    r = statemachine.replacePage(newAddr, oldSelf);
     if(r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark tree node page used because %s", err_msg(r));
@@ -1220,11 +1220,6 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update node address in Parent!");
         return r;
-    }
-
-    if (oldSelf != 0)
-    {
-        statemachine.markPageOld(oldSelf);
     }
 
     r = dev->areaMgmt.manageActiveAreaFull(AreaType::index);

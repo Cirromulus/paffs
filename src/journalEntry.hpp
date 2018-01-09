@@ -54,8 +54,7 @@ namespace journalEntry
     {
         enum Type : uint8_t
         {
-            pageUsed,
-            pagePending,
+            replacePage,
             success,    ///> Warn: This is not to be written into journal, only interpreted by topic from other actions
             invalidateOldPages,
         };
@@ -69,19 +68,15 @@ namespace journalEntry
 
     namespace pagestate
     {
-        struct PageUsed : public Pagestate
+        struct ReplacePage : public Pagestate
         {
-            Addr addr;
+            Addr neu;
+            Addr old;
             inline
-            PageUsed(Topic _target, Addr _addr) : Pagestate(_target, Type::pageUsed), addr(_addr){};
+            ReplacePage(Topic _target, Addr _new, Addr _old) :
+                Pagestate(_target, Type::replacePage), neu(_new), old(_old){};
         };
 
-        struct PagePending : public Pagestate
-        {
-            Addr addr;
-            inline
-            PagePending(Topic _target, Addr _addr) : Pagestate(_target, Type::pagePending), addr(_addr){};
-        };
         struct Success : public Pagestate
         {
             inline
@@ -95,8 +90,7 @@ namespace journalEntry
 
         union Max
         {
-            PageUsed pageUsed;
-            PagePending pagePending;
+            ReplacePage replacePage;
             Success success;
             InvalidateOldPages invalidateOldPages;
         };

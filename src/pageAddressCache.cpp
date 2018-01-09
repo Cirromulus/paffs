@@ -728,7 +728,7 @@ PageAddressCache::writeAddrList(Addr& source, Addr list[addrsPerPage])
     Addr to = combineAddress(device.areaMgmt.getActiveArea(AreaType::index), firstFreePage);
 
     // Mark Page as used
-    r = statemachine.markPageUsed(to);
+    r = statemachine.replacePage(to, source);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
@@ -743,24 +743,12 @@ PageAddressCache::writeAddrList(Addr& source, Addr list[addrsPerPage])
         return r;
     }
 
-    Addr formerPosition = source;
     source = to;
 
     r = device.areaMgmt.manageActiveAreaFull(AreaType::index);
     if (r != Result::ok)
     {
         return r;
-    }
-
-    if (formerPosition != 0)
-    {
-        r = statemachine.markPageOld(formerPosition);
-        if (r != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not invalidate old Page! "
-                      "Ignoring Errors to continue...");
-        }
     }
 
     return Result::ok;

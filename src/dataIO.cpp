@@ -382,7 +382,7 @@ DataIO::writePageData(PageAbs  pageFrom,
             *bytesWritten += btw;
         }
 
-        res = statemachine.markPageUsed(newAddress);
+        res = statemachine.replacePage(newAddress, oldAddr);
         if (res != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
@@ -401,14 +401,8 @@ DataIO::writePageData(PageAbs  pageFrom,
 
         ac.setPage(page + pageFrom, newAddress);
 
-        // if we have overwriting existing data...
-        if (oldAddr != 0)  // not an empty page
-        {
-            statemachine.markPageOld(oldAddr);
-        }
-        else
-        {
-            // or we added a new page to this file
+        if (oldAddr == 0)
+        {   //we added a new page to this file
             reservedPages++;
         }
 

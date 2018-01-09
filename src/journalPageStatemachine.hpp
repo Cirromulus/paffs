@@ -29,9 +29,8 @@ class PageStateMachine
 
 
     Addr newPageList[maxPages];
-    uint16_t newPageListHWM;
     Addr oldPageList[maxPages];
-    uint16_t oldPageListHWM;
+    uint16_t pageListHWM;
     enum class JournalState : uint8_t
     {
         ok,
@@ -43,70 +42,64 @@ public:
     PageStateMachine(Journal& journal, SummaryCache& summaryCache) :
         mJournal(journal),mSummaryCache(summaryCache)
     {
+        pageListHWM = maxPages;
         clear();
     };
 
     inline void clear()
     {
         journalState = JournalState::ok;
-        newPageListHWM = 0;
-        oldPageListHWM = 0;
+        memset(newPageList, 0, sizeof(uint16_t) * pageListHWM);
+        memset(oldPageList, 0, sizeof(uint16_t) * pageListHWM);
+        pageListHWM = 0;
     }
 
     inline uint16_t getMinSpaceLeft()
     {
-        //newPageList is bigger or equal to oldPages, because we delete immediately
-        return maxPages - newPageListHWM;
+        return maxPages - pageListHWM;
     }
 
     inline Result
-    markPageUsed(Addr addr)
+    replacePage(Addr neu, Addr old)
     {
-        if(newPageListHWM == maxPages)
+        if(pageListHWM == maxPages)
         {
             return Result::lowmem;
         }
         PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "mark %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " NEW/USED at %" PRIu16,
-                    extractLogicalArea(addr), extractPageOffs(addr), newPageListHWM);
-        newPageList[newPageListHWM++] = addr;
+                    extractLogicalArea(neu), extractPageOffs(neu), pageListHWM);
+        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "     %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "   old    at %" PRIu16,
+                    extractLogicalArea(old), extractPageOffs(old), pageListHWM);
+        newPageList[pageListHWM  ] = neu;
+        oldPageList[pageListHWM++] = old;
         //TODO: unify both journal events saying the same thing
-        mJournal.addEvent(journalEntry::pagestate::PageUsed(topic, addr));
-        return mSummaryCache.setPageStatus(addr, SummaryEntry::used);
+        mJournal.addEvent(journalEntry::pagestate::ReplacePage(topic, neu, old));
+        return mSummaryCache.setPageStatus(neu, SummaryEntry::used);
     }
 
-    inline Result
-    markPageOld(Addr addr)
-    {
-        if(oldPageListHWM == maxPages)
-        {
-            return Result::lowmem;
-        }
-        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "mark %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " OLD at %" PRIu16,
-                    extractLogicalArea(addr), extractPageOffs(addr), oldPageListHWM);
-        oldPageList[oldPageListHWM++] = addr;
-        mJournal.addEvent(journalEntry::pagestate::PagePending(topic, addr));
-        return Result::ok;
-    }
 
     inline Result
     invalidateOldPages()
     {
         Result r;
-        for(uint16_t i = 0; i < oldPageListHWM; i++)
+        for(uint16_t i = 0; i < pageListHWM; i++)
         {
+            if(oldPageList[i] == 0)
+            {
+                continue;
+            }
             PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "invalidate %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " at %" PRIu16,
                       extractLogicalArea(oldPageList[i]), extractPageOffs(oldPageList[i]), i);
             r = mSummaryCache.setPageStatus(oldPageList[i], SummaryEntry::dirty);
             if(r != Result::ok)
             {
                 //TODO: rewind
-                return r;
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set old Page dirty!");
             }
         }
-        mJournal.addEvent(journalEntry::pagestate::InvalidateOldPages(topic));
-        oldPageListHWM = 0;
-        newPageListHWM = 0;
         PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "invalidate done");
+        mJournal.addEvent(journalEntry::pagestate::InvalidateOldPages(topic));
+        clear();
         return Result::ok;
     }
 
@@ -119,8 +112,9 @@ public:
         case JournalState::ok:
             switch(entry.pagestate.type)
             {
-                case journalEntry::Pagestate::Type::pageUsed:
-                    newPageList[newPageListHWM++] = action.pageUsed.addr;
+                case journalEntry::Pagestate::Type::replacePage:
+                    newPageList[pageListHWM  ] = action.replacePage.neu;
+                    oldPageList[pageListHWM++] = action.replacePage.old;
                     journalState = JournalState::invalid;
                     break;
                 default:
@@ -131,11 +125,9 @@ public:
         case JournalState::invalid:
             switch(entry.pagestate.type)
             {
-                case journalEntry::Pagestate::Type::pageUsed:
-                    newPageList[newPageListHWM++] = action.pageUsed.addr;
-                    break;
-                case journalEntry::Pagestate::Type::pagePending:
-                    oldPageList[oldPageListHWM++] = action.pagePending.addr;
+                case journalEntry::Pagestate::Type::replacePage:
+                    newPageList[pageListHWM  ] = action.replacePage.neu;
+                    oldPageList[pageListHWM++] = action.replacePage.old;
                     break;
                 case journalEntry::Pagestate::Type::success:
                     journalState = JournalState::recover;
@@ -148,8 +140,7 @@ public:
         case JournalState::recover:
             switch(entry.pagestate.type)
             {
-                case journalEntry::Pagestate::Type::pageUsed:
-                case journalEntry::Pagestate::Type::pagePending:
+                case journalEntry::Pagestate::Type::replacePage:
                 case journalEntry::Pagestate::Type::success:
                     PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid operation in state RECOVER");
                     return Result::bug;
@@ -179,16 +170,19 @@ public:
             clear();
             return true;
         case JournalState::invalid:
-            for(uint16_t i = 0; i < newPageListHWM; i++)
+            for(uint16_t i = 0; i < pageListHWM; i++)
             {
                 mSummaryCache.setPageStatus(newPageList[i], SummaryEntry::dirty);
             }
             clear();
             return false;
         case JournalState::recover:
-            for(uint16_t i = 0; i < oldPageListHWM; i++)
+            for(uint16_t i = 0; i < pageListHWM; i++)
             {
-                mSummaryCache.setPageStatus(oldPageList[i], SummaryEntry::dirty);
+                if(oldPageList[i] != 0)
+                {
+                    mSummaryCache.setPageStatus(oldPageList[i], SummaryEntry::dirty);
+                }
             }
             clear();
             return true;
