@@ -498,12 +498,16 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         return r == Result::ok ? Result::bug : r;
     }
 
+
+    DirEntryCount dirEntries;
+    memcmp(&dirEntries, buf.get(), sizeof(DirEntryCount));
+    FileSize p = sizeof(DirEntryCount);
+    DirEntryCount entryNo = 0;
+
     PAFFS_DBG_S(PAFFS_TRACE_DEVICE,
                 "Searching for '%s' in Inode %" PTYPE_INODENO " (%" PTYPE_DIRENTRYCOUNT " entries)",
-                name, folder.no, *reinterpret_cast<DirEntryCount*>(buf.get()));
+                name, folder.no, dirEntries);
 
-    FileSize p = sizeof(DirEntryCount);  // skip directory entry count
-    DirEntryCount entryNo = 0;
     while (p < folder.size)
     {
         DirEntryLength direntryl = buf[p];
