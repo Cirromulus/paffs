@@ -87,6 +87,7 @@ DataIO::writeInodeData(Inode& inode,
 
 
     pac.setValid();
+    dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
 
     // FIXME the Tree UpdateExistingInode has to be done by high level functions,
     // bc they may modify it by themselves. This leads to doubled journal Messages

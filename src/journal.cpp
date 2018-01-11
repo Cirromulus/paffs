@@ -151,7 +151,7 @@ Journal::applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEnt
             PAFFS_DBG(PAFFS_TRACE_BUG, "Could not read journal to target end");
             return r;
         }
-
+        bool processed = false;
         for (JournalTopic* worker : topics)
         {
             if (entry.base.topic == worker->getTopic() ||
@@ -181,8 +181,14 @@ Journal::applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEnt
                         printMeaning(entry.base);
                         return r;
                     }
+                    processed = true;
                 }
             }
+        }
+        if(!processed)
+        {
+            PAFFS_DBG(PAFFS_TRACE_ERROR, "No registered worker matching event!");
+            printMeaning(entry.base);
         }
     }
 
