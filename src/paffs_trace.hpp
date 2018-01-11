@@ -62,7 +62,7 @@ extern const char* traceDescription[];
 #define PAFFS_TRACE_INFO        0x00000001
 #define PAFFS_TRACE_OS          0x00000002
 #define PAFFS_TRACE_DEVICE      0x00000004
-#define PAFFS_TRACE_SCAN        0x00000008
+#define PAFFS_TRACE_JOUR_PERS   0x00000008
 #define PAFFS_TRACE_BAD_BLOCKS  0x00000010
 #define PAFFS_TRACE_ERASE       0x00000020
 #define PAFFS_TRACE_GC          0x00000040

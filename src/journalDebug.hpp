@@ -18,7 +18,7 @@ static constexpr const char* topicNames[] = {
         "TREE",
         "SUMMARY CACHE",
         "PAC",
-        "DATAIO"
+        "DATAIO",
         "DEVICE",
 };
 }

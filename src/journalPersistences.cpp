@@ -183,7 +183,7 @@ MramPersistence::readNextElem(journalEntry::Max& entry)
 
     device->driver.readMRAM(curr, &entry, sizeof(journalEntry::Max));
     uint16_t size = getSizeFromMax(entry);
-    PAFFS_DBG_S(PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE,
+    PAFFS_DBG_S(PAFFS_TRACE_JOUR_PERS,
                 "Read entry at %" PRIu32 "-%" PRIu32,
                 curr,
                 curr + size);
@@ -315,7 +315,7 @@ FlashPersistence::readNextElem(journalEntry::Max& entry)
            curr.offs + sizeof(journalEntry::Max) > dataPagesPerArea ? dataPagesPerArea - curr.offs
                                                                     : sizeof(journalEntry::Max));
     uint16_t size = getSizeFromMax(entry);
-    PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE),
+    PAFFS_DBG_S(PAFFS_TRACE_JOUR_PERS,
                 "Read entry at %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " %" PRIu16 "-%" PRIu16,
                 extractLogicalArea(curr.addr),
                 extractPageOffs(curr.addr),

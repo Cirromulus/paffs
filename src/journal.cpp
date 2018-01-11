@@ -42,6 +42,7 @@ Journal::addEvent(const JournalEntry& entry)
     }
     if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
     {
+        printf("Add event ");
         printMeaning(entry);
     }
     return Result::ok;
@@ -215,25 +216,38 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         printf("Pagestate for %s ", topicNames[ps->target]);
         switch(ps->type)
         {
-            case journalEntry::Pagestate::Type::replacePage:
-            {
-                auto repl = static_cast<const journalEntry::pagestate::ReplacePage*>(&entry);
-                printf("new Page: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ", old: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
-                       extractLogicalArea(repl->neu),
-                       extractPageOffs(repl->neu),
-                       extractLogicalArea(repl->old),
-                       extractPageOffs(repl->old));
-                found = true;
-                break;
-            }
-            case journalEntry::Pagestate::Type::success:
-                printf("success");
-                found = true;
-                break;
-            case journalEntry::Pagestate::Type::invalidateOldPages:
-                printf("invalidateAllOldPages");
-                found = true;
-                break;
+        case journalEntry::Pagestate::Type::replacePage:
+         {
+             auto repl = static_cast<const journalEntry::pagestate::ReplacePage*>(&entry);
+             printf("new Page: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ", old: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+                    extractLogicalArea(repl->neu),
+                    extractPageOffs(repl->neu),
+                    extractLogicalArea(repl->old),
+                    extractPageOffs(repl->old));
+             found = true;
+             break;
+         }
+        case journalEntry::Pagestate::Type::replacePagePos:
+         {
+             auto repl = static_cast<const journalEntry::pagestate::ReplacePagePos*>(&entry);
+             printf("new Page: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ", old: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS
+                    " at pos %" PTYPE_PAGEABS,
+                    extractLogicalArea(repl->neu),
+                    extractPageOffs(repl->neu),
+                    extractLogicalArea(repl->old),
+                    extractPageOffs(repl->old),
+                    repl->pos);
+             found = true;
+             break;
+         }
+        case journalEntry::Pagestate::Type::success:
+            printf("success");
+            found = true;
+            break;
+        case journalEntry::Pagestate::Type::invalidateOldPages:
+            printf("invalidateAllOldPages");
+            found = true;
+            break;
         }
         break;
     }
@@ -373,6 +387,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         break;
     case JournalEntry::Topic::device:
         //todo: add things and stuff.
+        printf("device");
         break;
     }
     if (!found)

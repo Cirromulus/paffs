@@ -46,7 +46,7 @@ TraceMask traceMask =
         // PAFFS_TRACE_TREE |
         // PAFFS_TRACE_TREECACHE |
         // PAFFS_TRACE_ASCACHE |
-        // PAFFS_TRACE_SCAN |
+        // PAFFS_TRACE_JOUR_PERS |
         // PAFFS_TRACE_WRITE |
         // PAFFS_TRACE_SUPERBLOCK |
         // PAFFS_TRACE_ALLOCATE |
@@ -63,7 +63,7 @@ const char* traceDescription[] =
        "INFO",
        "OS",
        "DEVICE",
-       "SCAN",
+       "JPERSIST",
        "BAD_BLOCKS",
        "ERASE",
        "GC",
