@@ -27,7 +27,6 @@ class PageStateMachine
     Journal& mJournal;
     SummaryCache& mSummaryCache;
 
-
     Addr newPageList[maxPages];
     Addr oldPageList[maxPages];
     uint16_t pageListHWM;
@@ -77,7 +76,6 @@ public:
         return mSummaryCache.setPageStatus(neu, SummaryEntry::used);
     }
 
-
     inline Result
     invalidateOldPages()
     {
@@ -97,8 +95,8 @@ public:
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set old Page dirty!");
             }
         }
-        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "invalidate done");
         mJournal.addEvent(journalEntry::pagestate::InvalidateOldPages(topic));
+        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "invalidate done");
         clear();
         return Result::ok;
     }
@@ -112,46 +110,53 @@ public:
         case JournalState::ok:
             switch(entry.pagestate.type)
             {
-                case journalEntry::Pagestate::Type::replacePage:
-                    newPageList[pageListHWM  ] = action.replacePage.neu;
-                    oldPageList[pageListHWM++] = action.replacePage.old;
-                    journalState = JournalState::invalid;
-                    break;
-                default:
-                    PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid operation in state OK");
-                    return Result::bug;
+            case journalEntry::Pagestate::Type::replacePagePos:
+                PAFFS_DBG(PAFFS_TRACE_BUG, "processed entry with Position");
+                return Result::bug;
+            case journalEntry::Pagestate::Type::replacePage:
+                newPageList[pageListHWM  ] = action.replacePage.neu;
+                oldPageList[pageListHWM++] = action.replacePage.old;
+                journalState = JournalState::invalid;
+                break;
+            default:
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid operation in state OK");
+                return Result::bug;
             }
             break;
         case JournalState::invalid:
             switch(entry.pagestate.type)
             {
-                case journalEntry::Pagestate::Type::replacePage:
-                    newPageList[pageListHWM  ] = action.replacePage.neu;
-                    oldPageList[pageListHWM++] = action.replacePage.old;
-                    break;
-                case journalEntry::Pagestate::Type::success:
-                    journalState = JournalState::recover;
-                    break;
-                case journalEntry::Pagestate::Type::invalidateOldPages:
-                    PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid operation in state INVALID");
-                    return Result::bug;
+            case journalEntry::Pagestate::Type::replacePagePos:
+                PAFFS_DBG(PAFFS_TRACE_BUG, "processed entry with Position");
+                return Result::bug;
+            case journalEntry::Pagestate::Type::replacePage:
+                newPageList[pageListHWM  ] = action.replacePage.neu;
+                oldPageList[pageListHWM++] = action.replacePage.old;
+                break;
+            case journalEntry::Pagestate::Type::success:
+                journalState = JournalState::recover;
+                break;
+            case journalEntry::Pagestate::Type::invalidateOldPages:
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid operation in state INVALID");
+                return Result::bug;
             }
             break;
         case JournalState::recover:
             switch(entry.pagestate.type)
             {
-                case journalEntry::Pagestate::Type::replacePage:
-                case journalEntry::Pagestate::Type::success:
-                    PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid operation in state RECOVER");
-                    return Result::bug;
-                case journalEntry::Pagestate::Type::invalidateOldPages:
-                    //The only time we should see this is if we broke down before setting checkpoint
-                    //TODO: Should we produce a checkpoint now? Maybe not, because PAC has many cycles
-                    //through statemachine until checkpoint comes
-                    //mJournal.addEvent(journalEntry::Checkpoint(topic));
-                    journalState = JournalState::ok;
-                    clear();
-                    break;
+            case journalEntry::Pagestate::Type::replacePagePos:
+            case journalEntry::Pagestate::Type::replacePage:
+            case journalEntry::Pagestate::Type::success:
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid operation in state RECOVER");
+                return Result::bug;
+            case journalEntry::Pagestate::Type::invalidateOldPages:
+                //The only time we should see this is if we broke down before setting checkpoint
+                //TODO: Should we produce a checkpoint now? Maybe not, because PAC has many cycles
+                //through statemachine until checkpoint comes
+                //mJournal.addEvent(journalEntry::Checkpoint(topic));
+                journalState = JournalState::ok;
+                clear();
+                break;
             }
             break;
         }
@@ -160,6 +165,7 @@ public:
 
     /**
      * @return true, if commit was successful
+     * \warn this strongly relies on PAC having been set to the correct Inode!
      */
     inline bool
     signalEndOfLog()

@@ -30,12 +30,14 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
     case JournalEntry::Topic::pagestate:
         switch (static_cast<const journalEntry::Pagestate*>(&entry)->type)
         {
-            case journalEntry::Pagestate::Type::replacePage:
-                return sizeof(journalEntry::pagestate::ReplacePage);
-            case journalEntry::Pagestate::Type::success:
-                return sizeof(journalEntry::pagestate::Success);
-            case journalEntry::Pagestate::Type::invalidateOldPages:
-                return sizeof(journalEntry::pagestate::InvalidateOldPages);
+        case journalEntry::Pagestate::Type::replacePage:
+            return sizeof(journalEntry::pagestate::ReplacePage);
+        case journalEntry::Pagestate::Type::replacePagePos:
+            return sizeof(journalEntry::pagestate::ReplacePagePos);
+        case journalEntry::Pagestate::Type::success:
+            return sizeof(journalEntry::pagestate::Success);
+        case journalEntry::Pagestate::Type::invalidateOldPages:
+            return sizeof(journalEntry::pagestate::InvalidateOldPages);
         }
         break;
     case JournalEntry::Topic::areaMgmt:

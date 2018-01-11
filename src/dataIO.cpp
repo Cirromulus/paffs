@@ -24,7 +24,7 @@
 namespace paffs
 {
 
-DataIO::DataIO(Device *mdev) : dev(mdev), statemachine(mdev->journal, mdev->sumCache), pac(*mdev){};
+DataIO::DataIO(Device *mdev) : dev(mdev), pac(*mdev), statemachine(mdev->journal, mdev->sumCache, pac){};
 
 // modifies inode->size and inode->reserved size as well
 Result
@@ -382,7 +382,7 @@ DataIO::writePageData(PageAbs  pageFrom,
             *bytesWritten += btw;
         }
 
-        res = statemachine.replacePage(newAddress, oldAddr);
+        res = statemachine.replacePage(newAddress, oldAddr, page + pageFrom);
         if (res != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,

@@ -33,6 +33,10 @@ AddrListCacheElem::setAddr(PageNo pos, Addr addr)
                   pos,
                   addrsPerPage);
     }
+    if(cache[pos] == addr)
+    {
+        return;
+    }
     cache[pos] = addr;
     dirty = true;
 }

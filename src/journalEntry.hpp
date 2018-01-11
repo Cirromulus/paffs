@@ -55,6 +55,7 @@ namespace journalEntry
         enum Type : uint8_t
         {
             replacePage,
+            replacePagePos,
             success,    ///> Warn: This is not to be written into journal, only interpreted by topic from other actions
             invalidateOldPages,
         };
@@ -77,6 +78,16 @@ namespace journalEntry
                 Pagestate(_target, Type::replacePage), neu(_new), old(_old){};
         };
 
+        struct ReplacePagePos : public Pagestate
+        {
+            Addr    neu;
+            Addr    old;
+            PageAbs pos;
+            inline
+            ReplacePagePos(Topic _target, Addr _new, Addr _old, Addr _pos) :
+                Pagestate(_target, Type::replacePagePos), neu(_new), old(_old), pos(_pos){};
+        };
+
         struct Success : public Pagestate
         {
             inline
@@ -91,6 +102,7 @@ namespace journalEntry
         union Max
         {
             ReplacePage replacePage;
+            ReplacePagePos replacePagePos;
             Success success;
             InvalidateOldPages invalidateOldPages;
         };

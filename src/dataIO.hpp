@@ -19,6 +19,7 @@
 #include "commonTypes.hpp"
 #include "pageAddressCache.hpp"
 #include "superblock.hpp"
+#include "journalPagePosStatemachine.hpp"
 
 namespace paffs
 {
@@ -26,11 +27,11 @@ namespace paffs
 class DataIO
 {
     Device* dev;
-
-    PageStateMachine<maxPagesPerWrite, JournalEntry::Topic::dataIO> statemachine;
-
 public:
     PageAddressCache pac;
+private:
+    PagePosStateMachine<maxPagesPerWrite, JournalEntry::Topic::dataIO> statemachine;
+public:
 
     DataIO(Device* mdev);
     // Updates changes to treeCache as well
