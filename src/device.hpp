@@ -31,7 +31,7 @@ namespace paffs
 {
 extern outpost::rtos::SystemClock systemClock;
 
-class Device
+class Device : public JournalTopic
 {
     InodePool<maxNumberOfInodes> inodePool;
     ObjectPool<Obj, maxNumberOfFiles> filesPool;
@@ -109,6 +109,13 @@ public:
     getNumberOfOpenFiles();
     uint8_t
     getNumberOfOpenInodes();
+
+    JournalEntry::Topic
+    getTopic();
+    Result
+    processEntry(const journalEntry::Max& entry);
+    void
+    signalEndOfLog();
 
 private:
     Result

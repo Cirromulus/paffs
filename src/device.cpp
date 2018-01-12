@@ -33,7 +33,8 @@ Device::Device(Driver& _driver) :
       dataIO(this),
       superblock(this),
       journalPersistence(this),
-      journal(journalPersistence, superblock, sumCache, tree){};
+      journal(journalPersistence, superblock, sumCache, tree,
+              dataIO, dataIO.pac, *this){};
 
 Device::~Device()
 {
@@ -641,7 +642,7 @@ Device::findOrLoadInode(InodeNo no, SmartInodePtr& target)
 Result
 Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
 {
-    journal.addEvent(journalEntry::device::MkObjInode(contDir.no));
+    journal.addEvent(journalEntry::device::InsertIntoDir(contDir.no));
     FileNamePos elemNameL = strlen(name);
     if (name[elemNameL - 1] == '/')
     {
@@ -730,6 +731,8 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
         }
         return r;
     }
+
+    journal.addEvent(journalEntry::Checkpoint(getTopic()));
 
     //FIXME Dirty hack. Actually, the Problem is with the inode reference.
     //      Inode target is located in Tree, which may have cleared the node until we commit PAC.
@@ -1539,13 +1542,6 @@ Device::remove(const char* path)
         return Result::invalidInput;
     }
 
-    r = truncate(path, 0);
-    if (r != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete the files contents");
-        return r;
-    }
-
     SmartInodePtr parentDir;
     uint16_t lastSlash = 0;
     if ((r = getParentDir(path, parentDir, &lastSlash)) != Result::ok)
@@ -1554,6 +1550,13 @@ Device::remove(const char* path)
     }
 
     journal.addEvent(journalEntry::device::RemoveObj(object->no, parentDir->no));
+
+    r = truncate(path, 0);
+    if (r != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete the files contents");
+        return r;
+    }
 
     if ((r = removeInodeFromDir(*parentDir, object->no)) != Result::ok)
     {
@@ -1618,6 +1621,25 @@ uint8_t
 Device::getNumberOfOpenInodes()
 {
     return inodePool.getUsage();
+}
+
+JournalEntry::Topic
+Device::getTopic()
+{
+    return JournalEntry::Topic::device;
+}
+
+Result
+Device::processEntry(const journalEntry::Max&)
+{
+    //ui ui ui
+    return Result::ok;
+}
+
+void
+Device::signalEndOfLog()
+{
+    //Si, fliegen
 }
 
 Result

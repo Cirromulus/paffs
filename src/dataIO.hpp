@@ -24,7 +24,7 @@
 namespace paffs
 {
 
-class DataIO
+class DataIO : public JournalTopic
 {
     Device* dev;
 public:
@@ -49,6 +49,13 @@ public:
                   uint8_t* data);
     Result
     deleteInodeData(Inode& inode, unsigned int offs);
+
+    JournalEntry::Topic
+    getTopic();
+    Result
+    processEntry(const journalEntry::Max& entry);
+    void
+    signalEndOfLog();
 
 private:
     /**

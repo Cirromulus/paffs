@@ -32,7 +32,7 @@ struct JournalEntry
         device,
     };
 
-    static constexpr const unsigned char numberOfTopics = 8;
+    static constexpr const unsigned char numberOfTopics = 9;
     Topic topic;
 
 protected:
@@ -421,7 +421,6 @@ namespace journalEntry
             MkObjInode mkObjInode;
             InsertIntoDir insertIntoDir;
             RemoveObj removeObj;
-
         };
     }
 

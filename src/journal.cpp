@@ -128,6 +128,14 @@ Journal::processBuffer()
     return Result::ok;
 }
 
+bool
+Journal::isTopicValid(JournalEntry::Topic topic)
+{
+    return topic > JournalEntry::Topic::invalid
+            && topic <= JournalEntry::numberOfTopics
+            && (topic == JournalEntry::pagestate || topics[topic] != nullptr);
+}
+
 Result
 Journal::applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEntry::numberOfTopics])
 {
@@ -151,51 +159,63 @@ Journal::applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEnt
             PAFFS_DBG(PAFFS_TRACE_BUG, "Could not read journal to target end");
             return r;
         }
-        bool processed = false;
-        for (JournalTopic* worker : topics)
+
+        if(entry.base.topic == JournalEntry::Topic::checkpoint)
         {
-            if (entry.base.topic == worker->getTopic() ||
-                    (entry.base.topic == JournalEntry::Topic::pagestate
-                     && entry.pagestate.target == worker->getTopic()))
-            {
-                if (persistence.tell() >= firstUncheckpointedEntry[worker->getTopic()])
-                {
-                    if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
-                    {
-                        printf("Processing entry ");
-                        printMeaning(entry.base, false);
-                        printf(" by %s ",
-                               topicNames[worker->getTopic()]);
-                        printf("at %" PRIu32 ".%" PRIu16 "\n",
-                               persistence.tell().flash.addr,
-                               persistence.tell().flash.offs);
-                    }
-                    r = worker->processEntry(entry);
-                    if(r != Result::ok)
-                    {
-                        PAFFS_DBG(PAFFS_TRACE_ERROR, "%s: Could not apply %s entry at %" PRIu32 ".%" PRIu16,
-                                  err_msg(r),
-                                  topicNames[worker->getTopic()],
-                                  persistence.tell().flash.addr,
-                                  persistence.tell().flash.offs);
-                        printMeaning(entry.base);
-                        return r;
-                    }
-                    processed = true;
-                }
-            }
+            continue;
         }
-        if(!processed)
+
+        if(!isTopicValid(entry.base.topic))
         {
-            PAFFS_DBG(PAFFS_TRACE_ERROR, "No registered worker matching event!");
-            printMeaning(entry.base);
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Read invalid Topic identifier, probably misaligned!");
+            return Result::bug;
+        }
+
+        JournalEntry::Topic target = entry.base.topic;
+
+        if(entry.base.topic == JournalEntry::Topic::pagestate)
+        {
+            if(!isTopicValid(entry.pagestate.target))
+            {
+                PAFFS_DBG(PAFFS_TRACE_BUG, "Read invalid Target identifier, probably misaligned!");
+                return Result::bug;
+            }
+            target = entry.pagestate.target;
+        }
+
+        if (persistence.tell() >= firstUncheckpointedEntry[target])
+        {
+            if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
+            {
+                printf("Processing entry");
+                printf(" by %s ",
+                       topicNames[target]);
+                printMeaning(entry.base, false);
+                printf(" at %" PRIu32 ".%" PRIu16 "\n",
+                       persistence.tell().flash.addr,
+                       persistence.tell().flash.offs);
+            }
+            r = topics[target]->processEntry(entry);
+            if(r != Result::ok)
+            {
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "%s: Could not apply %s entry at %" PRIu32 ".%" PRIu16,
+                          err_msg(r),
+                          topicNames[entry.base.topic],
+                          persistence.tell().flash.addr,
+                          persistence.tell().flash.offs);
+                printMeaning(entry.base);
+                return r;
+            }
         }
     }
 
     PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Signalling end of Log");
     for (JournalTopic* worker : topics)
     {
-        worker->signalEndOfLog();
+        if(worker != nullptr)
+        {
+            worker->signalEndOfLog();
+        }
     }
 
     return Result::ok;
@@ -392,8 +412,26 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         //todo: add things and stuff.
         break;
     case JournalEntry::Topic::device:
-        //todo: add things and stuff.
-        printf("device");
+        printf("device ");
+        switch(static_cast<const journalEntry::Device*>(&entry)->action)
+        {
+        case journalEntry::Device::Action::mkObjInode:
+            printf("make Obj Inode %" PTYPE_INODENO,
+                   static_cast<const journalEntry::device::MkObjInode*>(&entry)->inode);
+            found = true;
+            break;
+        case journalEntry::Device::Action::insertIntoDir:
+            printf("insert inode into dir %" PTYPE_INODENO,
+                   static_cast<const journalEntry::device::InsertIntoDir*>(&entry)->inode);
+            found = true;
+            break;
+        case journalEntry::Device::Action::removeObj:
+            printf("remove Obj %" PTYPE_INODENO " from dir %" PTYPE_INODENO ,
+                   static_cast<const journalEntry::device::RemoveObj*>(&entry)->obj,
+                   static_cast<const journalEntry::device::RemoveObj*>(&entry)->parDir);
+            found = true;
+            break;
+        }
         break;
     }
     if (!found)

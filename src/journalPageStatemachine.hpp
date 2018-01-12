@@ -80,12 +80,14 @@ public:
     invalidateOldPages()
     {
         Result r;
+        bool any = false;
         for(uint16_t i = 0; i < pageListHWM; i++)
         {
             if(oldPageList[i] == 0)
             {
                 continue;
             }
+            any = true;
             PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "invalidate %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " at %" PRIu16,
                       extractLogicalArea(oldPageList[i]), extractPageOffs(oldPageList[i]), i);
             r = mSummaryCache.setPageStatus(oldPageList[i], SummaryEntry::dirty);
@@ -95,7 +97,10 @@ public:
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set old Page dirty!");
             }
         }
-        mJournal.addEvent(journalEntry::pagestate::InvalidateOldPages(topic));
+        if(any)
+        {
+            mJournal.addEvent(journalEntry::pagestate::InvalidateOldPages(topic));
+        }
         PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "invalidate done");
         clear();
         return Result::ok;
@@ -118,6 +123,9 @@ public:
                 oldPageList[pageListHWM++] = action.replacePage.old;
                 journalState = JournalState::invalid;
                 break;
+            case journalEntry::Pagestate::Type::success:
+                //This is only temporary as long as PAC produces success messages after valid
+                return Result::ok;
             default:
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid operation in state OK");
                 return Result::bug;

@@ -98,7 +98,9 @@ Btree::updateExistingInode(const Inode& inode)
     TreeCacheNode* node = nullptr;
     Result r = findLeaf(inode.no, node);
     if (r != Result::ok)
+    {
         return r;
+    }
 
     uint16_t pos;
     for (pos = 0; pos < node->raw.keys; pos++)
@@ -263,7 +265,31 @@ Btree::processEntry(const journalEntry::Max& entry)
         case journalEntry::BTree::Operation::insert:
             return insertInode(entry.btree_.insert.inode);
         case journalEntry::BTree::Operation::update:
+        {
+            const Inode& node = entry.btree_.update.inode;
+            if(traceMask & PAFFS_TRACE_VERBOSE)
+            {
+                printf("Inode %" PTYPE_INODENO " : %s\n", node.no,
+                       node.type == InodeType::file ? "fil" : "dir");
+                printf("   Perm: %s%s%s\n", node.perm & R ? "r" : "-",
+                        node.perm & W ? "w" : "-",
+                        node.perm & X ? "x" : "-"
+                        );
+                printf("   Size: %" PTYPE_FILSIZE " Byte (%" PRIu32 " pages)\n",
+                       node.size, node.reservedPages);
+                for(uint8_t i = 0; i < directAddrCount ; i++)
+                {
+                    if(node.direct[i] == 0)
+                    {
+                        printf("   ...\n");
+                        break;
+                    }
+                    printf("   %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "\n",
+                           extractLogicalArea(node.direct[i]), extractPageOffs(node.direct[i]));
+                }
+            }
             return updateExistingInode(entry.btree_.update.inode);
+        }
         case journalEntry::BTree::Operation::remove:
             return deleteInode(entry.btree_.remove.no);
         case journalEntry::BTree::Operation::setRootnode:

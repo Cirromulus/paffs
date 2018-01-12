@@ -188,8 +188,13 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Coud not get Page %" PRId32 " for read", page + pageFrom);
             return r;
         }
-        unsigned int area = extractLogicalArea(pageAddr);
-        unsigned int relPage = extractPageOffs(pageAddr);
+        if(pageAddr == 0)
+        {   //If we continue an aborted deletions
+            continue;
+        }
+
+        AreaPos  area = extractLogicalArea(pageAddr);
+        PageOffs relPage = extractPageOffs(pageAddr);
 
         if (dev->areaMgmt.getType(area) != AreaType::data)
         {
@@ -241,6 +246,35 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
 
     inode.size = offs;
     return Result::ok;
+}
+
+JournalEntry::Topic
+DataIO::getTopic()
+{
+    return JournalEntry::Topic::dataIO;
+}
+
+Result
+DataIO::processEntry(const journalEntry::Max& entry)
+{
+    if(entry.base.topic == getTopic())
+    {
+        return Result::nimpl;
+    }
+    else if(entry.base.topic == JournalEntry::Topic::pagestate)
+    {
+        return statemachine.processEntry(entry);
+    }
+    else
+    {
+        return Result::bug;
+    }
+}
+
+void
+DataIO::signalEndOfLog()
+{
+    statemachine.signalEndOfLog();
 }
 
 Result
@@ -420,6 +454,7 @@ DataIO::writePageData(PageAbs  pageFrom,
                     toPage + 1,
                     getPageNumber(newAddress, *dev));
     }
+    dev->journal.addEvent(journalEntry::pagestate::Success(getTopic()));
     res = statemachine.invalidateOldPages();
     if (res != Result::ok)
     {

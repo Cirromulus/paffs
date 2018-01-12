@@ -46,6 +46,8 @@ main(int argc, char** argv)
     }
 }
 
+char text[] = "Das Pferd frisst keinen Gurkensalat";
+
 void
 import()
 {
@@ -95,18 +97,30 @@ import()
         cout << "File could not be opened" << endl;
         return;
     }
-    char text[info.size + 1];
+    if(info.size != sizeof(text))
+    {
+        cout << "filesize differs! (should " << sizeof(text) << ", was " << info.size << ")" << endl;
+        return;
+    }
+    char input[info.size + 1];
     unsigned int br;
-    r = fs.read(*fil, text, info.size, &br);
+    r = fs.read(*fil, input, info.size, &br);
     if (r != paffs::Result::ok)
     {
         cout << "File could not be read!" << endl;
         return;
     }
-    text[info.size] = 0;
+    input[info.size] = 0;
+
+    if(memcmp(input, text, sizeof(text)) != 0)
+    {
+        cout << "File contents differ! Should \n" << text << "\nbut was\n" << input << endl;
+        return;
+    }
 
     cout << "File contents:" << endl << text << endl;
 
+    cout << endl << "OK" << endl;
     fs.close(*fil);
     fs.unmount();
 }
@@ -137,7 +151,6 @@ exportLog()
         cout << "File could not be opened" << endl;
         return;
     }
-    char text[] = "Das Pferd frisst keinen Gurkensalat";
     unsigned int bw = 0;
     Result r = fs.write(*fil, text, sizeof(text), &bw);
     if (r != Result::ok)
@@ -155,7 +168,7 @@ exportLog()
     mram->serialize(em);
     em.close();
 
-    cout << "done" << endl;
+    cout << endl << "OK" << endl;
 
     fs.close(*fil);
     fs.unmount();

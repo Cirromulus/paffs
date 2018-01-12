@@ -185,7 +185,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
 
     if (relPage < directAddrCount)
     {
-        //the event gets verz;gert until we are sure we dont have to commit
+        //the event gets delayed until we are sure we don't have to commit
         //or else during replay we commit before the log commits (so we would overwrite the last element)
         device.journal.addEvent(journalEntry::pac::SetAddress(page, addr));
         inode->direct[relPage] = addr;
@@ -261,6 +261,7 @@ PageAddressCache::setValid()
 {
     //We only want to invalidate old Pages which may have been written.
     //It is not allowed for PAC to revert new pages after DATAIO assumes the new Data having set.
+    //TODO: Only log success if we actually wrote something
     device.journal.addEvent(journalEntry::pagestate::Success(getTopic()));
     return statemachine.invalidateOldPages();
 }
@@ -365,6 +366,10 @@ PageAddressCache::signalEndOfLog()
     }
     if(inode != nullptr)
     {
+        //This refreshes the Inode we will commit to Index.
+        //During replay, changes to the same node are only done to index, not the PAC version
+        //TODO: Link them somehow
+        device.tree.getInode(inode->no, journalInode);
         commit();
     }
 }
