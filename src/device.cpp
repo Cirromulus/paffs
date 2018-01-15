@@ -558,6 +558,87 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
 }
 
 Result
+Device::getNameOfInodeInDir(InodeNo target, Inode& folder, char* outName, uint8_t &namelength)
+{
+    //FIXME: Copypaste of InodeNoInDir, create a 'FolderTraverser' that does both
+    if (folder.type != InodeType::dir)
+    {
+        return Result::bug;
+    }
+    if (folder.size <= sizeof(DirEntryCount))
+    {
+        // Just contains a zero for "No entries"
+        return Result::notFound;
+    }
+    std::unique_ptr<uint8_t[]> buf(new uint8_t[folder.size]);
+    FileSize bytesRead = 0;
+    Result r = dataIO.readInodeData(folder, 0, folder.size, &bytesRead, buf.get());
+    if (r != Result::ok || bytesRead != folder.size)
+    {
+        return r == Result::ok ? Result::bug : r;
+    }
+
+
+    DirEntryCount dirEntries;
+    memcpy(&dirEntries, buf.get(), sizeof(DirEntryCount));
+    FileSize p = sizeof(DirEntryCount);
+    DirEntryCount entryNo = 0;
+
+    PAFFS_DBG_S(PAFFS_TRACE_DEVICE,
+                "Searching for Inode %" PTYPE_INODENO " in Inode %" PTYPE_INODENO " (%" PTYPE_DIRENTRYCOUNT " entries)",
+                target, folder.no, dirEntries);
+
+    while (p < folder.size)
+    {
+        DirEntryLength direntryl = buf[p];
+        if (direntryl < sizeof(DirEntryLength) + sizeof(InodeNo) + 1)
+        {
+            PAFFS_DBG(PAFFS_TRACE_BUG,
+                      "Folder %" PTYPE_INODENO ": Directory entry %" PTYPE_DIRENTRYCOUNT " size is unplausible! "
+                              "(was: %" PTYPE_DIRENTRYLEN ", should: >%zu)",
+                      folder.no, entryNo, direntryl,
+                      sizeof(DirEntryLength) + sizeof(InodeNo) + 1);
+            return Result::bug;
+        }
+        if (direntryl > folder.size)
+        {
+            PAFFS_DBG(PAFFS_TRACE_BUG,
+                      "Folder %" PTYPE_INODENO ": Directory entry %" PTYPE_DIRENTRYCOUNT " length not plausible "
+                              "(was: %" PTYPE_DIRENTRYLEN ", should: >%" PTYPE_FILSIZE ")!",
+                      folder.no, entryNo, direntryl,
+                      folder.size);
+            return Result::bug;
+        }
+        FileNamePos dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
+        p += sizeof(DirEntryLength);
+        InodeNo elem;
+        memcpy(&elem, &buf[p], sizeof(InodeNo));
+        p += sizeof(InodeNo);
+        if (elem == target)
+        {
+            // Eintrag gefunden
+            memcpy(&outName, &buf[p], dirnamel < namelength ?  dirnamel : namelength);
+            namelength = dirnamel;
+            PAFFS_DBG_S(PAFFS_TRACE_DEVICE,
+                        "Found '%.*s' with Inode %" PTYPE_INODENO " at offs %" PTYPE_FILSIZE,
+                        dirnamel, &buf[p], elem,
+                        static_cast<FileSize>(p - sizeof(InodeNo) - sizeof(DirEntryLength)));
+            return Result::ok;
+        }
+        if(traceMask & PAFFS_TRACE_VERBOSE)
+        {
+            PAFFS_DBG_S(PAFFS_TRACE_DEVICE,
+                        "Not '%.*s' (length %" PTYPE_DIRENTRYLEN ") with Inode %" PTYPE_INODENO " at offs %" PTYPE_FILSIZE,
+                        dirnamel, &buf[p], direntryl, elem,
+                        static_cast<FileSize>(p - sizeof(InodeNo) - sizeof(DirEntryLength)));
+        }
+        p += dirnamel;
+        entryNo++;
+    }
+    return Result::notFound;
+}
+
+Result
 Device::getInodeOfElem(SmartInodePtr& outInode, const char* fullPath)
 {
     SmartInodePtr curr;
@@ -1630,10 +1711,90 @@ Device::getTopic()
 }
 
 Result
-Device::processEntry(const journalEntry::Max&)
+Device::processEntry(const journalEntry::Max& entry)
 {
-    //ui ui ui
-    return Result::ok;
+    //remember, all of these log messages have not gotten to checkpoint
+    if(entry.base.topic == JournalEntry::Topic::device)
+    {
+        switch(entry.device.action)
+        {
+        case journalEntry::Device::Action::mkObjInode:
+        {
+            Inode node;
+            Result r = tree.getInode(entry.device_.mkObjInode.inode, node);
+            if(r != Result::ok)
+            {   //no successful add
+                recoveryObjValid = false;
+            }
+            //Inode exists
+            recoveryObjInodeNo = entry.device_.mkObjInode.inode;
+            return Result::ok;
+        }
+        case journalEntry::Device::Action::insertIntoDir:
+        {
+            Inode folder;
+            Result r;
+            r = tree.getInode(entry.device_.insertIntoDir.inode, folder);
+            if(r != Result::ok)
+            {   //serious business
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get parent inode %" PTYPE_INODENO,
+                          entry.device_.insertIntoDir.inode);
+                return r;
+            }
+            if(!recoveryObjValid)
+            {
+                //Either we added Inode zero (only during format which is not protected)
+                //Or the Obj was officially added, and our journal could not rescue it. >:(
+
+                //no truncation needed, bc contents are added after successful creation
+                removeInodeFromDir(folder, recoveryObjInodeNo);
+                return Result::ok;
+            }
+            char name[200];
+            uint8_t namelength = 200;
+            r = getNameOfInodeInDir(recoveryObjInodeNo, folder, name, namelength);
+            if(r == Result::notFound)
+            {   //usually, this will happen
+                tree.deleteInode(recoveryObjInodeNo);
+                return Result::ok;
+            }
+            PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Could restore file '%.*s', "
+                    "\n\twow such journal many log, much restore", namelength, name);
+            return Result::ok;
+        }
+        case journalEntry::Device::Action::removeObj:
+        {
+            Inode obj;
+            Result r = tree.getInode(entry.device_.removeObj.obj, obj);
+            if(r == Result::ok)
+            {
+                r = dataIO.deleteInodeData(obj, 0);
+                if (r != Result::ok)
+                {
+                    PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete Inode Data");
+                    return r;
+                }
+                r = dataIO.pac.commit();
+                if (r != Result::ok)
+                {
+                    PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit PAC");
+                }
+                tree.deleteInode(entry.device_.removeObj.obj);
+            }
+            Inode folder;
+            r = tree.getInode(entry.device_.removeObj.parDir, folder);
+            if(r != Result::ok)
+            {   //serious business
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get parent inode %" PTYPE_INODENO,
+                          entry.device_.removeObj.parDir);
+                return r;
+            }
+            removeInodeFromDir(folder, entry.device_.removeObj.obj);
+        }
+        }
+        return Result::ok;
+    }
+    return Result::bug;
 }
 
 void

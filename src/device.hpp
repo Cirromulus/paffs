@@ -36,6 +36,9 @@ class Device : public JournalTopic
     InodePool<maxNumberOfInodes> inodePool;
     ObjectPool<Obj, maxNumberOfFiles> filesPool;
     bool useJournal = false;
+
+    InodeNo recoveryObjInodeNo = 0;
+    bool  recoveryObjValid = false;
 public:
     Driver& driver;
     Result lasterr;
@@ -134,14 +137,15 @@ private:
     Result
     getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name);
     /**
-     * @param outInode has to point to an Inode, it is used as a buffer!
+     * \param namelength[in,out] input is used as the max length the name will get copied into outName.
+     *  Output marks the length of the name in bytes
      */
+    Result
+    getNameOfInodeInDir(InodeNo target, Inode& folder, char* outName, uint8_t &namelength);
+
     Result
     getInodeOfElem(SmartInodePtr& outInode, const char* fullPath);
     /**
-     * @warn does not store the target into List, just checks whether it has to load it from tree
-     * TODO: Future possibility is to store this target into cache (no buffer needed)
-     *
      * @param target shall not point to valid data
      */
     Result
