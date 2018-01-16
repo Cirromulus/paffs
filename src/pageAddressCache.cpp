@@ -17,6 +17,7 @@
 #include "device.hpp"
 #include "driver/driver.hpp"
 #include "journalEntry.hpp"
+#include "journalPageStatemachine_impl.hpp"
 #include <cmath>
 #include <inttypes.h>
 

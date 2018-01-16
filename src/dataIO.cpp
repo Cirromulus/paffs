@@ -17,6 +17,8 @@
 #include "device.hpp"
 #include "driver/driver.hpp"
 #include "paffs_trace.hpp"
+#include "journalPageStatemachine_impl.hpp"
+
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,7 +26,7 @@
 namespace paffs
 {
 
-DataIO::DataIO(Device *mdev) : dev(mdev), pac(*mdev), statemachine(mdev->journal, mdev->sumCache, pac){};
+DataIO::DataIO(Device *mdev) : dev(mdev), pac(*mdev), statemachine(mdev->journal, mdev->sumCache, &pac){};
 
 // modifies inode->size and inode->reserved size as well
 Result
@@ -44,13 +46,19 @@ DataIO::writeInodeData(Inode& inode,
         PAFFS_DBG(PAFFS_TRACE_BUG, "Write size 0! Bug?");
         return Result::invalidInput;
     }
-
     // todo: use pageFrom as offset to reduce memory usage and IO
     FileSize pageFrom = offs / dataBytesPerPage;
     FileSize toPage = (offs + bytes) / dataBytesPerPage;
     if ((offs + bytes) % dataBytesPerPage == 0)
     {
         toPage--;
+    }
+
+    if(toPage - pageFrom > maxPagesPerWrite)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Due to the journal, only %" PRIu16 " pages "
+                "are allowed per single write", maxPagesPerWrite);
+        return Result::toobig;
     }
 
     Result res = pac.setTargetInode(inode);

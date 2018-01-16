@@ -16,6 +16,7 @@
 #include "btree.hpp"
 #include "dataIO.hpp"
 #include "device.hpp"
+#include "journalPageStatemachine_impl.hpp"
 #include <inttypes.h>
 #include <string.h>
 

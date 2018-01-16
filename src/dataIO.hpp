@@ -19,7 +19,7 @@
 #include "commonTypes.hpp"
 #include "pageAddressCache.hpp"
 #include "superblock.hpp"
-#include "journalPagePosStatemachine.hpp"
+#include "journalPageStatemachine.hpp"
 
 namespace paffs
 {
@@ -30,7 +30,7 @@ class DataIO : public JournalTopic
 public:
     PageAddressCache pac;
 private:
-    PagePosStateMachine<maxPagesPerWrite, JournalEntry::Topic::dataIO> statemachine;
+    PageStateMachine<maxPagesPerWrite, maxPagesPerWrite, JournalEntry::Topic::dataIO> statemachine;
 public:
 
     DataIO(Device* mdev);
@@ -51,11 +51,11 @@ public:
     deleteInodeData(Inode& inode, unsigned int offs);
 
     JournalEntry::Topic
-    getTopic();
+    getTopic() override;
     Result
-    processEntry(const journalEntry::Max& entry);
+    processEntry(const journalEntry::Max& entry) override;
     void
-    signalEndOfLog();
+    signalEndOfLog() override;
 
 private:
     /**

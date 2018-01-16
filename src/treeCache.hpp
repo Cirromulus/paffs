@@ -30,7 +30,7 @@ class TreeCache
     TreeCacheNode mCache[treeNodeCacheSize];
 
     BitList<treeNodeCacheSize> mCacheUsage;
-    PageStateMachine<treeNodeCacheSize, JournalEntry::Topic::tree> statemachine;
+    PageStateMachine<treeNodeCacheSize, 0, JournalEntry::Topic::tree> statemachine;
 
     // Just for debug/tuning purposes
     uint16_t mCacheHits = 0;

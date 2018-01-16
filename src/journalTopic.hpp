@@ -26,6 +26,11 @@ public:
 
     virtual JournalEntry::Topic
     getTopic() = 0;
+    /**
+     * These functions get called by the Journal,
+     * dispatching journal Entries to the corresponding topics.
+     * Each Topic has to do its own actions to revert its state.
+     */
     virtual Result
     processEntry(const journalEntry::Max& entry) = 0;
     virtual inline void

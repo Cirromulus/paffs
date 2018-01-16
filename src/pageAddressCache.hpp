@@ -47,7 +47,7 @@ class PageAddressCache : public JournalTopic
     Device& device;
     Inode* inode;
 
-    PageStateMachine<maxPagesPerWrite, JournalEntry::Topic::pac> statemachine;
+    PageStateMachine<maxPagesPerWrite, 0, JournalEntry::Topic::pac> statemachine;
     Inode journalInode;
 
 public:
@@ -66,11 +66,11 @@ public:
     isDirty();
 
     JournalEntry::Topic
-    getTopic();
+    getTopic() override;
     Result
-    processEntry(const journalEntry::Max& entry);
+    processEntry(const journalEntry::Max& entry) override;
     void
-    signalEndOfLog();
+    signalEndOfLog() override;
 
 private:
     uint16_t

@@ -24,6 +24,7 @@ using namespace std;
 char filename[] = "/a.txt";
 char exportFlash[] = "export_flash.bin";
 char exportMram[] = "export_mram.bin";
+char text[] = "Das Pferd frisst keinen Gurkensalat";
 
 void
 exportLog();
@@ -45,8 +46,6 @@ main(int argc, char** argv)
         import();
     }
 }
-
-char text[] = "Das Pferd frisst keinen Gurkensalat";
 
 void
 import()

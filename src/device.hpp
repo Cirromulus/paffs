@@ -114,11 +114,11 @@ public:
     getNumberOfOpenInodes();
 
     JournalEntry::Topic
-    getTopic();
+    getTopic() override;
     Result
-    processEntry(const journalEntry::Max& entry);
+    processEntry(const journalEntry::Max& entry) override;
     void
-    signalEndOfLog();
+    signalEndOfLog() override;
 
 private:
     Result
