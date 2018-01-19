@@ -62,7 +62,7 @@ PageAddressCache::setTargetInode(Inode& node)
     {
         return Result::ok;
     }
-    PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Set new target inode");
+    PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Set new target inode %" PTYPE_INODENO, node.no);
     if (isDirty())
     {
         PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Target Inode differs, committing old Inode");
@@ -95,14 +95,13 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
         return Result::bug;
     }
-    if (traceMask & PAFFS_TRACE_VERBOSE)
-    {
-        PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "GetPage at %" PRIu32, page);
-    }
 
     if (page < directAddrCount)
     {
         *addr = inode->direct[page];
+        PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "GetPage at %" PRIu32
+                    " (direct, %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ")",
+                    page, extractLogicalArea(*addr), extractPageOffs(*addr));
         return Result::ok;
     }
     page -= directAddrCount;
@@ -110,7 +109,7 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
 
     if (page < addrsPerPage)
     {
-        PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Accessing first indirection at %" PRIu32, page);
+        PAFFS_DBG_S(PAFFS_TRACE_VERBOSE | PAFFS_TRACE_PACACHE, "Accessing first indirection at %" PRIu32, page);
         if (!singl.active)
         {
             r = loadCacheElem(inode->indir, singl);
@@ -121,6 +120,9 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
             }
         }
         *addr = singl.getAddr(page);
+        PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "GetPage at %" PRIu32
+                    " (first, %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ")",
+                    page, extractLogicalArea(*addr), extractPageOffs(*addr));
         return Result::ok;
     }
     page -= addrsPerPage;
@@ -128,7 +130,7 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
 
     if (page < std::pow(addrsPerPage, 2))
     {
-        PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Accessing second indirection at %" PRIu32, page);
+        PAFFS_DBG_S(PAFFS_TRACE_VERBOSE | PAFFS_TRACE_PACACHE, "Accessing second indirection at %" PRIu32, page);
         r = loadPath(inode->d_indir, page, doubl, 1, addrPos);
         if (r != Result::ok)
         {
@@ -136,13 +138,16 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
             return r;
         }
         *addr = doubl[1].getAddr(addrPos);
+        PAFFS_DBG_S( PAFFS_TRACE_PACACHE, "GetPage at %" PRIu32
+                    " (second, %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ")",
+                    page, extractLogicalArea(*addr), extractPageOffs(*addr));
         return Result::ok;
     }
     page -= std::pow(addrsPerPage, 2);
 
     if (page < std::pow(addrsPerPage, 3))
     {
-        PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Accessing third indirection at %" PRIu32, page);
+        PAFFS_DBG_S(PAFFS_TRACE_VERBOSE | PAFFS_TRACE_PACACHE, "Accessing third indirection at %" PRIu32, page);
         r = loadPath(inode->t_indir, page, tripl, 2, addrPos);
         if (r != Result::ok)
         {
@@ -150,6 +155,9 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
             return r;
         }
         *addr = tripl[2].getAddr(addrPos);
+        PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "GetPage at %" PRIu32
+                    " (third, %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ")",
+                    page, extractLogicalArea(*addr), extractPageOffs(*addr));
         return Result::ok;
     }
 
@@ -308,6 +316,17 @@ PageAddressCache::commit()
 
     device.journal.addEvent(journalEntry::pac::UpdateAddressList(*inode));
     r = device.tree.updateExistingInode(*inode);
+
+    if(traceMask & PAFFS_TRACE_PACACHE && traceMask & PAFFS_TRACE_VERBOSE)
+    {
+        printf("Resulting Addresslist of Inode %" PTYPE_INODENO, inode->no);
+        for(uint8_t i = 0; i < 13; i++)
+        {
+            //intentionally over size of 11, because we print indirects too
+            printf("%" PRIu8 "\t%" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+                   i, extractLogicalArea(inode->direct[i]), extractPageOffs(inode->direct[i]));
+        }
+    }
 
     statemachine.invalidateOldPages();
     device.journal.addEvent(journalEntry::Checkpoint(getTopic()));

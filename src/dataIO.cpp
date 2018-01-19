@@ -368,6 +368,15 @@ DataIO::writePageData(PageAbs  pageFrom,
             btw = dataBytesPerPage - offs;
         }
 
+        //This has to be done before we write into the pagebuffer, this may modify it!
+        res = statemachine.replacePage(newAddress, oldAddr, page + pageFrom);
+        if (res != Result::ok)
+        {
+            PAFFS_DBG(PAFFS_TRACE_ERROR,
+                      "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!",
+                      resultMsg[static_cast<int>(res)]);
+        }
+
         uint8_t* buf = dev->driver.getPageBuffer();
 
         // start misaligned || End Misaligned
@@ -425,14 +434,6 @@ DataIO::writePageData(PageAbs  pageFrom,
             *bytesWritten += btw;
         }
 
-        res = statemachine.replacePage(newAddress, oldAddr, page + pageFrom);
-        if (res != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!",
-                      resultMsg[static_cast<int>(res)]);
-        }
-
         res = dev->driver.writePage(getPageNumber(newAddress, *dev), buf, btw);
         if (res != Result::ok)
         {
@@ -457,10 +458,12 @@ DataIO::writePageData(PageAbs  pageFrom,
         }
 
         PAFFS_DBG_S(PAFFS_TRACE_WRITE,
-                    "write r.P: %" PTYPE_PAGEOFFS "/%" PTYPE_PAGEABS ", phy.P: %" PTYPE_PAGEABS,
+                    "write r.P: %" PTYPE_PAGEOFFS "/%" PTYPE_PAGEABS ", "
+                    "%" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
                     page + 1,
-                    toPage + 1,
-                    getPageNumber(newAddress, *dev));
+                    toPage - 1,
+                    extractLogicalArea(newAddress), dev->areaMgmt.getPos(extractLogicalArea(newAddress)),
+                    extractPageOffs(newAddress));
     }
     dev->journal.addEvent(journalEntry::pagestate::Success(getTopic()));
     res = statemachine.invalidateOldPages();

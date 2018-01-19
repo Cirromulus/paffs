@@ -371,8 +371,8 @@ GarbageCollection::collectGarbage(AreaType targetType)
     PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL,
                 "Garbagecollection erased pos %" PRIu16 " and gave area %" PRIu16 " pos %" PRIu16 ".",
                 dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(AreaType::garbageBuffer)),
-                dev->areaMgmt.getActiveArea(targetType),
-                dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(targetType)));
+                deletionTarget,
+                dev->areaMgmt.getPos(deletionTarget));
 
     return Result::ok;
 }

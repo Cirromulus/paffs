@@ -77,9 +77,9 @@ PageStateMachine<maxPages, maxPositions, topic>::replacePage(Addr neu, Addr old,
     if(withPosition)
     {
         PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM,
-                    "mark %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " NEW/USED\n"
-                    "     %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "   old    at %" PRIu16 "\n"
-                    "     filoffs: %" PTYPE_PAGEABS,
+                    "mark %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " NEW/USED"
+                    " (old %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " at %" PRIu16 ","
+                    " filoffs: %" PTYPE_PAGEABS,
                     extractLogicalArea(neu), extractPageOffs(neu),
                     extractLogicalArea(old), extractPageOffs(old), pageListHWM, pos);
         position   [pageListHWM] = pos;
@@ -90,7 +90,7 @@ PageStateMachine<maxPages, maxPositions, topic>::replacePage(Addr neu, Addr old,
     {
         PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "mark %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " NEW/USED at %" PRIu16,
                     extractLogicalArea(neu), extractPageOffs(neu), pageListHWM);
-        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "     %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "   old    at %" PRIu16,
+        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "\told %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " at %" PRIu16,
                     extractLogicalArea(old), extractPageOffs(old), pageListHWM);
         //TODO: unify both journal events saying the same thing
         mJournal.addEvent(journalEntry::pagestate::ReplacePage(topic, neu, old));

@@ -391,6 +391,11 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried setting PageStatus in readOnly mode!");
         return Result::bug;
     }
+    if(area == 0)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried setting PageStatus of superblock!");
+        return Result::bug;
+    }
     if (page > dataPagesPerArea)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
