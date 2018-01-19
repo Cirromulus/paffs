@@ -321,7 +321,6 @@ namespace journalEntry
     {
     enum class Operation : uint8_t
     {
-        setInode,
         setAddress,
         updateAddresslist,
     };
@@ -335,19 +334,14 @@ namespace journalEntry
 
     namespace pac
     {
-        struct SetInode : public PAC
-        {
-            InodeNo inodeNo;
-            inline
-            SetInode(InodeNo _inodeNo) : PAC(Operation::setInode), inodeNo(_inodeNo){};
-        };
-
         struct SetAddress : public PAC
         {
+            InodeNo inodeNo;
             PageOffs page;
             Addr addr;
             inline
-            SetAddress(PageOffs _page, Addr _addr) : PAC(Operation::setAddress), page(_page), addr(_addr){};
+            SetAddress(InodeNo _inodeno, PageOffs _page, Addr _addr) : PAC(Operation::setAddress),
+            inodeNo(_inodeno), page(_page), addr(_addr){};
         };
 
         struct UpdateAddressList : public PAC
@@ -360,7 +354,6 @@ namespace journalEntry
         };
 
         union Max {
-            SetInode setInode;
             SetAddress setAddress;
             UpdateAddressList updateAddressList;
         };

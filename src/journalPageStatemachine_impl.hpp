@@ -210,6 +210,7 @@ PageStateMachine<maxPages, maxPositions, topic>::signalEndOfLog()
         clear();
         return true;
     case JournalState::invalid:
+        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "reverting written pages");
         for(uint16_t i = 0; i < pageListHWM; i++)
         {
             mSummaryCache.setPageStatus(newPageList[i], SummaryEntry::dirty);
@@ -221,6 +222,7 @@ PageStateMachine<maxPages, maxPositions, topic>::signalEndOfLog()
         clear();
         return false;
     case JournalState::recover:
+        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "Recovering written pages");
         for(uint16_t i = 0; i < pageListHWM; i++)
         {
             if(oldPageList[i] != 0)

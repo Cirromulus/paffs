@@ -93,8 +93,6 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
     case JournalEntry::Topic::pac:
         switch (static_cast<const journalEntry::PAC*>(&entry)->operation)
         {
-        case journalEntry::PAC::Operation::setInode:
-            return sizeof(journalEntry::pac::SetInode);
         case journalEntry::PAC::Operation::setAddress:
             return sizeof(journalEntry::pac::SetAddress);
         case journalEntry::PAC::Operation::updateAddresslist:

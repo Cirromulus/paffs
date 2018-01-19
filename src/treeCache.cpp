@@ -87,10 +87,12 @@ TreeCache::signalEndOfLog()
 {
     if(statemachine.signalEndOfLog())
     {
-        for(uint16_t i = 0; i < treeNodeCacheSize; i++)
-        {
-            mCache[i].dirty = false;
-        }
+        //we did not have to revert
+        //TODO: Check which nodes may be clean
+    }
+    if(!isTreeCacheValid())
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Something happened during Journal replay!");
     }
 }
 
@@ -221,8 +223,9 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
 
     if (node.raw.self == 0 && !node.dirty)
     {
+        printNode(node);
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Node n° %d is not dirty, but has no flash address!",
+                  "Node on pos %d is not dirty, but has no flash address!",
                   getIndexFromPointer(node));
         return false;
     }

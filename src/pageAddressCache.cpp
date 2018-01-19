@@ -83,7 +83,9 @@ PageAddressCache::setTargetInode(Inode& node)
     }
     singl.active = false;
     inode = &node;
-    device.journal.addEvent(journalEntry::pac::SetInode(node.no));
+
+    //journal setInode is delayed until something is really changed
+
     return Result::ok;
 }
 
@@ -196,7 +198,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
     {
         //the event gets delayed until we are sure we don't have to commit
         //or else during replay we commit before the log commits (so we would overwrite the last element)
-        device.journal.addEvent(journalEntry::pac::SetAddress(page, addr));
+        device.journal.addEvent(journalEntry::pac::SetAddress(inode->no, page, addr));
         inode->direct[relPage] = addr;
         return Result::ok;
     }
@@ -225,7 +227,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
                 return r;
             }
         }
-        device.journal.addEvent(journalEntry::pac::SetAddress(page, addr));
+        device.journal.addEvent(journalEntry::pac::SetAddress(inode->no, page, addr));
         singl.setAddr(relPage, addr);
         return Result::ok;
     }
@@ -240,7 +242,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load second indirection!");
             return r;
         }
-        device.journal.addEvent(journalEntry::pac::SetAddress(page, addr));
+        device.journal.addEvent(journalEntry::pac::SetAddress(inode->no, page, addr));
         doubl[1].setAddr(addrPos, addr);
         return Result::ok;
     }
@@ -254,7 +256,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load third indirection!");
             return r;
         }
-        device.journal.addEvent(journalEntry::pac::SetAddress(page, addr));
+        device.journal.addEvent(journalEntry::pac::SetAddress(inode->no, page, addr));
         tripl[2].setAddr(addrPos, addr);
         return Result::ok;
     }
@@ -283,6 +285,8 @@ PageAddressCache::commit()
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
         return Result::bug;
     }
+
+    bool wasDirt = isDirty();
 
     Result r;
     r = commitPath(inode->indir, &singl, 0);
@@ -314,8 +318,16 @@ PageAddressCache::commit()
 
     //todo: doubled code, use tree update as a signal
 
-    device.journal.addEvent(journalEntry::pac::UpdateAddressList(*inode));
+    if(wasDirt)
+    {   //this would not be necessary if we got the update as a signal
+        device.journal.addEvent(journalEntry::pac::UpdateAddressList(*inode));
+    }
     r = device.tree.updateExistingInode(*inode);
+
+    if(!wasDirt)
+    {
+        return r;
+    }
 
     if(traceMask & PAFFS_TRACE_PACACHE && traceMask & PAFFS_TRACE_VERBOSE)
     {
@@ -346,11 +358,15 @@ PageAddressCache::processEntry(const journalEntry::Max& entry)
     {   //normal operations
         switch (entry.pac.operation)
         {
-        case journalEntry::PAC::Operation::setInode:
-            device.tree.getInode(entry.pac_.setInode.inodeNo, journalInode);
-            return setTargetInode(journalInode);
         case journalEntry::PAC::Operation::setAddress:
+        {
+            Result r = device.tree.getInode(entry.pac_.setAddress.inodeNo, journalInode);
+            if(r != Result::ok)
+            {
+                return r;
+            }
             return setPage(entry.pac_.setAddress.page, entry.pac_.setAddress.addr);
+        }
         case journalEntry::PAC::Operation::updateAddresslist:
             {
             Result r = device.tree.updateExistingInode(entry.pac_.updateAddressList.inode);

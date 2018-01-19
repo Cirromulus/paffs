@@ -20,6 +20,9 @@
 
 namespace paffs
 {
+
+extern uint8_t colorMap[JournalEntry::numberOfTopics];
+
 class Journal
 {
     JournalTopic* topics[JournalEntry::numberOfTopics];

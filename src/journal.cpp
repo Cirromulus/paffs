@@ -21,6 +21,19 @@
 
 using namespace paffs;
 
+uint8_t paffs::colorMap[JournalEntry::numberOfTopics] =
+        {
+                97, //invalid
+                31, //checkpoint
+                32, //pagestate
+                33, //areaMgmt
+                35, //tree
+                36, //summaryCache
+                37, //pac
+                91, //dataIO
+                93, //device
+        };
+
 Result
 Journal::addEvent(const JournalEntry& entry)
 {
@@ -108,7 +121,8 @@ Journal::processBuffer()
         printf("FirstUncheckpointedEntry:\n");
         for (unsigned i = 0; i < JournalEntry::numberOfTopics; i++)
         {
-            printf("\t%s: %" PRIu32 ".%" PRIu16 "\n",
+            printf("\t\e[1;%um%s\e[0m: %" PRIu32 ".%" PRIu16 "\n",
+                   colorMap[i],
                    topicNames[i],
                    firstUncheckpointedEntry[i].flash.addr,
                    firstUncheckpointedEntry[i].flash.offs);
@@ -225,6 +239,7 @@ void
 Journal::printMeaning(const JournalEntry& entry, bool withNewline)
 {
     bool found = false;
+    printf("\e[1;%um", colorMap[entry.topic]);
     switch (entry.topic)
     {
     case JournalEntry::Topic::invalid:
@@ -232,7 +247,8 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         found = true;
         break;
     case JournalEntry::Topic::checkpoint:
-        printf("\tcheckpoint of %s",
+        printf("\tcheckpoint of \e[1;%um%s",
+               colorMap[static_cast<const journalEntry::Checkpoint*>(&entry)->target],
                topicNames[static_cast<const journalEntry::Checkpoint*>(&entry)->target]);
         found = true;
         break;
@@ -281,7 +297,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         switch (static_cast<const journalEntry::AreaMgmt*>(&entry)->type)
         {
         case journalEntry::AreaMgmt::Type::rootnode:
-            printf("Rootnode to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+            printf("Superblock Rootnode to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
                    extractLogicalArea(static_cast<const journalEntry::areaMgmt::Rootnode*>(&entry)->addr),
                    extractPageOffs(static_cast<const journalEntry::areaMgmt::Rootnode*>(&entry)->addr));
             found = true;
@@ -356,7 +372,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             found = true;
             break;
         case journalEntry::BTree::Operation::setRootnode:
-            printf("SetRootnode to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+            printf("Tree SetRootnode to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
                    extractLogicalArea(static_cast<const journalEntry::btree::SetRootnode*>(&entry)->address),
                    extractPageOffs(static_cast<const journalEntry::btree::SetRootnode*>(&entry)->address));
             found = true;
@@ -390,15 +406,11 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         printf("pac ");
         switch (static_cast<const journalEntry::PAC*>(&entry)->operation)
         {
-        case journalEntry::PAC::Operation::setInode:
-            printf("set Inode %" PTYPE_INODENO, static_cast<const journalEntry::pac::SetInode*>(&entry)->inodeNo);
-            found = true;
-            break;
         case journalEntry::PAC::Operation::setAddress:
             {
             auto sa = static_cast<const journalEntry::pac::SetAddress*>(&entry);
-            printf("set Address at %" PTYPE_PAGEOFFS " to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
-                   sa->page, extractLogicalArea(sa->addr), extractPageOffs(sa->addr));
+            printf("set Address of %" PTYPE_INODENO " at %" PTYPE_PAGEOFFS " to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+                   sa->inodeNo, sa->page, extractLogicalArea(sa->addr), extractPageOffs(sa->addr));
             found = true;
             break;
             }
@@ -436,7 +448,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
     }
     if (!found)
         printf("Unrecognized");
-    printf(" event");
+    printf("\e[0m event");
     if (withNewline)
         printf(".\n");
 }
