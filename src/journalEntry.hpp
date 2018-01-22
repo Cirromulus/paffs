@@ -82,10 +82,11 @@ namespace journalEntry
         {
             Addr    neu;
             Addr    old;
+            InodeNo nod;
             PageAbs pos;
             inline
-            ReplacePagePos(Topic _target, Addr _new, Addr _old, Addr _pos) :
-                Pagestate(_target, Type::replacePagePos), neu(_new), old(_old), pos(_pos){};
+            ReplacePagePos(Topic _target, Addr _new, Addr _old, InodeNo _nod, Addr _pos) :
+                Pagestate(_target, Type::replacePagePos), neu(_new), old(_old), nod(_nod), pos(_pos){};
         };
 
         struct Success : public Pagestate

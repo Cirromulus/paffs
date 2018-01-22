@@ -369,7 +369,7 @@ DataIO::writePageData(PageAbs  pageFrom,
         }
 
         //This has to be done before we write into the pagebuffer, this may modify it!
-        res = statemachine.replacePage(newAddress, oldAddr, page + pageFrom);
+        res = statemachine.replacePage(newAddress, oldAddr, ac.getTargetInode(), page + pageFrom);
         if (res != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,

@@ -31,6 +31,8 @@ public:
      * dispatching journal Entries to the corresponding topics.
      * Each Topic has to do its own actions to revert its state.
      */
+    virtual inline void
+    preScanEntry(const journalEntry::Max&){};
     virtual Result
     processEntry(const journalEntry::Max& entry) = 0;
     virtual inline void

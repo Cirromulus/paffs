@@ -738,22 +738,37 @@ TreeCache::freeNodes(uint16_t neededCleanNodes)
         return Result::bug;
     }
 
+    Result r;
 
-    cleanFreeLeafNodes(neededCleanNodes);
+    r = cleanFreeLeafNodes(neededCleanNodes);
+    if(r != Result::ok)
+        return r;
     if (neededCleanNodes == 0)
         return Result::ok;
 
-    cleanFreeNodes(neededCleanNodes);
+    r = cleanFreeNodes(neededCleanNodes);
+    if(r != Result::ok)
+        return r;
     if (neededCleanNodes == 0)
         return Result::ok;
 
-    commitCache();
+    r = commitCache();
+    if(r != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit cache");
+        return r;
+    }
 
-    cleanFreeLeafNodes(neededCleanNodes);
+
+    r = cleanFreeLeafNodes(neededCleanNodes);
+    if(r != Result::ok)
+        return r;
     if (neededCleanNodes == 0)
         return Result::ok;
 
-    cleanFreeNodes(neededCleanNodes);
+    r = cleanFreeNodes(neededCleanNodes);
+    if(r != Result::ok)
+        return r;
     if (neededCleanNodes == 0)
         return Result::ok;
 

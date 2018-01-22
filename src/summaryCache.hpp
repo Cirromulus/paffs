@@ -77,6 +77,7 @@ class SummaryCache : public JournalTopic
 
     std::unordered_map<AreaPos, uint16_t> mTranslation;  // from area number to array offset
     Device* dev;
+    bool journalReplayMode = false;
 
 public:
     SummaryCache(Device* mdev);
@@ -157,6 +158,9 @@ public:
     getTopic() override;
     Result
     processEntry(const journalEntry::Max& entry) override;
+    void
+    signalEndOfLog() override;
+
 
 private:
     /**

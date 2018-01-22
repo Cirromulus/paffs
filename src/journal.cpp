@@ -114,6 +114,7 @@ Journal::processBuffer()
         {
             //printMeaning(entry.base);
         }
+
         if (entry.base.topic == JournalEntry::Topic::checkpoint)
         {
             firstUncheckpointedEntry[entry.checkpoint.target] = persistence.tell();

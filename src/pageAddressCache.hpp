@@ -57,6 +57,8 @@ public:
     clear();
     Result
     setTargetInode(Inode& node);
+    InodeNo
+    getTargetInode();
     Result
     getPage(PageNo page, Addr* addr);
     Result
@@ -70,6 +72,8 @@ public:
 
     JournalEntry::Topic
     getTopic() override;
+    Result
+    setJournallingInode(InodeNo no);
     Result
     processEntry(const journalEntry::Max& entry) override;
     void

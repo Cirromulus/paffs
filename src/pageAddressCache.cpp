@@ -106,6 +106,17 @@ PageAddressCache::setTargetInode(Inode& node)
     return Result::ok;
 }
 
+InodeNo
+PageAddressCache::getTargetInode()
+{
+    if(mInodePtr == nullptr)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get InodeNo without Inode!");
+        return 0;
+    }
+    return mInodePtr->no;
+}
+
 Result
 PageAddressCache::getPage(PageNo page, Addr* addr)
 {
@@ -203,7 +214,8 @@ PageAddressCache::setPage(PageNo page, Addr addr)
     if (traceMask & PAFFS_TRACE_VERBOSE)
     {
         PAFFS_DBG_S(PAFFS_TRACE_PACACHE,
-                    "SetPage to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " at %" PRIu32,
+                    "SetPage of %" PTYPE_INODENO " to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " at %" PRIu32,
+                    mInodePtr->no,
                     extractLogicalArea(addr),
                     extractPageOffs(addr),
                     page);
@@ -364,11 +376,11 @@ PageAddressCache::commit()
 
     if(traceMask & PAFFS_TRACE_PACACHE && traceMask & PAFFS_TRACE_VERBOSE)
     {
-        printf("Resulting Addresslist of Inode %" PTYPE_INODENO, mInodePtr->no);
+        printf("Resulting Addresslist of Inode %" PTYPE_INODENO "\n", mInodePtr->no);
         for(uint8_t i = 0; i < 13; i++)
         {
             //intentionally over size of 11, because we print indirects too
-            printf("%" PRIu8 "\t%" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+            printf("%" PRIu8 "\t%" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "\n",
                    i, extractLogicalArea(mInodePtr->direct[i]), extractPageOffs(mInodePtr->direct[i]));
         }
     }
@@ -386,6 +398,17 @@ PageAddressCache::getTopic()
 }
 
 Result
+PageAddressCache::setJournallingInode(InodeNo no)
+{
+    Result r = device.tree.getInode(no, mJournalInodeCopy);
+    if(r != Result::ok)
+    {
+        return r;
+    }
+    return setTargetInode(mJournalInodeCopy);
+}
+
+Result
 PageAddressCache::processEntry(const journalEntry::Max& entry)
 {
     if (entry.base.topic == getTopic())
@@ -396,12 +419,7 @@ PageAddressCache::processEntry(const journalEntry::Max& entry)
         {
             if(mInodePtr == nullptr || entry.pac_.setAddress.inodeNo != mInodePtr->no)
             {
-                Result r = device.tree.getInode(entry.pac_.setAddress.inodeNo, mJournalInodeCopy);
-                if(r != Result::ok)
-                {
-                    return r;
-                }
-                setTargetInode(mJournalInodeCopy);
+                setJournallingInode(entry.pac_.setAddress.inodeNo);
             }
             return setPage(entry.pac_.setAddress.page, entry.pac_.setAddress.addr);
         }

@@ -14,6 +14,7 @@
 
 #pragma once
 #include "journalPageStatemachine.hpp"
+#include "pageAddressCache.hpp"
 
 namespace paffs
 {
@@ -28,7 +29,8 @@ PageStateMachine<maxPages, maxPositions, topic>::PageStateMachine(Journal& journ
 };
 
 template <uint16_t maxPages, uint16_t maxPositions, JournalEntry::Topic topic>
-PageStateMachine<maxPages, maxPositions, topic>::PageStateMachine(Journal& journal, SummaryCache& summaryCache, PageAddressCache* pac) :
+PageStateMachine<maxPages, maxPositions, topic>::PageStateMachine(Journal& journal, SummaryCache& summaryCache,
+                                                                  PageAddressCache* pac) :
         mJournal(journal),mSummaryCache(summaryCache), mPac(pac)
 {
     pageListHWM = maxPages;
@@ -43,6 +45,7 @@ PageStateMachine<maxPages, maxPositions, topic>::clear()
     memset(newPageList, 0, sizeof(uint16_t) * pageListHWM);
     memset(oldPageList, 0, sizeof(uint16_t) * pageListHWM);
     pageListHWM = 0;
+    currentInode = 0;
 }
 
 template <uint16_t maxPages, uint16_t maxPositions, JournalEntry::Topic topic>
@@ -61,12 +64,13 @@ PageStateMachine<maxPages, maxPositions, topic>::replacePage(Addr neu, Addr old)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried replacing page without position in file!");
         return Result::bug;
     }
-    return replacePage(neu, old, 0);
+    return replacePage(neu, old, 0, 0);
 }
 
 template <uint16_t maxPages, uint16_t maxPositions, JournalEntry::Topic topic>
 inline Result
-PageStateMachine<maxPages, maxPositions, topic>::replacePage(Addr neu, Addr old, PageAbs pos)
+PageStateMachine<maxPages, maxPositions, topic>::replacePage(Addr neu, Addr old,
+                                                             InodeNo inodeNo, PageAbs pos)
 {
     if(pageListHWM == maxPages)
     {
@@ -83,7 +87,7 @@ PageStateMachine<maxPages, maxPositions, topic>::replacePage(Addr neu, Addr old,
                     extractLogicalArea(neu), extractPageOffs(neu),
                     extractLogicalArea(old), extractPageOffs(old), pageListHWM, pos);
         position   [pageListHWM] = pos;
-        mJournal.addEvent(journalEntry::pagestate::ReplacePagePos(topic, neu, old, pos));
+        mJournal.addEvent(journalEntry::pagestate::ReplacePagePos(topic, neu, old, inodeNo, pos));
     }
     else
     {
@@ -140,6 +144,7 @@ PageStateMachine<maxPages, maxPositions, topic>::processEntry(const journalEntry
         switch(entry.pagestate.type)
         {
         case journalEntry::Pagestate::Type::replacePagePos:
+            currentInode = action.replacePagePos.nod;
             position   [pageListHWM  ] = action.replacePagePos.pos;
             //fall-through
         case journalEntry::Pagestate::Type::replacePage:
@@ -213,11 +218,21 @@ PageStateMachine<maxPages, maxPositions, topic>::signalEndOfLog()
         for(uint16_t i = 0; i < pageListHWM; i++)
         {
             mSummaryCache.setPageStatus(newPageList[i], SummaryEntry::dirty);
-            if(withPosition && oldPageList[i] != 0)
-            {
-                mPac->setPage(position[i], oldPageList[i]);
-            }
         }
+
+        if(withPosition)
+        {
+            mPac->setJournallingInode(currentInode);
+            for(uint16_t i = 0; i < pageListHWM; i++)
+            {
+                if(oldPageList[i] != 0)
+                {
+                    mPac->setPage(position[i], oldPageList[i]);
+                }
+            }
+            mPac->commit();
+        }
+
         clear();
         return false;
     case JournalState::recover:
@@ -227,10 +242,6 @@ PageStateMachine<maxPages, maxPositions, topic>::signalEndOfLog()
             if(oldPageList[i] != 0)
             {
                 mSummaryCache.setPageStatus(oldPageList[i], SummaryEntry::dirty);
-            }
-            if(withPosition)
-            {
-                mPac->setPage(position[i], newPageList[i]);
             }
         }
         clear();

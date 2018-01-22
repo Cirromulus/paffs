@@ -245,7 +245,7 @@ enum AreaStatus : uint8_t
     empty
 };
 
-enum class SummaryEntry : uint8_t
+enum SummaryEntry : uint8_t
 {
     free = 0,
     used,  // if read from super index, used can mean both free and used to save a bit per entry.

@@ -77,6 +77,8 @@ AreaSummaryElem::setStatus(PageOffs page, SummaryEntry value)
         setDirty();
         setLoadedFromSuperPage(false);
     }
+    PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "set Area %" PTYPE_AREAPOS " page %" PTYPE_PAGEOFFS " to %s",
+                getArea(), page, summaryEntryNames[value]);
     setStatus(page, value, mEntries);
     if (value == SummaryEntry::dirty)
     {
@@ -440,7 +442,7 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
     dev->journal.addEvent(journalEntry::summaryCache::SetStatus(area, page, state));
 
     mSummaryCache[mTranslation[area]].setStatus(page, state);
-    if (state == SummaryEntry::dirty)
+    if (!journalReplayMode && state == SummaryEntry::dirty)
     {
         if (traceMask & PAFFS_WRITE_VERIFY_AS)
         {
@@ -813,6 +815,7 @@ SummaryCache::getTopic()
 Result
 SummaryCache::processEntry(const journalEntry::Max& entry)
 {
+    journalReplayMode = true;
     if (entry.base.topic != getTopic())
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
@@ -840,6 +843,11 @@ SummaryCache::processEntry(const journalEntry::Max& entry)
     }
 
     return Result::ok;
+}
+void
+SummaryCache::signalEndOfLog()
+{
+    journalReplayMode = false;
 }
 
 Result

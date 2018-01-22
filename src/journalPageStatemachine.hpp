@@ -24,6 +24,7 @@ namespace paffs
 
 //Forward declaration
 class PageAddressCache;
+class Btree;
 
 /**
  * The PageStateMachine implements a Logic for when written Pages get applied after an action,
@@ -45,6 +46,7 @@ class PageStateMachine
     PageAbs position[maxPositions];
     uint16_t pageListHWM;
     bool withPosition = maxPages == maxPositions;
+    InodeNo currentInode;
     enum class JournalState : uint8_t
     {
         ok,
@@ -66,7 +68,7 @@ public:
     replacePage(Addr neu, Addr old);
 
     Result
-    replacePage(Addr neu, Addr old, PageAbs pos);
+    replacePage(Addr neu, Addr old, InodeNo inodeNo, PageAbs pos);
 
     Result
     invalidateOldPages();
