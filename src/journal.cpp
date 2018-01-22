@@ -112,7 +112,7 @@ Journal::processBuffer()
     {
         if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
         {
-            printMeaning(entry.base);
+            //printMeaning(entry.base);
         }
         if (entry.base.topic == JournalEntry::Topic::checkpoint)
         {

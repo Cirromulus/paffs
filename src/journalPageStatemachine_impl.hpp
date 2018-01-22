@@ -83,7 +83,6 @@ PageStateMachine<maxPages, maxPositions, topic>::replacePage(Addr neu, Addr old,
                     extractLogicalArea(neu), extractPageOffs(neu),
                     extractLogicalArea(old), extractPageOffs(old), pageListHWM, pos);
         position   [pageListHWM] = pos;
-        //TODO: unify both journal events saying the same thing
         mJournal.addEvent(journalEntry::pagestate::ReplacePagePos(topic, neu, old, pos));
     }
     else

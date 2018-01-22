@@ -824,11 +824,12 @@ SummaryCache::processEntry(const journalEntry::Max& entry)
     case journalEntry::SummaryCache::Subtype::remove:
         PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                     "Deleting cache "
-                    "entry of area %" PRId16 "",
-                    mSummaryCache[entry.summaryCache.area].getArea());
-        mSummaryCache[entry.summaryCache.area].setDirty(false);
-        mTranslation.erase(mSummaryCache[entry.summaryCache.area].getArea());
-        mSummaryCache[entry.summaryCache.area].clear();
+                    "entry %" PRIu8 " of area %" PRId16 "",
+                    mTranslation[entry.summaryCache.area],
+                    entry.summaryCache.area);
+        mSummaryCache[mTranslation[entry.summaryCache.area]].setDirty(false);
+        mSummaryCache[mTranslation[entry.summaryCache.area]].clear();
+        mTranslation.erase(entry.summaryCache.area);
         break;
     case journalEntry::SummaryCache::Subtype::setStatus:
         setPageStatus(entry.summaryCache_.setStatus.area, entry.summaryCache_.setStatus.page,
