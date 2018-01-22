@@ -58,6 +58,15 @@ Journal::addEvent(const JournalEntry& entry)
         printf("Add event ");
         printMeaning(entry);
     }
+
+    if(entry.topic == JournalEntry::Topic::checkpoint &&
+            static_cast<const journalEntry::Checkpoint*>(&entry)->target == JournalEntry::Topic::device)
+    {   //This is a special case, because now we are in an absolutely clean state
+        //so we can clean up the log
+        //TODO: Do something
+    }
+
+
     return Result::ok;
 }
 

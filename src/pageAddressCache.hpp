@@ -46,12 +46,15 @@ class PageAddressCache : public JournalTopic
     AddrListCacheElem singl;
     Device& device;
     Inode* mInodePtr;
+    bool isInodeDirty = false;
 
     PageStateMachine<maxPagesPerWrite, 0, JournalEntry::Topic::pac> statemachine;
     Inode mJournalInodeCopy;
 
 public:
     PageAddressCache(Device& mdev);
+    void
+    clear();
     Result
     setTargetInode(Inode& node);
     Result

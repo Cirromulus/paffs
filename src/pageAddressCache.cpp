@@ -55,6 +55,23 @@ AddrListCacheElem::getAddr(PageNo pos)
 PageAddressCache::PageAddressCache(Device& mdev) :
         device(mdev), mInodePtr(nullptr), statemachine(device.journal, device.sumCache){};
 
+void
+PageAddressCache::clear()
+{
+    for (AddrListCacheElem& elem : tripl)
+    {
+        elem.active = false;
+    }
+    for (AddrListCacheElem& elem : doubl)
+    {
+        elem.active = false;
+    }
+    singl.active = false;
+
+    mInodePtr = nullptr;
+    isInodeDirty = false;
+}
+
 Result
 PageAddressCache::setTargetInode(Inode& node)
 {
@@ -196,10 +213,15 @@ PageAddressCache::setPage(PageNo page, Addr addr)
 
     if (relPage < directAddrCount)
     {
+        if(mInodePtr->direct[relPage] == addr)
+        {
+            return Result::ok;
+        }
         //the event gets delayed until we are sure we don't have to commit
         //or else during replay we commit before the log commits (so we would overwrite the last element)
         device.journal.addEvent(journalEntry::pac::SetAddress(mInodePtr->no, page, addr));
         mInodePtr->direct[relPage] = addr;
+        isInodeDirty = true;
         return Result::ok;
     }
     relPage -= directAddrCount;
@@ -227,8 +249,13 @@ PageAddressCache::setPage(PageNo page, Addr addr)
                 return r;
             }
         }
+        if(singl.getAddr(relPage) == addr)
+        {
+            return Result::ok;
+        }
         device.journal.addEvent(journalEntry::pac::SetAddress(mInodePtr->no, page, addr));
         singl.setAddr(relPage, addr);
+        isInodeDirty = true;
         return Result::ok;
     }
     relPage -= addrsPerPage;
@@ -242,8 +269,13 @@ PageAddressCache::setPage(PageNo page, Addr addr)
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load second indirection!");
             return r;
         }
+        if(doubl[1].getAddr(relPage) == addr)
+        {
+            return Result::ok;
+        }
         device.journal.addEvent(journalEntry::pac::SetAddress(mInodePtr->no, page, addr));
         doubl[1].setAddr(addrPos, addr);
+        isInodeDirty = true;
         return Result::ok;
     }
     relPage -= std::pow(addrsPerPage, 2);
@@ -256,8 +288,13 @@ PageAddressCache::setPage(PageNo page, Addr addr)
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load third indirection!");
             return r;
         }
+        if(tripl[2].getAddr(relPage) == addr)
+        {
+            return Result::ok;
+        }
         device.journal.addEvent(journalEntry::pac::SetAddress(mInodePtr->no, page, addr));
         tripl[2].setAddr(addrPos, addr);
+        isInodeDirty = true;
         return Result::ok;
     }
 
@@ -286,7 +323,10 @@ PageAddressCache::commit()
         return Result::bug;
     }
 
-    bool wasDirt = isDirty();
+    if(!isInodeDirty)
+    {
+        return Result::ok;
+    }
 
     Result r;
     r = commitPath(mInodePtr->indir, &singl, 0);
@@ -318,16 +358,9 @@ PageAddressCache::commit()
 
     //todo: doubled code, use tree update as a signal
 
-    if(wasDirt)
-    {   //this would not be necessary if we got the update as a signal
-        device.journal.addEvent(journalEntry::pac::UpdateAddressList(*mInodePtr));
-    }
+    //this would not be necessary if we got the update as a signal
+    device.journal.addEvent(journalEntry::pac::UpdateAddressList(*mInodePtr));
     r = device.tree.updateExistingInode(*mInodePtr);
-
-    if(!wasDirt)
-    {
-        return r;
-    }
 
     if(traceMask & PAFFS_TRACE_PACACHE && traceMask & PAFFS_TRACE_VERBOSE)
     {
@@ -342,6 +375,7 @@ PageAddressCache::commit()
 
     statemachine.invalidateOldPages();
     device.journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    isInodeDirty = false;
     return r;
 }
 
@@ -373,7 +407,17 @@ PageAddressCache::processEntry(const journalEntry::Max& entry)
         }
         case journalEntry::PAC::Operation::updateAddresslist:
         {
-            Result r = device.tree.updateExistingInode(entry.pac_.updateAddressList.inode);
+            if(mInodePtr == nullptr || mInodePtr != &mJournalInodeCopy)
+            {
+                return Result::bug;
+            }
+            //Get newest metadata of Inode from tree
+            Inode tmp;
+            device.tree.getInode(mInodePtr->no, tmp);
+            //This intentionally reads over the boundaries of direct array into the indirections
+            memcpy(&tmp.direct, &entry.pac_.updateAddressList.inode.direct, (11+3) * sizeof(Addr));
+            mJournalInodeCopy = tmp;
+            Result r = device.tree.updateExistingInode(mJournalInodeCopy);
             if(r != Result::ok)
             {
                 return r;

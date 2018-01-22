@@ -302,9 +302,33 @@ Device::mnt(bool readOnlyMode)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Could not load Inode of Root Dir!");
         return r;
     }
+    //Basic sanity check
+    if(rootDir->type != InodeType::dir)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Root directory is not marked as dir");
+        printf("Inode %" PTYPE_INODENO " : %s\n", rootDir->no,
+               rootDir->type == InodeType::file ? "fil" : "dir");
+        printf("   Perm: %s%s%s\n", rootDir->perm & R ? "r" : "-",
+                rootDir->perm & W ? "w" : "-",
+                        rootDir->perm & X ? "x" : "-"
+                );
+        printf("   Size: %" PTYPE_FILSIZE " Byte (%" PRIu32 " pages)\n",
+               rootDir->size, rootDir->reservedPages);
+        for(uint8_t i = 0; i < directAddrCount + 3; i++)
+        {   //Intentionally reading over boundary of direct array into indirect
+            if(rootDir->direct[i] == 0)
+            {
+                printf("   ...\n");
+                break;
+            }
+            printf("   %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "\n",
+                   extractLogicalArea(rootDir->direct[i]), extractPageOffs(rootDir->direct[i]));
+        }
+        return Result::fail;
+    }
     // TODO: Supress decrease or increase reference to node 0 manually
     mounted = true;
-    PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Mount sucessful");
+    PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Mount successful");
     return r;
 }
 Result
@@ -1855,6 +1879,7 @@ Device::destroyDevice()
     areaMgmt.clear();
     inodePool.clear();
     filesPool.clear();
+    dataIO.pac.clear();
     return Result::ok;
 }
 };
