@@ -45,10 +45,10 @@ class PageAddressCache : public JournalTopic
     AddrListCacheElem doubl[2];  // name clash with double
     AddrListCacheElem singl;
     Device& device;
-    Inode* inode;
+    Inode* mInodePtr;
 
     PageStateMachine<maxPagesPerWrite, 0, JournalEntry::Topic::pac> statemachine;
-    Inode journalInode;
+    Inode mJournalInodeCopy;
 
 public:
     PageAddressCache(Device& mdev);

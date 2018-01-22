@@ -53,12 +53,12 @@ AddrListCacheElem::getAddr(PageNo pos)
 }
 
 PageAddressCache::PageAddressCache(Device& mdev) :
-        device(mdev), inode(nullptr), statemachine(device.journal, device.sumCache){};
+        device(mdev), mInodePtr(nullptr), statemachine(device.journal, device.sumCache){};
 
 Result
 PageAddressCache::setTargetInode(Inode& node)
 {
-    if (&node == inode)
+    if (&node == mInodePtr)
     {
         return Result::ok;
     }
@@ -82,7 +82,7 @@ PageAddressCache::setTargetInode(Inode& node)
         elem.active = false;
     }
     singl.active = false;
-    inode = &node;
+    mInodePtr = &node;
 
     //journal setInode is delayed until something is really changed
 
@@ -92,7 +92,7 @@ PageAddressCache::setTargetInode(Inode& node)
 Result
 PageAddressCache::getPage(PageNo page, Addr* addr)
 {
-    if (inode == nullptr)
+    if (mInodePtr == nullptr)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
         return Result::bug;
@@ -100,7 +100,7 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
 
     if (page < directAddrCount)
     {
-        *addr = inode->direct[page];
+        *addr = mInodePtr->direct[page];
         PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "GetPage at %" PRIu32
                     " (direct, %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ")",
                     page, extractLogicalArea(*addr), extractPageOffs(*addr));
@@ -114,7 +114,7 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
         PAFFS_DBG_S(PAFFS_TRACE_VERBOSE | PAFFS_TRACE_PACACHE, "Accessing first indirection at %" PRIu32, page);
         if (!singl.active)
         {
-            r = loadCacheElem(inode->indir, singl);
+            r = loadCacheElem(mInodePtr->indir, singl);
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read first indirection!");
@@ -133,7 +133,7 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
     if (page < std::pow(addrsPerPage, 2))
     {
         PAFFS_DBG_S(PAFFS_TRACE_VERBOSE | PAFFS_TRACE_PACACHE, "Accessing second indirection at %" PRIu32, page);
-        r = loadPath(inode->d_indir, page, doubl, 1, addrPos);
+        r = loadPath(mInodePtr->d_indir, page, doubl, 1, addrPos);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load second indirection!");
@@ -150,7 +150,7 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
     if (page < std::pow(addrsPerPage, 3))
     {
         PAFFS_DBG_S(PAFFS_TRACE_VERBOSE | PAFFS_TRACE_PACACHE, "Accessing third indirection at %" PRIu32, page);
-        r = loadPath(inode->t_indir, page, tripl, 2, addrPos);
+        r = loadPath(mInodePtr->t_indir, page, tripl, 2, addrPos);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load third indirection!");
@@ -172,7 +172,7 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
 Result
 PageAddressCache::setPage(PageNo page, Addr addr)
 {
-    if (inode == nullptr)
+    if (mInodePtr == nullptr)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
         return Result::bug;
@@ -198,8 +198,8 @@ PageAddressCache::setPage(PageNo page, Addr addr)
     {
         //the event gets delayed until we are sure we don't have to commit
         //or else during replay we commit before the log commits (so we would overwrite the last element)
-        device.journal.addEvent(journalEntry::pac::SetAddress(inode->no, page, addr));
-        inode->direct[relPage] = addr;
+        device.journal.addEvent(journalEntry::pac::SetAddress(mInodePtr->no, page, addr));
+        mInodePtr->direct[relPage] = addr;
         return Result::ok;
     }
     relPage -= directAddrCount;
@@ -220,14 +220,14 @@ PageAddressCache::setPage(PageNo page, Addr addr)
         // First Indirection
         if (!singl.active)
         {
-            r = loadCacheElem(inode->indir, singl);
+            r = loadCacheElem(mInodePtr->indir, singl);
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read first indirection!");
                 return r;
             }
         }
-        device.journal.addEvent(journalEntry::pac::SetAddress(inode->no, page, addr));
+        device.journal.addEvent(journalEntry::pac::SetAddress(mInodePtr->no, page, addr));
         singl.setAddr(relPage, addr);
         return Result::ok;
     }
@@ -236,13 +236,13 @@ PageAddressCache::setPage(PageNo page, Addr addr)
 
     if (relPage < std::pow(addrsPerPage, 2))
     {
-        r = loadPath(inode->d_indir, relPage, doubl, 1, addrPos);
+        r = loadPath(mInodePtr->d_indir, relPage, doubl, 1, addrPos);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load second indirection!");
             return r;
         }
-        device.journal.addEvent(journalEntry::pac::SetAddress(inode->no, page, addr));
+        device.journal.addEvent(journalEntry::pac::SetAddress(mInodePtr->no, page, addr));
         doubl[1].setAddr(addrPos, addr);
         return Result::ok;
     }
@@ -250,13 +250,13 @@ PageAddressCache::setPage(PageNo page, Addr addr)
 
     if (relPage < std::pow(addrsPerPage, 3))
     {
-        r = loadPath(inode->t_indir, relPage, tripl, 2, addrPos);
+        r = loadPath(mInodePtr->t_indir, relPage, tripl, 2, addrPos);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load third indirection!");
             return r;
         }
-        device.journal.addEvent(journalEntry::pac::SetAddress(inode->no, page, addr));
+        device.journal.addEvent(journalEntry::pac::SetAddress(mInodePtr->no, page, addr));
         tripl[2].setAddr(addrPos, addr);
         return Result::ok;
     }
@@ -280,7 +280,7 @@ PageAddressCache::setValid()
 Result
 PageAddressCache::commit()
 {
-    if (inode == nullptr)
+    if (mInodePtr == nullptr)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
         return Result::bug;
@@ -289,21 +289,21 @@ PageAddressCache::commit()
     bool wasDirt = isDirty();
 
     Result r;
-    r = commitPath(inode->indir, &singl, 0);
+    r = commitPath(mInodePtr->indir, &singl, 0);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit first indirection!");
         return r;
     }
 
-    r = commitPath(inode->d_indir, doubl, 1);
+    r = commitPath(mInodePtr->d_indir, doubl, 1);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit second indirection!");
         return r;
     }
 
-    r = commitPath(inode->t_indir, tripl, 2);
+    r = commitPath(mInodePtr->t_indir, tripl, 2);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit third indirection!");
@@ -320,9 +320,9 @@ PageAddressCache::commit()
 
     if(wasDirt)
     {   //this would not be necessary if we got the update as a signal
-        device.journal.addEvent(journalEntry::pac::UpdateAddressList(*inode));
+        device.journal.addEvent(journalEntry::pac::UpdateAddressList(*mInodePtr));
     }
-    r = device.tree.updateExistingInode(*inode);
+    r = device.tree.updateExistingInode(*mInodePtr);
 
     if(!wasDirt)
     {
@@ -331,12 +331,12 @@ PageAddressCache::commit()
 
     if(traceMask & PAFFS_TRACE_PACACHE && traceMask & PAFFS_TRACE_VERBOSE)
     {
-        printf("Resulting Addresslist of Inode %" PTYPE_INODENO, inode->no);
+        printf("Resulting Addresslist of Inode %" PTYPE_INODENO, mInodePtr->no);
         for(uint8_t i = 0; i < 13; i++)
         {
             //intentionally over size of 11, because we print indirects too
             printf("%" PRIu8 "\t%" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
-                   i, extractLogicalArea(inode->direct[i]), extractPageOffs(inode->direct[i]));
+                   i, extractLogicalArea(mInodePtr->direct[i]), extractPageOffs(mInodePtr->direct[i]));
         }
     }
 
@@ -360,15 +360,19 @@ PageAddressCache::processEntry(const journalEntry::Max& entry)
         {
         case journalEntry::PAC::Operation::setAddress:
         {
-            Result r = device.tree.getInode(entry.pac_.setAddress.inodeNo, journalInode);
-            if(r != Result::ok)
+            if(mInodePtr == nullptr || entry.pac_.setAddress.inodeNo != mInodePtr->no)
             {
-                return r;
+                Result r = device.tree.getInode(entry.pac_.setAddress.inodeNo, mJournalInodeCopy);
+                if(r != Result::ok)
+                {
+                    return r;
+                }
+                setTargetInode(mJournalInodeCopy);
             }
             return setPage(entry.pac_.setAddress.page, entry.pac_.setAddress.addr);
         }
         case journalEntry::PAC::Operation::updateAddresslist:
-            {
+        {
             Result r = device.tree.updateExistingInode(entry.pac_.updateAddressList.inode);
             if(r != Result::ok)
             {
@@ -377,7 +381,7 @@ PageAddressCache::processEntry(const journalEntry::Max& entry)
             journalEntry::Max success;
             success.pagestate_.success = journalEntry::pagestate::Success(getTopic());
             return statemachine.processEntry(success);
-            }
+        }
         }
         return Result::bug;
     }
@@ -400,12 +404,16 @@ PageAddressCache::signalEndOfLog()
     {
         //TODO: We may want to find out which cache elements are clean to suppress double versions
     }
-    if(inode != nullptr)
+    if(mInodePtr != nullptr)
     {
         //This refreshes the Inode we will commit to Index.
         //During replay, changes to the same node are only done to index, not the PAC version
         //TODO: Link them somehow
-        device.tree.getInode(inode->no, journalInode);
+        Inode tmp;
+        device.tree.getInode(mInodePtr->no, tmp);
+        //This intentionally reads over the boundaries of direct array into the indirections
+        memcpy(&tmp.direct, &mJournalInodeCopy.direct, (11+3) * sizeof(Addr));
+        mJournalInodeCopy = tmp;
         commit();
     }
 }
