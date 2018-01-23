@@ -14,6 +14,7 @@
 
 #pragma once
 #include "commonTypes.hpp"
+#include "bitlist.hpp"
 
 namespace paffs
 {
@@ -25,8 +26,8 @@ struct JournalEntry
         checkpoint,
         pagestate,
         areaMgmt,
-        tree,
         summaryCache,
+        tree,
         pac,
         dataIO,
         device,
@@ -219,6 +220,63 @@ namespace journalEntry
         };
     };
 
+    struct SummaryCache : public JournalEntry
+    {
+        enum class Subtype : uint8_t
+        {
+            commit,
+            remove,
+            setStatus,
+            setStatusBlock,
+        };
+        AreaPos area;
+        Subtype subtype;
+
+    protected:
+        inline
+        SummaryCache(AreaPos _area, Subtype _subtype) :
+            JournalEntry(Topic::summaryCache), area(_area), subtype(_subtype){};
+    };
+
+    namespace summaryCache
+    {
+        struct Commit : public SummaryCache
+        {
+            inline
+            Commit(AreaPos _area) : SummaryCache(_area, Subtype::commit){};
+        };
+
+        struct Remove : public SummaryCache
+        {
+            inline
+            Remove(AreaPos _area) : SummaryCache(_area, Subtype::remove){};
+        };
+
+        struct SetStatus : public SummaryCache
+        {
+            PageOffs page;
+            SummaryEntry status;
+            inline SetStatus(AreaPos _area, PageOffs _page, SummaryEntry _status) :
+                    SummaryCache(_area, Subtype::setStatus), page(_page), status(_status){};
+        };
+
+        struct SetStatusBlock : public SummaryCache
+        {
+            TwoBitList<dataPagesPerArea> status;
+            inline SetStatusBlock(AreaPos _area, TwoBitList<dataPagesPerArea>& _status) :
+                    SummaryCache(_area, Subtype::setStatus), status(_status){};
+        };
+
+        union Max
+        {
+            Commit commit;
+            Remove remove;
+            SetStatus setStatus;
+            SetStatusBlock setStatusBlock;
+        };
+    }
+
+
     struct BTree : public JournalEntry
     {
         enum class Operation : uint8_t
@@ -270,53 +328,6 @@ namespace journalEntry
             SetRootnode setRootnode;
         };
     };
-
-    struct SummaryCache : public JournalEntry
-    {
-        enum class Subtype : uint8_t
-        {
-            commit,
-            remove,
-            setStatus,
-        };
-        AreaPos area;
-        Subtype subtype;
-
-    protected:
-        inline
-        SummaryCache(AreaPos _area, Subtype _subtype) :
-            JournalEntry(Topic::summaryCache), area(_area), subtype(_subtype){};
-    };
-
-    namespace summaryCache
-    {
-        struct Commit : public SummaryCache
-        {
-            inline
-            Commit(AreaPos _area) : SummaryCache(_area, Subtype::commit){};
-        };
-
-        struct Remove : public SummaryCache
-        {
-            inline
-            Remove(AreaPos _area) : SummaryCache(_area, Subtype::remove){};
-        };
-
-        struct SetStatus : public SummaryCache
-        {
-            PageOffs page;
-            SummaryEntry status;
-            inline SetStatus(AreaPos _area, PageOffs _page, SummaryEntry _status) :
-                    SummaryCache(_area, Subtype::setStatus), page(_page), status(_status){};
-        };
-
-        union Max
-        {
-            Commit commit;
-            Remove remove;
-            SetStatus setStatus;
-        };
-    }
 
     struct PAC : public JournalEntry
     {

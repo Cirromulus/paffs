@@ -36,7 +36,7 @@ public:
     SummaryEntry
     getStatus(PageOffs page);
     static SummaryEntry
-    getStatus(PageOffs page, TwoBitList<dataPagesPerArea>& list);
+    getStatus(PageOffs page, const TwoBitList<dataPagesPerArea>& list);
     void
     setStatus(PageOffs page, SummaryEntry value);
     static void
@@ -160,6 +160,8 @@ public:
     processEntry(const journalEntry::Max& entry) override;
     void
     signalEndOfLog() override;
+    void
+    printStatus();
 
 
 private:

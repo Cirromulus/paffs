@@ -88,6 +88,8 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
             return sizeof(journalEntry::summaryCache::Remove);
         case journalEntry::SummaryCache::Subtype::setStatus:
             return sizeof(journalEntry::summaryCache::SetStatus);
+        case journalEntry::SummaryCache::Subtype::setStatusBlock:
+            return sizeof(journalEntry::summaryCache::SetStatusBlock);
         }
         break;
     case JournalEntry::Topic::pac:

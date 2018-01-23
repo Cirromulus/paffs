@@ -19,6 +19,9 @@
 #include "driver/driver.hpp"
 #include "inttypes.h"
 
+//just for debug
+#include "device.hpp"
+
 using namespace paffs;
 
 uint8_t paffs::colorMap[JournalEntry::numberOfTopics] =
@@ -27,8 +30,8 @@ uint8_t paffs::colorMap[JournalEntry::numberOfTopics] =
                 31, //checkpoint
                 32, //pagestate
                 33, //areaMgmt
-                35, //tree
                 36, //summaryCache
+                35, //tree
                 37, //pac
                 91, //dataIO
                 93, //device
@@ -115,8 +118,34 @@ Journal::processBuffer()
             //printMeaning(entry.base);
         }
 
+        if(entry.base.topic == JournalEntry::Topic::areaMgmt)
+        {
+            /**
+             * AreaMap should calculate the actual position of an area
+             * before other Topics like summaryCache scans wrong summaryEntries because
+             * a newer (and possibly different) area was committed there.
+             * This also applies to Rootnode of IndexTree, where only the newest node may
+             * point to valid data.
+             * The processing of AreaMap before knowing where the checkpoints are
+             * is (mostly!) safe in this special case, because after a AreaMap checkpoint
+             * the whole log will be flushed (Superblock commit!)
+             */
+            r = topics[JournalEntry::Topic::areaMgmt]->processEntry(entry);
+            if(r != Result::ok)
+            {
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not apply areaMgmt elem in pre-run!");
+                return r;
+            }
+        }
+
         if (entry.base.topic == JournalEntry::Topic::checkpoint)
         {
+            if(entry.checkpoint.target == JournalEntry::Topic::areaMgmt)
+            {
+                PAFFS_DBG(PAFFS_TRACE_BUG, "we met checkpoint of areaMgmt,"
+                        "this would require a third run");
+                return Result::nimpl;
+            }
             firstUncheckpointedEntry[entry.checkpoint.target] = persistence.tell();
         }
     } while ((r = persistence.readNextElem(entry)) == Result::ok);
@@ -140,6 +169,25 @@ Journal::processBuffer()
     }
 
     PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Applying log...");
+
+    //FIXME DEBUG
+    AreaManagement* areaMgmt = &reinterpret_cast<Device*>(topics[JournalEntry::Topic::device])->areaMgmt;
+    printf("Info: \n\t%" PTYPE_AREAPOS " used Areas\n", areaMgmt->getUsedAreas());
+    for (AreaPos i = 0; i < areasNo; i++)
+    {
+        printf("\tArea %3" PTYPE_AREAPOS " on %4" PTYPE_AREAPOS " as %10s %s\n",
+               i,
+               areaMgmt->getPos(i),
+               areaNames[areaMgmt->getType(i)],
+               areaStatusNames[areaMgmt->getStatus(i)]);
+        if (i > 128)
+        {
+            printf("\n -- truncated 128-%" PTYPE_AREAPOS " Areas.\n", areasNo);
+            break;
+        }
+    }
+    printf("\t----------------------\n");
+    //FIXME DEBUG
 
     r = applyJournalEntries(firstUncheckpointedEntry);
     if(r != Result::ok)
@@ -189,6 +237,12 @@ Journal::applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEnt
             continue;
         }
 
+        if(entry.base.topic == JournalEntry::Topic::areaMgmt)
+        {
+            //we already applied these messages
+            continue;
+        }
+
         if(!isTopicValid(entry.base.topic))
         {
             PAFFS_DBG(PAFFS_TRACE_BUG, "Read invalid Topic identifier, probably misaligned!");
@@ -231,7 +285,21 @@ Journal::applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEnt
                 return r;
             }
         }
+        else
+        {
+            printf("_skipping_ ");
+            printMeaning(entry.base, false);
+            printf(" at %" PRIu32 ".%" PRIu16 "\n",
+                   persistence.tell().flash.addr,
+                   persistence.tell().flash.offs);
+        }
     }
+
+    //FIXME
+    //While persistence does not have read/write pointers,
+    //we enable it here (It should be enabled before targets process entries
+    //This is OK as long as a processEntry does not produce some decisions we would ignore later on
+    disabled = false;
 
     PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Signalling end of Log");
     for (JournalTopic* worker : topics)
@@ -241,6 +309,7 @@ Journal::applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEnt
             worker->signalEndOfLog();
         }
     }
+
 
     return Result::ok;
 }
@@ -265,7 +334,10 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
     case JournalEntry::Topic::pagestate:
     {
         auto ps = static_cast<const journalEntry::Pagestate*>(&entry);
-        printf("Pagestate for %s ", topicNames[ps->target]);
+        printf("Pagestate for \e[1;%um%s \e[1;%um",
+               colorMap[ps->target],
+               topicNames[ps->target],
+               colorMap[entry.topic]);
         switch(ps->type)
         {
         case journalEntry::Pagestate::Type::replacePage:
@@ -331,7 +403,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
                 found = true;
                 break;
             case journalEntry::areaMgmt::AreaMap::Operation::increaseErasecount:
-                printf("set Erasecount");
+                printf("increase Erasecount");
                 found = true;
                 break;
             case journalEntry::areaMgmt::AreaMap::Operation::position:
@@ -345,7 +417,8 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
                 break;
             }
             case journalEntry::areaMgmt::AreaMap::Operation::swap:
-                printf("Swap");
+                printf("Swap with %" PTYPE_AREAPOS,
+                       static_cast<const journalEntry::areaMgmt::areaMap::Swap*>(&entry)->b);
                 found = true;
                 break;
             }
@@ -408,6 +481,10 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
                    summaryEntryNames[static_cast<unsigned>(
                            static_cast<const journalEntry::summaryCache::SetStatus*>(&entry)
                                    ->status)]);
+            found = true;
+            break;
+        case journalEntry::SummaryCache::Subtype::setStatusBlock:
+            printf("set Statusblock");
             found = true;
             break;
         }

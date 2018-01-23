@@ -293,6 +293,11 @@ Device::mnt(bool readOnlyMode)
         return r;
     }
 
+    //FIXME debug
+    printf("\nAfter journal:\n");
+    sumCache.printStatus();
+    //FIXME debug
+
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Replayed Journal if needed");
 
     SmartInodePtr rootDir;
