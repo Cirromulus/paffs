@@ -66,7 +66,7 @@ Journal::addEvent(const JournalEntry& entry)
             static_cast<const journalEntry::Checkpoint*>(&entry)->target == JournalEntry::Topic::device)
     {   //This is a special case, because now we are in an absolutely clean state
         //so we can clean up the log
-        //TODO: Do something
+        //TODO: Check for persistence usage and commit everything if nearly full
     }
 
 
@@ -111,13 +111,11 @@ Journal::processBuffer()
     PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Replay of Journal needed");
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL, "Scanning for success entries...");
 
+    //TODO: Add a prescan function for JournalEntries so that AreaMgmt and ASCache can
+    // preapply / skip all committed areas
+
     do
     {
-        if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
-        {
-            //printMeaning(entry.base);
-        }
-
         if(entry.base.topic == JournalEntry::Topic::areaMgmt)
         {
             /**

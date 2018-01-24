@@ -66,6 +66,24 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
             return sizeof(journalEntry::areaMgmt::UsedAreas);
         }
         break;
+    case JournalEntry::Topic::summaryCache:
+        switch (static_cast<const journalEntry::SummaryCache*>(&entry)->subtype)
+        {
+        case journalEntry::SummaryCache::Subtype::commit:
+            return sizeof(journalEntry::summaryCache::Commit);
+        case journalEntry::SummaryCache::Subtype::remove:
+            return sizeof(journalEntry::summaryCache::Remove);
+        case journalEntry::SummaryCache::Subtype::setStatus:
+            if(static_cast<const journalEntry::summaryCache::SetStatus*>(&entry)->status == 0)
+            {   //FREE is not allowed
+                PAFFS_DBG(PAFFS_TRACE_BUG, "NAY");
+                return 0;
+            }
+            return sizeof(journalEntry::summaryCache::SetStatus);
+        case journalEntry::SummaryCache::Subtype::setStatusBlock:
+            return sizeof(journalEntry::summaryCache::SetStatusBlock);
+        }
+        break;
     case JournalEntry::Topic::tree:
         switch (static_cast<const journalEntry::BTree*>(&entry)->op)
         {
@@ -77,19 +95,6 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
             return sizeof(journalEntry::btree::Remove);
         case journalEntry::BTree::Operation::setRootnode:
             return sizeof(journalEntry::btree::SetRootnode);
-        }
-        break;
-    case JournalEntry::Topic::summaryCache:
-        switch (static_cast<const journalEntry::SummaryCache*>(&entry)->subtype)
-        {
-        case journalEntry::SummaryCache::Subtype::commit:
-            return sizeof(journalEntry::summaryCache::Commit);
-        case journalEntry::SummaryCache::Subtype::remove:
-            return sizeof(journalEntry::summaryCache::Remove);
-        case journalEntry::SummaryCache::Subtype::setStatus:
-            return sizeof(journalEntry::summaryCache::SetStatus);
-        case journalEntry::SummaryCache::Subtype::setStatusBlock:
-            return sizeof(journalEntry::summaryCache::SetStatusBlock);
         }
         break;
     case JournalEntry::Topic::pac:

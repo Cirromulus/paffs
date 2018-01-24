@@ -267,7 +267,7 @@ namespace journalEntry
         {
             TwoBitList<dataPagesPerArea> status;
             inline SetStatusBlock(AreaPos _area, TwoBitList<dataPagesPerArea>& _status) :
-                    SummaryCache(_area, Subtype::setStatus), status(_status){};
+                    SummaryCache(_area, Subtype::setStatusBlock), status(_status){};
         };
 
         union Max
