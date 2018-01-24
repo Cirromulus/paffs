@@ -228,6 +228,9 @@ namespace journalEntry
             remove,
             setStatus,
             setStatusBlock,
+            //setDirty,
+            //setAreaSummaryWritten,
+            //setLoadedFromSuperpage,
         };
         AreaPos area;
         Subtype subtype;

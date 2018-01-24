@@ -251,7 +251,7 @@ void
 SummaryCache::printStatus()
 {
     printf("pos: used dirty loadedFromSP isASwritten [area dirty_pages]\n");
-    for (unsigned i = 0; i < areaSummaryCacheSize; i++)
+    for (uint8_t i = 0; i < areaSummaryCacheSize; i++)
     {
         printf("%2u: %s %s %s %s ", i,
                mSummaryCache[i].isUsed() ? "used" : "  - ",
@@ -263,6 +263,27 @@ SummaryCache::printStatus()
         {
             printf("%2" PTYPE_AREAPOS " %3" PTYPE_PAGEOFFS,
                    mSummaryCache[i].getArea(), mSummaryCache[i].getDirtyPages());
+
+            if(mSummaryCache[i].getArea() == 0 || mSummaryCache[i].getArea() >= areasNo)
+            {
+                printf(" UNPLAUSIBLE (too High/Low)");
+            }
+            if(mTranslation.find(mSummaryCache[i].getArea()) == mTranslation.end())
+            {
+                printf(" NOT IN TRANSLATION");
+            }
+            if(mTranslation[mSummaryCache[i].getArea()] != i)
+            {
+                printf(" UNPLAUSIBLE (Position %" PRIu8 " vs %" PRIu8 ")",
+                       i, mTranslation[mSummaryCache[i].getArea()]);
+            }
+            if(mSummaryCache[mTranslation[mSummaryCache[i].getArea()]].getArea() !=
+                    mSummaryCache[i].getArea())
+            {
+                printf(" UNPLAUSIBLE (Position %" PTYPE_AREAPOS " vs %" PTYPE_AREAPOS ")",
+                       mSummaryCache[mTranslation[mSummaryCache[i].getArea()]].getArea(),
+                       mSummaryCache[i].getArea());
+            }
         }
         printf("\n");
     }
@@ -430,9 +451,9 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
     if (state == SummaryEntry::free)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Area %" PTYPE_AREAPOS " was set to empty, "
-                  "but apperarently not by deleting it!",
-                  area);
+                  "Area %" PTYPE_AREAPOS " page %" PTYPE_PAGEOFFS " was set to FREE, "
+                  "but this is only allowed by deleting the Area!",
+                  area, page);
     }
     if (mTranslation.find(area) == mTranslation.end())
     {
@@ -461,7 +482,6 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
     }
 
     dev->journal.addEvent(journalEntry::summaryCache::SetStatus(area, page, state));
-
     mSummaryCache[mTranslation[area]].setStatus(page, state);
     if (!journalReplayMode && state == SummaryEntry::dirty)
     {
@@ -619,12 +639,10 @@ SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary)
         if (r != Result::ok)
             return r;
     }
-    //TODO: notify journal
+
     packStatusArray(mTranslation[area], summary);
-    dev->journal.addEvent(
-            journalEntry::summaryCache::SetStatusBlock(
-                    area, *mSummaryCache[mTranslation[area]].exposeSummary()));
-    mSummaryCache[mTranslation[area]].setDirtyPages(countDirtyPages(mTranslation[area]));
+    dev->journal.addEvent(journalEntry::summaryCache::SetStatusBlock(
+            area, *mSummaryCache[mTranslation[area]].exposeSummary()));
     return Result::ok;
 }
 
@@ -850,42 +868,31 @@ SummaryCache::processEntry(const journalEntry::Max& entry)
     {
     case journalEntry::SummaryCache::Subtype::commit:
         //sanity check
+        if(mTranslation.count(entry.summaryCache.area) == 0)
+        {   //can only be 0 or 1
+            PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
+                        "Log committing an nonexistent area %" PTYPE_AREAPOS,
+                        entry.summaryCache.area);
+            //This may be OK because it was written
+            return Result::ok;
+        }
         if(mSummaryCache[mTranslation[entry.summaryCache.area]].getArea() !=
                 entry.summaryCache.area)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
                       "There was an error in SummaryCache log replay!\n"
-                      "\tSumcache entry %2" PRIu16 "states it was "
-                      "on %" PTYPE_AREAPOS ", but translation says on %" PTYPE_AREAPOS,
+                      "\tSumcache entry %2" PRIu16 " states it was "
+                      "on %2" PTYPE_AREAPOS ", but translation says on %2" PTYPE_AREAPOS,
                       mTranslation[entry.summaryCache.area],
                       mSummaryCache[mTranslation[entry.summaryCache.area]].getArea(),
                       entry.summaryCache.area);
             return Result::bug;
         }
         mSummaryCache[mTranslation[entry.summaryCache.area]].setDirty(false);
+        mSummaryCache[mTranslation[entry.summaryCache.area]].setAreaSummaryWritten();
         break;
     case journalEntry::SummaryCache::Subtype::remove:
-        //sanity check
-        if(mSummaryCache[mTranslation[entry.summaryCache.area]].getArea() !=
-                entry.summaryCache.area)
-        {
-            PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "There was an error in SummaryCache log replay!\n"
-                      "\tSumcache entry %2" PRIu16 "states it was "
-                      "on %" PTYPE_AREAPOS ", but translation says on %" PTYPE_AREAPOS,
-                      mTranslation[entry.summaryCache.area],
-                      mSummaryCache[mTranslation[entry.summaryCache.area]].getArea(),
-                      entry.summaryCache.area);
-            return Result::bug;
-        }
-        PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
-                    "Deleting cache "
-                    "entry %" PRIu8 " of area %" PRId16 "",
-                    mTranslation[entry.summaryCache.area],
-                    entry.summaryCache.area);
-        mSummaryCache[mTranslation[entry.summaryCache.area]].setDirty(false);
-        mSummaryCache[mTranslation[entry.summaryCache.area]].clear();
-        mTranslation.erase(entry.summaryCache.area);
+        deleteSummary(entry.summaryCache.area);
         break;
     case journalEntry::SummaryCache::Subtype::setStatus:
         setPageStatus(entry.summaryCache_.setStatus.area, entry.summaryCache_.setStatus.page,
@@ -904,7 +911,6 @@ SummaryCache::processEntry(const journalEntry::Max& entry)
     default:
         return Result::nimpl;
     }
-
     return Result::ok;
 }
 void
@@ -1181,6 +1187,11 @@ SummaryCache::writeAreasummary(AreaSummaryElem& elem)
     if (elem.isAreaSummaryWritten())
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to commit elem with existing AS Commit!");
+        return Result::bug;
+    }
+    if (journalReplayMode)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to commit an elem in Journal replay!");
         return Result::bug;
     }
     uint8_t* summary;
