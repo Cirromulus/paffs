@@ -237,8 +237,12 @@ Journal::applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEnt
 
         if(entry.base.topic == JournalEntry::Topic::areaMgmt)
         {
-            //we already applied these messages
-            continue;
+            //TODO: remove this by designing the prescan / process scheme
+            printf("_skipping_ ");
+            printMeaning(entry.base, false);
+            printf(" at %" PRIu32 ".%" PRIu16 "\n",
+                   persistence.tell().flash.addr,
+                   persistence.tell().flash.offs);
         }
 
         if(!isTopicValid(entry.base.topic))
@@ -263,9 +267,7 @@ Journal::applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEnt
         {
             if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
             {
-                printf("Processing entry");
-                printf(" by %s ",
-                       topicNames[target]);
+                printf("Processing ");
                 printMeaning(entry.base, false);
                 printf(" at %" PRIu32 ".%" PRIu16 "\n",
                        persistence.tell().flash.addr,

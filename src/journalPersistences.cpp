@@ -74,11 +74,6 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
         case journalEntry::SummaryCache::Subtype::remove:
             return sizeof(journalEntry::summaryCache::Remove);
         case journalEntry::SummaryCache::Subtype::setStatus:
-            if(static_cast<const journalEntry::summaryCache::SetStatus*>(&entry)->status == 0)
-            {   //FREE is not allowed
-                PAFFS_DBG(PAFFS_TRACE_BUG, "NAY");
-                return 0;
-            }
             return sizeof(journalEntry::summaryCache::SetStatus);
         case journalEntry::SummaryCache::Subtype::setStatusBlock:
             return sizeof(journalEntry::summaryCache::SetStatusBlock);
