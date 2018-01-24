@@ -281,7 +281,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load second indirection!");
             return r;
         }
-        if(doubl[1].getAddr(relPage) == addr)
+        if(doubl[1].getAddr(addrPos) == addr)
         {
             return Result::ok;
         }
@@ -300,7 +300,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load third indirection!");
             return r;
         }
-        if(tripl[2].getAddr(relPage) == addr)
+        if(tripl[2].getAddr(addrPos) == addr)
         {
             return Result::ok;
         }

@@ -85,7 +85,7 @@ private:
     void
     informJournal(uint16_t cacheID, const PageNo pos, const Addr newAddr);
     /**
-     * @param target outputs the address of the wanted page
+     * @param addrPos is the position of the wanted page in end list
      */
     Result
     loadPath(Addr& anchor,
