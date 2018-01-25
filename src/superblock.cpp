@@ -274,7 +274,7 @@ Superblock::getTopic()
 }
 
 Result
-Superblock::processEntry(const journalEntry::Max& entry)
+Superblock::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 {
     if (entry.base.topic != getTopic())
     {

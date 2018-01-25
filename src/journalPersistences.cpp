@@ -133,16 +133,16 @@ MramPersistence::rewind()
 }
 
 Result
-MramPersistence::seek(EntryIdentifier& addr)
+MramPersistence::seek(JournalEntryPosition& addr)
 {
     curr = addr.mram.offs;
     return Result::ok;
 }
 
-EntryIdentifier
+JournalEntryPosition
 MramPersistence::tell()
 {
-    return EntryIdentifier(curr);
+    return JournalEntryPosition(curr);
 }
 
 Result
@@ -215,7 +215,7 @@ FlashPersistence::rewind()
     return Result::ok;
 }
 Result
-FlashPersistence::seek(EntryIdentifier& addr)
+FlashPersistence::seek(JournalEntryPosition& addr)
 {
     if (buf.dirty)
     {
@@ -231,10 +231,10 @@ FlashPersistence::seek(EntryIdentifier& addr)
     }
     return Result::ok;
 }
-EntryIdentifier
+JournalEntryPosition
 FlashPersistence::tell()
 {
-    return EntryIdentifier(curr);
+    return JournalEntryPosition(curr);
 }
 Result
 FlashPersistence::appendEntry(const JournalEntry& entry)
@@ -374,7 +374,7 @@ FlashPersistence::findNextPos(bool forACheckpoint)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find a free page in journal!");
         return Result::nospace;
     }
-    curr = EntryIdentifier(
+    curr = JournalEntryPosition(
                    combineAddress(extractLogicalArea(curr.addr), extractPageOffs(curr.addr) + 1), 0)
                    .flash;
     return Result::ok;

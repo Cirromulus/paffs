@@ -83,7 +83,7 @@ Result
 Journal::processBuffer()
 {
     journalEntry::Max entry;
-    EntryIdentifier firstUncheckpointedEntry[JournalEntry::numberOfTopics];
+    JournalEntryPosition firstUncheckpointedEntry[JournalEntry::numberOfTopics];
 
     Result r = persistence.rewind();
     if (r != Result::ok)
@@ -91,7 +91,7 @@ Journal::processBuffer()
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not rewind Journal!");
         return r;
     }
-    for (EntryIdentifier& id : firstUncheckpointedEntry)
+    for (JournalEntryPosition& id : firstUncheckpointedEntry)
     {
         id = persistence.tell();
     }
@@ -111,41 +111,28 @@ Journal::processBuffer()
     PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Replay of Journal needed");
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL, "Scanning for success entries...");
 
-    //TODO: Add a prescan function for JournalEntries so that AreaMgmt and ASCache can
-    // preapply / skip all committed areas
-
     do
-    {
-        if(entry.base.topic == JournalEntry::Topic::areaMgmt)
-        {
-            /**
-             * AreaMap should calculate the actual position of an area
-             * before other Topics like summaryCache scans wrong summaryEntries because
-             * a newer (and possibly different) area was committed there.
-             * This also applies to Rootnode of IndexTree, where only the newest node may
-             * point to valid data.
-             * The processing of AreaMap before knowing where the checkpoints are
-             * is (mostly!) safe in this special case, because after a AreaMap checkpoint
-             * the whole log will be flushed (Superblock commit!)
-             */
-            r = topics[JournalEntry::Topic::areaMgmt]->processEntry(entry);
-            if(r != Result::ok)
-            {
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not apply areaMgmt elem in pre-run!");
-                return r;
-            }
-        }
-
+    {   //Prescan for finding the newest checkpoints (Also for ASCache and the newest commits)
         if (entry.base.topic == JournalEntry::Topic::checkpoint)
         {
-            if(entry.checkpoint.target == JournalEntry::Topic::areaMgmt)
-            {
-                PAFFS_DBG(PAFFS_TRACE_BUG, "we met checkpoint of areaMgmt,"
-                        "this would require a third run");
-                return Result::nimpl;
-            }
             firstUncheckpointedEntry[entry.checkpoint.target] = persistence.tell();
+            continue;
         }
+
+        if(entry.base.topic == JournalEntry::Topic::pagestate)
+        {
+            //not needed for pagestate, so skip
+            continue;
+        }
+
+        if(!isTopicValid(entry.base.topic))
+        {
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Read invalid Topic identifier, probably misaligned!");
+            return Result::bug;
+        }
+
+        topics[entry.base.topic]->preScan(entry, persistence.tell());
+
     } while ((r = persistence.readNextElem(entry)) == Result::ok);
     if (r != Result::notFound)
     {
@@ -207,7 +194,7 @@ Journal::isTopicValid(JournalEntry::Topic topic)
 }
 
 Result
-Journal::applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEntry::numberOfTopics])
+Journal::applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[JournalEntry::numberOfTopics])
 {
     Result r = persistence.rewind();
     if (r != Result::ok)
@@ -235,22 +222,6 @@ Journal::applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEnt
             continue;
         }
 
-        if(entry.base.topic == JournalEntry::Topic::areaMgmt)
-        {
-            //TODO: remove this by designing the prescan / process scheme
-            printf("_skipping_ ");
-            printMeaning(entry.base, false);
-            printf(" at %" PRIu32 ".%" PRIu16 "\n",
-                   persistence.tell().flash.addr,
-                   persistence.tell().flash.offs);
-        }
-
-        if(!isTopicValid(entry.base.topic))
-        {
-            PAFFS_DBG(PAFFS_TRACE_BUG, "Read invalid Topic identifier, probably misaligned!");
-            return Result::bug;
-        }
-
         JournalEntry::Topic target = entry.base.topic;
 
         if(entry.base.topic == JournalEntry::Topic::pagestate)
@@ -273,7 +244,7 @@ Journal::applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEnt
                        persistence.tell().flash.addr,
                        persistence.tell().flash.offs);
             }
-            r = topics[target]->processEntry(entry);
+            r = topics[target]->processEntry(entry, persistence.tell());
             if(r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "%s: Could not apply %s entry at %" PRIu32 ".%" PRIu16,

@@ -409,7 +409,7 @@ PageAddressCache::setJournallingInode(InodeNo no)
 }
 
 Result
-PageAddressCache::processEntry(const journalEntry::Max& entry)
+PageAddressCache::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 {
     if (entry.base.topic == getTopic())
     {   //normal operations

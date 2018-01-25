@@ -133,7 +133,7 @@ public:
     JournalEntry::Topic
     getTopic() override;
     Result
-    processEntry(const journalEntry::Max& entry) override;
+    processEntry(const journalEntry::Max& entry, JournalEntryPosition position) override;
 
     // returns PAFFS_NF if no superindex is in flash
     Result

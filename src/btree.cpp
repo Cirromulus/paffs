@@ -256,7 +256,7 @@ Btree::getTopic()
 }
 
 Result
-Btree::processEntry(const journalEntry::Max& entry)
+Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 {
     if (entry.base.topic == getTopic())
     {   //normal operations

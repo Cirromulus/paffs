@@ -854,9 +854,22 @@ SummaryCache::getTopic()
 {
     return JournalEntry::Topic::summaryCache;
 }
+void
+SummaryCache::preScan(const journalEntry::Max& entry, JournalEntryPosition position)
+{
+    if (entry.base.topic != getTopic())
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
+        return;
+    }
+    if(entry.summaryCache.subtype == journalEntry::SummaryCache::Subtype::commit)
+    {
+        firstUncommittedElem[entry.summaryCache.area] = position;
+    }
+}
 
 Result
-SummaryCache::processEntry(const journalEntry::Max& entry)
+SummaryCache::processEntry(const journalEntry::Max& entry, JournalEntryPosition position)
 {
     journalReplayMode = true;
     if (entry.base.topic != getTopic())
@@ -864,16 +877,26 @@ SummaryCache::processEntry(const journalEntry::Max& entry)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
         return Result::invalidInput;
     }
+
+    if(position < firstUncommittedElem[entry.summaryCache.area])
+    {   //This is an action that already got committed
+        PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Skipping Entry (area %" PTYPE_AREAPOS
+                    " starts at %" PRIu32 ")", entry.summaryCache.area,
+                    firstUncommittedElem[entry.summaryCache.area].mram.offs);
+        return Result::ok;
+    }
+
     switch (entry.summaryCache.subtype)
     {
     case journalEntry::SummaryCache::Subtype::commit:
+        //TODO: This should never be reached because we filter commits now
         //sanity check
         if(mTranslation.count(entry.summaryCache.area) == 0)
         {   //can only be 0 or 1
             PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                         "Log committing an nonexistent area %" PTYPE_AREAPOS,
                         entry.summaryCache.area);
-            //This may be OK because it was written
+            //This may be OK because it was detected to be written and thus removed
             return Result::ok;
         }
         if(mSummaryCache[mTranslation[entry.summaryCache.area]].getArea() !=

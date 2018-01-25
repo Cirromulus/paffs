@@ -1740,7 +1740,7 @@ Device::getTopic()
 }
 
 Result
-Device::processEntry(const journalEntry::Max& entry)
+Device::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 {
     //remember, all of these log messages have not gotten to checkpoint
     if(entry.base.topic == JournalEntry::Topic::device)

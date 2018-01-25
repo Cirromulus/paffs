@@ -80,6 +80,6 @@ private:
     bool
     isTopicValid(JournalEntry::Topic topic);
     Result
-    applyJournalEntries(EntryIdentifier firstUncheckpointedEntry[JournalEntry::numberOfTopics]);
+    applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[JournalEntry::numberOfTopics]);
 };
 };

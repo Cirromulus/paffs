@@ -19,7 +19,7 @@
 
 namespace paffs
 {
-union EntryIdentifier {
+union JournalEntryPosition {
     struct Flash
     {
         Addr addr;
@@ -55,39 +55,39 @@ union EntryIdentifier {
         PageAbs offs;
     } mram;
     inline
-    EntryIdentifier(){};
+    JournalEntryPosition(){};
     inline
-    EntryIdentifier(Addr _addr, uint16_t _offs)
+    JournalEntryPosition(Addr _addr, uint16_t _offs)
     {
         flash.addr = _addr;
         flash.offs = _offs;
     }
     inline
-    EntryIdentifier(Flash _flash) : flash(_flash){};
+    JournalEntryPosition(Flash _flash) : flash(_flash){};
     inline
-    EntryIdentifier(PageAbs _offs)
+    JournalEntryPosition(PageAbs _offs)
     {
         mram.offs = _offs;
         flash.offs = 0;
     }
 
     inline bool
-    operator<(const EntryIdentifier& other)
+    operator<(const JournalEntryPosition& other)
     {
         return flash < other.flash;
     }
     inline bool
-    operator==(const EntryIdentifier& other)
+    operator==(const JournalEntryPosition& other)
     {
         return flash == other.flash;
     }
     inline bool
-    operator!=(const EntryIdentifier& other)
+    operator!=(const JournalEntryPosition& other)
     {
         return !(*this == other);
     }
     inline bool
-    operator>=(const EntryIdentifier& other)
+    operator>=(const JournalEntryPosition& other)
     {
         return !(*this < other);
     }
@@ -115,9 +115,9 @@ public:
     rewind() = 0;
 
     virtual Result
-    seek(EntryIdentifier& addr) = 0;
+    seek(JournalEntryPosition& addr) = 0;
 
-    virtual EntryIdentifier
+    virtual JournalEntryPosition
     tell() = 0;
 
     virtual Result
@@ -140,8 +140,8 @@ public:
     Result
     rewind() override;
     Result
-    seek(EntryIdentifier& addr) override;
-    EntryIdentifier
+    seek(JournalEntryPosition& addr) override;
+    JournalEntryPosition
     tell() override;
     Result
     appendEntry(const JournalEntry& entry) override;
@@ -167,7 +167,7 @@ class FlashPersistence : public JournalPersistence
             page = 0;
         }
     } buf;
-    EntryIdentifier::Flash curr;
+    JournalEntryPosition::Flash curr;
 
 public:
     inline
@@ -175,8 +175,8 @@ public:
     Result
     rewind() override;
     Result
-    seek(EntryIdentifier& addr) override;
-    EntryIdentifier
+    seek(JournalEntryPosition& addr) override;
+    JournalEntryPosition
     tell() override;
     Result
     appendEntry(const JournalEntry& entry) override;

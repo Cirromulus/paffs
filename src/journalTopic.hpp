@@ -16,6 +16,7 @@
 
 #include "commonTypes.hpp"
 #include "journalEntry.hpp"
+#include "journalPersistence.hpp"
 
 namespace paffs
 {
@@ -32,8 +33,10 @@ public:
      * Each Topic has to do its own actions to revert its state.
      */
 
+    virtual inline void
+    preScan(const journalEntry::Max&, JournalEntryPosition){};
     virtual Result
-    processEntry(const journalEntry::Max& entry) = 0;
+    processEntry(const journalEntry::Max& entry, JournalEntryPosition position) = 0;
     virtual inline void
     signalEndOfLog(){};
 };

@@ -263,7 +263,7 @@ DataIO::getTopic()
 }
 
 Result
-DataIO::processEntry(const journalEntry::Max& entry)
+DataIO::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 {
     if(entry.base.topic == getTopic())
     {

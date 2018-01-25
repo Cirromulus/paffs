@@ -75,7 +75,7 @@ public:
     Result
     setJournallingInode(InodeNo no);
     Result
-    processEntry(const journalEntry::Max& entry) override;
+    processEntry(const journalEntry::Max& entry, JournalEntryPosition position) override;
     void
     signalEndOfLog() override;
 
