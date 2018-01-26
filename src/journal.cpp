@@ -258,11 +258,14 @@ Journal::applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[Journ
         }
         else
         {
-            printf("_skipping_ ");
-            printMeaning(entry.base, false);
-            printf(" at %" PRIu32 ".%" PRIu16 "\n",
-                   persistence.tell().flash.addr,
-                   persistence.tell().flash.offs);
+            if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
+            {
+                printf("_skipping_ ");
+                printMeaning(entry.base, false);
+                printf(" at %" PRIu32 ".%" PRIu16 "\n",
+                       persistence.tell().flash.addr,
+                       persistence.tell().flash.offs);
+            }
         }
     }
 

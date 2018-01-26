@@ -865,6 +865,13 @@ SummaryCache::preScan(const journalEntry::Max& entry, JournalEntryPosition posit
     if(entry.summaryCache.subtype == journalEntry::SummaryCache::Subtype::commit)
     {
         firstUncommittedElem[entry.summaryCache.area] = position;
+
+        if(mTranslation.find(entry.summaryCache.area) != mTranslation.end())
+        {   //This area was loaded from a superpage, but is now committed elsewhere
+            //so force an update by deleting it now.
+            mSummaryCache[mTranslation[entry.summaryCache.area]].clear();
+            mTranslation.erase(entry.summaryCache.area);
+        }
     }
 }
 
@@ -985,7 +992,8 @@ SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent)
         mSummaryCache[nextEntry].setAreaSummaryWritten();
         mSummaryCache[nextEntry].setDirty(
                 r == Result::biterrorCorrected);  // Rewrites corrected Bit upon next commit
-        PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of %" PRId16 " to cache", area);
+        PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of "
+                "%" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ") to cache", area, dev->areaMgmt.getPos(area));
         mSummaryCache[mTranslation[area]].setDirtyPages(countDirtyPages(mTranslation[area]));
     }
     else if (r == Result::notFound)

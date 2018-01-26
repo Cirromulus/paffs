@@ -1191,16 +1191,20 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
         if (s == SummaryEntry::free)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "WRITE operation, old node is FREE data at %X:%X",
+                      "WRITE operation, old node is FREE data at %" PTYPE_AREAPOS
+                      "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
                       extractLogicalArea(node.raw.self),
+                      dev->areaMgmt.getPos(extractLogicalArea(node.raw.self)),
                       extractPageOffs(node.raw.self));
             return Result::bug;
         }
         if (s == SummaryEntry::dirty)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "WRITE operation, old node is DIRTY data at %X:%X",
+                      "WRITE operation, old node is DIRTY data at %" PTYPE_AREAPOS
+                      "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
                       extractLogicalArea(node.raw.self),
+                      dev->areaMgmt.getPos(extractLogicalArea(node.raw.self)),
                       extractPageOffs(node.raw.self));
             return Result::bug;
         }
