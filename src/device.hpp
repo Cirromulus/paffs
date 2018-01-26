@@ -39,6 +39,11 @@ class Device : public JournalTopic
 
     InodeNo recoveryObjInodeNo = 0;
     bool  recoveryObjValid = false;
+
+    InodeNo deletionTargetInodeNo = 0;
+    InodeNo deletionFolderInodeNo = 0;
+    bool deletionObjValid = false;
+
 public:
     Driver& driver;
     Result lasterr;

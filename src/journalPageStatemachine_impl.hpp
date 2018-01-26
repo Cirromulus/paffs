@@ -82,7 +82,7 @@ PageStateMachine<maxPages, maxPositions, topic>::replacePage(Addr neu, Addr old,
     {
         PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM,
                     "mark %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " NEW/USED"
-                    " (old %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " at %" PRIu16 ","
+                    " (old %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " at %" PRIu16 ")"
                     " filoffs: %" PTYPE_PAGEABS,
                     extractLogicalArea(neu), extractPageOffs(neu),
                     extractLogicalArea(old), extractPageOffs(old), pageListHWM, pos);

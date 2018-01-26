@@ -1792,34 +1792,9 @@ Device::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
             return Result::ok;
         }
         case journalEntry::Device::Action::removeObj:
-        {
-            Inode obj;
-            Result r = tree.getInode(entry.device_.removeObj.obj, obj);
-            if(r == Result::ok)
-            {
-                r = dataIO.deleteInodeData(obj, 0);
-                if (r != Result::ok)
-                {
-                    PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete Inode Data");
-                    return r;
-                }
-                r = dataIO.pac.commit();
-                if (r != Result::ok)
-                {
-                    PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit PAC");
-                }
-                tree.deleteInode(entry.device_.removeObj.obj);
-            }
-            Inode folder;
-            r = tree.getInode(entry.device_.removeObj.parDir, folder);
-            if(r != Result::ok)
-            {   //serious business
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get parent inode %" PTYPE_INODENO,
-                          entry.device_.removeObj.parDir);
-                return r;
-            }
-            removeInodeFromDir(folder, entry.device_.removeObj.obj);
-        }
+            deletionTargetInodeNo = entry.device_.removeObj.obj;
+            deletionFolderInodeNo = entry.device_.removeObj.parDir;
+            deletionObjValid = true;
         }
         return Result::ok;
     }
@@ -1829,7 +1804,42 @@ Device::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 void
 Device::signalEndOfLog()
 {
-    //Si, fliegen
+    if(deletionObjValid)
+    {
+        Inode obj;
+        //Check if Inode Exists
+        Result r = tree.getInode(deletionTargetInodeNo, obj);
+        if(r == Result::ok)
+        {
+            r = dataIO.deleteInodeData(obj, 0);
+            if (r != Result::ok)
+            {
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete Inode Data");
+                return;
+            }
+            r = dataIO.pac.commit();
+            if (r != Result::ok)
+            {
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit PAC");
+            }
+            tree.deleteInode(deletionTargetInodeNo);
+        }
+        Inode folder;
+        //Check if InodeNo is in folder
+        r = tree.getInode(deletionFolderInodeNo, folder);
+        if(r != Result::ok)
+        {   //serious business
+            PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get parent inode %" PTYPE_INODENO,
+                      deletionFolderInodeNo);
+            return;
+        }
+        removeInodeFromDir(folder, deletionTargetInodeNo);
+    }
+
+    if(recoveryObjValid)
+    {   //(try) deleting new Obj which could not be inserted into Dir
+        tree.deleteInode(recoveryObjInodeNo);
+    }
 }
 
 Result
