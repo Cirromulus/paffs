@@ -554,7 +554,7 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
                       "Folder %" PTYPE_INODENO ": Directory entry %" PTYPE_DIRENTRYCOUNT " length not plausible "
-                              "(was: %" PTYPE_DIRENTRYLEN ", should: >%" PTYPE_FILSIZE ")!",
+                              "(was: %" PTYPE_DIRENTRYLEN ", should: <%" PTYPE_FILSIZE ")!",
                       folder.no, entryNo, direntryl,
                       folder.size);
             return Result::bug;
