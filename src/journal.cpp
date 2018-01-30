@@ -462,7 +462,15 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         }
         break;
     case JournalEntry::Topic::dataIO:
-        //todo: add things and stuff.
+        switch(static_cast<const journalEntry::DataIO*>(&entry)->operation)
+        {
+        case journalEntry::DataIO::Operation::newInodeSize:
+            printf("Change Size of Inode %" PTYPE_INODENO " to %" PTYPE_FILSIZE,
+                   static_cast<const journalEntry::dataIO::NewInodeSize*>(&entry)->inodeNo,
+                   static_cast<const journalEntry::dataIO::NewInodeSize*>(&entry)->filesize);
+            found = true;
+            break;
+        }
         break;
     case JournalEntry::Topic::device:
         printf("device ");

@@ -127,8 +127,8 @@ PageStateMachine<maxPages, maxPositions, topic>::invalidateOldPages()
     if(any)
     {
         mJournal.addEvent(journalEntry::pagestate::InvalidateOldPages(topic));
+        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "invalidate done");
     }
-    PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "invalidate done");
     clear();
     return Result::ok;
 }
@@ -205,16 +205,17 @@ PageStateMachine<maxPages, maxPositions, topic>::processEntry(const journalEntry
  * \warn this strongly relies on PAC having been set to the correct Inode!
  */
 template <uint16_t maxPages, uint16_t maxPositions, JournalEntry::Topic topic>
-inline bool
+inline JournalState
 PageStateMachine<maxPages, maxPositions, topic>::signalEndOfLog()
 {
     switch (journalState)
     {
     case JournalState::ok:
         clear();
-        return true;
+        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "%s All clear", topicNames[topic]);
+        return JournalState::ok;
     case JournalState::invalid:
-        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "reverting written pages");
+        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "%s reverting written pages", topicNames[topic]);
         for(uint16_t i = 0; i < pageListHWM; i++)
         {
             mSummaryCache.setPageStatus(newPageList[i], SummaryEntry::dirty);
@@ -234,9 +235,9 @@ PageStateMachine<maxPages, maxPositions, topic>::signalEndOfLog()
         }
 
         clear();
-        return false;
+        return JournalState::invalid;
     case JournalState::recover:
-        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "Recovering written pages");
+        PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "%s recovering written pages", topicNames[topic]);
         for(uint16_t i = 0; i < pageListHWM; i++)
         {
             if(oldPageList[i] != 0)
@@ -245,9 +246,9 @@ PageStateMachine<maxPages, maxPositions, topic>::signalEndOfLog()
             }
         }
         clear();
-        return true;
+        return JournalState::recover;
     }
-    return false;
+    return JournalState::invalid;
 }
 
 }

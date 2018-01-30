@@ -947,13 +947,6 @@ void
 SummaryCache::signalEndOfLog()
 {
     journalReplayMode = false;
-    printf("\nEND OF RESTORE\n");
-    printStatus();
-    /*Result r = commitAreaSummaries();
-    if(r != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_BUG, "Could not commit area Summaries at end of log!");
-    }*/
 }
 
 Result

@@ -78,6 +78,11 @@ DataIO::writeInodeData(Inode& inode,
         }
     }
 
+    if (inode.size < bytes + offs)
+    {   //it will only be applied if write succeeds
+        dev->journal.addEvent(journalEntry::dataIO::NewInodeSize(inode.no, bytes + offs));
+    }
+
     res = writePageData(pageFrom,
                         toPage,
                         offs % dataBytesPerPage,
@@ -95,10 +100,11 @@ DataIO::writeInodeData(Inode& inode,
 
 
     pac.setValid();
+    dev->tree.updateExistingInode(inode);
     dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
 
-    // FIXME the Tree UpdateExistingInode has to be done by high level functions,
-    // bc they may modify it by themselves. This leads to doubled journal Messages
+    // FIXME the Tree UpdateExistingInode is also done by high level functions
+    // (updating the last-modified time). this leads to doubled journal Messages
     return res;
 }
 
@@ -162,14 +168,9 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
     {
         toPage--;
     }
-    if (pageFrom > toPage)
+    if (pageFrom > toPage || inode.reservedPages == 0)
     {
         // We are deleting just some bytes on the same page
-        inode.size = offs;
-        return Result::ok;
-    }
-    if (inode.reservedPages == 0)
-    {
         inode.size = offs;
         return Result::ok;
     }
@@ -186,6 +187,8 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "could not set new Inode!");
         return r;
     }
+
+    dev->journal.addEvent(journalEntry::dataIO::NewInodeSize(inode.no, offs));
 
     for (int32_t page = (toPage - pageFrom); page >= 0; page--)
     {
@@ -253,6 +256,9 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
     }
 
     inode.size = offs;
+    pac.setValid();
+    dev->tree.updateExistingInode(inode);
+    dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
     return Result::ok;
 }
 
@@ -267,7 +273,13 @@ DataIO::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 {
     if(entry.base.topic == getTopic())
     {
-        return Result::nimpl;
+        switch(entry.dataIO.operation)
+        {
+        case journalEntry::DataIO::Operation::newInodeSize:
+            journalLastModifiedInode = entry.dataIO_.newInodeSize.inodeNo;
+            journalLastSize = entry.dataIO_.newInodeSize.filesize;
+            journalInodeValid = true;
+        }
     }
     else if(entry.base.topic == JournalEntry::Topic::pagestate)
     {
@@ -277,12 +289,34 @@ DataIO::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
     {
         return Result::bug;
     }
+    return Result::ok;
 }
 
 void
 DataIO::signalEndOfLog()
 {
-    statemachine.signalEndOfLog();
+    if(statemachine.signalEndOfLog() == JournalState::recover && journalInodeValid)
+    {
+        //We succeded in replay
+        Inode inode;
+        Result r = dev->tree.getInode(journalLastModifiedInode, inode);
+        if(r != Result::ok)
+        {
+            //It was already deleted, so ok
+            return;
+        }
+        if(inode.size != journalLastSize)
+        {
+            PAFFS_DBG(PAFFS_TRACE_DEVICE | PAFFS_TRACE_JOURNAL,
+                      "Recovered Write, changing Inode %" PTYPE_INODENO " size "
+                      "from %" PTYPE_FILSIZE " to %" PTYPE_FILSIZE,
+                      inode.no, inode.size, journalLastSize);
+            inode.size = journalLastSize;
+            dev->tree.updateExistingInode(inode);
+            journalInodeValid = false;
+        }
+
+    }
 }
 
 Result

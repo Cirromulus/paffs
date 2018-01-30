@@ -462,7 +462,7 @@ PageAddressCache::processEntry(const journalEntry::Max& entry, JournalEntryPosit
 void
 PageAddressCache::signalEndOfLog()
 {
-    if(statemachine.signalEndOfLog())
+    if(statemachine.signalEndOfLog() == JournalState::recover)
     {
         //TODO: We may want to find out which cache elements are clean to suppress double versions
     }

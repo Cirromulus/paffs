@@ -102,7 +102,12 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
         }
         break;
     case JournalEntry::Topic::dataIO:
-        return sizeof(JournalEntry::dataIO);
+        switch(static_cast<const journalEntry::DataIO*>(&entry)->operation)
+        {
+        case journalEntry::DataIO::Operation::newInodeSize:
+            return sizeof(journalEntry::dataIO::NewInodeSize);
+        }
+        break;
     case JournalEntry::Topic::device:
         switch (static_cast<const journalEntry::Device*>(&entry)->action)
         {

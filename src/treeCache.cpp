@@ -85,7 +85,7 @@ TreeCache::processEntry(const journalEntry::Max& entry)
 void
 TreeCache::signalEndOfLog()
 {
-    if(statemachine.signalEndOfLog())
+    if(statemachine.signalEndOfLog() == JournalState::recover)
     {
         //we did not have to revert
         //TODO: Check which nodes may be clean

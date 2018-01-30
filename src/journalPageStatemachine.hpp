@@ -26,6 +26,13 @@ namespace paffs
 class PageAddressCache;
 class Btree;
 
+
+enum class JournalState : uint8_t
+ {
+     ok,
+     invalid,
+     recover,
+ };
 /**
  * The PageStateMachine implements a Logic for when written Pages get applied after an action,
  * or when they get invalidated after a sudden powerloss.
@@ -47,13 +54,9 @@ class PageStateMachine
     uint16_t pageListHWM;
     bool withPosition = maxPages == maxPositions;
     InodeNo currentInode;
-    enum class JournalState : uint8_t
-    {
-        ok,
-        invalid,
-        recover,
-    } journalState;
+    JournalState journalState;
 public:
+
     PageStateMachine(Journal& journal, SummaryCache& summaryCache);
 
     PageStateMachine(Journal& journal, SummaryCache& summaryCache, PageAddressCache* pac);
@@ -76,10 +79,10 @@ public:
     Result
     processEntry(const journalEntry::Max& entry);
     /**
-     * @return true, if commit was successful
+     * @return the state from wich we came (Nothing happened = ok, invalid = reverted, ...)
      * \warn this strongly relies on PAC having been set to the correct Inode beforehand!
      */
-    bool
+    JournalState
     signalEndOfLog();
 };
 }

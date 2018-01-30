@@ -376,8 +376,33 @@ namespace journalEntry
 
     struct DataIO : public JournalEntry
     {
-
+        enum class Operation : uint8_t
+        {
+            newInodeSize,
+        } operation;
+    protected:
+        inline
+        DataIO(Operation _operation) : JournalEntry(Topic::dataIO), operation(_operation){};
     };
+
+    namespace dataIO
+    {
+        struct NewInodeSize : public DataIO
+        {
+            InodeNo inodeNo;
+            FileSize filesize;
+            inline
+            NewInodeSize(InodeNo _inodeNo, FileSize _filesize) : DataIO(Operation::newInodeSize),
+                         inodeNo(_inodeNo), filesize(_filesize){};
+        };
+
+        union Max
+        {
+            NewInodeSize newInodeSize;
+        };
+    }
+
+
 
     struct Device : public JournalEntry
     {
@@ -446,6 +471,8 @@ namespace journalEntry
         summaryCache::Max summaryCache_;
         PAC pac;
         pac::Max pac_;
+        DataIO dataIO;
+        dataIO::Max dataIO_;
         Device device;
         device::Max device_;
         inline

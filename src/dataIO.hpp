@@ -31,6 +31,9 @@ public:
     PageAddressCache pac;
 private:
     PageStateMachine<maxPagesPerWrite, maxPagesPerWrite, JournalEntry::Topic::dataIO> statemachine;
+    InodeNo journalLastModifiedInode = 0;
+    FileSize journalLastSize = 0;
+    bool journalInodeValid = false;
 public:
 
     DataIO(Device* mdev);
