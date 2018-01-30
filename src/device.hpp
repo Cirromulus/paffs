@@ -37,12 +37,15 @@ class Device : public JournalTopic
     ObjectPool<Obj, maxNumberOfFiles> filesPool;
     bool useJournal = false;
 
-    InodeNo recoveryObjInodeNo = 0;
-    bool  recoveryObjValid = false;
-
-    InodeNo deletionTargetInodeNo = 0;
-    InodeNo deletionFolderInodeNo = 0;
-    bool deletionObjValid = false;
+    InodeNo targetInodeNo = 0;
+    InodeNo folderInodeNo = 0;
+    enum class JournalState
+    {
+        ok,
+        makeObj,
+        insertObj,
+        removeObj,
+    } journalState = JournalState::ok;
 
 public:
     Driver& driver;
@@ -117,6 +120,9 @@ public:
     getNumberOfOpenFiles();
     uint8_t
     getNumberOfOpenInodes();
+    Result
+    checkFolderSanity(InodeNo folderNo);
+
 
     JournalEntry::Topic
     getTopic() override;

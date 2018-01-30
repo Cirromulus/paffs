@@ -155,25 +155,6 @@ Journal::processBuffer()
 
     PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Applying log...");
 
-    //FIXME DEBUG
-    AreaManagement* areaMgmt = &reinterpret_cast<Device*>(topics[JournalEntry::Topic::device])->areaMgmt;
-    printf("Info: \n\t%" PTYPE_AREAPOS " used Areas\n", areaMgmt->getUsedAreas());
-    for (AreaPos i = 0; i < areasNo; i++)
-    {
-        printf("\tArea %3" PTYPE_AREAPOS " on %4" PTYPE_AREAPOS " as %10s %s\n",
-               i,
-               areaMgmt->getPos(i),
-               areaNames[areaMgmt->getType(i)],
-               areaStatusNames[areaMgmt->getStatus(i)]);
-        if (i > 128)
-        {
-            printf("\n -- truncated 128-%" PTYPE_AREAPOS " Areas.\n", areasNo);
-            break;
-        }
-    }
-    printf("\t----------------------\n");
-    //FIXME DEBUG
-
     r = applyJournalEntries(firstUncheckpointedEntry);
     if(r != Result::ok)
     {
@@ -181,7 +162,6 @@ Journal::processBuffer()
         return r;
     }
 
-    disabled = false;
     return Result::ok;
 }
 
@@ -495,7 +475,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             break;
         case journalEntry::Device::Action::insertIntoDir:
             printf("insert inode into dir %" PTYPE_INODENO,
-                   static_cast<const journalEntry::device::InsertIntoDir*>(&entry)->inode);
+                   static_cast<const journalEntry::device::InsertIntoDir*>(&entry)->dirInode);
             found = true;
             break;
         case journalEntry::Device::Action::removeObj:

@@ -407,10 +407,10 @@ namespace journalEntry
 
         struct InsertIntoDir : public Device
         {
-            InodeNo inode;
+            InodeNo dirInode;
         public:
             inline
-            InsertIntoDir(InodeNo _inode) : Device(Action::insertIntoDir), inode(_inode){};
+            InsertIntoDir(InodeNo _dirInode) : Device(Action::insertIntoDir), dirInode(_dirInode){};
         };
 
         struct RemoveObj : public Device

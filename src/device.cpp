@@ -284,7 +284,6 @@ Device::mnt(bool readOnlyMode)
         return r;
     }
 
-    //This is skipped until journal is somewhat finished
     r = journal.processBuffer();
     if (r != Result::ok)
     {
@@ -292,11 +291,6 @@ Device::mnt(bool readOnlyMode)
         PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not process journal!");
         return r;
     }
-
-    /*FIXME debug
-    printf("\nAfter journal:\n");
-    sumCache.printStatus();
-    //FIXME debug*/
 
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Replayed Journal if needed");
 
@@ -331,6 +325,13 @@ Device::mnt(bool readOnlyMode)
         }
         return Result::fail;
     }
+
+    if((traceMask & PAFFS_TRACE_VERIFY_DEV) && checkFolderSanity(0) != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Rootfolder not sane!");
+        return Result::fail;
+    }
+
     // TODO: Supress decrease or increase reference to node 0 manually
     mounted = true;
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Mount successful");
@@ -552,10 +553,35 @@ Device::getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name)
         }
         if (direntryl > folder.size)
         {
+            if(true || (traceMask & PAFFS_TRACE_VERBOSE))
+            {
+                for(uint16_t i = 0; i < folder.size; i+=4)
+                {
+                    printf("%3u-%3u: %3u %3u %3u %3u | ",
+                            i, i+3,
+                            buf[i], buf[i+1], buf[i+2], buf[i+3]);
+                    for(uint8_t ch = 0; ch < 4; ch++)
+                    {
+                        if(buf[i + ch] > 31 && buf[i + ch] < 127)
+                        {
+                            printf("%c", buf[i + ch]);
+                        }else
+                        {
+                            printf(" ");
+                        }
+                    }
+                    if(i >= p-4 && i < p)
+                    {
+                        printf(" <");
+                    }
+                    printf("\n");
+                }
+            }
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "Folder %" PTYPE_INODENO ": Directory entry %" PTYPE_DIRENTRYCOUNT " length not plausible "
+                      "Folder %" PTYPE_INODENO ": Directory entry %" PTYPE_DIRENTRYCOUNT " "
+                              "(%" PTYPE_FILSIZE ") length not plausible "
                               "(was: %" PTYPE_DIRENTRYLEN ", should: <%" PTYPE_FILSIZE ")!",
-                      folder.no, entryNo, direntryl,
+                      folder.no, entryNo, p,  direntryl,
                       folder.size);
             return Result::bug;
         }
@@ -856,10 +882,92 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update Inode after directory insert!");
         return r;
     }
+    if(traceMask & PAFFS_TRACE_VERIFY_DEV)
+    {
+        r = checkFolderSanity(contDir.no);
+    }
     return r;
 }
 
-// TODO: mark deleted treeCacheNodes as dirty
+Result
+Device::checkFolderSanity(InodeNo folderNo)
+{
+    SmartInodePtr folder;
+    Result r = findOrLoadInode(folderNo, folder);
+    if(r != Result::ok)
+    {
+        return r;
+    }
+    std::unique_ptr<uint8_t[]> dirData(new uint8_t[folder->size]);
+    FileSize bytes = 0;
+    if (folder->reservedPages == 0)
+    {
+        return Result::ok;
+    }
+    r = dataIO.readInodeData(*folder, 0, folder->size, &bytes, dirData.get());
+    if (r != Result::ok || bytes != folder->size)
+    {
+        return r;
+    }
+    DirEntryCount noEntries;
+    memcpy(&noEntries, &dirData[0], sizeof(DirEntryCount));
+    FileSize p = sizeof(DirEntryCount);
+    DirEntryCount currentEntry = 0;
+    while (p < folder->size)
+    {
+        DirEntryLength direntryl = dirData[p];
+        if (direntryl > folder->size - p)
+        {
+            // We have an error while reading
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Dirname length was bigger than possible "
+                    "(%" PTYPE_FILNAMEPOS " > %" PTYPE_FILNAMEPOS ")!",
+                    direntryl, folder->size - p);
+            return Result::bug;
+        }
+        FileNamePos dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
+        p += sizeof(DirEntryLength);
+        Inode obj;
+        InodeNo objNo;
+        memcpy(&objNo, &dirData[p], sizeof(InodeNo));
+        r = tree.getInode(objNo, obj);
+        if(r != Result::ok)
+        {
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Folder contains a nonexistent Inode %" PTYPE_INODENO, objNo);
+            return Result::bug;
+        }
+        p += sizeof(InodeNo);
+        for(uint8_t i = 0; i < dirnamel; i++)
+        {
+            if(dirData[p+i] < 32 || dirData[p+i] > 126)
+            {
+                PAFFS_DBG(PAFFS_TRACE_BUG, "Directory %" PTYPE_INODENO " contains "
+                        "non-printable ascii character at offs %" PTYPE_FILSIZE "!",
+                        folder->no, p+i);
+                return Result::bug;
+            }
+        }
+        if(traceMask & PAFFS_TRACE_VERBOSE)
+        {
+            char name[dirnamel];
+            memcpy(name, &dirData[p], dirnamel);
+            printf("%3u: %.*s\n", currentEntry + 1, dirnamel, name);
+        }
+        p += dirnamel;
+        currentEntry++;
+    }
+
+    if (currentEntry != noEntries)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG,
+                  "Directory stated it had %" PTYPE_DIRENTRYCOUNT " entries, "
+                          "but has actually %" PTYPE_DIRENTRYCOUNT "!",
+                  noEntries, currentEntry);
+        return Result::bug;
+    }
+
+    return Result::ok;
+}
+
 Result
 Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
 {
@@ -940,6 +1048,14 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
             if ((r = dataIO.deleteInodeData(contDir, newSize)) != Result::ok)
             {
                 return r;
+            }
+            if (traceMask & PAFFS_TRACE_VERIFY_DEV)
+            {
+                r = checkFolderSanity(contDir.no);
+                if(r != Result::ok)
+                {
+                    return r;
+                }
             }
             return dataIO.pac.commit();
         }
@@ -1045,21 +1161,29 @@ Device::openDir(const char* path)
     dir->self->no = dirPinode->no;
 
     dir->self->parent = nullptr;  // no caching, so we probably don't have the parent
-    dir->entries = dirPinode->size == 0 ? 0 : dirData[0];
+    if(dirPinode->size == 0)
+    {
+        dir->entries = 0;
+    }
+    else
+    {
+        memcpy(&dir->entries, &dirData[0], sizeof(DirEntryCount));
+    }
     dir->childs = new Dirent[dir->entries];
     dir->pos = 0;
 
     FileSize p = sizeof(DirEntryCount);
-    DirEntryCount entry;
-    for (entry = 0; p < dirPinode->size; entry++)
+    DirEntryCount entry = 0;
+    while (p < dirPinode->size)
     {
         DirEntryLength direntryl = dirData[p];
         FileNamePos dirnamel = direntryl - sizeof(DirEntryLength) - sizeof(InodeNo);
-        if (dirnamel > 1 << sizeof(DirEntryLength) * 8)
+        if (dirnamel > dirPinode->size - p)
         {
             // We have an error while reading
             PAFFS_DBG(PAFFS_TRACE_BUG, "Dirname length was bigger than possible "
-                    "(%" PTYPE_FILNAMEPOS ")!", dirnamel);
+                    "(%" PTYPE_FILNAMEPOS " > %" PTYPE_FILNAMEPOS ")!",
+                    dirnamel, dirPinode->size - p);
             delete[] dir->childs;
             delete dir->self;
             delete dir;
@@ -1076,6 +1200,7 @@ Device::openDir(const char* path)
         dir->childs[entry].name[dirnamel] = 0;
         dir->childs[entry].parent = dir->self;
         p += dirnamel;
+        entry++;
     }
 
     if (entry != dir->entries)
@@ -1149,7 +1274,7 @@ Device::readDir(Dir& dir)
     Result r = findOrLoadInode(dir.childs[dir.pos].no, dir.childs[dir.pos].node);
     if (r != Result::ok)
     {
-        lasterr = Result::bug;
+        lasterr = r;
         return nullptr;
     }
     if ((dir.childs[dir.pos].node->perm & R) == 0)
@@ -1165,6 +1290,7 @@ Device::readDir(Dir& dir)
         dir.childs[dir.pos].name[namel] = '/';
         dir.childs[dir.pos].name[namel + 1] = 0;
     }
+
     return &dir.childs[dir.pos++];
 }
 
@@ -1749,52 +1875,20 @@ Device::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
         {
         case journalEntry::Device::Action::mkObjInode:
         {
-            Inode node;
-            Result r = tree.getInode(entry.device_.mkObjInode.inode, node);
-            if(r != Result::ok)
-            {   //no successful add
-                recoveryObjValid = false;
-            }
-            //Inode exists
-            recoveryObjInodeNo = entry.device_.mkObjInode.inode;
+            targetInodeNo = entry.device_.mkObjInode.inode;
+            journalState = JournalState::makeObj;
             return Result::ok;
         }
         case journalEntry::Device::Action::insertIntoDir:
         {
-            Inode folder;
-            Result r;
-            r = tree.getInode(entry.device_.insertIntoDir.inode, folder);
-            if(r != Result::ok)
-            {   //serious business
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get parent inode %" PTYPE_INODENO,
-                          entry.device_.insertIntoDir.inode);
-                return r;
-            }
-            if(!recoveryObjValid)
-            {
-                //Either we added Inode zero (only during format which is not protected)
-                //Or the Obj was officially added, and our journal could not rescue it. >:(
-
-                //no truncation needed, bc contents are added after successful creation
-                removeInodeFromDir(folder, recoveryObjInodeNo);
-                return Result::ok;
-            }
-            char name[200];
-            uint8_t namelength = 200;
-            r = getNameOfInodeInDir(recoveryObjInodeNo, folder, name, namelength);
-            if(r == Result::notFound)
-            {   //usually, this will happen
-                tree.deleteInode(recoveryObjInodeNo);
-                return Result::ok;
-            }
-            PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Could restore file '%.*s', "
-                    "\n\twow such journal many log, much restore", namelength, name);
+            folderInodeNo = entry.device_.insertIntoDir.dirInode;
+            journalState = JournalState::insertObj;
             return Result::ok;
         }
         case journalEntry::Device::Action::removeObj:
-            deletionTargetInodeNo = entry.device_.removeObj.obj;
-            deletionFolderInodeNo = entry.device_.removeObj.parDir;
-            deletionObjValid = true;
+            targetInodeNo = entry.device_.removeObj.obj;
+            folderInodeNo = entry.device_.removeObj.parDir;
+            journalState = JournalState::removeObj;
         }
         return Result::ok;
     }
@@ -1804,13 +1898,53 @@ Device::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 void
 Device::signalEndOfLog()
 {
-    if(deletionObjValid)
+    Inode obj;
+    Inode folder;
+    Result r;
+
+    switch(journalState)
     {
-        Inode obj;
-        //Check if Inode Exists
-        Result r = tree.getInode(deletionTargetInodeNo, obj);
-        if(r == Result::ok)
+    case JournalState::ok:
+        //Step 1: be finished. Step 2: Hey, you're finished!
+        return;
+    case JournalState::makeObj:
+        //we never got to insert it into directory
+        tree.deleteInode(targetInodeNo);
+        return;
+    case JournalState::insertObj:
+        //Maybe we inserted Obj into dir
+        r = tree.getInode(targetInodeNo, obj);
+        if(r != Result::ok)
         {
+            PAFFS_DBG(PAFFS_TRACE_BUG, "This should not happen because "
+                    "Tree must have gotten the entry to add Inodeno!");
+            return;
+        }
+        r = tree.getInode(folderInodeNo, folder);
+        if(r != Result::ok)
+        {
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Serious business, the folder is missing?"
+                    "Should not happen either");
+            return;
+        }
+        {
+            uint8_t namelength = 200;
+            char name[200];
+            r = getNameOfInodeInDir(targetInodeNo, folder, name, namelength);
+            if(r == Result::notFound)
+            {   //usually, this will happen
+                tree.deleteInode(targetInodeNo);
+                return;
+            }
+            PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Could restore file '%.*s', "
+                    "\n\twow such journal many log, much restore", namelength, name);
+            //to supress deletion of node in endOfLog
+            return;
+        }
+    case JournalState::removeObj:
+        r = tree.getInode(targetInodeNo, obj);
+        if(r == Result::ok)
+        {   //First, delete all contents of file
             r = dataIO.deleteInodeData(obj, 0);
             if (r != Result::ok)
             {
@@ -1822,23 +1956,17 @@ Device::signalEndOfLog()
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit PAC");
             }
-            tree.deleteInode(deletionTargetInodeNo);
+            tree.deleteInode(targetInodeNo);
         }
-        Inode folder;
-        //Check if InodeNo is in folder
-        r = tree.getInode(deletionFolderInodeNo, folder);
+        r = tree.getInode(folderInodeNo, folder);
         if(r != Result::ok)
         {   //serious business
-            PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not get parent inode %" PTYPE_INODENO,
-                      deletionFolderInodeNo);
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Could not get parent inode %" PTYPE_INODENO,
+                      folderInodeNo);
             return;
         }
-        removeInodeFromDir(folder, deletionTargetInodeNo);
-    }
-
-    if(recoveryObjValid)
-    {   //(try) deleting new Obj which could not be inserted into Dir
-        tree.deleteInode(recoveryObjInodeNo);
+        removeInodeFromDir(folder, targetInodeNo);
+        return;
     }
 }
 
@@ -1891,6 +2019,7 @@ Device::initializeDevice()
 Result
 Device::destroyDevice()
 {
+    journalState = JournalState::ok;
     areaMgmt.clear();
     inodePool.clear();
     filesPool.clear();
