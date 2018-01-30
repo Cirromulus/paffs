@@ -1,0 +1,83 @@
+---
+- type: DLR SE QM project file
+- seqm_version: 1.0
+- application_class: 1
+- description: ""
+- maintainer: ""
+- recommendations:
+    - eaa01:
+        - state: done
+        - remark: ""
+    - eaa02:
+        - state: done
+        - remark: ""
+    - eaa10:
+        - state: done
+        - remark: Uses other repos, but yes
+    - eaem02:
+        - state: done
+        - remark: ""
+    - eaem05:
+        - state: done
+        - remark: ""
+    - eaem07:
+        - state: done
+        - remark: ""
+    - eaem08:
+        - state: done
+        - remark: ""
+    - eam01:
+        - state: todo
+        - remark: ""
+    - eam03:
+        - state: done
+        - remark: ""
+    - edi01:
+        - state: done
+        - remark: ""
+    - edi02:
+        - state: done
+        - remark: ""
+    - edi09:
+        - state: done
+        - remark: ""
+    - edi10:
+        - state: done
+        - remark: ""
+    - eqa01:
+        - state: done
+        - remark: ""
+    - eqa02:
+        - state: done
+        - remark: ""
+    - eqa03:
+        - state: unknown
+        - remark: ""
+    - eqa04:
+        - state: unknown
+        - remark: ""
+    - erm01:
+        - state: done
+        - remark: No release yet
+    - erm02:
+        - state: todo
+        - remark: ""
+    - erm06:
+        - state: done
+        - remark: ""
+    - erm09:
+        - state: done
+        - remark: ""
+    - erm10:
+        - state: todo
+        - remark: ""
+    - esa02:
+        - state: future
+        - remark: Some of them
+    - est04:
+        - state: done
+        - remark: ""
+    - est10:
+        - state: n.a.
+        - remark: ""
+...
