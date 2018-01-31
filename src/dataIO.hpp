@@ -34,6 +34,7 @@ private:
     InodeNo journalLastModifiedInode = 0;
     FileSize journalLastSize = 0;
     bool journalInodeValid = false;
+    bool modifiedInode = false;
 public:
 
     DataIO(Device* mdev);

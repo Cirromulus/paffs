@@ -279,10 +279,12 @@ DataIO::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
             journalLastModifiedInode = entry.dataIO_.newInodeSize.inodeNo;
             journalLastSize = entry.dataIO_.newInodeSize.filesize;
             journalInodeValid = true;
+            modifiedInode = false;
         }
     }
     else if(entry.base.topic == JournalEntry::Topic::pagestate)
     {
+        modifiedInode = true;
         return statemachine.processEntry(entry);
     }
     else
@@ -295,7 +297,7 @@ DataIO::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 void
 DataIO::signalEndOfLog()
 {
-    if(statemachine.signalEndOfLog() == JournalState::recover && journalInodeValid)
+    if(statemachine.signalEndOfLog() != JournalState::invalid && journalInodeValid && modifiedInode)
     {
         //We succeded in replay
         Inode inode;
@@ -313,10 +315,11 @@ DataIO::signalEndOfLog()
                       inode.no, inode.size, journalLastSize);
             inode.size = journalLastSize;
             dev->tree.updateExistingInode(inode);
-            journalInodeValid = false;
         }
 
     }
+    journalInodeValid = false;
+    modifiedInode = false;
 }
 
 Result
