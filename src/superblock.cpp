@@ -273,13 +273,13 @@ Superblock::getTopic()
     return JournalEntry::Topic::areaMgmt;
 }
 
-Result
-Superblock::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
+void
+Superblock::preScan(const journalEntry::Max& entry, JournalEntryPosition)
 {
     if (entry.base.topic != getTopic())
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
-        return Result::invalidInput;
+        return;
     }
     auto e = &entry.areaMgmt;
     switch (e->type)
@@ -308,7 +308,7 @@ Superblock::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
                     device->areaMgmt.swapAreaPosition(a->offs, entry.areaMgmt_.areaMap_.swap.b);
                     break;
                 default:
-                    return Result::bug;
+                    return;
             }
             break;
             }
@@ -321,9 +321,12 @@ Superblock::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
         case journalEntry::AreaMgmt::Type::usedAreas:
             device->areaMgmt.setUsedAreas(entry.areaMgmt_.usedAreas.usedAreas);
             break;
-    default:
-        return Result::bug;
     }
+}
+
+Result
+Superblock::processEntry(const journalEntry::Max&, JournalEntryPosition)
+{
     return Result::ok;
 }
 

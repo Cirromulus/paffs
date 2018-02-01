@@ -132,6 +132,14 @@ public:
 
     JournalEntry::Topic
     getTopic() override;
+    /**
+     * AreaMap contains the phys. Positions of the areas.
+     * An area move instruction changes the position of older elements as well.
+     * We need to have the latest Version of the Areamap before
+     * other topics start processing the log.
+     */
+    void
+    preScan(const journalEntry::Max& entry, JournalEntryPosition position) override;
     Result
     processEntry(const journalEntry::Max& entry, JournalEntryPosition position) override;
 

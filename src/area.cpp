@@ -23,7 +23,7 @@
 namespace paffs
 {
 const char* areaNames[] = {
-        "UNSET", "SUPERBLOCK", "JOURNAL", "INDEX", "DATA", "GC_BUFFER", "RETIRED",
+        "UNSET", "SBLOCK", "JOURNAL", "INDEX", "DATA", "GC", "RETIRED",
         "YOUSHOULDNOTBESEEINGTHIS"};
 
 const char* areaStatusNames[] = {"CLOSED", "ACTIVE", "EMPTY"};
@@ -312,6 +312,10 @@ AreaManagement::swapAreaPosition(AreaPos a, AreaPos b)
         return;
     }
     dev->journal.addEvent(journalEntry::areaMgmt::areaMap::Swap(a, b));
+    PAFFS_DBG_S(PAFFS_TRACE_AREA | PAFFS_TRACE_VERBOSE,
+              "Swap Area %" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ") "
+              "with Area %" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ")",
+              a, map[a].position, b, map[b].position);
 
     AreaPos tmp1 = map[a].position;
     uint32_t tmp2 = map[a].erasecount;
@@ -321,6 +325,17 @@ AreaManagement::swapAreaPosition(AreaPos a, AreaPos b)
 
     map[b].position = tmp1;
     map[b].erasecount = tmp2;
+
+    if(traceMask & PAFFS_TRACE_VERBOSE && traceMask & PAFFS_TRACE_AREA)
+    {
+        printf("After apply:\n");
+        for(AreaPos i = 0; i < areasNo; i++)
+        {
+            printf("Area %2" PTYPE_AREAPOS " on %2" PTYPE_AREAPOS " %7s %6s %c\n",
+                   i, map[i].position, areaNames[map[i].type], areaStatusNames[map[i].status],
+                   (i == a || i == b) ? '<' : ' ');
+        }
+    }
 }
 
 void
