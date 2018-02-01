@@ -1913,18 +1913,11 @@ Device::signalEndOfLog()
         return;
     case JournalState::insertObj:
         //Maybe we inserted Obj into dir
-        r = tree.getInode(targetInodeNo, obj);
-        if(r != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_BUG, "This should not happen because "
-                    "Tree must have gotten the entry to add Inodeno!");
-            return;
-        }
+        //We dont need the real Obj for that. It may have been deleted by aborted JournalRecover.
         r = tree.getInode(folderInodeNo, folder);
         if(r != Result::ok)
         {
-            PAFFS_DBG(PAFFS_TRACE_BUG, "Serious business, the folder is missing?"
-                    "Should not happen either");
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Serious business, the folder is missing?");
             return;
         }
         {

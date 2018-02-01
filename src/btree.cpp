@@ -288,7 +288,17 @@ Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
                            extractLogicalArea(node.direct[i]), extractPageOffs(node.direct[i]));
                 }
             }
-            return updateExistingInode(entry.btree_.update.inode);
+            {
+                Result r = updateExistingInode(entry.btree_.update.inode);
+                if(r == Result::ok || r == Result::notFound)
+                {   //If it was deleted later on
+                    return Result::ok;
+                }
+                else
+                {
+                    return r;
+                }
+            }
         }
         case journalEntry::BTree::Operation::remove:
             return deleteInode(entry.btree_.remove.no);
