@@ -1011,6 +1011,12 @@ TreeCache::removeNode(TreeCacheNode& tcn)
 }
 
 Result
+TreeCache::releaseRemovedNodes()
+{
+    return statemachine.invalidateOldPages();
+}
+
+Result
 TreeCache::setRoot(TreeCacheNode& rootTcn)
 {
     if (rootTcn.parent != &rootTcn)
@@ -1360,6 +1366,7 @@ TreeCache::deleteTreeNode(TreeNode& node)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried deleting something in readOnly mode!");
         return Result::bug;
     }
-    return dev->sumCache.setPageStatus(node.self, SummaryEntry::dirty);
+    //Delays deletion until tree is in a safe state
+    return statemachine.replacePage(0, node.self);
 }
 }

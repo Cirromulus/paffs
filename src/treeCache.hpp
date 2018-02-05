@@ -89,6 +89,9 @@ public:
     removeNode(TreeCacheNode& tcn);
 
     Result
+    releaseRemovedNodes();
+
+    Result
     setRoot(TreeCacheNode& rootTcn);
 
     Result

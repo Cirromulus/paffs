@@ -168,6 +168,7 @@ Btree::deleteInode(InodeNo number)
             return Result::bug;
         }
     }
+    mCache.releaseRemovedNodes();
     return r;
 }
 
@@ -995,13 +996,16 @@ Btree::adjustRoot(TreeCacheNode& root)
         root.pointers[0]->parent = root.pointers[0];
         Result r = mCache.setRoot(*root.pointers[0]);
         if (r != Result::ok)
+        {
             return r;
+        }
+        // The actual removal is delayed until Cache gets the OK
         return mCache.removeNode(root);
     }
 
     // If it is a leaf (has no children),
     // then the whole tree is empty.
-
+    // The actual removal is delayed until Cache gets the OK
     return mCache.removeNode(root);
 }
 

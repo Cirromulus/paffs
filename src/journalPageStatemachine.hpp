@@ -36,7 +36,7 @@ enum class JournalState : uint8_t
 /**
  * The PageStateMachine implements a Logic for when written Pages get applied after an action,
  * or when they get invalidated after a sudden powerloss.
- * Every write of a new page gets logged in a list, including the addres of the replaced page.
+ * Every write of a new page gets logged in a list, including the address of the replaced page.
  * If everything went ok, all old pages get invalidated.
  */
 template <uint16_t maxPages, uint16_t maxPositions, JournalEntry::Topic topic>
@@ -67,6 +67,10 @@ public:
     uint16_t
     getMinSpaceLeft();
 
+    /**
+     * \param neu May be 0 if just old page is to be deleted
+     * \param old May be 0 if new page does not override something older
+     */
     Result
     replacePage(Addr neu, Addr old);
 

@@ -99,7 +99,12 @@ PageStateMachine<maxPages, maxPositions, topic>::replacePage(Addr neu, Addr old,
         mJournal.addEvent(journalEntry::pagestate::ReplacePage(topic, neu, old));
     }
     pageListHWM++;
-    return mSummaryCache.setPageStatus(neu, SummaryEntry::used);
+    if(neu != 0)
+    {
+        return mSummaryCache.setPageStatus(neu, SummaryEntry::used);
+    }
+    //If we are just deleting pages
+    return Result::ok;
 }
 
 template <uint16_t maxPages, uint16_t maxPositions, JournalEntry::Topic topic>
@@ -218,7 +223,10 @@ PageStateMachine<maxPages, maxPositions, topic>::signalEndOfLog()
         PAFFS_DBG_S(PAFFS_TRACE_PAGESTATEM, "%s reverting written pages", topicNames[topic]);
         for(uint16_t i = 0; i < pageListHWM; i++)
         {
-            mSummaryCache.setPageStatus(newPageList[i], SummaryEntry::dirty);
+            if(newPageList[i] != 0)
+            {   //a newPage may be 0 if we are deleting pages
+                mSummaryCache.setPageStatus(newPageList[i], SummaryEntry::dirty);
+            }
         }
 
         if(withPosition)
