@@ -168,7 +168,8 @@ Btree::deleteInode(InodeNo number)
             return Result::bug;
         }
     }
-    mCache.releaseRemovedNodes();
+
+    mCache.commitIfNodesWereRemoved();
     return r;
 }
 

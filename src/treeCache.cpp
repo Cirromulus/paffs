@@ -665,6 +665,11 @@ Result
 TreeCache::commitCache()
 {
     dev->lasterr = Result::ok;
+    if(mCacheRoot < 0)
+    {
+        //We have no root, so nothing is to be written
+        return Result::ok;
+    }
     resolveDirtyPaths(mCache[mCacheRoot]);
     if (dev->lasterr != Result::ok)
     {
@@ -1011,9 +1016,16 @@ TreeCache::removeNode(TreeCacheNode& tcn)
 }
 
 Result
-TreeCache::releaseRemovedNodes()
+TreeCache::commitIfNodesWereRemoved()
 {
-    return statemachine.invalidateOldPages();
+    if(statemachine.getMinSpaceLeft() == treeNodeCacheSize)
+    {
+        //nothing was removed
+        return Result::ok;
+    }
+    //One or more Nodes were removed, so update whole tree (Just for Ausfallsicherheit!)
+    //Note: This also dirtifies removed nodes
+    return commitCache();
 }
 
 Result

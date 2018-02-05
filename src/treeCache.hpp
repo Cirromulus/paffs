@@ -89,7 +89,7 @@ public:
     removeNode(TreeCacheNode& tcn);
 
     Result
-    releaseRemovedNodes();
+    commitIfNodesWereRemoved();
 
     Result
     setRoot(TreeCacheNode& rootTcn);
