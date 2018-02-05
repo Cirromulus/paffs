@@ -99,12 +99,6 @@ exportLog()
 
     BadBlockList bbl[maxNumberOfDevices];
     fs.format(bbl);
-    fs.setTraceMask(fs.getTraceMask()
-                    | PAFFS_TRACE_ERROR
-                    | PAFFS_TRACE_BUG
-                    | PAFFS_TRACE_INFO
-                    | PAFFS_TRACE_JOURNAL);
-
     fs.mount();
 
     Obj* fil = fs.open(filename, paffs::FW | paffs::FC);

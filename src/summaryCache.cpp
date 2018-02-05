@@ -233,6 +233,7 @@ SummaryCache::SummaryCache(Device* mdev) : dev(mdev)
                   "\tThis is not recommended, as Errors can happen.");
     }
     mTranslation.reserve(areaSummaryCacheSize);
+    memset(&firstUncommittedElem, 0, areasNo * sizeof(JournalEntryPosition));
 }
 
 SummaryCache::~SummaryCache()
@@ -865,7 +866,9 @@ SummaryCache::preScan(const journalEntry::Max& entry, JournalEntryPosition posit
     if(entry.summaryCache.subtype == journalEntry::SummaryCache::Subtype::commit)
     {
         firstUncommittedElem[entry.summaryCache.area] = position;
-
+        PAFFS_DBG(PAFFS_TRACE_ASCACHE | PAFFS_TRACE_JOURNAL,
+                  "Commit of %" PTYPE_AREAPOS " at %" PRIu32,
+                  entry.summaryCache.area, position.mram.offs);
         if(mTranslation.find(entry.summaryCache.area) != mTranslation.end())
         {   //This area was loaded from a superpage, but is now committed elsewhere
             //so force an update by deleting it now.
