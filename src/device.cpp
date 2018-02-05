@@ -855,19 +855,12 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
                   "Could not write %" PRIu32 " of %" PRIu32 " bytes directory data",
                   contDir.size + direntryl - bytes,
                   contDir.size + direntryl);
-        if (bytes != 0)
-        {
-            Result r2 = tree.updateExistingInode(contDir);
-            if (r2 != Result::ok)
-            {
-                PAFFS_DBG(PAFFS_TRACE_ERROR,
-                          "Could not update Inode after unfinished directory insert!"
-                          " Ignoring error to continue.");
-            }
-        }
         return r;
     }
-
+    contDir.mod =
+                systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
+    tree.updateExistingInode(contDir);
+    journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
     journal.addEvent(journalEntry::Checkpoint(getTopic()));
 
     //FIXME Dirty hack. Actually, the Problem is with the inode reference.
@@ -993,8 +986,8 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
     FileSize pointer = sizeof(DirEntryCount);
 
     PAFFS_DBG_S(PAFFS_TRACE_DEVICE,
-                "Deleting from Inode %" PTYPE_INODENO " (%" PTYPE_DIRENTRYCOUNT " entries)",
-                contDir.no, entries);
+                "Deleting %" PTYPE_INODENO " from Inode %" PTYPE_INODENO " (%" PTYPE_DIRENTRYCOUNT " entries)",
+                elem, contDir.no, entries);
 
     while (pointer < contDir.size)
     {
@@ -1034,9 +1027,11 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
 
             entries--;
             memcpy(&dirData[0], &entries, sizeof(DirEntryCount));
-            //source and destination may overlap if there more than one entry behind us
+            //source and destination may overlap if there is more than one entry behind us
             memmove(&dirData[pointer], &dirData[pointer + entryl], restByte);
 
+            //This lets journal know what to do if write succeeded
+            journal.addEvent(journalEntry::dataIO::NewInodeSize(contDir.size, newSize));
             FileSize bw = 0;
             r = dataIO.writeInodeData(contDir, 0, newSize, &bw, dirData.get());
             if (r != Result::ok)
@@ -1049,6 +1044,8 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
             {
                 return r;
             }
+            //DeleteInodeData updated Inode in tree, so not necessary here
+
             if (traceMask & PAFFS_TRACE_VERIFY_DEV)
             {
                 r = checkFolderSanity(contDir.no);
@@ -1650,6 +1647,8 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update existing inode");
         return r;
     }
+
+    journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
 
     return r;
 }

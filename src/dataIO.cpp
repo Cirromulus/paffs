@@ -100,11 +100,8 @@ DataIO::writeInodeData(Inode& inode,
 
 
     pac.setValid();
-    dev->tree.updateExistingInode(inode);
-    dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
 
-    // FIXME the Tree UpdateExistingInode is also done by high level functions
-    // (updating the last-modified time). this leads to doubled journal Messages
+    //Checkpoint is done by device functions, because a write-truncate pair has to be kept together
     return res;
 }
 
@@ -158,6 +155,11 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
         return Result::bug;
     }
 
+    if(inode.size == offs)
+    {   //nothing to do
+        return Result::ok;
+    }
+
     FileSize pageFrom = offs / dataBytesPerPage;
     FileSize toPage = inode.size / dataBytesPerPage;
     if (offs % dataBytesPerPage != 0)
@@ -168,13 +170,6 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
     {
         toPage--;
     }
-    if (pageFrom > toPage || inode.reservedPages == 0)
-    {
-        // We are deleting just some bytes on the same page
-        inode.size = offs;
-        return Result::ok;
-    }
-
     if (inode.size < offs)
     {
         // Offset bigger than actual filesize
@@ -189,6 +184,13 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
     }
 
     dev->journal.addEvent(journalEntry::dataIO::NewInodeSize(inode.no, offs));
+
+    if (pageFrom > toPage || inode.reservedPages == 0)
+    {
+        // We are deleting just some bytes on the same page
+        inode.size = offs;
+        return Result::ok;
+    }
 
     for (int32_t page = (toPage - pageFrom); page >= 0; page--)
     {
@@ -310,11 +312,17 @@ DataIO::signalEndOfLog()
         if(inode.size != journalLastSize)
         {
             PAFFS_DBG(PAFFS_TRACE_DEVICE | PAFFS_TRACE_JOURNAL,
-                      "Recovered Write, changing Inode %" PTYPE_INODENO " size "
+                      "Recovered Write/delete, changing Inode %" PTYPE_INODENO " size "
                       "from %" PTYPE_FILSIZE " to %" PTYPE_FILSIZE,
                       inode.no, inode.size, journalLastSize);
-            inode.size = journalLastSize;
-            dev->tree.updateExistingInode(inode);
+            if(inode.size > journalLastSize)
+            {   //write
+                inode.size = journalLastSize;
+                dev->tree.updateExistingInode(inode);
+            }else
+            {   //delete
+                deleteInodeData(inode, journalLastSize);
+            }
         }
 
     }

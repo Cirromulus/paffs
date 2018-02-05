@@ -315,7 +315,8 @@ Paffs::mount(bool readOnly)
             Result deviceReturn = devices[i]->mnt(readOnly);
             if (deviceReturn > globalReturn)
             {   //Results are (somewhat) ordered by badness
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mount device %" PRId16 "!", i);
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mount device %" PRId16 " (%s)"
+                          , i, err_msg(deviceReturn));
                 globalReturn = deviceReturn;
             }
         }
