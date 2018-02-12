@@ -1031,7 +1031,7 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
             memmove(&dirData[pointer], &dirData[pointer + entryl], restByte);
 
             //This lets journal know what to do if write succeeded
-            journal.addEvent(journalEntry::dataIO::NewInodeSize(contDir.size, newSize));
+            journal.addEvent(journalEntry::dataIO::NewInodeSize(contDir.no, newSize));
             FileSize bw = 0;
             r = dataIO.writeInodeData(contDir, 0, newSize, &bw, dirData.get());
             if (r != Result::ok)
