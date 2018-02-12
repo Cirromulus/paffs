@@ -278,8 +278,9 @@ DataIO::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
         switch(entry.dataIO.operation)
         {
         case journalEntry::DataIO::Operation::newInodeSize:
-            if(journalLastModifiedInode != entry.dataIO_.newInodeSize.inodeNo &&
-               journalLastSize != entry.dataIO_.newInodeSize.filesize)
+            if(journalInodeValid &&
+               journalLastModifiedInode == entry.dataIO_.newInodeSize.inodeNo &&
+               journalLastSize == entry.dataIO_.newInodeSize.filesize)
             {
                 //If the same message comes again, we were truncating a directory (write-delete pair)
                 //so we dont reset the "modified Inode" switch
@@ -319,11 +320,11 @@ DataIO::signalEndOfLog()
         }
         if(inode.size != journalLastSize)
         {
-            PAFFS_DBG(PAFFS_TRACE_DEVICE | PAFFS_TRACE_JOURNAL,
+            PAFFS_DBG_S(PAFFS_TRACE_DEVICE | PAFFS_TRACE_JOURNAL,
                       "Recovered Write/deletion, changing Inode %" PTYPE_INODENO " size "
                       "from %" PTYPE_FILSIZE " to %" PTYPE_FILSIZE,
                       inode.no, inode.size, journalLastSize);
-            if(inode.size > journalLastSize)
+            if(inode.size < journalLastSize)
             {   //write
                 inode.size = journalLastSize;
                 dev->tree.updateExistingInode(inode);
