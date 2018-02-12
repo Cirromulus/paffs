@@ -1046,6 +1046,14 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
             }
             //DeleteInodeData updated Inode in tree, so not necessary here
 
+            r = dataIO.pac.commit();
+            if(r != Result::ok)
+            {
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit tuncated folder %" PTYPE_INODENO,
+                          contDir.no);
+                return r;
+            }
+
             if (traceMask & PAFFS_TRACE_VERIFY_DEV)
             {
                 r = checkFolderSanity(contDir.no);
@@ -1054,7 +1062,7 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
                     return r;
                 }
             }
-            return dataIO.pac.commit();
+            return Result::ok;
         }
         pointer += entryl;
     }

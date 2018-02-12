@@ -185,76 +185,73 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
 
     dev->journal.addEvent(journalEntry::dataIO::NewInodeSize(inode.no, offs));
 
-    if (pageFrom > toPage || inode.reservedPages == 0)
+    if (pageFrom <= toPage && inode.reservedPages != 0)
     {
-        // We are deleting just some bytes on the same page
-        inode.size = offs;
-        return Result::ok;
-    }
-
-    for (int32_t page = (toPage - pageFrom); page >= 0; page--)
-    {
-        Addr pageAddr;
-        r = pac.getPage(page + pageFrom, &pageAddr);
-        if (r != Result::ok)
+        //If we dont need one or more page anymore, mark them dirty
+        for (int32_t page = (toPage - pageFrom); page >= 0; page--)
         {
-            PAFFS_DBG(PAFFS_TRACE_ERROR, "Coud not get Page %" PRId32 " for read", page + pageFrom);
-            return r;
-        }
-        if(pageAddr == 0)
-        {   //If we continue an aborted deletions
-            continue;
-        }
+            Addr pageAddr;
+            r = pac.getPage(page + pageFrom, &pageAddr);
+            if (r != Result::ok)
+            {
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Coud not get Page %" PRId32 " for read", page + pageFrom);
+                return r;
+            }
+            if(pageAddr == 0)
+            {   //If we continue an aborted deletions
+                continue;
+            }
 
-        AreaPos  area = extractLogicalArea(pageAddr);
-        PageOffs relPage = extractPageOffs(pageAddr);
+            AreaPos  area = extractLogicalArea(pageAddr);
+            PageOffs relPage = extractPageOffs(pageAddr);
 
-        if (dev->areaMgmt.getType(area) != AreaType::data)
-        {
-            PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "DELETE INODE operation of invalid area at %" PRId16 ":%" PRId16 "",
-                      extractLogicalArea(pageAddr),
-                      extractPageOffs(pageAddr));
-            return Result::bug;
-        }
+            if (dev->areaMgmt.getType(area) != AreaType::data)
+            {
+                PAFFS_DBG(PAFFS_TRACE_BUG,
+                          "DELETE INODE operation of invalid area at %" PRId16 ":%" PRId16 "",
+                          extractLogicalArea(pageAddr),
+                          extractPageOffs(pageAddr));
+                return Result::bug;
+            }
 
-        if (dev->sumCache.getPageStatus(area, relPage, &r) == SummaryEntry::dirty)
-        {
-            PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "DELETE INODE operation of outdated (dirty)"
-                      " data at %" PRId16 ":%" PRId16 "",
-                      extractLogicalArea(pageAddr),
-                      extractPageOffs(pageAddr));
-            return Result::bug;
-        }
-        if (r != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not load AreaSummary for area %" PRId16 ","
-                      " so no invalidation of data!",
-                      area);
-            return r;
-        }
+            if (dev->sumCache.getPageStatus(area, relPage, &r) == SummaryEntry::dirty)
+            {
+                PAFFS_DBG(PAFFS_TRACE_BUG,
+                          "DELETE INODE operation of outdated (dirty)"
+                          " data at %" PRId16 ":%" PRId16 "",
+                          extractLogicalArea(pageAddr),
+                          extractPageOffs(pageAddr));
+                return Result::bug;
+            }
+            if (r != Result::ok)
+            {
+                PAFFS_DBG(PAFFS_TRACE_ERROR,
+                          "Could not load AreaSummary for area %" PRId16 ","
+                          " so no invalidation of data!",
+                          area);
+                return r;
+            }
 
-        // Mark old pages dirty
-        r = dev->sumCache.setPageStatus(area, relPage, SummaryEntry::dirty);
-        if (r != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not write AreaSummary for area %" PRId16 ","
-                      " so no invalidation of data!",
-                      area);
-            return r;
-        }
+            // Mark old pages dirty
+            r = dev->sumCache.setPageStatus(area, relPage, SummaryEntry::dirty);
+            if (r != Result::ok)
+            {
+                PAFFS_DBG(PAFFS_TRACE_ERROR,
+                          "Could not write AreaSummary for area %" PRId16 ","
+                          " so no invalidation of data!",
+                          area);
+                return r;
+            }
 
-        r = pac.setPage(page + pageFrom, 0);
-        if (r != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete page %" PRIu32 " to %" PRIu32 "", pageFrom, toPage);
-            return r;
-        }
+            r = pac.setPage(page + pageFrom, 0);
+            if (r != Result::ok)
+            {
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete page %" PRIu32 " to %" PRIu32 "", pageFrom, toPage);
+                return r;
+            }
 
-        inode.reservedPages--;
+            inode.reservedPages--;
+        }
     }
 
     inode.size = offs;
