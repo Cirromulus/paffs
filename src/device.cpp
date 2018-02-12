@@ -337,83 +337,94 @@ Device::mnt(bool readOnlyMode)
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Mount successful");
     return r;
 }
+
+Result
+Device::flushAllCaches()
+{
+    if (!mounted)
+     {
+         return Result::notMounted;
+     }
+     Result r;
+
+     InodePool<maxNumberOfInodes>::InodeMap::iterator it = inodePool.map.begin();
+     if (it != inodePool.map.end())
+     {
+         while (it != inodePool.map.end())
+         {
+             PAFFS_DBG_S(PAFFS_TRACE_DEVICE,
+                         "Commit Inode %" PTYPE_INODENO " with %" PRIu8 " references",
+                         it->first,
+                         it->second.second);
+             // TODO: Later, we would choose the actual pac instance (or the PAC will choose the
+             // actual Inode...
+             r = dataIO.pac.setTargetInode(*it->second.first);
+             if (r != Result::ok)
+             {
+                 // we ignore Result, because we unmount.
+                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load pac of an open file");
+             }
+             r = dataIO.pac.commit();
+             if (r != Result::ok)
+             {
+                 // we ignore Result, because we unmount.
+                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit pac of an open file");
+             }
+             it++;
+         }
+     }
+
+     r = tree.commitCache();
+     if (r != Result::ok)
+     {
+         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Tree cache!");
+         return r;
+     }
+
+     r = sumCache.commitAreaSummaries();
+     if (r != Result::ok)
+     {
+         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Area Summaries!");
+         return r;
+     }
+
+     if (traceMask & PAFFS_TRACE_AREA)
+     {
+         printf("Info: \n\t%" PTYPE_AREAPOS " used Areas\n", areaMgmt.getUsedAreas());
+         for (AreaPos i = 0; i < areasNo; i++)
+         {
+             printf("\tArea %03" PTYPE_AREAPOS " on %03" PTYPE_AREAPOS " as %10s from page %4" PTYPE_AREAPOS " %s\n",
+                    i,
+                    areaMgmt.getPos(i),
+                    areaNames[areaMgmt.getType(i)],
+                    areaMgmt.getPos(i) * blocksPerArea * pagesPerBlock,
+                    areaStatusNames[areaMgmt.getStatus(i)]);
+             if (i > 128)
+             {
+                 printf("\n -- truncated 128-%" PTYPE_AREAPOS " Areas.\n", areasNo);
+                 break;
+             }
+         }
+         printf("\t----------------------\n");
+     }
+
+     journal.clear();
+     return Result::ok;
+}
+
 Result
 Device::unmnt()
 {
-    if (!mounted)
+    Result r = flushAllCaches();
+    if(r != Result::ok)
     {
-        return Result::notMounted;
-    }
-    Result r;
-
-    InodePool<maxNumberOfInodes>::InodeMap::iterator it = inodePool.map.begin();
-    if (it != inodePool.map.end())
-    {
-        PAFFS_DBG(PAFFS_TRACE_ALWAYS, "Unclosed files remain, committing for unmount");
-        while (it != inodePool.map.end())
-        {
-            PAFFS_DBG_S(PAFFS_TRACE_ALWAYS,
-                        "Commit Inode %" PTYPE_INODENO " with %" PRIu8 " references",
-                        it->first,
-                        it->second.second);
-            // TODO: Later, we would choose the actual pac instance (or the PAC will choose the
-            // actual Inode...
-            r = dataIO.pac.setTargetInode(*it->second.first);
-            if (r != Result::ok)
-            {
-                // we ignore Result, because we unmount.
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load pac of an open file");
-            }
-            r = dataIO.pac.commit();
-            if (r != Result::ok)
-            {
-                // we ignore Result, because we unmount.
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit pac of an open file");
-            }
-            it++;
-        }
-    }
-
-    r = tree.commitCache();
-    if (r != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Tree cache!");
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not flush caches for unmount");
         return r;
     }
-
-    r = sumCache.commitAreaSummaries();
-    if (r != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Area Summaries!");
-        return r;
-    }
-
-    if (traceMask & PAFFS_TRACE_AREA)
-    {
-        printf("Info: \n\t%" PTYPE_AREAPOS " used Areas\n", areaMgmt.getUsedAreas());
-        for (AreaPos i = 0; i < areasNo; i++)
-        {
-            printf("\tArea %03" PTYPE_AREAPOS " on %03" PTYPE_AREAPOS " as %10s from page %4" PTYPE_AREAPOS " %s\n",
-                   i,
-                   areaMgmt.getPos(i),
-                   areaNames[areaMgmt.getType(i)],
-                   areaMgmt.getPos(i) * blocksPerArea * pagesPerBlock,
-                   areaStatusNames[areaMgmt.getStatus(i)]);
-            if (i > 128)
-            {
-                printf("\n -- truncated 128-%" PTYPE_AREAPOS " Areas.\n", areasNo);
-                break;
-            }
-        }
-        printf("\t----------------------\n");
-    }
-
-    journal.clear();
 
     destroyDevice();
     driver.deInitializeNand();
-    // just for cleanup & tests
-    tree.wipeCache();
+    tree.wipeCache();   // just for cleanup & tests
     mounted = false;
     return Result::ok;
 }
@@ -943,7 +954,7 @@ Device::checkFolderSanity(InodeNo folderNo)
         {
             char name[dirnamel];
             memcpy(name, &dirData[p], dirnamel);
-            printf("%3u: %.*s\n", currentEntry + 1, dirnamel, name);
+            //printf("%3u: %3" PTYPE_INODENO ", %.*s\n", currentEntry + 1, 0, dirnamel, name);
         }
         p += dirnamel;
         currentEntry++;
@@ -1044,7 +1055,7 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
             {
                 return r;
             }
-            //DeleteInodeData updated Inode in tree, so not necessary here
+            //DeleteInodeData updated Inode in tree and also wrote checkpoint
 
             r = dataIO.pac.commit();
             if(r != Result::ok)
@@ -1062,6 +1073,7 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
                     return r;
                 }
             }
+            journal.addEvent(journalEntry::Checkpoint(getTopic()));
             return Result::ok;
         }
         pointer += entryl;
@@ -1114,7 +1126,7 @@ Device::mkDir(const char* fullPath, Permission mask)
     }
     //Journal log is included in insertInodeInDir
     r = insertInodeInDir(&fullPath[lastSlash], *parDir, *newDir);
-
+    journal.addEvent(journalEntry::Checkpoint(getTopic()));
     return r;
 }
 
@@ -1351,7 +1363,7 @@ Device::createFile(SmartInodePtr& outFile, const char* fullPath, Permission mask
     //Journal log is included in insertInodeInDir
     res = insertInodeInDir(&fullPath[lastSlash], *parDir, *outFile);
 
-    //==================
+    journal.addEvent(journalEntry::Checkpoint(getTopic()));
 
     return res;
 }
@@ -1657,7 +1669,7 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
     }
 
     journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
-
+    journal.addEvent(journalEntry::Checkpoint(getTopic()));
     return r;
 }
 
@@ -1715,12 +1727,12 @@ Device::flush(Obj& obj)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Inode!");
         return r;
     }
-
+    journal.addEvent(journalEntry::Checkpoint(getTopic()));
     return Result::ok;
 }
 
 Result
-Device::truncate(const char* path, FileSize newLength)
+Device::truncate(const char* path, FileSize newLength, bool fromUserspace)
 {
     if (!mounted)
     {
@@ -1764,6 +1776,11 @@ Device::truncate(const char* path, FileSize newLength)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit PAC");
     }
 
+    if(fromUserspace)
+    {
+        journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    }
+
     return r;
 }
 
@@ -1794,7 +1811,7 @@ Device::remove(const char* path)
 
     journal.addEvent(journalEntry::device::RemoveObj(object->no, parentDir->no));
 
-    r = truncate(path, 0);
+    r = truncate(path, 0, false);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete the files contents");
@@ -1812,7 +1829,7 @@ Device::remove(const char* path)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete Inode");
         return r;
     }
-
+    journal.addEvent(journalEntry::Checkpoint(getTopic()));
     return Result::ok;
 }
 

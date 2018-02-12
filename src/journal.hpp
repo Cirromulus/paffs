@@ -21,15 +21,14 @@
 namespace paffs
 {
 
-extern uint8_t colorMap[JournalEntry::numberOfTopics];
-
 class Journal
 {
     JournalTopic* topics[JournalEntry::numberOfTopics];
+    BitList<JournalEntry::numberOfTopics> uncheckpointedChanges;
 
     JournalPersistence& persistence;
-    bool disabled;  //TODO: remove this for securing mount process
-
+    bool disabled;
+    bool lowLogSpace;
 public:
     Journal(JournalPersistence& _persistence,
             JournalTopic& superblock,
@@ -49,6 +48,14 @@ public:
         topics[device.getTopic()      ] = &device;
 
         disabled = false;
+        lowLogSpace = false;
+        for(JournalTopic* topic : topics)
+        {
+            if(topic != nullptr)
+            {
+                uncheckpointedChanges.setBit(topic->getTopic());
+            }
+        }
 
         if(traceMask & PAFFS_TRACE_VERBOSE)
         {

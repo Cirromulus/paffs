@@ -24,19 +24,6 @@
 
 using namespace paffs;
 
-uint8_t paffs::colorMap[JournalEntry::numberOfTopics] =
-        {
-                97, //invalid
-                31, //checkpoint
-                32, //pagestate
-                33, //areaMgmt
-                36, //summaryCache
-                35, //tree
-                37, //pac
-                91, //dataIO
-                93, //device
-        };
-
 Result
 Journal::addEvent(const JournalEntry& entry)
 {
@@ -45,28 +32,58 @@ Journal::addEvent(const JournalEntry& entry)
         // Skipping, because we are currently replaying a buffer or formatting fs
         return Result::ok;
     }
-    Result r = persistence.appendEntry(entry);
-    if (r == Result::nospace)
-    {
-        PAFFS_DBG(PAFFS_TRACE_JOURNAL, "Log full. should be flushed.");
-        return r;
-    }
-    if (r != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not append Entry to persistence");
-        return r;
-    }
     if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
     {
         printf("Add event ");
         printMeaning(entry);
     }
 
+    if(entry.topic != JournalEntry::Topic::checkpoint ||
+            uncheckpointedChanges.getBit(static_cast<const journalEntry::Checkpoint*>(&entry)->target))
+    {
+        Result r = persistence.appendEntry(entry);
+        if (r == Result::nospace)
+        {   //most bad situation
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Log full. should have been flushed.");
+            return r;
+        }
+        if (r == Result::lowmem)
+        {
+            //This is a warning that we fell under the safetythreshold.
+            //commit everything as soon as everything is valid
+            lowLogSpace = true;
+        }
+        if (r != Result::ok)
+        {
+            PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not append Entry to persistence");
+            return r;
+        }
+        if(entry.topic == JournalEntry::Topic::checkpoint)
+        {
+            uncheckpointedChanges.resetBit(static_cast<const journalEntry::Checkpoint*>(&entry)->target);
+        }
+        else
+        {
+            JournalEntry::Topic target = entry.topic;
+            if(target == JournalEntry::Topic::pagestate)
+            {
+                target = static_cast<const journalEntry::Pagestate*>(&entry)->target;
+            }
+            uncheckpointedChanges.setBit(target);
+        }
+    }
+    else
+    {
+        PAFFS_DBG(PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE,
+                  "Skipped checkpoint because no changes were made");
+    }
+
+
     if(entry.topic == JournalEntry::Topic::checkpoint &&
             static_cast<const journalEntry::Checkpoint*>(&entry)->target == JournalEntry::Topic::device)
     {   //This is a special case, because now we are in an absolutely clean state
         //so we can clean up the log
-        //TODO: Check for persistence usage and commit everything if nearly full
+        //TODO: tell device to commit all modules to clear log
     }
 
 
@@ -76,6 +93,15 @@ Journal::addEvent(const JournalEntry& entry)
 Result
 Journal::clear()
 {
+    disabled = false;
+    lowLogSpace = false;
+    for(JournalTopic* topic : topics)
+    {
+        if(topic != nullptr)
+        {
+            uncheckpointedChanges.setBit(topic->getTopic());
+        }
+    }
     return persistence.clear();
 }
 
@@ -512,5 +538,13 @@ Result
 Journal::enable()
 {
     disabled = false;
+    lowLogSpace = false;
+    for(JournalTopic* topic : topics)
+    {
+        if(topic != nullptr)
+        {
+            uncheckpointedChanges.setBit(topic->getTopic());
+        }
+    }
     return persistence.rewind();
 }

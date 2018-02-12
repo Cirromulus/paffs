@@ -165,6 +165,10 @@ MramPersistence::appendEntry(const JournalEntry& entry)
                 curr + size);
     curr += size;
     device->driver.writeMRAM(0, &curr, sizeof(PageAbs));
+    if(mramSize - curr < reservedLogsize)
+    {
+        return Result::lowmem;
+    }
     return Result::ok;
 }
 

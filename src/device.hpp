@@ -77,7 +77,10 @@ public:
     Result
     mnt(bool readOnlyMode = false);
     Result
+    flushAllCaches();
+    Result
     unmnt();
+
 
     // Directory
     Result
@@ -109,7 +112,7 @@ public:
     Result
     flush(Obj& obj);
     Result
-    truncate(const char* path, FileSize newLength);
+    truncate(const char* path, FileSize newLength, bool fromUserspace = true);
     Result
     remove(const char* path);
     Result

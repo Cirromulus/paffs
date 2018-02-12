@@ -38,7 +38,11 @@ private:
 public:
 
     DataIO(Device* mdev);
-    // Updates changes to treeCache as well
+
+    /**
+     *  requires a checkpoint to be done from the outside because
+     *  it may be combined to a write-truncate pair
+     */
     Result
     writeInodeData(Inode& inode,
                    FileSize offs,

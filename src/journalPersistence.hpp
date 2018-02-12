@@ -120,6 +120,10 @@ public:
     virtual JournalEntryPosition
     tell() = 0;
 
+    /**
+     * \return noSpace if log is full, lowMem if log capacity
+     * is less than configurated reservedLogsize
+     */
     virtual Result
     appendEntry(const JournalEntry& entry) = 0;
 

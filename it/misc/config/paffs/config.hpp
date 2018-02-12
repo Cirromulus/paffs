@@ -27,6 +27,7 @@ static constexpr uint8_t  jumpPadNo = 1;				//Should scale with max(0, log2(bloc
 
 //MRam config
 static constexpr uint32_t mramSize = 4096 * 512;		//Should be a multiple of 512 for viewer
+static constexpr uint16_t reservedLogsize = 4096;       	//bytes
 
 //Cache sizes
 static constexpr uint8_t  treeNodeCacheSize = 5;		//max. 1,5 * dataBytesPerPage(TreeNode) Bytes per Entry
