@@ -199,8 +199,6 @@ GarbageCollection::collectGarbage(AreaType targetType)
 
     while (1)
     {
-        //FIXME DEBUG
-        dev->sumCache.printStatus();
         deletionTarget = findNextBestArea(targetType, summary, &srcAreaContainsData);
         if (deletionTarget == 0
                 || (lastDeletionTarget != 0 && srcAreaContainsData))

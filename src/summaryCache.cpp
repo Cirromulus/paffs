@@ -639,7 +639,6 @@ SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary)
     // This area ist likely to be used soon
     if (mTranslation.find(area) == mTranslation.end())
     {
-        printStatus();  //FIXME DEBUG
         Result r = loadUnbufferedArea(area, false);
         if (r == Result::notFound)
         {

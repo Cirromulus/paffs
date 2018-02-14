@@ -127,6 +127,9 @@ public:
     virtual Result
     appendEntry(const JournalEntry& entry) = 0;
 
+    virtual bool
+    isLowMem() = 0;
+
     virtual Result
     clear() = 0;
 
@@ -149,6 +152,8 @@ public:
     tell() override;
     Result
     appendEntry(const JournalEntry& entry) override;
+    bool
+    isLowMem() override;
     Result
     clear() override;
     Result
@@ -184,6 +189,8 @@ public:
     tell() override;
     Result
     appendEntry(const JournalEntry& entry) override;
+    bool
+    isLowMem() override;
     Result
     clear() override;
     Result

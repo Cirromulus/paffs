@@ -165,11 +165,17 @@ MramPersistence::appendEntry(const JournalEntry& entry)
                 curr + size);
     curr += size;
     device->driver.writeMRAM(0, &curr, sizeof(PageAbs));
-    if(mramSize - curr < reservedLogsize)
+    if(isLowMem())
     {
         return Result::lowMem;
     }
     return Result::ok;
+}
+
+bool
+MramPersistence::isLowMem()
+{
+    return mramSize - curr < reservedLogsize;
 }
 
 Result
@@ -292,8 +298,19 @@ FlashPersistence::appendEntry(const JournalEntry& entry)
         // just init current page b.c. we assume free pages after last page
         loadCurrentPage(false);
     }
+    if(isLowMem())
+    {
+        return Result::lowMem;
+    }
     return Result::ok;
 }
+
+bool
+FlashPersistence::isLowMem()
+{
+    return totalPagesPerArea * dataBytesPerPage - extractPageOffs(curr.addr) < reservedLogsize;
+}
+
 Result
 FlashPersistence::clear()
 {

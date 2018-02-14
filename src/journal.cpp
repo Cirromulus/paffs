@@ -78,6 +78,7 @@ Journal::addEvent(const JournalEntry& entry)
     {
         PAFFS_DBG(PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE,
                   "Skipped checkpoint because no changes were made");
+        lowLogSpace = persistence.isLowMem();
     }
 
     return lowLogSpace ? Result::lowMem : Result::ok;
