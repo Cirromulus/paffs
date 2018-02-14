@@ -872,7 +872,7 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
                 systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
     tree.updateExistingInode(contDir);
     journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
-    journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    Result journalStatus = journal.addEvent(journalEntry::Checkpoint(getTopic()));
 
     //FIXME Dirty hack. Actually, the Problem is with the inode reference.
     //      Inode target is located in Tree, which may have cleared the node until we commit PAC.
@@ -889,6 +889,10 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
     if(traceMask & PAFFS_TRACE_VERIFY_DEV)
     {
         r = checkFolderSanity(contDir.no);
+    }
+    if(journalStatus == Result::lowMem)
+    {
+        return flushAllCaches();
     }
     return r;
 }
@@ -1073,7 +1077,12 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
                     return r;
                 }
             }
-            journal.addEvent(journalEntry::Checkpoint(getTopic()));
+            r = journal.addEvent(journalEntry::Checkpoint(getTopic()));
+            if(r == Result::lowMem)
+            {
+                PAFFS_DBG(PAFFS_TRACE_DEVICE, "Journal nearly full, flushing caches");
+                return flushAllCaches();
+            }
             return Result::ok;
         }
         pointer += entryl;
@@ -1090,11 +1099,11 @@ Device::mkDir(const char* fullPath, Permission mask)
     }
     if (readOnly)
     {
-        return Result::readonly;
+        return Result::readOnly;
     }
     if (areaMgmt.getUsedAreas() > areasNo - minFreeAreas)
     {
-        return Result::nospace;
+        return Result::noSpace;
     }
 
     FileNamePos lastSlash = 0;
@@ -1126,8 +1135,18 @@ Device::mkDir(const char* fullPath, Permission mask)
     }
     //Journal log is included in insertInodeInDir
     r = insertInodeInDir(&fullPath[lastSlash], *parDir, *newDir);
-    journal.addEvent(journalEntry::Checkpoint(getTopic()));
-    return r;
+    if(r != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new Dir inode in parent dir");
+        return r;
+    }
+    r = journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    if(r == Result::lowMem)
+    {
+        PAFFS_DBG(PAFFS_TRACE_DEVICE, "Journal nearly full, flushing caches");
+        return flushAllCaches();
+    }
+    return Result::ok;
 }
 
 Dir*
@@ -1296,7 +1315,7 @@ Device::readDir(Dir& dir)
     }
     if ((dir.childs[dir.pos].node->perm & R) == 0)
     {
-        lasterr = Result::noperm;
+        lasterr = Result::noPerm;
         dir.pos++;
         return nullptr;
     }
@@ -1326,20 +1345,20 @@ Device::createFile(SmartInodePtr& outFile, const char* fullPath, Permission mask
     }
     if (readOnly)
     {
-        return Result::readonly;
+        return Result::readOnly;
     }
     if (areaMgmt.getUsedAreas() > areasNo - minFreeAreas)
     {
-        return Result::nospace;
+        return Result::noSpace;
     }
 
     FileNamePos lastSlash = 0;
 
     SmartInodePtr parDir;
-    Result res = getParentDir(fullPath, parDir, &lastSlash);
-    if (res != Result::ok)
+    Result r = getParentDir(fullPath, parDir, &lastSlash);
+    if (r != Result::ok)
     {
-        return res;
+        return r;
     }
 
     if (strlen(&fullPath[lastSlash]) > maxDirEntryLength)
@@ -1347,25 +1366,35 @@ Device::createFile(SmartInodePtr& outFile, const char* fullPath, Permission mask
         return Result::objNameTooLong;
     }
 
-    if ((res = createFilInode(outFile, mask)) != Result::ok)
+    if ((r = createFilInode(outFile, mask)) != Result::ok)
     {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not create fileInode: %s", err_msg(res));
-        return res;
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not create fileInode: %s", err_msg(r));
+        return r;
     }
 
     journal.addEvent(journalEntry::device::MkObjInode(outFile->no));
-    res = tree.insertInode(*outFile);
-    if (res != Result::ok)
+    r = tree.insertInode(*outFile);
+    if (r != Result::ok)
     {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert Inode into tree: %s", err_msg(res));
-        return res;
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert Inode into tree: %s", err_msg(r));
+        return r;
     }
     //Journal log is included in insertInodeInDir
-    res = insertInodeInDir(&fullPath[lastSlash], *parDir, *outFile);
+    r = insertInodeInDir(&fullPath[lastSlash], *parDir, *outFile);
+    if(r != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new fil inode in parent dir");
+        return r;
+    }
+    r = journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    if(r == Result::lowMem)
+    {
+        PAFFS_DBG(PAFFS_TRACE_DEVICE, "Journal nearly full, flushing caches");
+        return flushAllCaches();
+    }
+    return Result::ok;
 
-    journal.addEvent(journalEntry::Checkpoint(getTopic()));
-
-    return res;
+    return r;
 }
 
 Obj*
@@ -1378,7 +1407,7 @@ Device::open(const char* path, Fileopenmask mask)
     }
     if (readOnly && mask & FW)
     {
-        lasterr = Result::readonly;
+        lasterr = Result::readOnly;
         return nullptr;
     }
     SmartInodePtr file;
@@ -1427,7 +1456,7 @@ Device::open(const char* path, Fileopenmask mask)
 
     if ((file->perm | (mask & permMask)) != (file->perm & permMask))
     {
-        lasterr = Result::noperm;
+        lasterr = Result::noPerm;
         return nullptr;
     }
 
@@ -1486,11 +1515,11 @@ Device::touch(const char* path)
     }
     if (readOnly)
     {
-        return Result::readonly;
+        return Result::readOnly;
     }
     if (areaMgmt.getUsedAreas() > areasNo - minFreeAreas)
     {   // If we use reserved Areas, extensive touching may fill flash
-        return Result::nospace;
+        return Result::noSpace;
     }
 
     SmartInodePtr file;
@@ -1557,7 +1586,7 @@ Device::read(Obj& obj, void* buf, FileSize bytesToRead, FileSize* bytesRead)
         return lasterr = Result::nimpl;
     }
     if ((obj.dirent.node->perm & R) == 0)
-        return Result::noperm;
+        return Result::noPerm;
 
     if (obj.dirent.node->size == 0)
     {
@@ -1588,11 +1617,11 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
     }
     if (readOnly)
     {
-        return Result::readonly;
+        return Result::readOnly;
     }
     if (areaMgmt.getUsedAreas() > areasNo - minFreeAreas)
     {
-        return Result::nospace;
+        return Result::noSpace;
     }
     if (obj.dirent.node == nullptr)
     {
@@ -1610,7 +1639,7 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
     }
     if ((obj.dirent.node->perm & W) == 0)
     {
-        return Result::noperm;
+        return Result::noPerm;
     }
 
     //TODO: Is inconsistent between write and update filsize.
@@ -1669,8 +1698,13 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
     }
 
     journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
-    journal.addEvent(journalEntry::Checkpoint(getTopic()));
-    return r;
+    r = journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    if(r == Result::lowMem)
+    {
+        PAFFS_DBG(PAFFS_TRACE_DEVICE, "Journal nearly full, flushing caches");
+        return flushAllCaches();
+    }
+    return Result::ok;
 }
 
 Result
@@ -1721,13 +1755,23 @@ Device::flush(Obj& obj)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not set Target Inode!");
         return r;
     }
-    dataIO.pac.commit();
+    r = dataIO.pac.commit();
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Inode!");
         return r;
     }
-    journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    if(r != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new Dir inode in parent dir");
+        return r;
+    }
+    r = journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    if(r == Result::lowMem)
+    {
+        PAFFS_DBG(PAFFS_TRACE_DEVICE, "Journal nearly full, flushing caches");
+        return flushAllCaches();
+    }
     return Result::ok;
 }
 
@@ -1740,7 +1784,7 @@ Device::truncate(const char* path, FileSize newLength, bool fromUserspace)
     }
     if (readOnly)
     {
-        return Result::readonly;
+        return Result::readOnly;
     }
 
     SmartInodePtr object;
@@ -1753,14 +1797,14 @@ Device::truncate(const char* path, FileSize newLength, bool fromUserspace)
 
     if (!(object->perm & W))
     {
-        return Result::noperm;
+        return Result::noPerm;
     }
 
     if (object->type == InodeType::dir)
     {
         if (object->size > sizeof(DirEntryCount))
         {
-            return Result::dirnotempty;
+            return Result::dirNotEmpty;
         }
     }
 
@@ -1778,10 +1822,16 @@ Device::truncate(const char* path, FileSize newLength, bool fromUserspace)
 
     if(fromUserspace)
     {
-        journal.addEvent(journalEntry::Checkpoint(getTopic()));
+        r = journal.addEvent(journalEntry::Checkpoint(getTopic()));
+        if(r == Result::lowMem)
+        {
+            PAFFS_DBG(PAFFS_TRACE_DEVICE, "Journal nearly full, flushing caches");
+            return flushAllCaches();
+        }
+
     }
 
-    return r;
+    return Result::ok;
 }
 
 Result
@@ -1829,7 +1879,12 @@ Device::remove(const char* path)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete Inode");
         return r;
     }
-    journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    r = journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    if(r == Result::lowMem)
+    {
+        PAFFS_DBG(PAFFS_TRACE_DEVICE, "Journal nearly full, flushing caches");
+        return flushAllCaches();
+    }
     return Result::ok;
 }
 

@@ -28,7 +28,6 @@ class Journal
 
     JournalPersistence& persistence;
     bool disabled;
-    bool lowLogSpace;
 public:
     Journal(JournalPersistence& _persistence,
             JournalTopic& superblock,
@@ -48,7 +47,6 @@ public:
         topics[device.getTopic()      ] = &device;
 
         disabled = false;
-        lowLogSpace = false;
         for(JournalTopic* topic : topics)
         {
             if(topic != nullptr)
@@ -70,6 +68,11 @@ public:
         }
     }
 
+    /**
+     * \return Result::ok and Result::lowMem both indicate a success.
+     * Result::lowMem signals the urgency to flush all caches.
+     * return Result::noSpace or others if not successful.
+     */
     Result
     addEvent(const JournalEntry& entry);
     Result

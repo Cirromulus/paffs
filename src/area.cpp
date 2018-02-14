@@ -468,7 +468,7 @@ AreaManagement::findFirstFreePage(PageOffs& page, AreaPos area)
         if (r != Result::ok)
             return r;
     }
-    return Result::nospace;
+    return Result::noSpace;
 }
 
 Result
@@ -586,7 +586,7 @@ AreaManagement::deleteAreaContents(AreaPos area)
                         getPos(area) * blocksPerArea + i,
                         area);
             retireArea(area);
-            r = Result::badflash;
+            r = Result::badFlash;
             break;
         }
     }
@@ -596,7 +596,7 @@ AreaManagement::deleteAreaContents(AreaPos area)
         dev->sumCache.resetASWritten(area);
     }
 
-    if (r == Result::badflash)
+    if (r == Result::badFlash)
     {
         PAFFS_DBG_S(PAFFS_TRACE_GC,
                     "Could not delete block in area %" PTYPE_AREAPOS " "

@@ -216,7 +216,7 @@ fillFlashAndVerify(paffs::Paffs& fs)
         r = fs.mkDir(filename, paffs::FC);
         if (r != paffs::Result::ok)
         {
-            ASSERT_THAT(r, AnyOf(Eq(paffs::Result::nospace), Eq(paffs::Result::toobig)));
+            ASSERT_THAT(r, AnyOf(Eq(paffs::Result::noSpace), Eq(paffs::Result::tooBig)));
             break;
         }
         for (j = 0; j < 100; j++)
@@ -227,16 +227,16 @@ fillFlashAndVerify(paffs::Paffs& fs)
             {
                 std::cout << filename << ": " << paffs::err_msg(fs.getLastErr()) << std::endl;
                 ASSERT_THAT(fs.getLastErr(),
-                            AnyOf(Eq(paffs::Result::lowmem),
-                                     AnyOf(Eq(paffs::Result::nospace),
-                                     Eq(paffs::Result::toobig))));
+                            AnyOf(Eq(paffs::Result::lowMem),
+                                     AnyOf(Eq(paffs::Result::noSpace),
+                                     Eq(paffs::Result::tooBig))));
                 full = true;
                 break;
             }
             ASSERT_EQ(fs.getLastErr(), paffs::Result::ok);
 
             r = fs.write(*fil, txt, strlen(txt), &bw);
-            if (r == paffs::Result::nospace)
+            if (r == paffs::Result::noSpace)
             {
                 full = true;
                 break;

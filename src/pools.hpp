@@ -34,7 +34,7 @@ struct ObjectPool
         size_t objOffs = activeObjects.findFirstFree();
         if (objOffs >= size)
         {
-            return Result::nospace;
+            return Result::noSpace;
         }
         activeObjects.setBit(objOffs);
         new (&objects[objOffs]) T;

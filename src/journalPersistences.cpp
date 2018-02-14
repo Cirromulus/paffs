@@ -155,7 +155,7 @@ MramPersistence::appendEntry(const JournalEntry& entry)
 {
     if (curr + sizeof(journalEntry::Max) > mramSize)
     {
-        return Result::nospace;
+        return Result::noSpace;
     }
     uint16_t size = getSizeFromJE(entry);
     device->driver.writeMRAM(curr, &entry, size);
@@ -167,7 +167,7 @@ MramPersistence::appendEntry(const JournalEntry& entry)
     device->driver.writeMRAM(0, &curr, sizeof(PageAbs));
     if(mramSize - curr < reservedLogsize)
     {
-        return Result::lowmem;
+        return Result::lowMem;
     }
     return Result::ok;
 }
@@ -381,7 +381,7 @@ FlashPersistence::findNextPos(bool forACheckpoint)
     {
         // Ouch, we dont want to reach this
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find a free page in journal!");
-        return Result::nospace;
+        return Result::noSpace;
     }
     curr = JournalEntryPosition(
                    combineAddress(extractLogicalArea(curr.addr), extractPageOffs(curr.addr) + 1), 0)

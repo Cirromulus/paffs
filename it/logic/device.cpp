@@ -224,7 +224,7 @@ TEST_F(FileTest, createReadWriteDeleteManyFiles)
                 //append
                 unsigned int bw;
                 r = fs.write(*fd, block, blocksize, &bw);
-                if(r == Result::nospace)
+                if(r == Result::noSpace)
                 {
                     r = fs.close(*fd);
                     ASSERT_EQ(r, Result::ok);
@@ -336,7 +336,7 @@ TEST_F(FileTest, permissions)
     ASSERT_EQ(r, Result::ok);
 
     fil = fs.open("/file", FW);
-    EXPECT_EQ(fs.getLastErr(), Result::noperm);
+    EXPECT_EQ(fs.getLastErr(), Result::noPerm);
     ASSERT_EQ(fil, nullptr);
     fs.resetLastErr();
 
@@ -345,7 +345,7 @@ TEST_F(FileTest, permissions)
 
     r = fs.write(*fil, txt, strlen(txt), &bw);
     EXPECT_EQ(bw, static_cast<unsigned int>(0));
-    ASSERT_EQ(r, Result::noperm);
+    ASSERT_EQ(r, Result::noPerm);
 
     r = fs.close(*fil);
     ASSERT_EQ(r, Result::ok);
@@ -382,7 +382,7 @@ TEST_F(FileTest, maxFilesize)
     {
         r = fs.write(*fil, block, blocksize, &bw);
         i += bw;
-        if (r == Result::nospace)
+        if (r == Result::noSpace)
             break;
         if (r != Result::ok)
         {
@@ -614,17 +614,17 @@ TEST_F(FileTest, readOnlyChecks)
 
     // Write try
     fil = fs.open("/a/b/file1", FW);
-    ASSERT_EQ(fs.getLastErr(), Result::readonly);
+    ASSERT_EQ(fs.getLastErr(), Result::readOnly);
     ASSERT_EQ(fil, nullptr);
     fs.resetLastErr();
 
     // existing File
     r = fs.touch("/a/b/file1");
-    ASSERT_EQ(r, Result::readonly);
+    ASSERT_EQ(r, Result::readOnly);
 
     // new file
     r = fs.touch("/a/b/fileNEW");
-    ASSERT_EQ(r, Result::readonly);
+    ASSERT_EQ(r, Result::readOnly);
 
     // existing Dirs
     // root
@@ -676,9 +676,9 @@ TEST_F(FileTest, readOnlyChecks)
 
     // new Dir
     r = fs.mkDir("/c/");
-    ASSERT_EQ(r, Result::readonly);
+    ASSERT_EQ(r, Result::readOnly);
 
     // delete dir
     r = fs.remove("/a/b");
-    ASSERT_EQ(r, Result::readonly);
+    ASSERT_EQ(r, Result::readOnly);
 }

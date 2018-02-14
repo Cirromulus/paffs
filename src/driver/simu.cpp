@@ -153,10 +153,10 @@ SimuDriver::checkBad(BlockAbs block_no)
 	for(unsigned page = 0; page < pagesPerBlock; page++){
 		Nandaddress d = translatePageToAddress(block_no * pagesPerBlock + page);
 		if(cell->readPage(d.plane, d.block, d.page, buf) < 0){
-			return Result::badflash;
+			return Result::badFlash;
 		}
 		if(buf[dataBytesPerPage + 5] == 0)
-			return Result::badflash;
+			return Result::badFlash;
 	}
 	return Result::ok;
 }

@@ -58,7 +58,7 @@ DataIO::writeInodeData(Inode& inode,
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Due to the journal, only %" PRIu16 " pages "
                 "are allowed per single write", maxPagesPerWrite);
-        return Result::toobig;
+        return Result::tooBig;
     }
 
     Result res = pac.setTargetInode(inode);
@@ -391,7 +391,7 @@ DataIO::writePageData(PageAbs  pageFrom,
         PageOffs firstFreePage = 0;
         if (dev->areaMgmt.findFirstFreePage(firstFreePage,
                                             dev->areaMgmt.getActiveArea(AreaType::data))
-            == Result::nospace)
+            == Result::noSpace)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
                       "BUG: findWritableArea returned full area (%" PRId16 ").",

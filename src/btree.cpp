@@ -452,7 +452,7 @@ Btree::findLeaf(InodeNo key, TreeCacheNode*& outtreeCacheNode)
                       "Cache size (%" PRId16 ") too small for depth %" PRId16 "!",
                       treeNodeCacheSize,
                       depth);
-            return Result::lowmem;
+            return Result::lowMem;
         }
 
         i = 0;

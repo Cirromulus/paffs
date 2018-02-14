@@ -145,7 +145,7 @@ GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea, Summ
                 PAFFS_DBG_S(PAFFS_TRACE_GC,
                             "Could not write page n° %lu!",
                             static_cast<long unsigned>(dst));
-                return Result::badflash;
+                return Result::badFlash;
             }
         }
         else
@@ -208,13 +208,13 @@ GarbageCollection::collectGarbage(AreaType targetType)
             if (targetType != AreaType::index)
             {
                 PAFFS_DBG_S(PAFFS_TRACE_GC, "And we use reserved Areas for INDEX only.");
-                return Result::nospace;
+                return Result::noSpace;
             }
 
             if (dev->areaMgmt.getUsedAreas() <= areasNo)
             {
                 PAFFS_DBG_S(PAFFS_TRACE_GC, "and have no reserved Areas left.");
-                return Result::nospace;
+                return Result::noSpace;
             }
 
             // This happens if we couldn't erase former srcArea which was not empty

@@ -38,16 +38,18 @@ Journal::addEvent(const JournalEntry& entry)
         printMeaning(entry);
     }
 
+    bool lowLogSpace = false;
+
     if(entry.topic != JournalEntry::Topic::checkpoint ||
             uncheckpointedChanges.getBit(static_cast<const journalEntry::Checkpoint*>(&entry)->target))
     {
         Result r = persistence.appendEntry(entry);
-        if (r == Result::nospace)
+        if (r == Result::noSpace)
         {   //most bad situation
             PAFFS_DBG(PAFFS_TRACE_BUG, "Log full. should have been flushed.");
             return r;
         }
-        if (r == Result::lowmem)
+        if (r == Result::lowMem)
         {
             //This is a warning that we fell under the safetythreshold.
             //commit everything as soon as everything is valid
@@ -78,23 +80,13 @@ Journal::addEvent(const JournalEntry& entry)
                   "Skipped checkpoint because no changes were made");
     }
 
-
-    if(entry.topic == JournalEntry::Topic::checkpoint &&
-            static_cast<const journalEntry::Checkpoint*>(&entry)->target == JournalEntry::Topic::device)
-    {   //This is a special case, because now we are in an absolutely clean state
-        //so we can clean up the log
-        //TODO: tell device to commit all modules to clear log
-    }
-
-
-    return Result::ok;
+    return lowLogSpace ? Result::lowMem : Result::ok;
 }
 
 Result
 Journal::clear()
 {
     disabled = false;
-    lowLogSpace = false;
     for(JournalTopic* topic : topics)
     {
         if(topic != nullptr)
@@ -538,7 +530,6 @@ Result
 Journal::enable()
 {
     disabled = false;
-    lowLogSpace = false;
     for(JournalTopic* topic : topics)
     {
         if(topic != nullptr)

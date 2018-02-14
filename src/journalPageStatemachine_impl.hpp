@@ -74,7 +74,7 @@ PageStateMachine<maxPages, maxPositions, topic>::replacePage(Addr neu, Addr old,
 {
     if(pageListHWM == maxPages)
     {
-        return Result::lowmem;
+        return Result::lowMem;
     }
     oldPageList[pageListHWM] = old;
     newPageList[pageListHWM] = neu;

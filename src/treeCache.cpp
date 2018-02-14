@@ -105,7 +105,7 @@ TreeCache::tryAddNewCacheNode(TreeCacheNode*& newTcn)
         PAFFS_DBG_S(PAFFS_TRACE_TREECACHE, "Cache is full!");
         if (traceMask & PAFFS_TRACE_TREECACHE)
             printTreeCache();
-        return Result::lowmem;
+        return Result::lowMem;
     }
     newTcn = &mCache[index];
     memset(newTcn, 0, sizeof(TreeCacheNode));
@@ -144,7 +144,7 @@ TreeCache::addNewCacheNode(TreeCacheNode*& newTcn)
     Result r = tryAddNewCacheNode(newTcn);
     if (r == Result::ok)
         return r;
-    if (r != Result::lowmem)
+    if (r != Result::lowMem)
         return r;
     if (traceMask & PAFFS_TRACE_VERIFY_TC && !isTreeCacheValid())
     {
@@ -783,7 +783,7 @@ TreeCache::freeNodes(uint16_t neededCleanNodes)
     }
     PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Even hard commit could not allocate "
             "remaining %" PRIu16 " treenodes!", neededCleanNodes);
-    return Result::lowmem;
+    return Result::lowMem;
 }
 
 /**
@@ -1230,7 +1230,7 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
     PageOffs firstFreePage = 0;
     if (dev->areaMgmt.findFirstFreePage(firstFreePage,
                                         dev->areaMgmt.getActiveArea(AreaType::index))
-        == Result::nospace)
+        == Result::noSpace)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "BUG: findWritableArea returned full area (%" PTYPE_AREAPOS " on %" PTYPE_AREAPOS ").",

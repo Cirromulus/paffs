@@ -548,7 +548,7 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result* result)
     if (mTranslation.find(area) == mTranslation.end())
     {
         Result r = loadUnbufferedArea(area, false);
-        if (r == Result::nospace)
+        if (r == Result::noSpace)
         {
             // load one-shot AS in read only
             TwoBitList<dataPagesPerArea> buf;
@@ -964,7 +964,7 @@ SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent)
         {
             PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                         "Nonurgent Cacheclean did not return free space, activating read-only");
-            return Result::nospace;
+            return Result::noSpace;
         }
         if (r != Result::ok)
         {

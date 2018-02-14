@@ -194,7 +194,7 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
     PAFFS_DBG(PAFFS_TRACE_ERROR,
               "Get Page bigger than allowed! (was --, should <--)");
     // TODO: Actual calculation of values
-    return Result::toobig;
+    return Result::tooBig;
 }
 
 Result
@@ -313,7 +313,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
     PAFFS_DBG(PAFFS_TRACE_ERROR,
               "Get Page bigger than allowed! (was --, should <--)");
     // TODO: Actual calculation of values
-    return Result::toobig;
+    return Result::tooBig;
 }
 
 Result
@@ -833,7 +833,7 @@ PageAddressCache::writeAddrList(Addr& source, Addr list[addrsPerPage])
 
     PageOffs firstFreePage = 0;
     if (device.areaMgmt.findFirstFreePage(firstFreePage, device.areaMgmt.getActiveArea(AreaType::index))
-        == Result::nospace)
+        == Result::noSpace)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "BUG: findWritableArea returned full area (%" PRId16 ").",
