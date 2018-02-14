@@ -28,8 +28,10 @@ GarbageCollection::countDirtyPages(SummaryEntry* summary)
     PageOffs dirty = 0;
     for (PageOffs i = 0; i < dataPagesPerArea; i++)
     {
-        if (summary[i] != SummaryEntry::used)
+        if (summary[i] == SummaryEntry::dirty)
+        {
             dirty++;
+        }
     }
     return dirty;
 }
@@ -55,7 +57,6 @@ GarbageCollection::findNextBestArea(AreaType target,
                 || dev->areaMgmt.getType(i) == AreaType::index))
         {
             Result r = dev->sumCache.getSummaryStatus(i, curr);
-            PageOffs dirtyPages = countDirtyPages(curr);
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
@@ -63,6 +64,7 @@ GarbageCollection::findNextBestArea(AreaType target,
                           i);
                 return 0;
             }
+            PageOffs dirtyPages = countDirtyPages(curr);
             if (target != AreaType::unset)
             {
                 // normal case
@@ -85,7 +87,7 @@ GarbageCollection::findNextBestArea(AreaType target,
                     || (dirtyPages != 0 && dirtyPages == favDirtyPages
                         && dev->areaMgmt.getErasecount(i) < favErases)
                     || (dirtyPages != 0 && dirtyPages == favDirtyPages
-                        && dev->sumCache.wasASWritten(i)))
+                        && dev->sumCache.wasAreaSummaryWritten(i)))
                 {
                     favourite_area = i;
                     favDirtyPages = dirtyPages;
@@ -96,9 +98,11 @@ GarbageCollection::findNextBestArea(AreaType target,
             else
             {
                 // Special Case for freeing committed AreaSummaries
-                if (dev->sumCache.isCached(i) && dev->sumCache.wasASWritten(i)
-                    && dirtyPages >= favDirtyPages)
+                if (dev->sumCache.shouldClearArea(i) && dirtyPages >= favDirtyPages)
                 {
+                    //printf("GC shouldclear %" PTYPE_AREAPOS " with %" PTYPE_PAGEOFFS " dirty pages "
+                    //        "(fav: Area %" PTYPE_AREAPOS " with %" PTYPE_PAGEOFFS ")\n",
+                    //       i, dirtyPages, favourite_area, favDirtyPages);
                     favourite_area = i;
                     favDirtyPages = dirtyPages;
                     memcpy(summaryOut, curr, dataPagesPerArea);
@@ -195,6 +199,8 @@ GarbageCollection::collectGarbage(AreaType targetType)
 
     while (1)
     {
+        //FIXME DEBUG
+        dev->sumCache.printStatus();
         deletionTarget = findNextBestArea(targetType, summary, &srcAreaContainsData);
         if (deletionTarget == 0
                 || (lastDeletionTarget != 0 && srcAreaContainsData))
@@ -302,24 +308,8 @@ GarbageCollection::collectGarbage(AreaType targetType)
             r = dev->areaMgmt.deleteAreaContents(deletionTarget);
             if(r != Result::ok)
             {
-
-            }
-            // Copy the updated (no SummaryEntry::dirty pages) summary to the deletion_target
-            // (it will be the fresh area!)
-            r = dev->sumCache.setSummaryStatus(deletionTarget, summary);
-            if (r != Result::ok)
-            {
-                PAFFS_DBG_S(PAFFS_TRACE_ERROR,
-                            "Could not remove dirty entries in AS of area %" PRId16 "",
-                            deletionTarget);
-                return r;
-            }
-            // Notify for used Pages
-            if (targetType != AreaType::unset)
-            {
-                // Safe, because we can assume deletion targetType is same Type as we want (from
-                // getNextBestArea)
-                dev->areaMgmt.setStatus(deletionTarget, AreaStatus::active);
+                //TODO: Handle this better
+                continue;
             }
         }
         else
@@ -336,6 +326,27 @@ GarbageCollection::collectGarbage(AreaType targetType)
     dev->areaMgmt.swapAreaPosition(deletionTarget,
                                    dev->areaMgmt.getActiveArea(AreaType::garbageBuffer));
 
+    if (srcAreaContainsData)
+    {
+        // Copy the updated (no SummaryEntry::dirty pages) summary to the deletion_target
+        // (it will be the fresh area!)
+        r = dev->sumCache.setSummaryStatus(deletionTarget, summary);
+        if (r != Result::ok)
+        {
+            PAFFS_DBG_S(PAFFS_TRACE_ERROR,
+                        "Could not remove dirty entries in AS of area %" PRId16 "",
+                        deletionTarget);
+            return r;
+        }
+        // Notify for used Pages
+        if (targetType != AreaType::unset)
+        {
+            // Safe, because we can assume deletion targetType is same Type as we want (from
+            // getNextBestArea)
+            dev->areaMgmt.setStatus(deletionTarget, AreaStatus::active);
+        }
+    }
+
     if (targetType != AreaType::unset)
     {
         // This assumes that current activearea is closed...
@@ -347,7 +358,6 @@ GarbageCollection::collectGarbage(AreaType targetType)
                       dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(targetType)));
             return Result::bug;
         }
-        // dev->areaMgmt.setActiveArea(targetType, deletion_target);
         dev->areaMgmt.initAreaAs(deletionTarget, targetType);
     }
 

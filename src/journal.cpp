@@ -256,7 +256,7 @@ Journal::applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[Journ
         }
         else
         {
-            if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
+            if (false && (traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
             {
                 printf("_skipping_ ");
                 printMeaning(entry.base, false);

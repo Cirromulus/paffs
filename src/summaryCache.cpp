@@ -639,8 +639,9 @@ SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary)
     // This area ist likely to be used soon
     if (mTranslation.find(area) == mTranslation.end())
     {
-        int nextEntry = findNextFreeCacheEntry();
-        if(nextEntry < 0)
+        printStatus();  //FIXME DEBUG
+        Result r = loadUnbufferedArea(area, false);
+        if (r == Result::notFound)
         {
             //No space for loading this area, so directly hardcommit this (Ugly!)
             AreaSummaryElem tmp;
@@ -652,11 +653,10 @@ SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary)
             writeAreasummary(tmp);
             return Result::ok;
         }
-        else
+        else if(r != Result::ok)
         {
-            Result r = loadUnbufferedArea(area, true);
-            if (r != Result::ok)
-                return r;
+            //something bad happened
+            return r;
         }
     }
 
@@ -687,14 +687,26 @@ SummaryCache::deleteSummary(AreaPos area)
 
 // For Garbage collection to consider cached AS-Areas before others
 bool
-SummaryCache::isCached(AreaPos area)
+SummaryCache::shouldClearArea(AreaPos area)
 {
-    return mTranslation.find(area) != mTranslation.end();
+    if (mTranslation.find(area) == mTranslation.end())
+    {   //not cached
+        return false;
+    }
+    if(!mSummaryCache[mTranslation[area]].isAreaSummaryWritten())
+    {   //not AS written
+        return false;
+    }
+    if(!mSummaryCache[mTranslation[area]].isDirty())
+    {   //Not dirty
+        return false;
+    }
+    return true;
 }
 
 // For Garbage collection to consider committed AS-Areas before others
 bool
-SummaryCache::wasASWritten(AreaPos area)
+SummaryCache::wasAreaSummaryWritten(AreaPos area)
 {
     if (mTranslation.find(area) == mTranslation.end())
     {
@@ -713,9 +725,6 @@ SummaryCache::resetASWritten(AreaPos area)
 {
     if (mTranslation.find(area) == mTranslation.end())
     {
-        PAFFS_DBG(PAFFS_TRACE_ASCACHE,
-                  "Tried to reset AS-Record of non-cached Area %" PRId16 ". This is probably not a bug.",
-                  area);
         return;
     }
     mSummaryCache[mTranslation[area]].setAreaSummaryWritten(false);

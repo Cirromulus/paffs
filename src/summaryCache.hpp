@@ -128,14 +128,15 @@ public:
      * Used by Garbage collection to consider cached AS-Areas before others
      */
     bool
-    isCached(AreaPos area);
+    shouldClearArea(AreaPos area);
+
     /**
-     * Used by Garbage collection to consider committed AS-Areas before others
+     * Used by Garbage collection to consider dirty AS-Areas before others
      */
-    bool
-    wasASWritten(AreaPos area);
+    bool wasAreaSummaryWritten(AreaPos area);
+
     /**
-     * Used by Garbage collection that can delete the AS too
+     * Used by Garbage collection that can delete the AS too. Does nothing if area is not cached.
      */
     void
     resetASWritten(AreaPos area);
@@ -191,6 +192,9 @@ private:
     int
     findNextFreeCacheEntry();
 
+    /**
+     * \param urgent if not urgent, it stops before calling garbagecollection
+     */
     Result
     loadUnbufferedArea(AreaPos area, bool urgent);
 
