@@ -270,7 +270,7 @@ SuperIndex::print()
 JournalEntry::Topic
 Superblock::getTopic()
 {
-    return JournalEntry::Topic::areaMgmt;
+    return JournalEntry::Topic::superblock;
 }
 
 void
@@ -281,45 +281,45 @@ Superblock::preScan(const journalEntry::Max& entry, JournalEntryPosition)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
         return;
     }
-    auto e = &entry.areaMgmt;
+    auto e = &entry.superblock;
     switch (e->type)
     {
-        case journalEntry::AreaMgmt::Type::rootnode:
-            registerRootnode(entry.areaMgmt_.rootnode.addr);
+        case journalEntry::Superblock::Type::rootnode:
+            registerRootnode(entry.superblock_.rootnode.addr);
             break;
-        case journalEntry::AreaMgmt::Type::areaMap:
+        case journalEntry::Superblock::Type::areaMap:
             {
-            auto a = &entry.areaMgmt_.areaMap;
+            auto a = &entry.superblock_.areaMap;
             switch(a->operation)
             {
-                case journalEntry::areaMgmt::AreaMap::Operation::type:
-                    device->areaMgmt.setType(a->offs, entry.areaMgmt_.areaMap_.type.type);
+                case journalEntry::superblock::AreaMap::Operation::type:
+                    device->areaMgmt.setType(a->offs, entry.superblock_.areaMap_.type.type);
                     break;
-                case journalEntry::areaMgmt::AreaMap::Operation::status:
-                    device->areaMgmt.setStatus(a->offs, entry.areaMgmt_.areaMap_.status.status);
+                case journalEntry::superblock::AreaMap::Operation::status:
+                    device->areaMgmt.setStatus(a->offs, entry.superblock_.areaMap_.status.status);
                     break;
-                case journalEntry::areaMgmt::AreaMap::Operation::increaseErasecount:
+                case journalEntry::superblock::AreaMap::Operation::increaseErasecount:
                     device->areaMgmt.increaseErasecount(a->offs);
                     break;
-                case journalEntry::areaMgmt::AreaMap::Operation::position:
-                    device->areaMgmt.setPos(a->offs, entry.areaMgmt_.areaMap_.position.position);
+                case journalEntry::superblock::AreaMap::Operation::position:
+                    device->areaMgmt.setPos(a->offs, entry.superblock_.areaMap_.position.position);
                     break;
-                case journalEntry::areaMgmt::AreaMap::Operation::swap:
-                    device->areaMgmt.swapAreaPosition(a->offs, entry.areaMgmt_.areaMap_.swap.b);
+                case journalEntry::superblock::AreaMap::Operation::swap:
+                    device->areaMgmt.swapAreaPosition(a->offs, entry.superblock_.areaMap_.swap.b);
                     break;
                 default:
                     return;
             }
             break;
             }
-        case journalEntry::AreaMgmt::Type::activeArea:
+        case journalEntry::Superblock::Type::activeArea:
             {
-            auto aa = &entry.areaMgmt_.activeArea;
+            auto aa = &entry.superblock_.activeArea;
             device->areaMgmt.setActiveArea(aa->type, aa->area);
             break;
             }
-        case journalEntry::AreaMgmt::Type::usedAreas:
-            device->areaMgmt.setUsedAreas(entry.areaMgmt_.usedAreas.usedAreas);
+        case journalEntry::Superblock::Type::usedAreas:
+            device->areaMgmt.setUsedAreas(entry.superblock_.usedAreas.usedAreas);
             break;
     }
 }
@@ -345,7 +345,7 @@ Superblock::registerRootnode(Addr addr)
 
     mRootnodeAddr = addr;
     mRootnodeDirty = true;
-    device->journal.addEvent(journalEntry::areaMgmt::Rootnode(addr));
+    device->journal.addEvent(journalEntry::superblock::Rootnode(addr));
     return Result::ok;
 }
 
@@ -731,7 +731,7 @@ Superblock::fillPathWithFirstSuperblockAreas(Addr directPath[superChainElems])
     if (foundElems != superChainElems)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Could not find enough superBlocks path! got %" PRId16 ", should %" PTYPE_AREAPOS "",
+                  "Could not find enough superblocks for path! got %" PRId16 ", should %" PTYPE_AREAPOS "",
                   foundElems,
                   superChainElems);
         return Result::fail;

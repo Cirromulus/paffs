@@ -629,16 +629,35 @@ SummaryCache::getEstimatedSummaryStatus(AreaPos area, SummaryEntry* summary)
     return getSummaryStatus(area, summary, false);
 }
 
+/**
+ * This function will not call garbagecollection.
+ */
 Result
 SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary)
 {
     // Dont set Dirty, because GC just deleted AS and dirty Pages
-    // This area ist most likely to be used soon
+    // This area ist likely to be used soon
     if (mTranslation.find(area) == mTranslation.end())
     {
-        Result r = loadUnbufferedArea(area, true);
-        if (r != Result::ok)
-            return r;
+        int nextEntry = findNextFreeCacheEntry();
+        if(nextEntry < 0)
+        {
+            //No space for loading this area, so directly hardcommit this (Ugly!)
+            AreaSummaryElem tmp;
+            tmp.setArea(dev->areaMgmt.getActiveArea(AreaType::garbageBuffer));
+            for (uint16_t i = 0; i < dataPagesPerArea; i++)
+            {
+                tmp.setStatus(i, summary[i]);
+            }
+            writeAreasummary(tmp);
+            return Result::ok;
+        }
+        else
+        {
+            Result r = loadUnbufferedArea(area, true);
+            if (r != Result::ok)
+                return r;
+        }
     }
 
     packStatusArray(mTranslation[area], summary);

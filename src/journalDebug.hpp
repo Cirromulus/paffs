@@ -15,7 +15,8 @@ static constexpr const char* topicNames[] =
         "INVALID",
         "CHECKPOINT",
         "PAGESTATUS",
-        "AREAMGMT",
+        "SUPBLOCK",
+        "GARBAGE",
         "SUMMARY CACHE",
         "TREE",
         "PAC",
@@ -28,7 +29,8 @@ static constexpr const uint8_t colorMap[JournalEntry::numberOfTopics] =
         97, //invalid
         31, //checkpoint
         32, //pagestate
-        33, //areaMgmt
+        33, //superblock
+        96, //garbage collection
         36, //summaryCache
         35, //tree
         37, //pac

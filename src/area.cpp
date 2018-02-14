@@ -188,7 +188,7 @@ AreaManagement::setType(AreaPos area, AreaType type)
         return;
     }
     PAFFS_DBG_S(PAFFS_TRACE_AREA, "Set area %" PTYPE_AREAPOS " to %s", area, areaNames[type]);
-    dev->journal.addEvent(journalEntry::areaMgmt::areaMap::Type(area, type));
+    dev->journal.addEvent(journalEntry::superblock::areaMap::Type(area, type));
     map[area].type = type;
 }
 void
@@ -204,7 +204,7 @@ AreaManagement::setStatus(AreaPos area, AreaStatus status)
         return;
     }
     PAFFS_DBG_S(PAFFS_TRACE_AREA, "Set area %" PTYPE_AREAPOS " to %s", area, areaStatusNames[status]);
-    dev->journal.addEvent(journalEntry::areaMgmt::areaMap::Status(area, status));
+    dev->journal.addEvent(journalEntry::superblock::areaMap::Status(area, status));
     map[area].status = status;
 }
 void
@@ -220,7 +220,7 @@ AreaManagement::increaseErasecount(AreaPos area)
         return;
     }
     overallDeletions++;
-    dev->journal.addEvent(journalEntry::areaMgmt::areaMap::IncreaseErasecount(area));
+    dev->journal.addEvent(journalEntry::superblock::areaMap::IncreaseErasecount(area));
     map[area].erasecount++;
 }
 void
@@ -236,7 +236,7 @@ AreaManagement::setPos(AreaPos area, AreaPos pos)
         return;
     }
     PAFFS_DBG_S(PAFFS_TRACE_AREA, "Set area %" PTYPE_AREAPOS " to %" PTYPE_AREAPOS, area, pos);
-    dev->journal.addEvent(journalEntry::areaMgmt::areaMap::Position(area, pos));
+    dev->journal.addEvent(journalEntry::superblock::areaMap::Position(area, pos));
     map[area].position = pos;
 }
 
@@ -264,7 +264,7 @@ AreaManagement::setActiveArea(AreaType type, AreaPos pos)
                 PAFFS_TRACE_BUG, "SetActiveArea of Pos %" PTYPE_AREAPOS ", but area is not active!", pos);
     }
     PAFFS_DBG_S(PAFFS_TRACE_AREA, "Set Active area of %s to %" PTYPE_AREAPOS, areaNames[type], pos);
-    dev->journal.addEvent(journalEntry::areaMgmt::ActiveArea(type, pos));
+    dev->journal.addEvent(journalEntry::superblock::ActiveArea(type, pos));
     activeArea[type] = pos;
 }
 
@@ -276,7 +276,7 @@ AreaManagement::getUsedAreas()
 void
 AreaManagement::setUsedAreas(AreaPos num)
 {
-    dev->journal.addEvent(journalEntry::areaMgmt::UsedAreas(num));
+    dev->journal.addEvent(journalEntry::superblock::UsedAreas(num));
     usedAreas = num;
 }
 void
@@ -311,7 +311,7 @@ AreaManagement::swapAreaPosition(AreaPos a, AreaPos b)
                   areasNo);
         return;
     }
-    dev->journal.addEvent(journalEntry::areaMgmt::areaMap::Swap(a, b));
+    dev->journal.addEvent(journalEntry::superblock::areaMap::Swap(a, b));
     PAFFS_DBG_S(PAFFS_TRACE_AREA | PAFFS_TRACE_VERBOSE,
               "Swap Area %" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ") "
               "with Area %" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ")",
@@ -648,11 +648,18 @@ AreaManagement::deleteArea(AreaPos area)
     }
 
     Result r = deleteAreaContents(area);
+    if(r != Result::ok)
+    {
+        PAFFS_DBG_S(PAFFS_TRACE_AREA, "Could not delete Area %" PTYPE_AREAPOS
+                    " at pos. %" PTYPE_AREAPOS ".", area, getPos(area));
+        return r;
+    }
 
     setStatus(area, AreaStatus::empty);
     setType(area, AreaType::unset);
     decreaseUsedAreas();
-    PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Area %" PTYPE_AREAPOS " at pos. %" PTYPE_AREAPOS ".", area, getPos(area));
+    PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Area %" PTYPE_AREAPOS
+                " at pos. %" PTYPE_AREAPOS ".", area, getPos(area));
     return r;
 }
 

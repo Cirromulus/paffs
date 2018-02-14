@@ -55,7 +55,7 @@ Journal::addEvent(const JournalEntry& entry)
             //commit everything as soon as everything is valid
             lowLogSpace = true;
         }
-        if (r != Result::ok)
+        else if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not append Entry to persistence");
             return r;
@@ -347,63 +347,63 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         }
         break;
     }
-    case JournalEntry::Topic::areaMgmt:
-        switch (static_cast<const journalEntry::AreaMgmt*>(&entry)->type)
+    case JournalEntry::Topic::superblock:
+        switch (static_cast<const journalEntry::Superblock*>(&entry)->type)
         {
-        case journalEntry::AreaMgmt::Type::rootnode:
+        case journalEntry::Superblock::Type::rootnode:
             printf("Superblock Rootnode to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
-                   extractLogicalArea(static_cast<const journalEntry::areaMgmt::Rootnode*>(&entry)->addr),
-                   extractPageOffs(static_cast<const journalEntry::areaMgmt::Rootnode*>(&entry)->addr));
+                   extractLogicalArea(static_cast<const journalEntry::superblock::Rootnode*>(&entry)->addr),
+                   extractPageOffs(static_cast<const journalEntry::superblock::Rootnode*>(&entry)->addr));
             found = true;
             break;
-        case journalEntry::AreaMgmt::Type::areaMap:
+        case journalEntry::Superblock::Type::areaMap:
             printf("AreaMap %" PTYPE_AREAPOS " ",
-                   static_cast<const journalEntry::areaMgmt::AreaMap*>(&entry)->offs);
-            switch (static_cast<const journalEntry::areaMgmt::AreaMap*>(&entry)->operation)
+                   static_cast<const journalEntry::superblock::AreaMap*>(&entry)->offs);
+            switch (static_cast<const journalEntry::superblock::AreaMap*>(&entry)->operation)
             {
-            case journalEntry::areaMgmt::AreaMap::Operation::type:
+            case journalEntry::superblock::AreaMap::Operation::type:
                 printf("set Type to %s",
-                       areaNames[static_cast<const journalEntry::areaMgmt::areaMap::Type*>(&entry)
+                       areaNames[static_cast<const journalEntry::superblock::areaMap::Type*>(&entry)
                                          ->type]);
                 found = true;
                 break;
-            case journalEntry::areaMgmt::AreaMap::Operation::status:
+            case journalEntry::superblock::AreaMap::Operation::status:
                 printf("set Status to %s",
-                       areaStatusNames[static_cast<const journalEntry::areaMgmt::areaMap::Status*>(
+                       areaStatusNames[static_cast<const journalEntry::superblock::areaMap::Status*>(
                                                &entry)
                                                ->status]);
                 found = true;
                 break;
-            case journalEntry::areaMgmt::AreaMap::Operation::increaseErasecount:
+            case journalEntry::superblock::AreaMap::Operation::increaseErasecount:
                 printf("increase Erasecount");
                 found = true;
                 break;
-            case journalEntry::areaMgmt::AreaMap::Operation::position:
+            case journalEntry::superblock::AreaMap::Operation::position:
             {
-                const journalEntry::areaMgmt::areaMap::Position* p =
-                        static_cast<const journalEntry::areaMgmt::areaMap::Position*>(&entry);
+                const journalEntry::superblock::areaMap::Position* p =
+                        static_cast<const journalEntry::superblock::areaMap::Position*>(&entry);
                 printf("set Position to %02X:%03X",
                        extractLogicalArea(p->position),
                        extractPageOffs(p->position));
                 found = true;
                 break;
             }
-            case journalEntry::areaMgmt::AreaMap::Operation::swap:
+            case journalEntry::superblock::AreaMap::Operation::swap:
                 printf("Swap with %" PTYPE_AREAPOS,
-                       static_cast<const journalEntry::areaMgmt::areaMap::Swap*>(&entry)->b);
+                       static_cast<const journalEntry::superblock::areaMap::Swap*>(&entry)->b);
                 found = true;
                 break;
             }
             break;
-        case journalEntry::AreaMgmt::Type::activeArea:
+        case journalEntry::Superblock::Type::activeArea:
             printf("Set ActiveArea of %s to %" PTYPE_AREAPOS,
-                   areaNames[static_cast<const journalEntry::areaMgmt::ActiveArea*>(&entry)->type],
-                   static_cast<const journalEntry::areaMgmt::ActiveArea*>(&entry)->area);
+                   areaNames[static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->type],
+                   static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->area);
             found = true;
             break;
-        case journalEntry::AreaMgmt::Type::usedAreas:
+        case journalEntry::Superblock::Type::usedAreas:
             printf("Set used Areas to %" PTYPE_AREAPOS,
-                   static_cast<const journalEntry::areaMgmt::UsedAreas*>(&entry)->usedAreas);
+                   static_cast<const journalEntry::superblock::UsedAreas*>(&entry)->usedAreas);
             found = true;
             break;
         }

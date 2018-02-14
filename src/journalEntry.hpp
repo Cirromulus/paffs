@@ -25,7 +25,8 @@ struct JournalEntry
         invalid = 0,
         checkpoint,
         pagestate,
-        areaMgmt,
+        superblock,
+        garbage,
         summaryCache,
         tree,
         pac,
@@ -33,7 +34,7 @@ struct JournalEntry
         device,
     };
 
-    static constexpr const unsigned char numberOfTopics = 9;
+    static constexpr const unsigned char numberOfTopics = 10;
     Topic topic;
 
 protected:
@@ -110,7 +111,7 @@ namespace journalEntry
         };
     }
 
-    struct AreaMgmt : public JournalEntry
+    struct Superblock : public JournalEntry
     {
         enum Type : uint8_t
         {
@@ -123,18 +124,18 @@ namespace journalEntry
 
     protected:
         inline
-        AreaMgmt(Type _type) : JournalEntry(Topic::areaMgmt), type(_type){};
+        Superblock(Type _type) : JournalEntry(Topic::superblock), type(_type){};
     };
 
-    namespace areaMgmt
+    namespace superblock
     {
-        struct Rootnode : public AreaMgmt
+        struct Rootnode : public Superblock
         {
             Addr addr;
-            Rootnode(Addr _addr) : AreaMgmt(Type::rootnode), addr(_addr){};
+            Rootnode(Addr _addr) : Superblock(Type::rootnode), addr(_addr){};
         };
 
-        struct AreaMap : public AreaMgmt
+        struct AreaMap : public Superblock
         {
             enum class Operation : uint8_t
             {
@@ -150,7 +151,7 @@ namespace journalEntry
         protected:
             inline
             AreaMap(AreaPos _offs, Operation _operation) :
-                AreaMgmt(AreaMgmt::Type::areaMap), offs(_offs), operation(_operation){};
+                Superblock(Superblock::Type::areaMap), offs(_offs), operation(_operation){};
         };
 
         namespace areaMap
@@ -195,20 +196,20 @@ namespace journalEntry
             };
         };
 
-        struct ActiveArea : public AreaMgmt
+        struct ActiveArea : public Superblock
         {
             AreaType type;
             AreaPos area;
             inline
             ActiveArea(AreaType _type, AreaPos _area) :
-                AreaMgmt(Type::activeArea), type(_type), area(_area){};
+                Superblock(Type::activeArea), type(_type), area(_area){};
         };
 
-        struct UsedAreas : public AreaMgmt
+        struct UsedAreas : public Superblock
         {
             AreaPos usedAreas;
             inline
-            UsedAreas(AreaPos _usedAreas) : AreaMgmt(Type::usedAreas), usedAreas(_usedAreas){};
+            UsedAreas(AreaPos _usedAreas) : Superblock(Type::usedAreas), usedAreas(_usedAreas){};
         };
 
         union Max {
@@ -463,8 +464,8 @@ namespace journalEntry
         Checkpoint checkpoint;
         Pagestate pagestate;
         pagestate::Max pagestate_;
-        AreaMgmt areaMgmt;
-        areaMgmt::Max areaMgmt_;
+        Superblock superblock;
+        superblock::Max superblock_;
         BTree btree;
         btree::Max btree_;
         SummaryCache summaryCache;

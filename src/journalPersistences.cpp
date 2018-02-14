@@ -40,30 +40,30 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
             return sizeof(journalEntry::pagestate::InvalidateOldPages);
         }
         break;
-    case JournalEntry::Topic::areaMgmt:
-        switch (static_cast<const journalEntry::AreaMgmt*>(&entry)->type)
+    case JournalEntry::Topic::superblock:
+        switch (static_cast<const journalEntry::Superblock*>(&entry)->type)
         {
-        case journalEntry::AreaMgmt::Type::rootnode:
-            return sizeof(journalEntry::areaMgmt::Rootnode);
-        case journalEntry::AreaMgmt::Type::areaMap:
-            switch (static_cast<const journalEntry::areaMgmt::AreaMap*>(&entry)->operation)
+        case journalEntry::Superblock::Type::rootnode:
+            return sizeof(journalEntry::superblock::Rootnode);
+        case journalEntry::Superblock::Type::areaMap:
+            switch (static_cast<const journalEntry::superblock::AreaMap*>(&entry)->operation)
             {
-            case journalEntry::areaMgmt::AreaMap::Operation::type:
-                return sizeof(journalEntry::areaMgmt::areaMap::Type);
-            case journalEntry::areaMgmt::AreaMap::Operation::status:
-                return sizeof(journalEntry::areaMgmt::areaMap::Status);
-            case journalEntry::areaMgmt::AreaMap::Operation::increaseErasecount:
-                return sizeof(journalEntry::areaMgmt::areaMap::IncreaseErasecount);
-            case journalEntry::areaMgmt::AreaMap::Operation::position:
-                return sizeof(journalEntry::areaMgmt::areaMap::Type);
-            case journalEntry::areaMgmt::AreaMap::Operation::swap:
-                return sizeof(journalEntry::areaMgmt::areaMap::Swap);
+            case journalEntry::superblock::AreaMap::Operation::type:
+                return sizeof(journalEntry::superblock::areaMap::Type);
+            case journalEntry::superblock::AreaMap::Operation::status:
+                return sizeof(journalEntry::superblock::areaMap::Status);
+            case journalEntry::superblock::AreaMap::Operation::increaseErasecount:
+                return sizeof(journalEntry::superblock::areaMap::IncreaseErasecount);
+            case journalEntry::superblock::AreaMap::Operation::position:
+                return sizeof(journalEntry::superblock::areaMap::Type);
+            case journalEntry::superblock::AreaMap::Operation::swap:
+                return sizeof(journalEntry::superblock::areaMap::Swap);
             }
             break;
-        case journalEntry::AreaMgmt::Type::activeArea:
-            return sizeof(journalEntry::areaMgmt::ActiveArea);
-        case journalEntry::AreaMgmt::Type::usedAreas:
-            return sizeof(journalEntry::areaMgmt::UsedAreas);
+        case journalEntry::Superblock::Type::activeArea:
+            return sizeof(journalEntry::superblock::ActiveArea);
+        case journalEntry::Superblock::Type::usedAreas:
+            return sizeof(journalEntry::superblock::UsedAreas);
         }
         break;
     case JournalEntry::Topic::summaryCache:
