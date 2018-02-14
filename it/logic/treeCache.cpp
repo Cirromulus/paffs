@@ -64,6 +64,8 @@ TEST_F(TreeTest, coalesceTree)
     paffs::Result r;
     const unsigned numberOfNodes = paffs::leafOrder * paffs::branchOrder + 1;
 
+    //This stops the log from filling
+    d->journal.disable();
 
     // insert
     for (unsigned int i = 1; i <= numberOfNodes; i++)
