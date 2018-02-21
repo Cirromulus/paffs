@@ -159,7 +159,7 @@ public:
     JournalEntry::Topic
     getTopic() override;
     void
-    preScan(const journalEntry::Max& entry, JournalEntryPosition position);
+    preScan(const journalEntry::Max& entry, JournalEntryPosition position) override;
     Result
     processEntry(const journalEntry::Max& entry, JournalEntryPosition position) override;
     void
