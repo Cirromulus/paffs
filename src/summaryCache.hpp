@@ -155,6 +155,8 @@ public:
      */
     Result
     commitAreaSummaries(bool createNew = false);
+    void
+    clear();
 
     JournalEntry::Topic
     getTopic() override;

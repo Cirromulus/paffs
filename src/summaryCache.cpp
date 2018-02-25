@@ -869,12 +869,22 @@ SummaryCache::commitAreaSummaries(bool createNew)
 
     for (std::pair<AreaPos, uint16_t> cacheElem : mTranslation)
     {
-        mSummaryCache[cacheElem.second].setDirty(false);
-        mSummaryCache[cacheElem.second].clear();
+    	mSummaryCache[cacheElem.second].setDirty(false);
+    	mSummaryCache[cacheElem.second].setLoadedFromSuperPage();
     }
-    mTranslation.clear();
 
     return Result::ok;
+}
+
+void
+SummaryCache::clear()
+{
+    for (std::pair<AreaPos, uint16_t> cacheElem : mTranslation)
+    {
+    	mSummaryCache[cacheElem.second].setDirty(false);
+    	mSummaryCache[cacheElem.second].clear();
+    }
+    mTranslation.clear();
 }
 
 JournalEntry::Topic

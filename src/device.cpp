@@ -2096,6 +2096,7 @@ Device::destroyDevice()
     inodePool.clear();
     filesPool.clear();
     dataIO.pac.clear();
+    sumCache.clear();
     return Result::ok;
 }
 };
