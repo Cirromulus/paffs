@@ -490,7 +490,7 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
         {
             uint8_t* writebuf = dev->driver.getPageBuffer();
             memset(writebuf, 0xFF, dataBytesPerPage);
-            memset(&writebuf[dataBytesPerPage], 0x0A, oobBytesPerPage);
+            memset(&writebuf[dataBytesPerPage], 0x00, oobBytesPerPage);
             Addr addr = combineAddress(area, page);
             dev->driver.writePage(getPageNumber(addr, *dev), writebuf, totalBytesPerPage);
         }
@@ -881,7 +881,6 @@ SummaryCache::clear()
 {
     for (std::pair<AreaPos, uint16_t> cacheElem : mTranslation)
     {
-    	mSummaryCache[cacheElem.second].setDirty(false);
     	mSummaryCache[cacheElem.second].clear();
     }
     mTranslation.clear();

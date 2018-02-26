@@ -142,6 +142,9 @@ public:
     preScan(const journalEntry::Max& entry, JournalEntryPosition position) override;
     Result
     processEntry(const journalEntry::Max& entry, JournalEntryPosition position) override;
+    void
+    signalEndOfLog() override;
+
 
     // returns PAFFS_NF if no superindex is in flash
     Result

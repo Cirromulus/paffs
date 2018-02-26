@@ -573,9 +573,9 @@ DataIO::readPageData(PageAbs  pageFrom,
             return Result::bug;
         }
 
-        PageAbs addr = getPageNumber(pageAddr, *dev);
+        PageAbs physPage = getPageNumber(pageAddr, *dev);
         uint8_t* buf = dev->driver.getPageBuffer();
-        r = dev->driver.readPage(addr, buf, btr);
+        r = dev->driver.readPage(physPage, buf, btr);
         if (r != Result::ok)
         {
             if (r == Result::biterrorCorrected)
@@ -586,7 +586,11 @@ DataIO::readPageData(PageAbs  pageFrom,
             }
             else
             {
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read page, aborting pageData Read");
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read page at "
+                        "%" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS
+                        ", aborting pageData Read",
+                        extractLogicalArea(pageAddr), dev->areaMgmt.getPos(extractLogicalArea(pageAddr)),
+                        extractPageOffs(pageAddr));
                 return dev->lasterr = r;
             }
         }

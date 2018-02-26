@@ -76,9 +76,14 @@ SimuDriver::writePage(PageAbs page, void* data, uint16_t dataLen)
 	    memcpy(buf, data, dataLen);
 	}
 
-	uint8_t* p = &buf[dataBytesPerPage+2];
-	for(int i = 0; i < dataBytesPerPage; i+=256, p+=3)
-		YaffsEcc::calc(&buf[i], p);
+	if(dataLen <= dataBytesPerPage)
+	{
+        uint8_t* p = &buf[dataBytesPerPage+2];
+        for(int i = 0; i < dataBytesPerPage; i+=256, p+=3)
+        {
+            YaffsEcc::calc(&buf[i], p);
+        }
+	}
 
 	Nandaddress d = translatePageToAddress(page);
 
@@ -103,18 +108,22 @@ SimuDriver::readPage(PageAbs page, void* data, uint16_t dataLen)
 
 	Nandaddress d = translatePageToAddress(page);
 
-	if(cell->readPage(d.plane, d.block, d.page, reinterpret_cast<unsigned char*>(buf)) < 0){
+	if(cell->readPage(d.plane, d.block, d.page, reinterpret_cast<unsigned char*>(buf)) < 0)
+	{
 		return Result::fail;
 	}
 	uint8_t readEcc[3];
 	uint8_t *p = &buf[dataBytesPerPage + 2];
 	Result ret = Result::ok;
-	for(int i = 0; i < dataBytesPerPage; i+=256, p+=3) {
+	for(int i = 0; i < dataBytesPerPage; i+=256, p+=3)
+	{
 		YaffsEcc::calc(buf + i, readEcc);
 		Result r = YaffsEcc::correct(buf, p, readEcc);
 		//ok < corrected < notcorrected
 		if (r > ret)
-			ret = r;
+		{
+		    ret = r;
+		}
 	}
 	if(data != buf)
 	{

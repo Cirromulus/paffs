@@ -330,6 +330,16 @@ Superblock::processEntry(const journalEntry::Max&, JournalEntryPosition)
     return Result::ok;
 }
 
+void
+Superblock::signalEndOfLog()
+{
+    //If the closing of an area was not applied
+    device->areaMgmt.manageActiveAreaFull(AreaType::data);
+    device->areaMgmt.manageActiveAreaFull(AreaType::index);
+}
+
+
+
 Result
 Superblock::registerRootnode(Addr addr)
 {

@@ -81,6 +81,8 @@ public:
     Result
     unmnt();
 
+    void
+    debugPrintStatus();
 
     // Directory
     Result

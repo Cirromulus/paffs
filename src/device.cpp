@@ -332,6 +332,11 @@ Device::mnt(bool readOnlyMode)
         return Result::fail;
     }
 
+    if (traceMask & PAFFS_TRACE_AREA)
+    {
+        debugPrintStatus();
+    }
+
     // TODO: Supress decrease or increase reference to node 0 manually
     mounted = true;
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Mount successful");
@@ -390,22 +395,7 @@ Device::flushAllCaches()
 
      if (traceMask & PAFFS_TRACE_AREA)
      {
-         printf("Info: \n\t%" PTYPE_AREAPOS " used Areas\n", areaMgmt.getUsedAreas());
-         for (AreaPos i = 0; i < areasNo; i++)
-         {
-             printf("\tArea %03" PTYPE_AREAPOS " on %03" PTYPE_AREAPOS " as %10s from page %4" PTYPE_AREAPOS " %s\n",
-                    i,
-                    areaMgmt.getPos(i),
-                    areaNames[areaMgmt.getType(i)],
-                    areaMgmt.getPos(i) * blocksPerArea * pagesPerBlock,
-                    areaStatusNames[areaMgmt.getStatus(i)]);
-             if (i > 128)
-             {
-                 printf("\n -- truncated 128-%" PTYPE_AREAPOS " Areas.\n", areasNo);
-                 break;
-             }
-         }
-         printf("\t----------------------\n");
+         debugPrintStatus();
      }
 
      journal.clear();
@@ -427,6 +417,43 @@ Device::unmnt()
     tree.wipeCache();   // just for cleanup & tests
     mounted = false;
     return Result::ok;
+}
+
+void
+Device::debugPrintStatus()
+{
+    printf("Info: \n\t%" PTYPE_AREAPOS " used Areas\n", areaMgmt.getUsedAreas());
+    for (AreaPos i = 0; i < areasNo; i++)
+    {
+        SummaryEntry summary[dataPagesPerArea];
+        sumCache.getEstimatedSummaryStatus(i, summary);
+        PageOffs dirtyPages = 0;
+        PageOffs freePages = 0;
+        for(PageOffs p = 0; p < dataPagesPerArea; p++)
+        {
+            if(summary[p] == SummaryEntry::dirty)
+            {
+                dirtyPages++;
+            }
+            if(summary[p] == SummaryEntry::free)
+            {
+                freePages++;
+            }
+        }
+        printf("\tArea %03" PTYPE_AREAPOS " on %03" PTYPE_AREAPOS " as %10s "
+                "(%4" PTYPE_PAGEOFFS "/%4" PTYPE_PAGEOFFS " dirty/free) %s\n",
+               i,
+               areaMgmt.getPos(i),
+               areaNames[areaMgmt.getType(i)],
+               dirtyPages, freePages,
+               areaStatusNames[areaMgmt.getStatus(i)]);
+        if (i > 128)
+        {
+            printf("\n -- truncated 128-%" PTYPE_AREAPOS " Areas.\n", areasNo);
+            break;
+        }
+    }
+    printf("\t----------------------\n");
 }
 
 Result
@@ -1386,15 +1413,7 @@ Device::createFile(SmartInodePtr& outFile, const char* fullPath, Permission mask
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new fil inode in parent dir");
         return r;
     }
-    r = journal.addEvent(journalEntry::Checkpoint(getTopic()));
-    if(r == Result::lowMem)
-    {
-        PAFFS_DBG(PAFFS_TRACE_DEVICE, "Journal nearly full, flushing caches");
-        return flushAllCaches();
-    }
     return Result::ok;
-
-    return r;
 }
 
 Obj*

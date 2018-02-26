@@ -476,7 +476,7 @@ AreaManagement::manageActiveAreaFull(AreaType areaType)
 {
     PageOffs ffp;
     AreaPos area = getActiveArea(areaType);
-    if (findFirstFreePage(ffp, area) != Result::ok)
+    if (area != 0 && findFirstFreePage(ffp, area) != Result::ok)
     {
         PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Area %" PTYPE_AREAPOS " (Type %s) full.", area, areaNames[areaType]);
         // Current Area is full!
