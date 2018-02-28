@@ -19,6 +19,13 @@
 
 class TreeTest : public InitFs
 {
+    void SetUp()
+    {
+        InitFs::SetUp();
+        //This stops the log from filling
+        paffs::Device* d = fs.getDevice(0);
+        d->journal.disable();
+    }
 };
 
 TEST_F(TreeTest, Sizes)
@@ -63,9 +70,6 @@ TEST_F(TreeTest, coalesceTree)
     paffs::Device* d = fs.getDevice(0);
     paffs::Result r;
     const unsigned numberOfNodes = paffs::leafOrder * paffs::branchOrder + 1;
-
-    //This stops the log from filling
-    d->journal.disable();
 
     // insert
     for (unsigned int i = 1; i <= numberOfNodes; i++)
