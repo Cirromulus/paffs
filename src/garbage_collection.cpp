@@ -22,18 +22,21 @@
 
 namespace paffs
 {
-PageOffs
-GarbageCollection::countDirtyPages(SummaryEntry* summary)
+void
+GarbageCollection::countDirtyAndUsedPages(PageOffs& dirty, PageOffs &used, SummaryEntry* summary)
 {
-    PageOffs dirty = 0;
+    dirty = 0;
     for (PageOffs i = 0; i < dataPagesPerArea; i++)
     {
         if (summary[i] == SummaryEntry::dirty)
         {
             dirty++;
         }
+        if (summary[i] == SummaryEntry::used)
+        {
+            used++;
+        }
     }
-    return dirty;
 }
 
 // Special Case 'unset': Find any Type and also extremely favour Areas with committed AS
@@ -45,7 +48,7 @@ GarbageCollection::findNextBestArea(AreaType target,
     AreaPos favourite_area = 0;
     PageOffs favDirtyPages = 0;
     uint32_t favErases = ~0;
-    *srcAreaContainsData = true;
+    *srcAreaContainsData = false;
     SummaryEntry curr[dataPagesPerArea];
 
     // Look for the most dirty area.
@@ -64,7 +67,8 @@ GarbageCollection::findNextBestArea(AreaType target,
                           i);
                 return 0;
             }
-            PageOffs dirtyPages = countDirtyPages(curr);
+            PageOffs dirtyPages, usedPages;
+            countDirtyAndUsedPages(dirtyPages, usedPages, curr);
             if (target != AreaType::unset)
             {
                 // normal case
@@ -91,6 +95,10 @@ GarbageCollection::findNextBestArea(AreaType target,
                 {
                     favourite_area = i;
                     favDirtyPages = dirtyPages;
+                    if(usedPages > 0 || dev->sumCache.wasAreaSummaryWritten(i))
+                    {
+                        *srcAreaContainsData = true;
+                    }
                     favErases = dev->areaMgmt.getErasecount(i);
                     memcpy(summaryOut, curr, dataPagesPerArea);
                 }
@@ -105,6 +113,10 @@ GarbageCollection::findNextBestArea(AreaType target,
                     //       i, dirtyPages, favourite_area, favDirtyPages);
                     favourite_area = i;
                     favDirtyPages = dirtyPages;
+                    if(usedPages > 0 || dev->sumCache.wasAreaSummaryWritten(i))
+                    {
+                        *srcAreaContainsData = true;
+                    }
                     memcpy(summaryOut, curr, dataPagesPerArea);
                 }
             }
@@ -118,7 +130,8 @@ GarbageCollection::findNextBestArea(AreaType target,
  * @param summary is input and output (with changed SummaryEntry::dirty to SummaryEntry::free)
  */
 Result
-GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea, SummaryEntry* summary)
+GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea,
+                                          bool& validDataLeft, SummaryEntry* summary)
 {
     PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL,
                 "Moving valid data from Area %" PRIu16 " (on %" PRIu16 ") to Area %" PRIu16 " (on %" PRIu16 ")",
@@ -126,10 +139,12 @@ GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea, Summ
                 dev->areaMgmt.getPos(srcArea),
                 dstArea,
                 dev->areaMgmt.getPos(dstArea));
+    validDataLeft = false;
     for (PageOffs page = 0; page < dataPagesPerArea; page++)
     {
         if (summary[page] == SummaryEntry::used)
         {
+            validDataLeft = true;
             PageAbs src = dev->areaMgmt.getPos(srcArea) * totalPagesPerArea + page;
             PageAbs dst = dev->areaMgmt.getPos(dstArea) * totalPagesPerArea + page;
 
@@ -138,7 +153,7 @@ GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea, Summ
             // Any Biterror gets corrected here by being moved
             if (r != Result::ok && r != Result::biterrorCorrected)
             {
-                PAFFS_DBG_S(PAFFS_TRACE_GC,
+                PAFFS_DBG_S(PAFFS_TRACE_ERROR,
                             "Could not read page n° %lu!",
                             static_cast<long unsigned>(src));
                 return r;
@@ -146,7 +161,7 @@ GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea, Summ
             r = dev->driver.writePage(dst, buf, totalBytesPerPage);
             if (r != Result::ok)
             {
-                PAFFS_DBG_S(PAFFS_TRACE_GC,
+                PAFFS_DBG_S(PAFFS_TRACE_ERROR,
                             "Could not write page n° %lu!",
                             static_cast<long unsigned>(dst));
                 return Result::badFlash;
@@ -290,8 +305,10 @@ GarbageCollection::collectGarbage(AreaType targetType)
                         deletionTarget,
                         dev->areaMgmt.getPos(deletionTarget));
 
-            r = moveValidDataToNewArea(
-                    deletionTarget, dev->areaMgmt.getActiveArea(AreaType::garbageBuffer), summary);
+            bool validDataLeft;
+            r = moveValidDataToNewArea(deletionTarget,
+                                       dev->areaMgmt.getActiveArea(AreaType::garbageBuffer),
+                                       validDataLeft, summary);
 
             if (r != Result::ok)
             {
@@ -303,12 +320,26 @@ GarbageCollection::collectGarbage(AreaType targetType)
                 // TODO: Maybe copy rest of Pages before quitting
                 return r;
             }
-            r = dev->areaMgmt.deleteAreaContents(deletionTarget);
-            if(r != Result::ok)
-            {
-                //TODO: Handle this better
-                continue;
+            if(!validDataLeft)
+            {   //We deleted the last dirty pages, nothing left
+                srcAreaContainsData = false;
+                r = dev->areaMgmt.deleteArea(deletionTarget);
+                if(r != Result::ok)
+                {
+                    //TODO: Handle this better
+                    continue;
+                }
             }
+            else
+            {
+                r = dev->areaMgmt.deleteAreaContents(deletionTarget);
+                if(r != Result::ok)
+                {
+                    //TODO: Handle this better
+                    continue;
+                }
+            }
+
         }
         else
         {

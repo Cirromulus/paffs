@@ -35,11 +35,11 @@ public:
      *	Moves all valid Pages to new Area.
      */
     Result
-    moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea, SummaryEntry* summary);
+    moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea, bool& validDataLeft, SummaryEntry* summary);
 
 private:
-    PageOffs
-    countDirtyPages(SummaryEntry* summary);
+    void
+    countDirtyAndUsedPages(PageOffs& dirty, PageOffs &used, SummaryEntry* summary);
     AreaPos
     findNextBestArea(AreaType target, SummaryEntry* summaryOut, bool* srcAreaContainsData);
 };
