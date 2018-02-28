@@ -399,6 +399,7 @@ Device::flushAllCaches()
      }
 
      journal.clear();
+
      return Result::ok;
 }
 
@@ -422,6 +423,8 @@ Device::unmnt()
 void
 Device::debugPrintStatus()
 {
+    TraceMask bkp = traceMask;
+    traceMask &= ~PAFFS_TRACE_ASCACHE;
     printf("Info: \n\t%" PTYPE_AREAPOS " used Areas\n", areaMgmt.getUsedAreas());
     for (AreaPos i = 0; i < areasNo; i++)
     {
@@ -440,8 +443,8 @@ Device::debugPrintStatus()
                 freePages++;
             }
         }
-        printf("\tArea %03" PTYPE_AREAPOS " on %03" PTYPE_AREAPOS " as %10s "
-                "(%4" PTYPE_PAGEOFFS "/%4" PTYPE_PAGEOFFS " dirty/free) %s\n",
+        printf("\tArea %03" PTYPE_AREAPOS " on %03" PTYPE_AREAPOS " as %6s "
+                "(%3" PTYPE_PAGEOFFS "/%3" PTYPE_PAGEOFFS " dirty/free) %s\n",
                i,
                areaMgmt.getPos(i),
                areaNames[areaMgmt.getType(i)],
@@ -454,6 +457,7 @@ Device::debugPrintStatus()
         }
     }
     printf("\t----------------------\n");
+    traceMask = bkp;
 }
 
 Result
@@ -2036,7 +2040,7 @@ Device::signalEndOfLog()
         r = tree.getInode(targetInodeNo, obj);
         if(r == Result::ok)
         {   //First, delete all contents of file
-            r = dataIO.deleteInodeData(obj, 0);
+            r = dataIO.deleteInodeData(obj, 0, true);
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete Inode Data");

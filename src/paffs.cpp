@@ -21,18 +21,20 @@
 namespace paffs
 {
 //Note: Order is different
-const Param stdParam{totalBytesPerPage,
-                     pagesPerBlock,
-                     blocksTotal,
-                     oobBytesPerPage,
-                     jumpPadNo,
-                     dataBytesPerPage,
-                     dataPagesPerArea,
-                     totalPagesPerArea,
-                     areaSummarySizePacked,
-                     blocksPerArea,
-                     superChainElems,
-                     areasNo,
+const Param stdParam{
+    totalBytesPerPage,
+    pagesPerBlock,
+    blocksTotal,
+    oobBytesPerPage,
+    jumpPadNo,
+    dataBytesPerPage,
+    dataPagesPerArea,
+    totalPagesPerArea,
+    areaSummarySizePacked,
+    blocksPerArea,
+    superChainElems,
+    areasNo,
+    mramSize,
 };
 
 TraceMask traceMask =

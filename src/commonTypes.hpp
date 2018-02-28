@@ -85,6 +85,7 @@ struct Param
     uint16_t blocksTotal;
     uint8_t  oobBytesPerPage;
     uint8_t  jumpPadNo;
+
     // Automatically filled//
     uint16_t dataBytesPerPage;
     uint16_t dataPagesPerArea;
@@ -93,6 +94,7 @@ struct Param
     uint8_t  blocksPerArea;
     uint8_t  superChainElems;
     uint32_t areasNo;
+    uint32_t mramSize;
 };
 
 extern const Param stdParam;

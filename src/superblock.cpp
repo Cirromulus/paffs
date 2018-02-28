@@ -420,7 +420,8 @@ Superblock::readSuperIndex(SuperIndex* index)
     }
     if (e.fsVersion != version)
     {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "FS Version differs with our own!");
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "FS Version (%" PRIu8 ") differs with our own (%" PRIu8 ")!",
+                  e.fsVersion, version);
         return Result::fail;
     }
 

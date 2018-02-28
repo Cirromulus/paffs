@@ -372,8 +372,11 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition)
     SummaryEntry summary[dataPagesPerArea];
     unpackStatusArray(cachePos, summary);
 
+    bool validDataLeft;
     Result r = dev->areaMgmt.gc.moveValidDataToNewArea(
-            favouriteArea, dev->areaMgmt.getActiveArea(AreaType::garbageBuffer), summary);
+            favouriteArea,
+            dev->areaMgmt.getActiveArea(AreaType::garbageBuffer),
+            validDataLeft, summary);
 
     if (r != Result::ok)
     {
@@ -381,13 +384,21 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition)
         clearedAreaCachePosition = -1;
         return r;
     }
-    //deletes a cache position here, resets AsWritten
-    dev->areaMgmt.deleteAreaContents(favouriteArea);
-    // swap logical position of areas to keep addresses valid
-    dev->areaMgmt.swapAreaPosition(favouriteArea,
-                                   dev->areaMgmt.getActiveArea(AreaType::garbageBuffer));
 
-    setSummaryStatus(favouriteArea, summary);
+    if(!validDataLeft)
+    {
+        dev->areaMgmt.deleteArea(favouriteArea);
+    }
+    else
+    {
+        //deletes a cache position here, resets AsWritten
+        dev->areaMgmt.deleteAreaContents(favouriteArea);
+        // swap logical position of areas to keep addresses valid
+        dev->areaMgmt.swapAreaPosition(favouriteArea,
+                                       dev->areaMgmt.getActiveArea(AreaType::garbageBuffer));
+
+        setSummaryStatus(favouriteArea, summary);
+    }
 
     return Result::ok;
 }
@@ -913,7 +924,6 @@ SummaryCache::preScan(const journalEntry::Max& entry, JournalEntryPosition posit
         }
     }
 }
-
 Result
 SummaryCache::processEntry(const journalEntry::Max& entry, JournalEntryPosition position)
 {
