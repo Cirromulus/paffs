@@ -526,6 +526,7 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
         if (mSummaryCache[mTranslation[area]].getDirtyPages() == dataPagesPerArea
             && !mSummaryCache[mTranslation[area]].isAreaSummaryWritten())
         {
+            //TODO: Delete AreaSummary and set as UNSET for GC
             Result r = writeAreasummary(mSummaryCache[mTranslation[area]]);
             if (r != Result::ok)
             {
@@ -640,7 +641,7 @@ SummaryCache::getEstimatedSummaryStatus(AreaPos area, SummaryEntry* summary)
 }
 
 /**
- * This function will not call garbagecollection.
+ * This function will not call garbage collection.
  */
 Result
 SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary)
@@ -910,18 +911,22 @@ SummaryCache::preScan(const journalEntry::Max& entry, JournalEntryPosition posit
         PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
         return;
     }
-    if(entry.summaryCache.subtype == journalEntry::SummaryCache::Subtype::commit)
+    if(entry.summaryCache.subtype != journalEntry::SummaryCache::Subtype::commit)
     {
-        firstUncommittedElem[entry.summaryCache.area] = position;
+        return;
+    }
+
+    firstUncommittedElem[entry.summaryCache.area] = position;
+    PAFFS_DBG(PAFFS_TRACE_ASCACHE | PAFFS_TRACE_JOURNAL,
+              "Commit of %" PTYPE_AREAPOS " at %" PRIu32,
+              entry.summaryCache.area, position.mram.offs);
+    if(mTranslation.find(entry.summaryCache.area) != mTranslation.end())
+    {   //This area was loaded from a superpage, but is now committed elsewhere
+        //so force an update by deleting it now.
         PAFFS_DBG(PAFFS_TRACE_ASCACHE | PAFFS_TRACE_JOURNAL,
-                  "Commit of %" PTYPE_AREAPOS " at %" PRIu32,
-                  entry.summaryCache.area, position.mram.offs);
-        if(mTranslation.find(entry.summaryCache.area) != mTranslation.end())
-        {   //This area was loaded from a superpage, but is now committed elsewhere
-            //so force an update by deleting it now.
-            mSummaryCache[mTranslation[entry.summaryCache.area]].clear();
-            mTranslation.erase(entry.summaryCache.area);
-        }
+                  "Commit overwrote superpage info");
+        mSummaryCache[mTranslation[entry.summaryCache.area]].clear();
+        mTranslation.erase(entry.summaryCache.area);
     }
 }
 Result
@@ -945,31 +950,10 @@ SummaryCache::processEntry(const journalEntry::Max& entry, JournalEntryPosition 
     switch (entry.summaryCache.subtype)
     {
     case journalEntry::SummaryCache::Subtype::commit:
-        //TODO: This should never be reached because we filter commits now
+        //This should never be reached because we filter commits
         //sanity check
-        if(mTranslation.count(entry.summaryCache.area) == 0)
-        {   //can only be 0 or 1
-            PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
-                        "Log committing an nonexistent area %" PTYPE_AREAPOS,
-                        entry.summaryCache.area);
-            //This may be OK because it was detected to be written and thus removed
-            return Result::ok;
-        }
-        if(mSummaryCache[mTranslation[entry.summaryCache.area]].getArea() !=
-                entry.summaryCache.area)
-        {
-            PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "There was an error in SummaryCache log replay!\n"
-                      "\tSumcache entry %2" PRIu16 " states it was "
-                      "on %2" PTYPE_AREAPOS ", but translation says on %2" PTYPE_AREAPOS,
-                      mTranslation[entry.summaryCache.area],
-                      mSummaryCache[mTranslation[entry.summaryCache.area]].getArea(),
-                      entry.summaryCache.area);
-            return Result::bug;
-        }
-        mSummaryCache[mTranslation[entry.summaryCache.area]].setDirty(false);
-        mSummaryCache[mTranslation[entry.summaryCache.area]].setAreaSummaryWritten();
-        break;
+        PAFFS_DBG(PAFFS_TRACE_BUG, "SummaryCache got a commit message");
+        return Result::bug;
     case journalEntry::SummaryCache::Subtype::remove:
         deleteSummary(entry.summaryCache.area);
         break;
@@ -989,10 +973,6 @@ SummaryCache::processEntry(const journalEntry::Max& entry, JournalEntryPosition 
     }
     default:
         return Result::nimpl;
-    }
-    if(mTranslation.find(8) != mTranslation.end())
-    {
-        printStatus();
     }
     return Result::ok;
 }

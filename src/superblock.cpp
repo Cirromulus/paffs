@@ -339,7 +339,6 @@ Superblock::signalEndOfLog()
 }
 
 
-
 Result
 Superblock::registerRootnode(Addr addr)
 {
@@ -605,6 +604,11 @@ Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew)
 
     if (traceMask & PAFFS_TRACE_VERBOSE)
     {
+        //FIXME DEBUG
+        if(newIndex->no == 8)
+        {
+            printf("Beware of the bug n2\n");
+        }
         printf("write Super Index:\n");
         newIndex->print();
     }
@@ -1200,7 +1204,7 @@ Superblock::insertNewSuperIndex(Addr logPrev, AreaPos* directArea, SuperIndex* e
     }
 
     PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK,
-                "Writing superIndex to phys. Area %" PTYPE_AREAPOS ", page %" PTYPE_AREAPOS,
+                "Writing SuperIndex to phys. Area %" PTYPE_AREAPOS ", page %" PTYPE_AREAPOS,
                 *directArea,
                 page);
     return writeSuperPageIndex(*directArea * totalPagesPerArea + page, entry);

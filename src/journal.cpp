@@ -76,7 +76,7 @@ Journal::addEvent(const JournalEntry& entry)
     }
     else
     {
-        PAFFS_DBG(PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE,
+        PAFFS_DBG_S(PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE,
                   "Skipped checkpoint because no changes were made");
         lowLogSpace = persistence.isLowMem();
     }
@@ -171,6 +171,9 @@ Journal::processBuffer()
                    firstUncheckpointedEntry[i].flash.offs);
         }
     }
+
+    //FIXME DEBUG
+    static_cast<Device*>(topics[JournalEntry::Topic::device])->debugPrintStatus();
 
     PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Applying log...");
 
