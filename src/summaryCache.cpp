@@ -254,16 +254,15 @@ SummaryCache::printStatus()
     printf("pos: used dirty loadedFromSP isASwritten [area dirty_pages]\n");
     for (uint8_t i = 0; i < areaSummaryCacheSize; i++)
     {
-        printf("%2u: %s %s %s %s ", i,
-               mSummaryCache[i].isUsed() ? "used" : "  - ",
-               mSummaryCache[i].isDirty() ? "dirty" : "  -  ",
-               mSummaryCache[i].isLoadedFromSuperPage() ? "fSP" : " - ",
-               mSummaryCache[i].isAreaSummaryWritten() ? "wrtn" : "  - "
-               );
         if(mSummaryCache[i].isUsed())
         {
-            printf("%2" PTYPE_AREAPOS " %3" PTYPE_PAGEOFFS,
-                   mSummaryCache[i].getArea(), mSummaryCache[i].getDirtyPages());
+            printf("%2u: %s %s %s %s %2" PTYPE_AREAPOS " %3" PTYPE_PAGEOFFS, i,
+                   mSummaryCache[i].isUsed() ? "used" : "  - ",
+                   mSummaryCache[i].isDirty() ? "dirty" : "  -  ",
+                   mSummaryCache[i].isLoadedFromSuperPage() ? "fSP" : " - ",
+                   mSummaryCache[i].isAreaSummaryWritten() ? "wrtn" : "  - ",
+                   mSummaryCache[i].getArea(), mSummaryCache[i].getDirtyPages()
+                   );
 
             if(mSummaryCache[i].getArea() == 0 || mSummaryCache[i].getArea() >= areasNo)
             {
@@ -285,8 +284,8 @@ SummaryCache::printStatus()
                        mSummaryCache[mTranslation[mSummaryCache[i].getArea()]].getArea(),
                        mSummaryCache[i].getArea());
             }
+            printf("\n");
         }
-        printf("\n");
     }
 }
 
@@ -895,6 +894,7 @@ SummaryCache::clear()
     	mSummaryCache[cacheElem.second].clear();
     }
     mTranslation.clear();
+    memset(firstUncommittedElem, 0, sizeof(JournalEntryPosition) * areasNo);
 }
 
 JournalEntry::Topic
@@ -989,6 +989,10 @@ SummaryCache::processEntry(const journalEntry::Max& entry, JournalEntryPosition 
     }
     default:
         return Result::nimpl;
+    }
+    if(mTranslation.find(8) != mTranslation.end())
+    {
+        printStatus();
     }
     return Result::ok;
 }
