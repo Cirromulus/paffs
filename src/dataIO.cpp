@@ -147,7 +147,7 @@ DataIO::readInodeData(Inode& inode,
 
 // inode->size and inode->reservedSize is altered.
 Result
-DataIO::deleteInodeData(Inode& inode, unsigned int offs)
+DataIO::deleteInodeData(Inode& inode, unsigned int offs, bool journalMode)
 {
     if (dev->readOnly)
     {
@@ -214,8 +214,9 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
                 return Result::bug;
             }
 
-            if (dev->sumCache.getPageStatus(area, relPage, &r) == SummaryEntry::dirty)
+            if (!journalMode && dev->sumCache.getPageStatus(area, relPage, &r) == SummaryEntry::dirty)
             {
+                //In journalMode, it may happen that a page was already deleted
                 PAFFS_DBG(PAFFS_TRACE_BUG,
                           "DELETE INODE operation of outdated (dirty)"
                           " data at %" PRId16 ":%" PRId16 "",
@@ -375,6 +376,8 @@ DataIO::writePageData(PageAbs  pageFrom,
             // TODO: Return to a safe state by trying to resurrect dirty marked pages
             //		Mark fresh written pages as dirty. If old pages have been deleted,
             //		use the Journal to resurrect (not currently implemented)
+            PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find writable area");
+            dev->debugPrintStatus();
             return dev->lasterr;
         }
         dev->lasterr = rBuf;

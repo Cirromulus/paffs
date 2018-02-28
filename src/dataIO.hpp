@@ -56,7 +56,7 @@ public:
                   FileSize* bytesRead,
                   uint8_t* data);
     Result
-    deleteInodeData(Inode& inode, unsigned int offs);
+    deleteInodeData(Inode& inode, unsigned int offs, bool journalMode = false);
 
     JournalEntry::Topic
     getTopic() override;
