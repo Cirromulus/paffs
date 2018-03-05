@@ -175,9 +175,10 @@ private:
      * @Brief uses garbageCollection-buffer to swap a whole Area,
      * committing its new AS.
      * @warn Decreases wear leveling if used regularly.
+     * @param desperate is used if even non-dirty elems have to be written if they are not active.
      */
     Result
-    commitAreaSummaryHard(int& clearedAreaCachePosition);
+    commitAreaSummaryHard(int& clearedAreaCachePosition, bool desperate = false);
 
     SummaryEntry
     getPackedStatus(uint16_t position, PageOffs page);

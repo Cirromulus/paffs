@@ -675,6 +675,7 @@ AreaManagement::deleteArea(AreaPos area)
 
     setStatus(area, AreaStatus::empty);
     setType(area, AreaType::unset);
+    dev->sumCache.deleteSummary(area);
     decreaseUsedAreas();
     PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Area %" PTYPE_AREAPOS
                 " at pos. %" PTYPE_AREAPOS ".", area, getPos(area));

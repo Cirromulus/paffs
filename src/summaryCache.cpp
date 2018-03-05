@@ -290,7 +290,7 @@ SummaryCache::printStatus()
 }
 
 Result
-SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition)
+SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition, bool desperate)
 {
     PageOffs favDirtyPages = 0;
     AreaPos favouriteArea = 0;
@@ -299,7 +299,8 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition)
     {
         // found a cached element
         cachePos = it.second;
-        if (mSummaryCache[cachePos].isDirty() && mSummaryCache[cachePos].isAreaSummaryWritten()
+        if ((mSummaryCache[cachePos].isDirty() || desperate)
+            && mSummaryCache[cachePos].isAreaSummaryWritten()
             && dev->areaMgmt.getStatus(it.first) != AreaStatus::active
             && (dev->areaMgmt.getType(it.first) == AreaType::data
                 || dev->areaMgmt.getType(it.first) == AreaType::index))
@@ -330,7 +331,7 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition)
             }
             if (!mSummaryCache[cachePos].isAreaSummaryWritten())
             {
-                PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "\tnot AS written");
+                PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "\tno AS written");
             }
             if (dev->areaMgmt.getStatus(it.first) == AreaStatus::active)
             {
@@ -348,9 +349,18 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition)
 
     if (favouriteArea == 0)
     {
-        PAFFS_DBG(PAFFS_TRACE_BUG, "Could not find any swappable candidats, why?");
-        clearedAreaCachePosition = -1;
-        return Result::bug;
+        if(!desperate)
+        {
+            PAFFS_DBG(PAFFS_TRACE_ASCACHE, "Could not find any swappable candidats, getting desperate");
+            return commitAreaSummaryHard(clearedAreaCachePosition, true);
+        }
+        else
+        {
+            PAFFS_DBG(PAFFS_TRACE_BUG,
+                      "Could not find any swappable candidats in desperate mode!");
+            clearedAreaCachePosition = -1;
+            return Result::bug;
+        }
     }
     if (mTranslation.find(favouriteArea) == mTranslation.end())
     {
@@ -1222,6 +1232,11 @@ SummaryCache::countUnusedPages(uint16_t position)
 Result
 SummaryCache::commitAndEraseElem(uint16_t position)
 {
+    if(!mSummaryCache[position].isUsed())
+    {
+        //it was already deleted by commitASHard
+        return Result::ok;
+    }
     // Commit AS to Area OOB
     Result r = writeAreasummary(mSummaryCache[position]);
     if (r != Result::ok)
