@@ -44,8 +44,8 @@ Btree::insertInode(const Inode& inode)
         {
             if (node->raw.as.branch.keys[i] == inode.no)
             {
-                PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Inode already existing with n° %" PTYPE_INODENO "", inode.no);
-                return Result::bug;
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "BUG: Inode already existing with n° %" PTYPE_INODENO "", inode.no);
+                return Result::exists;
             }
         }
     }
@@ -157,7 +157,6 @@ Btree::deleteInode(InodeNo number)
         mCache.printTreeCache();
     }
 
-    dev->journal.addEvent(journalEntry::btree::Remove(number));
     r = deleteEntry(*keyLeaf, number);
     if(traceMask & PAFFS_TRACE_VERIFY_TC)
     {
@@ -170,6 +169,7 @@ Btree::deleteInode(InodeNo number)
     }
 
     mCache.commitIfNodesWereRemoved();
+    dev->journal.addEvent(journalEntry::btree::Remove(number));
     return r;
 }
 
@@ -260,12 +260,18 @@ Btree::getTopic()
 Result
 Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 {
+    Result r;
     if (entry.base.topic == getTopic())
     {   //normal operations
         switch (entry.btree.op)
         {
         case journalEntry::BTree::Operation::insert:
-            return insertInode(entry.btree_.insert.inode);
+            r = insertInode(entry.btree_.insert.inode);
+            if(r == Result::exists)
+            {   //It was already added by a commit
+                return Result::ok;
+            }
+            return r;
         case journalEntry::BTree::Operation::update:
         {
             const Inode& node = entry.btree_.update.inode;
@@ -290,8 +296,7 @@ Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
                            extractLogicalArea(node.direct[i]), extractPageOffs(node.direct[i]));
                 }
             }
-            {
-                Result r = updateExistingInode(entry.btree_.update.inode);
+                r = updateExistingInode(entry.btree_.update.inode);
                 if(r == Result::ok || r == Result::notFound)
                 {   //If it was deleted later on
                     return Result::ok;
@@ -300,10 +305,14 @@ Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
                 {
                     return r;
                 }
-            }
         }
         case journalEntry::BTree::Operation::remove:
-            return deleteInode(entry.btree_.remove.no);
+            r = deleteInode(entry.btree_.remove.no);
+            if(r == Result::notFound)
+            {   //It was already committed
+                return Result::ok;
+            }
+            return r;
         case journalEntry::BTree::Operation::setRootnode:
             {
             dev->superblock.registerRootnode(entry.btree_.setRootnode.address);
