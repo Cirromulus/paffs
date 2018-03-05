@@ -573,6 +573,8 @@ Superblock::readSuperIndex(SuperIndex* index)
 Result
 Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew)
 {
+    //FIXME: If an Area gets deleted, only readSuperIndex will take care of deletion!
+    //TODO: Handle block overflow in a way that it does not depend on a read afterwards
     Result r;
     if (createNew)
     {
@@ -595,22 +597,27 @@ Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew)
     }
 
     // Get index of last chain elem (SuperEntry) and increase
-    newIndex->no = superChainIndexes[jumpPadNo + 1] + 1;
+    newIndex->no = ++superChainIndexes[jumpPadNo + 1];
     newIndex->rootNode = mRootnodeAddr;
     newIndex->areaMap = device->areaMgmt.getMap();
     newIndex->usedAreas = device->areaMgmt.getUsedAreas();
     newIndex->activeArea = device->areaMgmt.getActiveAreas();
     newIndex->overallDeletions = device->areaMgmt.getOverallDeletions();
 
-    if (traceMask & PAFFS_TRACE_VERBOSE)
+    if (traceMask & PAFFS_TRACE_SUPERBLOCK)
     {
+        printf("Superpath indices:\n");
+        for(uint8_t i = 0; i < superChainElems; i++)
+        {
+            printf("%u: %" PRIu32 "\n", i, superChainIndexes[i]);
+        }
         //FIXME DEBUG
+        printf("write Super Index:\n");
+        newIndex->print();
         if(newIndex->no == 8)
         {
             printf("Beware of the bug n2\n");
         }
-        printf("write Super Index:\n");
-        newIndex->print();
     }
 
     Addr logicalPath[superChainElems];
