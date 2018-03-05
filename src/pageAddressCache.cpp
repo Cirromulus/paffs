@@ -331,7 +331,7 @@ PageAddressCache::commit()
 {
     if (mInodePtr == nullptr)
     {
-        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to commit null inode");
         return Result::bug;
     }
 

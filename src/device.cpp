@@ -2044,16 +2044,19 @@ Device::signalEndOfLog()
         r = tree.getInode(targetInodeNo, obj);
         if(r == Result::ok)
         {   //First, delete all contents of file
-            r = dataIO.deleteInodeData(obj, 0, true);
-            if (r != Result::ok)
+            if(obj.size != 0)
             {
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete Inode Data");
-                return;
-            }
-            r = dataIO.pac.commit();
-            if (r != Result::ok)
-            {
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit PAC");
+                r = dataIO.deleteInodeData(obj, 0, true);
+                if (r != Result::ok)
+                {
+                    PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete Inode Data");
+                    return;
+                }
+                r = dataIO.pac.commit();
+                if (r != Result::ok)
+                {
+                    PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit PAC");
+                }
             }
             tree.deleteInode(targetInodeNo);
         }
