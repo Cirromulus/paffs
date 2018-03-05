@@ -389,12 +389,12 @@ AreaManagement::findWritableArea(AreaType areaType)
         return getActiveArea(areaType);
     }
 
+    AreaPos secondBestArea = 0;
     if (getUsedAreas() < areasNo - minFreeAreas)
     {
         /**We only take new areas, if we dont hit the reserved pool.
          * The exeption is Index area, which is needed for committing caches.
         **/
-        AreaPos secondBestArea = 0;
         for (unsigned int area = 0; area < areasNo; area++)
         {
             if (getStatus(area) == AreaStatus::empty && getType(area) != AreaType::retired)
@@ -413,14 +413,6 @@ AreaManagement::findWritableArea(AreaType areaType)
                 }
             }
         }
-        if(secondBestArea != 0)
-        {
-            initAreaAs(secondBestArea, areaType);
-            PAFFS_DBG_S(
-                    PAFFS_TRACE_AREA, "Found empty (but frequently deleted) Area %" PTYPE_AREAPOS " for %s",
-                    secondBestArea, areaNames[areaType]);
-            return secondBestArea;
-        }
     }
     else if (getUsedAreas() < areasNo)
     {
@@ -430,6 +422,17 @@ AreaManagement::findWritableArea(AreaType areaType)
     Result r = gc.collectGarbage(areaType);
     if (r != Result::ok)
     {
+        if(r == Result::noSpace)
+        {
+            if(secondBestArea != 0)
+            {
+                initAreaAs(secondBestArea, areaType);
+                PAFFS_DBG_S(
+                        PAFFS_TRACE_AREA, "Found empty (but frequently deleted) Area %" PTYPE_AREAPOS " for %s",
+                        secondBestArea, areaNames[areaType]);
+                return secondBestArea;
+            }
+        }
         dev->lasterr = r;
         return 0;
     }
