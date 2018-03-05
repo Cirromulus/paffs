@@ -251,16 +251,16 @@ SummaryCache::~SummaryCache()
 void
 SummaryCache::printStatus()
 {
-    printf("pos: used dirty loadedFromSP isASwritten [area dirty_pages]\n");
+    printf("pos: loadedFromSP isASwritten isActive [area dirty_pages]\n");
     for (uint8_t i = 0; i < areaSummaryCacheSize; i++)
     {
         if(mSummaryCache[i].isUsed())
         {
             printf("%2u: %s %s %s %s %2" PTYPE_AREAPOS " %3" PTYPE_PAGEOFFS, i,
-                   mSummaryCache[i].isUsed() ? "used" : "  - ",
                    mSummaryCache[i].isDirty() ? "dirty" : "  -  ",
                    mSummaryCache[i].isLoadedFromSuperPage() ? "fSP" : " - ",
                    mSummaryCache[i].isAreaSummaryWritten() ? "wrtn" : "  - ",
+                   dev->areaMgmt.getStatus(mSummaryCache[i].getArea()) ? "actv" : "  - ",
                    mSummaryCache[i].getArea(), mSummaryCache[i].getDirtyPages()
                    );
 
@@ -356,6 +356,7 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition, bool desperat
         }
         else
         {
+            printStatus();
             PAFFS_DBG(PAFFS_TRACE_BUG,
                       "Could not find any swappable candidats in desperate mode!");
             clearedAreaCachePosition = -1;
@@ -1086,6 +1087,11 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
     {
         return Result::ok;
     }
+
+    if(traceMask & PAFFS_TRACE_ASCACHE)
+    {
+    }
+        printStatus();
 
     // Look for the least probable Area to be used that has no committed AS
     PageOffs maxDirtyPages = 0;

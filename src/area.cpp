@@ -203,6 +203,29 @@ AreaManagement::setStatus(AreaPos area, AreaStatus status)
                   areasNo);
         return;
     }
+    if (traceMask & PAFFS_TRACE_VERIFY_AS)
+    {
+        if(status == AreaStatus::active)
+        {
+            uint8_t activeAreas = 0;
+            for(AreaPos i = 4; i < areasNo; i++)
+            {   //Jump over SBLOCK/GC and current
+                if(i == area)
+                {
+                    continue;
+                }
+                if(map[i].status == AreaStatus::active)
+                {
+                    activeAreas++;
+                }
+            }
+            if(activeAreas >= 2)
+            {
+                dev->debugPrintStatus();
+                PAFFS_DBG(PAFFS_TRACE_BUG, "Too many Active Areas (%" PRIu8 "!", activeAreas);
+            }
+        }
+    }
     PAFFS_DBG_S(PAFFS_TRACE_AREA, "Set area %" PTYPE_AREAPOS " to %s", area, areaStatusNames[status]);
     dev->journal.addEvent(journalEntry::superblock::areaMap::Status(area, status));
     map[area].status = status;

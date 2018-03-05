@@ -337,7 +337,8 @@ Paffs::unmount()
             Result deviceReturn = devices[i]->unmnt();
             if (deviceReturn > globalReturn)
             {   //Results are (somewhat) ordered by badness
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not unmount device %" PRId16 "!", i);
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not unmount device %" PRId16 " (%s)"
+                          , i, err_msg(deviceReturn));
                 globalReturn = deviceReturn;
             }
         }
