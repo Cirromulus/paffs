@@ -390,6 +390,7 @@ AreaManagement::findWritableArea(AreaType areaType)
     }
 
     AreaPos secondBestArea = 0;
+    uint32_t secondBestAreasDeletions = 0;
     if (getUsedAreas() < areasNo - minFreeAreas)
     {
         /**We only take new areas, if we dont hit the reserved pool.
@@ -409,9 +410,21 @@ AreaManagement::findWritableArea(AreaType areaType)
                 }
                 else
                 {
-                    secondBestArea = area;
+                    if(getErasecount(area) < secondBestAreasDeletions
+                       || secondBestArea == 0)
+                    {
+                        secondBestArea = area;
+                    }
                 }
             }
+        }
+        if(secondBestArea != 0)
+        {
+            initAreaAs(secondBestArea, areaType);
+            PAFFS_DBG_S(
+                    PAFFS_TRACE_AREA, "Found empty (but frequently deleted) Area %" PTYPE_AREAPOS " for %s",
+                    secondBestArea, areaNames[areaType]);
+            return secondBestArea;
         }
     }
     else if (getUsedAreas() < areasNo)
@@ -422,17 +435,6 @@ AreaManagement::findWritableArea(AreaType areaType)
     Result r = gc.collectGarbage(areaType);
     if (r != Result::ok)
     {
-        if(r == Result::noSpace)
-        {
-            if(secondBestArea != 0)
-            {
-                initAreaAs(secondBestArea, areaType);
-                PAFFS_DBG_S(
-                        PAFFS_TRACE_AREA, "Found empty (but frequently deleted) Area %" PTYPE_AREAPOS " for %s",
-                        secondBestArea, areaNames[areaType]);
-                return secondBestArea;
-            }
-        }
         dev->lasterr = r;
         return 0;
     }
