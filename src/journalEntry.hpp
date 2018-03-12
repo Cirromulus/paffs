@@ -26,6 +26,7 @@ struct JournalEntry
         checkpoint,
         pagestate,
         superblock,
+        areaMgmt,
         garbage,
         summaryCache,
         tree,
@@ -34,7 +35,7 @@ struct JournalEntry
         device,
     };
 
-    static constexpr const unsigned char numberOfTopics = 10;
+    static constexpr const unsigned char numberOfTopics = 11;
     Topic topic;
 
 protected:
@@ -54,7 +55,7 @@ namespace journalEntry
 
     struct Pagestate : public JournalEntry
     {
-        enum Type : uint8_t
+        enum class Type : uint8_t
         {
             replacePage,
             replacePagePos,
@@ -113,7 +114,7 @@ namespace journalEntry
 
     struct Superblock : public JournalEntry
     {
-        enum Type : uint8_t
+        enum class Type : uint8_t
         {
             rootnode,
             areaMap,
@@ -221,6 +222,85 @@ namespace journalEntry
         };
     };
 
+    struct AreaMgmt : public JournalEntry
+    {
+        enum class Operation : uint8_t
+        {
+            initAreaAs,
+            closeArea,
+            retireArea,
+            deleteAreaContents,
+            deleteArea,
+        };
+        AreaPos area;
+        Operation operation;
+    protected:
+        inline
+        AreaMgmt(AreaPos _area, Operation _operation) : JournalEntry(Topic::areaMgmt),
+            area(_area), operation(_operation){};
+    };
+
+    namespace areaMgmt
+    {
+        struct InitAreaAs : public AreaMgmt
+        {
+            AreaType type;
+            inline
+            InitAreaAs(AreaPos _area, AreaType _type) : AreaMgmt(_area, Operation::initAreaAs),
+                    type(_type){};
+        };
+        struct CloseArea : public AreaMgmt
+        {
+            inline
+            CloseArea(AreaPos _area) : AreaMgmt(_area, Operation::closeArea){};
+        };
+        struct RetireArea : public AreaMgmt
+        {
+            inline
+            RetireArea(AreaPos _area) : AreaMgmt(_area, Operation::retireArea){};
+        };
+        struct DeleteAreaContents : public AreaMgmt
+        {
+            inline
+            DeleteAreaContents(AreaPos target) : AreaMgmt(target, Operation::deleteAreaContents){};
+        };
+        struct DeleteArea : public AreaMgmt
+        {
+            inline
+            DeleteArea(AreaPos target) : AreaMgmt(target, Operation::deleteArea){};
+        };
+
+        union Max
+        {
+            InitAreaAs initAreaAs;
+            CloseArea closeArea;
+            RetireArea retireArea;
+            DeleteAreaContents deleteAreaContents;
+            DeleteArea deleteArea;
+        };
+    }
+    struct GarbageCollection : public JournalEntry
+    {
+        enum class Operation : uint8_t
+        {
+            moveValidData,
+        };
+        Operation operation;
+    protected:
+        inline
+        GarbageCollection(Operation _operation) : JournalEntry(Topic::garbage), operation(_operation){};
+    };
+
+    namespace garbageCollection
+    {
+        struct MoveValidData : public GarbageCollection
+        {
+            AreaPos area;
+            inline
+            MoveValidData(AreaPos _area) : GarbageCollection(Operation::moveValidData), area(_area){};
+        };
+    }
+
     struct SummaryCache : public JournalEntry
     {
         enum class Subtype : uint8_t
@@ -229,9 +309,6 @@ namespace journalEntry
             remove,
             setStatus,
             setStatusBlock,
-            //setDirty,
-            //setAreaSummaryWritten,
-            //setLoadedFromSuperpage,
         };
         AreaPos area;
         Subtype subtype;
@@ -466,6 +543,8 @@ namespace journalEntry
         pagestate::Max pagestate_;
         Superblock superblock;
         superblock::Max superblock_;
+        AreaMgmt areaMgmt;
+        areaMgmt::Max areaMgmt_;
         BTree btree;
         btree::Max btree_;
         SummaryCache summaryCache;

@@ -268,6 +268,16 @@ DataIO::getTopic()
     return JournalEntry::Topic::dataIO;
 }
 
+void
+DataIO::resetState()
+{
+    statemachine.clear();
+    journalLastModifiedInode = 0;
+    journalLastSize = 0;
+    journalInodeValid = false;
+    modifiedInode = false;
+}
+
 Result
 DataIO::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 {
@@ -494,6 +504,7 @@ DataIO::writePageData(PageAbs  pageFrom,
             PAFFS_DBG(PAFFS_TRACE_ERROR,
                       "ERR: write returned FAIL at phy.P: %" PTYPE_PAGEABS,
                       getPageNumber(newAddress, *dev));
+            //TODO: Revert all new Pages
             return res;
         }
 

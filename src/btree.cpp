@@ -256,6 +256,11 @@ Btree::getTopic()
 {
     return JournalEntry::Topic::tree;
 }
+void
+Btree::resetState()
+{
+    mCache.resetState();
+}
 
 Result
 Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition)

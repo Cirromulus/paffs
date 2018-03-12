@@ -57,6 +57,12 @@ public:
     void
     clear();
 
+    /**
+     * resets only statemachine
+     */
+    void
+    resetState();
+
     Result
     processEntry(const journalEntry::Max& entry);
 

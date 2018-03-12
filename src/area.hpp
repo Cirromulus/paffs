@@ -53,7 +53,7 @@ extractLogicalArea(const Addr addr);
 unsigned int
 extractPageOffs(const Addr addr);
 
-class AreaManagement
+class AreaManagement : public JournalTopic
 {
     Area map[areasNo];
     AreaPos activeArea[AreaType::no];
@@ -133,17 +133,27 @@ public:
     manageActiveAreaFull(AreaType areaType);
 
     void
-    initArea(AreaPos area);
-    void
     initAreaAs(AreaPos area, AreaType type);
     Result
     closeArea(AreaPos area);
     void
     retireArea(AreaPos area);
+    /**
+     * \param noJournalLogging is active if called from deleteArea.
+     */
     Result
-    deleteAreaContents(AreaPos area);
+    deleteAreaContents(AreaPos area, bool noJournalLogging = false);
     Result
     deleteArea(AreaPos area);
+
+    JournalEntry::Topic
+    getTopic() override;
+    void
+    resetState() override;
+    Result
+    processEntry(const journalEntry::Max& entry, JournalEntryPosition) override;
+    void
+    signalEndOfLog() override;
 };
 
 }  // namespace paffs

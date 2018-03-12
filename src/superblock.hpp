@@ -115,6 +115,9 @@ class Superblock : public JournalTopic
     Device* device;
     Addr mRootnodeAddr = 0;
     bool mRootnodeDirty = 0;
+
+    //TODO: Move areaMap stuff here
+
     Addr pathToSuperIndexDirect[superChainElems];  // Direct Addresses
     SerialNo superChainIndexes[superChainElems];
     bool testmode = false;
@@ -132,6 +135,9 @@ public:
 
     JournalEntry::Topic
     getTopic() override;
+    void
+    resetState() override;
+
     /**
      * AreaMap contains the phys. Positions of the areas.
      * An area move instruction changes the position of older elements as well.

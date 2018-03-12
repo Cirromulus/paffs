@@ -104,6 +104,14 @@ Journal::processBuffer()
     journalEntry::Max entry;
     JournalEntryPosition firstUncheckpointedEntry[JournalEntry::numberOfTopics];
 
+    for(JournalTopic* worker : topics)
+    {
+        if(worker != nullptr)
+        {
+            worker->resetState();
+        }
+    }
+
     Result r = persistence.rewind();
     if (r != Result::ok)
     {
@@ -269,12 +277,24 @@ Journal::applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[Journ
                        persistence.tell().flash.offs);
             }
         }
+
+        //Notify other Topics of this element
+        for(uint8_t t = 0; t < JournalEntry::numberOfTopics; t++)
+        {
+            if(topics[t] == nullptr || t == target)
+            {
+                continue;
+            }
+            if(topics[t]->isInterestedIn(entry) && persistence.tell() >= firstUncheckpointedEntry[t])
+            {
+                topics[t]->processEntry(entry, persistence.tell());
+                PAFFS_DBG_S(PAFFS_TRACE_JOURNAL || PAFFS_TRACE_VERBOSE,
+                            "Also informed \e[1;%um%s\e[0m of this entry.", colorMap[t], topicNames[t]);
+            }
+        }
     }
 
-    //FIXME
-    //While persistence does not have read/write pointers,
-    //we enable it here (It should be enabled before targets process entries
-    //This is OK as long as a processEntry does not produce some decisions we would ignore later on
+    //Only from here a write action of a journal Topic is allowed
     disabled = false;
 
     PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Signalling end of Log");

@@ -157,9 +157,10 @@ public:
     commitAreaSummaries(bool createNew = false);
     void
     clear();
-
     JournalEntry::Topic
     getTopic() override;
+    void
+    resetState() override;
     void
     preScan(const journalEntry::Max& entry, JournalEntryPosition position) override;
     Result

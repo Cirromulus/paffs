@@ -1966,7 +1966,11 @@ Device::getTopic()
 {
     return JournalEntry::Topic::device;
 }
-
+void
+Device::resetState()
+{
+    journalState = JournalState::ok;
+}
 Result
 Device::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 {

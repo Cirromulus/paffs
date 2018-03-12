@@ -139,6 +139,9 @@ GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea,
                 dev->areaMgmt.getPos(srcArea),
                 dstArea,
                 dev->areaMgmt.getPos(dstArea));
+
+    dev->journal.addEvent(journalEntry::garbageCollection::MoveValidData(dstArea));
+
     validDataLeft = false;
     for (PageOffs page = 0; page < dataPagesPerArea; page++)
     {
@@ -335,7 +338,8 @@ GarbageCollection::collectGarbage(AreaType targetType)
                 r = dev->areaMgmt.deleteAreaContents(deletionTarget);
                 if(r != Result::ok)
                 {
-                    //TODO: Handle this better
+                    //This restarts the loop to find a place for the GC-Buffer.
+                    //FIXME: findNextBestArea has to find a completely free area.
                     continue;
                 }
             }
@@ -390,6 +394,8 @@ GarbageCollection::collectGarbage(AreaType targetType)
         dev->areaMgmt.initAreaAs(deletionTarget, targetType);
     }
 
+    dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
+
     PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL,
                 "Garbagecollection erased pos %" PRIu16 " and gave area %" PRIu16 " pos %" PRIu16 ".",
                 dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(AreaType::garbageBuffer)),
@@ -398,4 +404,33 @@ GarbageCollection::collectGarbage(AreaType targetType)
 
     return Result::ok;
 }
+
+JournalEntry::Topic
+GarbageCollection::getTopic()
+{
+    return JournalEntry::Topic::garbage;
+}
+void
+GarbageCollection::resetState()
+{
+    state = Statemachine::ok;
+}
+bool
+GarbageCollection::isInterestedIn(const journalEntry::Max& entry)
+{
+    return state != Statemachine::ok &&
+            (entry.base.topic == JournalEntry::Topic::areaMgmt ||
+             entry.base.topic == JournalEntry::Topic::summaryCache);
+}
+Result
+GarbageCollection::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
+{
+    return Result::nimpl;
+}
+void
+GarbageCollection::signalEndOfLog()
+{
+
+}
+
 }

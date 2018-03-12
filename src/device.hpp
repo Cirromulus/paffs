@@ -131,6 +131,8 @@ public:
 
     JournalEntry::Topic
     getTopic() override;
+    void
+    resetState() override;
     Result
     processEntry(const journalEntry::Max& entry, JournalEntryPosition position) override;
     void

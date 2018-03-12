@@ -397,6 +397,12 @@ PageAddressCache::getTopic()
     return JournalEntry::Topic::pac;
 }
 
+void
+PageAddressCache::resetState()
+{
+    statemachine.clear();
+}
+
 Result
 PageAddressCache::setJournallingInode(InodeNo no)
 {

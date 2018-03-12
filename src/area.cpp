@@ -203,20 +203,23 @@ AreaManagement::setStatus(AreaPos area, AreaStatus status)
                   areasNo);
         return;
     }
-    if (traceMask & PAFFS_TRACE_VERIFY_AS)
+    if (map[area].type != AreaType::superblock && traceMask & PAFFS_TRACE_VERIFY_AS)
     {
         if(status == AreaStatus::active)
         {
             uint8_t activeAreas = 0;
-            for(AreaPos i = 4; i < areasNo; i++)
+            for(AreaPos i = 0; i < areasNo; i++)
             {   //Jump over SBLOCK/GC and current
                 if(i == area)
                 {
                     continue;
                 }
-                if(map[i].status == AreaStatus::active)
+                if(map[i].type == AreaType::data || map[i].type == AreaType::index)
                 {
-                    activeAreas++;
+                    if(map[i].status == AreaStatus::active)
+                    {
+                        activeAreas++;
+                    }
                 }
             }
             if(activeAreas >= 2)
@@ -536,17 +539,6 @@ AreaManagement::manageActiveAreaFull(AreaType areaType)
 void
 AreaManagement::initAreaAs(AreaPos area, AreaType type)
 {
-    setType(area, type);
-    initArea(area);
-}
-
-void
-AreaManagement::initArea(AreaPos area)
-{
-    if (getType(area) == AreaType::unset)
-    {
-        PAFFS_DBG(PAFFS_TRACE_BUG, "Initing Area with invalid type!");
-    }
     if (getActiveArea(getType(area)) != 0 && getActiveArea(getType(area)) != area)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
@@ -561,17 +553,22 @@ AreaManagement::initArea(AreaPos area)
                 static_cast<unsigned int>(area),
                 static_cast<unsigned int>(getPos(area)),
                 areaNames[getType(area)]);
+
+    dev->journal.addEvent(journalEntry::areaMgmt::InitAreaAs(area, type));
+    setType(area, type);
     if (getStatus(area) == AreaStatus::empty)
     {
         increaseUsedAreas();
     }
     setStatus(area, AreaStatus::active);
     setActiveArea(getType(area), area);
+    dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
 }
 
 Result
 AreaManagement::closeArea(AreaPos area)
 {
+    dev->journal.addEvent(journalEntry::areaMgmt::CloseArea(area));
     setStatus(area, AreaStatus::closed);
     setActiveArea(getType(area), 0);
     PAFFS_DBG_S(PAFFS_TRACE_AREA,
@@ -579,21 +576,24 @@ AreaManagement::closeArea(AreaPos area)
                 areaNames[getType(area)],
                 area,
                 getPos(area));
+    dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
     return Result::ok;
 }
 
 void
 AreaManagement::retireArea(AreaPos area)
 {
+    dev->journal.addEvent(journalEntry::areaMgmt::CloseArea(area));
     setStatus(area, AreaStatus::closed);
     setType(area, AreaType::retired);
     for (unsigned block = 0; block < blocksPerArea; block++)
         dev->driver.markBad(getPos(area) * blocksPerArea + block);
+    dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
     PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %" PTYPE_AREAPOS " at pos. %" PTYPE_AREAPOS ".", area, getPos(area));
 }
 
 Result
-AreaManagement::deleteAreaContents(AreaPos area)
+AreaManagement::deleteAreaContents(AreaPos area, bool noJournalLogging)
 {
     if (area >= areasNo)
     {
@@ -617,8 +617,12 @@ AreaManagement::deleteAreaContents(AreaPos area)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "deleted content of active area %" PTYPE_AREAPOS ", is this OK?", area);
     }
-    Result r = Result::ok;
 
+    if(!noJournalLogging)
+    {
+        dev->journal.addEvent(journalEntry::areaMgmt::DeleteAreaContents(area));
+    }
+    Result r = Result::ok;
     for (unsigned int i = 0; i < blocksPerArea; i++)
     {
         r = dev->driver.eraseBlock(getPos(area) * blocksPerArea + i);
@@ -659,6 +663,10 @@ AreaManagement::deleteAreaContents(AreaPos area)
     }
     PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Deleted Area %" PTYPE_AREAPOS " Contents at pos. %" PTYPE_AREAPOS ".", area, getPos(area));
     dev->sumCache.deleteSummary(area);
+    if(!noJournalLogging)
+    {
+        dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    }
     return r;
 }
 
@@ -688,7 +696,9 @@ AreaManagement::deleteArea(AreaPos area)
         PAFFS_DBG(PAFFS_TRACE_BUG, "deleted active area %" PTYPE_AREAPOS ", is this OK?", area);
     }
 
-    Result r = deleteAreaContents(area);
+    dev->journal.addEvent(journalEntry::areaMgmt::DeleteArea(area));
+
+    Result r = deleteAreaContents(area, true);
     if(r != Result::ok)
     {
         PAFFS_DBG_S(PAFFS_TRACE_AREA, "Could not delete Area %" PTYPE_AREAPOS
@@ -705,4 +715,24 @@ AreaManagement::deleteArea(AreaPos area)
     return r;
 }
 
+JournalEntry::Topic
+AreaManagement::getTopic()
+{
+    return JournalEntry::Topic::areaMgmt;
+}
+void
+AreaManagement::resetState()
+{
+    //nothing
+}
+Result
+AreaManagement::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
+{
+    return Result::nimpl;
+}
+void
+AreaManagement::signalEndOfLog()
+{
+
+}
 }  // namespace paffs

@@ -72,6 +72,8 @@ public:
 
     JournalEntry::Topic
     getTopic() override;
+    void
+    resetState() override;
     Result
     setJournallingInode(InodeNo no);
     Result

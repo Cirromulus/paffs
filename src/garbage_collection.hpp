@@ -15,15 +15,25 @@
 #pragma once
 
 #include "commonTypes.hpp"
+#include "journal.hpp"
 
 namespace paffs
 {
-class GarbageCollection
+class GarbageCollection : public JournalTopic
 {
     Device* dev;
 
+    enum class Statemachine
+    {
+        ok,
+        movedValidData,
+        deletedOldArea,
+        swappedPosition,
+        setNewSummary,
+    } state;
+
 public:
-    inline GarbageCollection(Device* mdev) : dev(mdev){};
+    inline GarbageCollection(Device* mdev) : dev(mdev), state(Statemachine::ok){};
 
     /* Special case: Target=unset.
      * This frees any Type (with a favour to areas with committed AS'es)
@@ -36,6 +46,17 @@ public:
      */
     Result
     moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea, bool& validDataLeft, SummaryEntry* summary);
+
+    JournalEntry::Topic
+    getTopic() override;
+    void
+    resetState() override;
+    bool
+    isInterestedIn(const journalEntry::Max& entry) override;
+    Result
+    processEntry(const journalEntry::Max& entry, JournalEntryPosition) override;
+    void
+    signalEndOfLog() override;
 
 private:
     void

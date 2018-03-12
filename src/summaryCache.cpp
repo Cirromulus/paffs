@@ -915,6 +915,11 @@ SummaryCache::getTopic()
     return JournalEntry::Topic::summaryCache;
 }
 void
+SummaryCache::resetState()
+{
+    //nothing
+}
+void
 SummaryCache::preScan(const journalEntry::Max& entry, JournalEntryPosition position)
 {
     if (entry.base.topic != getTopic())

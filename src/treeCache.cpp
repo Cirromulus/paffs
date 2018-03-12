@@ -74,6 +74,13 @@ TreeCache::clear()
 {
     memset(mCache, 0, treeNodeCacheSize * sizeof(TreeCacheNode));
     mCacheUsage.clear();
+    statemachine.clear();
+}
+
+void
+TreeCache::resetState()
+{
+    statemachine.clear();
 }
 
 Result

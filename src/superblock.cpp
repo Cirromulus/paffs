@@ -272,6 +272,11 @@ Superblock::getTopic()
 {
     return JournalEntry::Topic::superblock;
 }
+void
+Superblock::resetState()
+{
+    //nothing
+}
 
 void
 Superblock::preScan(const journalEntry::Max& entry, JournalEntryPosition)
@@ -1448,8 +1453,8 @@ Superblock::findBestNextFreeArea(AreaPos logPrev)
         if (device->areaMgmt.getStatus(i) == AreaStatus::empty)
         {
             // Following changes to areaMap may not be persistent if SuperIndex was already written
-            device->areaMgmt.setStatus(i, AreaStatus::active);
-            device->areaMgmt.setType(i, AreaType::superblock);
+            device->areaMgmt.setStatus(logPrev, AreaStatus::empty);
+
             /**
              * The area will be empty after the next handleBlockOverflow
              * This allows other SuperIndex areas to switch to this one if flushed in same commit.
@@ -1457,7 +1462,9 @@ Superblock::findBestNextFreeArea(AreaPos logPrev)
              * and that the replacing Area will be a higher order and
              * thus less frequently written to.
              */
-            device->areaMgmt.setStatus(logPrev, AreaStatus::empty);
+            device->areaMgmt.initAreaAs(i, AreaType::superblock);
+            //Ignore active Area with superblocks
+            device->areaMgmt.setActiveArea(AreaType::superblock, 0);
             // Unset is postponed till actual deletion
 
             PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found log. %" PTYPE_AREAPOS, i);
