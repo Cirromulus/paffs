@@ -260,7 +260,7 @@ SummaryCache::printStatus()
                    mSummaryCache[i].isDirty() ? "dirty" : "  -  ",
                    mSummaryCache[i].isLoadedFromSuperPage() ? "fSP" : " - ",
                    mSummaryCache[i].isAreaSummaryWritten() ? "wrtn" : "  - ",
-                   dev->areaMgmt.getStatus(mSummaryCache[i].getArea()) ? "actv" : "  - ",
+                   dev->superblock.getStatus(mSummaryCache[i].getArea()) ? "actv" : "  - ",
                    mSummaryCache[i].getArea(), mSummaryCache[i].getDirtyPages()
                    );
 
@@ -301,9 +301,9 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition, bool desperat
         cachePos = it.second;
         if ((mSummaryCache[cachePos].isDirty() || desperate)
             && mSummaryCache[cachePos].isAreaSummaryWritten()
-            && dev->areaMgmt.getStatus(it.first) != AreaStatus::active
-            && (dev->areaMgmt.getType(it.first) == AreaType::data
-                || dev->areaMgmt.getType(it.first) == AreaType::index))
+            && dev->superblock.getStatus(it.first) != AreaStatus::active
+            && (dev->superblock.getType(it.first) == AreaType::data
+                || dev->superblock.getType(it.first) == AreaType::index))
         {
             PageOffs dirtyPages = countDirtyPages(cachePos);
             PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
@@ -333,14 +333,14 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition, bool desperat
             {
                 PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "\tno AS written");
             }
-            if (dev->areaMgmt.getStatus(it.first) == AreaStatus::active)
+            if (dev->superblock.getStatus(it.first) == AreaStatus::active)
             {
                 PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                             "\tis active (%s)",
-                            areaNames[dev->areaMgmt.getType(it.first)]);
+                            areaNames[dev->superblock.getType(it.first)]);
             }
-            if (dev->areaMgmt.getType(it.first) != AreaType::data
-                && dev->areaMgmt.getType(it.first) != AreaType::index)
+            if (dev->superblock.getType(it.first) != AreaType::data
+                && dev->superblock.getType(it.first) != AreaType::index)
             {
                 PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "\tnot data/index");
             }
@@ -374,10 +374,10 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition, bool desperat
     PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                 "Commit Hard swaps GC Area %" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ")"
                 " from %" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ")",
-                dev->areaMgmt.getActiveArea(AreaType::garbageBuffer),
-                dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(AreaType::garbageBuffer)),
+                dev->superblock.getActiveArea(AreaType::garbageBuffer),
+                dev->superblock.getPos(dev->superblock.getActiveArea(AreaType::garbageBuffer)),
                 favouriteArea,
-                dev->areaMgmt.getPos(favouriteArea));
+                dev->superblock.getPos(favouriteArea));
 
     SummaryEntry summary[dataPagesPerArea];
     unpackStatusArray(cachePos, summary);
@@ -385,7 +385,7 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition, bool desperat
     bool validDataLeft;
     Result r = dev->areaMgmt.gc.moveValidDataToNewArea(
             favouriteArea,
-            dev->areaMgmt.getActiveArea(AreaType::garbageBuffer),
+            dev->superblock.getActiveArea(AreaType::garbageBuffer),
             validDataLeft, summary);
 
     if (r != Result::ok)
@@ -404,8 +404,8 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition, bool desperat
         //deletes a cache position here, resets AsWritten
         dev->areaMgmt.deleteAreaContents(favouriteArea);
         // swap logical position of areas to keep addresses valid
-        dev->areaMgmt.swapAreaPosition(favouriteArea,
-                                       dev->areaMgmt.getActiveArea(AreaType::garbageBuffer));
+        dev->superblock.swapAreaPosition(favouriteArea,
+                                       dev->superblock.getActiveArea(AreaType::garbageBuffer));
 
         setSummaryStatus(favouriteArea, summary);
     }
@@ -486,14 +486,14 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
             return r;
         }
     }
-    if (dev->areaMgmt.getType(area) == AreaType::unset)
+    if (dev->superblock.getType(area) == AreaType::unset)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "Tried setting Pagestatus on UNSET area "
                   "%" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ", status %" PRIu8 ")",
                   area,
-                  dev->areaMgmt.getPos(area),
-                  dev->areaMgmt.getStatus(area));
+                  dev->superblock.getPos(area),
+                  dev->superblock.getStatus(area));
         return Result::bug;
     }
 
@@ -526,7 +526,7 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
                           "(Area %" PTYPE_AREAPOS " on %" PTYPE_AREAPOS " was: %" PTYPE_PAGEOFFS ","
                                   " thought %" PTYPE_PAGEOFFS ")",
                           area,
-                          dev->areaMgmt.getPos(area),
+                          dev->superblock.getPos(area),
                           dirtyPagesCheck,
                           mSummaryCache[mTranslation[area]].getDirtyPages());
                 return Result::fail;
@@ -625,12 +625,12 @@ SummaryCache::getSummaryStatus(AreaPos area, SummaryEntry* summary, bool complet
         {
             // TODO: Handle biterror
             PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of "
-                    "Area %" PTYPE_AREAPOS " on %" PTYPE_AREAPOS, area, dev->areaMgmt.getPos(area));
+                    "Area %" PTYPE_AREAPOS " on %" PTYPE_AREAPOS, area, dev->superblock.getPos(area));
         }
         else if (r == Result::notFound)
         {
             PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded empty AreaSummary of "
-                        "Area %" PTYPE_AREAPOS " on %" PTYPE_AREAPOS, area, dev->areaMgmt.getPos(area));
+                        "Area %" PTYPE_AREAPOS " on %" PTYPE_AREAPOS, area, dev->superblock.getPos(area));
             r = Result::ok;
         }
         for(uint16_t i = 0; i < dataPagesPerArea; i++)
@@ -666,7 +666,7 @@ SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary)
         {
             //No space for loading this area, so directly hardcommit this (Ugly!)
             AreaSummaryElem tmp;
-            tmp.setArea(dev->areaMgmt.getActiveArea(AreaType::garbageBuffer));
+            tmp.setArea(dev->superblock.getActiveArea(AreaType::garbageBuffer));
             for (uint16_t i = 0; i < dataPagesPerArea; i++)
             {
                 tmp.setStatus(i, summary[i]);
@@ -731,7 +731,7 @@ SummaryCache::wasAreaSummaryWritten(AreaPos area)
 {
     if (mTranslation.find(area) == mTranslation.end())
     {
-        if (dev->areaMgmt.getStatus(area) == AreaStatus::empty)
+        if (dev->superblock.getStatus(area) == AreaStatus::empty)
             return false;
         // If it is not empty, and not in Cache, it has to be containing Data and is not active.
         // It has to have an AS written.
@@ -774,7 +774,7 @@ SummaryCache::loadAreaSummaries()
         PAFFS_DBG_S(PAFFS_TRACE_ERROR, "failed to load Area Summaries!");
         return r;
     }
-    dev->areaMgmt.setUsedAreas(index.usedAreas);
+    dev->superblock.setUsedAreas(index.usedAreas);
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "read superIndex successfully");
 
     for (uint8_t i = 0; i < 2; i++)
@@ -790,7 +790,7 @@ SummaryCache::loadAreaSummaries()
                         "Checking for an AS at area %" PTYPE_AREAPOS " (phys. %" PTYPE_AREAPOS ", "
                         "abs. page %" PTYPE_PAGEABS ")",
                         index.areaSummaryPositions[i],
-                        dev->areaMgmt.getPos(index.areaSummaryPositions[i]),
+                        dev->superblock.getPos(index.areaSummaryPositions[i]),
                         getPageNumber(combineAddress(index.areaSummaryPositions[i], dataPagesPerArea),
                                       *dev));
             uint8_t* summary = dev->driver.getPageBuffer();
@@ -814,15 +814,15 @@ SummaryCache::loadAreaSummaries()
                     break;
                 }
             }
-            if (dev->areaMgmt.getStatus(index.areaSummaryPositions[i]) == AreaStatus::active)
+            if (dev->superblock.getStatus(index.areaSummaryPositions[i]) == AreaStatus::active)
             {
-                dev->areaMgmt.setActiveArea(dev->areaMgmt.getType(index.areaSummaryPositions[i]),
+                dev->superblock.setActiveArea(dev->superblock.getType(index.areaSummaryPositions[i]),
                                             index.areaSummaryPositions[i]);
             }
             PAFFS_DBG_S(PAFFS_TRACE_VERBOSE,
                         "Loaded area summary %" PRId16 " on %" PRId16 "",
                         index.areaSummaryPositions[i],
-                        dev->areaMgmt.getPos(index.areaSummaryPositions[i]));
+                        dev->superblock.getPos(index.areaSummaryPositions[i]));
         }
     }
 
@@ -1035,7 +1035,7 @@ SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent)
         mSummaryCache[nextEntry].setDirty(
                 r == Result::biterrorCorrected);  // Rewrites corrected Bit upon next commit
         PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of "
-                "%" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ") to cache", area, dev->areaMgmt.getPos(area));
+                "%" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ") to cache", area, dev->superblock.getPos(area));
         mSummaryCache[mTranslation[area]].setDirtyPages(countDirtyPages(mTranslation[area]));
     }
     else if (r == Result::notFound)
@@ -1062,17 +1062,17 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
         if (mSummaryCache[i].isUsed())
         {
             if (!(mSummaryCache[i].isDirty() || mSummaryCache[i].isLoadedFromSuperPage())
-                || dev->areaMgmt.getStatus(mSummaryCache[i].getArea()) == AreaStatus::empty)
+                || dev->superblock.getStatus(mSummaryCache[i].getArea()) == AreaStatus::empty)
             {
                 if (mSummaryCache[i].isDirty()
-                    && dev->areaMgmt.getStatus(mSummaryCache[i].getArea()) == AreaStatus::empty)
+                    && dev->superblock.getStatus(mSummaryCache[i].getArea()) == AreaStatus::empty)
                 {
                     // Dirty, but it was not properly deleted?
                     PAFFS_DBG(PAFFS_TRACE_BUG,
                               "Area %" PTYPE_AREAPOS " is dirty, but was "
                               "not set to an status (Type %s)",
                               mSummaryCache[i].getArea(),
-                              areaNames[dev->areaMgmt.getType(mSummaryCache[i].getArea())]);
+                              areaNames[dev->superblock.getType(mSummaryCache[i].getArea())]);
                 }
                 PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                             "Deleted non-dirty cache entry "
@@ -1095,15 +1095,15 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
 
     if(traceMask & PAFFS_TRACE_ASCACHE)
     {
-    }
         printStatus();
+    }
 
     // Look for the least probable Area to be used that has no committed AS
     PageOffs maxDirtyPages = 0;
     for (uint16_t i = 0; i < areaSummaryCacheSize; i++)
     {
         if (mSummaryCache[i].isUsed() && !mSummaryCache[i].isAreaSummaryWritten()
-            && dev->areaMgmt.getStatus(mSummaryCache[i].getArea()) != AreaStatus::active)
+            && dev->superblock.getStatus(mSummaryCache[i].getArea()) != AreaStatus::active)
         {
             PageOffs tmp = countUnusedPages(i);
             if (tmp >= maxDirtyPages)
@@ -1141,7 +1141,7 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
     for (int i = 0; i < areaSummaryCacheSize; i++)
     {
         if (mSummaryCache[i].isUsed() && !mSummaryCache[i].isAreaSummaryWritten()
-            && dev->areaMgmt.getStatus(mSummaryCache[i].getArea()) != AreaStatus::active)
+            && dev->superblock.getStatus(mSummaryCache[i].getArea()) != AreaStatus::active)
         {
             PageOffs tmp = countUnusedPages(i);
             if (tmp >= maxDirtyPages)
@@ -1171,9 +1171,9 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
         uint8_t activeAreas = 0;
         for (AreaPos i = 0; i < areasNo; i++)
         {
-            if (dev->areaMgmt.getStatus(i) == AreaStatus::active
-                && (dev->areaMgmt.getType(i) == AreaType::data
-                    || dev->areaMgmt.getType(i) == AreaType::index))
+            if (dev->superblock.getStatus(i) == AreaStatus::active
+                && (dev->superblock.getType(i) == AreaType::data
+                    || dev->superblock.getType(i) == AreaType::index))
             {
                 activeAreas++;
             }

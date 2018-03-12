@@ -1199,12 +1199,12 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
     }
 
     // Handle Areas
-    if (dev->areaMgmt.getStatus(dev->areaMgmt.getActiveArea(AreaType::index)) != AreaStatus::active)
+    if (dev->superblock.getStatus(dev->superblock.getActiveArea(AreaType::index)) != AreaStatus::active)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned inactive area!");
         return Result::bug;
     }
-    if (dev->areaMgmt.getActiveArea(AreaType::index) == 0)
+    if (dev->superblock.getActiveArea(AreaType::index) == 0)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "WRITE TREE NODE findWritableArea returned 0");
         return Result::bug;
@@ -1219,7 +1219,7 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
                       "WRITE operation, old node is FREE data at %" PTYPE_AREAPOS
                       "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
                       extractLogicalArea(node.raw.self),
-                      dev->areaMgmt.getPos(extractLogicalArea(node.raw.self)),
+                      dev->superblock.getPos(extractLogicalArea(node.raw.self)),
                       extractPageOffs(node.raw.self));
             return Result::bug;
         }
@@ -1229,23 +1229,23 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
                       "WRITE operation, old node is DIRTY data at %" PTYPE_AREAPOS
                       "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
                       extractLogicalArea(node.raw.self),
-                      dev->areaMgmt.getPos(extractLogicalArea(node.raw.self)),
+                      dev->superblock.getPos(extractLogicalArea(node.raw.self)),
                       extractPageOffs(node.raw.self));
             return Result::bug;
         }
     }
     PageOffs firstFreePage = 0;
     if (dev->areaMgmt.findFirstFreePage(firstFreePage,
-                                        dev->areaMgmt.getActiveArea(AreaType::index))
+                                        dev->superblock.getActiveArea(AreaType::index))
         == Result::noSpace)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "BUG: findWritableArea returned full area (%" PTYPE_AREAPOS " on %" PTYPE_AREAPOS ").",
-                  dev->areaMgmt.getActiveArea(AreaType::index),
-                  dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(AreaType::index)));
+                  dev->superblock.getActiveArea(AreaType::index),
+                  dev->superblock.getPos(dev->superblock.getActiveArea(AreaType::index)));
         return dev->lasterr = Result::bug;
     }
-    Addr newAddr = combineAddress(dev->areaMgmt.getActiveArea(AreaType::index), firstFreePage);
+    Addr newAddr = combineAddress(dev->superblock.getActiveArea(AreaType::index), firstFreePage);
     Addr oldSelf = node.raw.self;
     node.raw.self = newAddr;
 
@@ -1282,20 +1282,20 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
 Result
 TreeCache::readTreeNode(Addr addr, TreeNode& node)
 {
-    if (dev->areaMgmt.getType(extractLogicalArea(addr)) != AreaType::index)
+    if (dev->superblock.getType(extractLogicalArea(addr)) != AreaType::index)
     {
         if (traceMask & PAFFS_TRACE_AREA)
         {
-            printf("Info: \n\t%" PTYPE_AREAPOS " used Areas\n", dev->areaMgmt.getUsedAreas());
+            printf("Info: \n\t%" PTYPE_AREAPOS " used Areas\n", dev->superblock.getUsedAreas());
             for (AreaPos i = 0; i < areasNo; i++)
             {
                 printf("\tArea %03" PTYPE_AREAPOS "  on %03" PTYPE_AREAPOS " as %10s "
                         "from page %4" PTYPE_AREAPOS " %s\n",
                        i,
-                       dev->areaMgmt.getPos(i),
-                       areaNames[dev->areaMgmt.getType(i)],
-                       dev->areaMgmt.getPos(i) * blocksPerArea * pagesPerBlock,
-                       areaStatusNames[dev->areaMgmt.getStatus(i)]);
+                       dev->superblock.getPos(i),
+                       areaNames[dev->superblock.getType(i)],
+                       dev->superblock.getPos(i) * blocksPerArea * pagesPerBlock,
+                       areaStatusNames[dev->superblock.getStatus(i)]);
                 if (i > 128)
                 {
                     printf("\n -- truncated 128-%" PRIu16 " Areas.\n", areasNo);
@@ -1306,17 +1306,17 @@ TreeCache::readTreeNode(Addr addr, TreeNode& node)
         }
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "READ TREEENODE operation on %s (Area %" PTYPE_AREAPOS ", pos %" PTYPE_AREAPOS "!",
-                  areaNames[dev->areaMgmt.getType(extractLogicalArea(addr))],
+                  areaNames[dev->superblock.getType(extractLogicalArea(addr))],
                   extractLogicalArea(addr),
-                  dev->areaMgmt.getPos(extractLogicalArea(addr)));
+                  dev->superblock.getPos(extractLogicalArea(addr)));
         return Result::bug;
     }
 
-    if (dev->areaMgmt.getType(extractLogicalArea(addr)) != AreaType::index)
+    if (dev->superblock.getType(extractLogicalArea(addr)) != AreaType::index)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "READ TREE NODE operation on %s Area at %X:%X",
-                  areaNames[dev->areaMgmt.getType(extractLogicalArea(addr))],
+                  areaNames[dev->superblock.getType(extractLogicalArea(addr))],
                   extractLogicalArea(addr),
                   extractPageOffs(addr));
         return Result::bug;
@@ -1357,7 +1357,11 @@ TreeCache::readTreeNode(Addr addr, TreeNode& node)
         }
         else
         {
-            PAFFS_DBG(PAFFS_TRACE_ERROR, "Error reading Treenode");
+            PAFFS_DBG(PAFFS_TRACE_ERROR, "Error reading Treenode at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
+                      extractLogicalArea(addr),
+                      dev->superblock.getPos(extractLogicalArea(addr)),
+                      extractPageOffs(addr)
+                      );
             return r;
         }
     }
@@ -1367,7 +1371,7 @@ TreeCache::readTreeNode(Addr addr, TreeNode& node)
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "Read Treenode at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS ", but its content stated that it was on %X:%X",
                   extractLogicalArea(addr),
-                  dev->areaMgmt.getPos(extractLogicalArea(addr)),
+                  dev->superblock.getPos(extractLogicalArea(addr)),
                   extractPageOffs(addr),
                   extractLogicalArea(node.self),
                   extractPageOffs(node.self));

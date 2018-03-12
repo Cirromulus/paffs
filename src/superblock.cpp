@@ -264,6 +264,7 @@ SuperIndex::print()
     {
         printf("%10s: %" PTYPE_AREAPOS "\n", areaNames[i], activeArea[i]);
     }
+    printf("Used Areas: %" PTYPE_AREAPOS "\n", usedAreas);
     printf("Overall deletions: %" PRIu64 "\n", overallDeletions);
 }
 
@@ -298,19 +299,19 @@ Superblock::preScan(const journalEntry::Max& entry, JournalEntryPosition)
             switch(a->operation)
             {
                 case journalEntry::superblock::AreaMap::Operation::type:
-                    device->areaMgmt.setType(a->offs, entry.superblock_.areaMap_.type.type);
+                    setType(a->offs, entry.superblock_.areaMap_.type.type);
                     break;
                 case journalEntry::superblock::AreaMap::Operation::status:
-                    device->areaMgmt.setStatus(a->offs, entry.superblock_.areaMap_.status.status);
+                    setStatus(a->offs, entry.superblock_.areaMap_.status.status);
                     break;
                 case journalEntry::superblock::AreaMap::Operation::increaseErasecount:
-                    device->areaMgmt.increaseErasecount(a->offs);
+                    increaseErasecount(a->offs);
                     break;
                 case journalEntry::superblock::AreaMap::Operation::position:
-                    device->areaMgmt.setPos(a->offs, entry.superblock_.areaMap_.position.position);
+                    setPos(a->offs, entry.superblock_.areaMap_.position.position);
                     break;
                 case journalEntry::superblock::AreaMap::Operation::swap:
-                    device->areaMgmt.swapAreaPosition(a->offs, entry.superblock_.areaMap_.swap.b);
+                    swapAreaPosition(a->offs, entry.superblock_.areaMap_.swap.b);
                     break;
                 default:
                     return;
@@ -320,11 +321,11 @@ Superblock::preScan(const journalEntry::Max& entry, JournalEntryPosition)
         case journalEntry::Superblock::Type::activeArea:
             {
             auto aa = &entry.superblock_.activeArea;
-            device->areaMgmt.setActiveArea(aa->type, aa->area);
+            setActiveArea(aa->type, aa->area);
             break;
             }
         case journalEntry::Superblock::Type::usedAreas:
-            device->areaMgmt.setUsedAreas(entry.superblock_.usedAreas.usedAreas);
+            setUsedAreas(entry.superblock_.usedAreas.usedAreas);
             break;
     }
 }
@@ -336,13 +337,16 @@ Superblock::processEntry(const journalEntry::Max&, JournalEntryPosition)
 }
 
 void
-Superblock::signalEndOfLog()
+Superblock::clear()
 {
-    //If the closing of an area was not applied
-    device->areaMgmt.manageActiveAreaFull(AreaType::data);
-    device->areaMgmt.manageActiveAreaFull(AreaType::index);
+    mRootnodeAddr = 0;
+    mRootnodeDirty = false;
+    memset(mMap, 0, areasNo * sizeof(Area));
+    memset(mActiveAreas, 0, AreaType::no * sizeof(AreaPos));
+    mUsedAreas = 0;
+    mOverallDeletions = 0;
+    PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Cleared Areamap, active Area and used Areas");
 }
-
 
 Result
 Superblock::registerRootnode(Addr addr)
@@ -375,14 +379,272 @@ Superblock::getRootnodeAddr()
     return mRootnodeAddr;
 }
 
+
+AreaType
+Superblock::getType(AreaPos area)
+{
+    if (area >= areasNo)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG,
+                  "Tried to get Type out of bounds! "
+                  "(%" PTYPE_AREAPOS " >= %" PTYPE_AREAPOS ")",
+                  area,
+                  areasNo);
+        return AreaType::no;
+    }
+    return mMap[area].type;
+}
+AreaStatus
+Superblock::getStatus(AreaPos area)
+{
+    if (area >= areasNo)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG,
+                  "Tried to get Status out of bounds! "
+                  "(%" PTYPE_AREAPOS " >= %" PTYPE_AREAPOS ")",
+                  area,
+                  areasNo);
+        return AreaStatus::active;
+    }
+    return mMap[area].status;
+}
+uint32_t
+Superblock::getErasecount(AreaPos area)
+{
+    if (area >= areasNo)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG,
+                  "Tried to get Erasecount out of bounds! "
+                  "(%" PTYPE_AREAPOS " >= %" PTYPE_AREAPOS ")",
+                  area,
+                  areasNo);
+        return 0;
+    }
+    return mMap[area].erasecount;
+}
+AreaPos
+Superblock::getPos(AreaPos area)
+{
+    if (area >= areasNo)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG,
+                  "Tried to get Position out of bounds! "
+                  "(%" PTYPE_AREAPOS " >= %" PRIu16 ")",
+                  area,
+                  areasNo);
+        return 0;
+    }
+    return mMap[area].position;
+}
+
+void
+Superblock::setType(AreaPos area, AreaType type)
+{
+    if (area >= areasNo)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG,
+                  "Tried to set AreaMap Type out of bounds! "
+                  "(%" PTYPE_AREAPOS " >= %" PTYPE_AREAPOS ")",
+                  area,
+                  areasNo);
+        return;
+    }
+    PAFFS_DBG_S(PAFFS_TRACE_AREA, "Set area %" PTYPE_AREAPOS " to Type %s", area, areaNames[type]);
+    device->journal.addEvent(journalEntry::superblock::areaMap::Type(area, type));
+    mMap[area].type = type;
+}
+void
+Superblock::setStatus(AreaPos area, AreaStatus status)
+{
+    if (area >= areasNo)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG,
+                  "Tried to set AreaMap Status out of bounds! "
+                  "(%" PTYPE_AREAPOS " >= %" PTYPE_AREAPOS ")",
+                  area,
+                  areasNo);
+        return;
+    }
+    if (mMap[area].type != AreaType::superblock && traceMask & PAFFS_TRACE_VERIFY_AS)
+    {
+        if(status == AreaStatus::active)
+        {
+            uint8_t activeAreas = 0;
+            for(AreaPos i = 0; i < areasNo; i++)
+            {   //Jump over SBLOCK/GC and current
+                if(i == area)
+                {
+                    continue;
+                }
+                if(mMap[i].type == AreaType::data || mMap[i].type == AreaType::index)
+                {
+                    if(mMap[i].status == AreaStatus::active)
+                    {
+                        activeAreas++;
+                    }
+                }
+            }
+            if(activeAreas >= 2)
+            {
+                device->debugPrintStatus();
+                PAFFS_DBG(PAFFS_TRACE_BUG, "Too many Active Areas (%" PRIu8 "!", activeAreas);
+            }
+        }
+    }
+    PAFFS_DBG_S(PAFFS_TRACE_AREA, "Set area %" PTYPE_AREAPOS " to Status %s", area, areaStatusNames[status]);
+    device->journal.addEvent(journalEntry::superblock::areaMap::Status(area, status));
+    mMap[area].status = status;
+}
+void
+Superblock::increaseErasecount(AreaPos area)
+{
+    if (area >= areasNo)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG,
+                  "Tried to set AreaMap Erasecount out of bounds! "
+                  "(%" PTYPE_AREAPOS " >= %" PTYPE_AREAPOS ")",
+                  area,
+                  areasNo);
+        return;
+    }
+    mOverallDeletions++;
+    device->journal.addEvent(journalEntry::superblock::areaMap::IncreaseErasecount(area));
+    mMap[area].erasecount++;
+}
+void
+Superblock::setPos(AreaPos area, AreaPos pos)
+{
+    if (area >= areasNo)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG,
+                  "Tried to set AreaMap position out of bounds! "
+                  "(%" PTYPE_AREAPOS " >= %" PTYPE_AREAPOS ")",
+                  area,
+                  areasNo);
+        return;
+    }
+    PAFFS_DBG_S(PAFFS_TRACE_AREA, "Set area %" PTYPE_AREAPOS " to %" PTYPE_AREAPOS, area, pos);
+    device->journal.addEvent(journalEntry::superblock::areaMap::Position(area, pos));
+    mMap[area].position = pos;
+}
+
+AreaPos
+Superblock::getActiveArea(AreaType type)
+{
+    if (type >= AreaType::no)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get ActiveArea of invalid Type!");
+        return 0;
+    }
+    return mActiveAreas[type];
+}
+void
+Superblock::setActiveArea(AreaType type, AreaPos pos)
+{
+    if (type >= AreaType::no)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set ActiveArea of invalid Type!");
+        return;
+    }
+    if (mMap[pos].status != AreaStatus::active)
+    {
+        PAFFS_DBG(
+                PAFFS_TRACE_BUG, "SetActiveArea of Pos %" PTYPE_AREAPOS ", but area is not active!", pos);
+    }
+    PAFFS_DBG_S(PAFFS_TRACE_AREA, "Set Active area of %s to %" PTYPE_AREAPOS, areaNames[type], pos);
+    device->journal.addEvent(journalEntry::superblock::ActiveArea(type, pos));
+    mActiveAreas[type] = pos;
+}
+
+AreaPos
+Superblock::getUsedAreas()
+{
+    return mUsedAreas;
+}
+void
+Superblock::setUsedAreas(AreaPos num)
+{
+    device->journal.addEvent(journalEntry::superblock::UsedAreas(num));
+    mUsedAreas = num;
+}
+void
+Superblock::increaseUsedAreas()
+{
+    setUsedAreas(mUsedAreas + 1);
+}
+void
+Superblock::decreaseUsedAreas()
+{
+    setUsedAreas(mUsedAreas - 1);
+}
+
+void
+Superblock::swapAreaPosition(AreaPos a, AreaPos b)
+{
+    if (a >= areasNo)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG,
+                  "Tried to swap AreamMap a out of bounds! "
+                  "(%" PTYPE_AREAPOS " >= %" PTYPE_AREAPOS ")",
+                  a,
+                  areasNo);
+        return;
+    }
+    if (b >= areasNo)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG,
+                  "Tried to swap AreamMap b out of bounds! "
+                  "(%" PTYPE_AREAPOS " >= %" PTYPE_AREAPOS ")",
+                  b,
+                  areasNo);
+        return;
+    }
+    device->journal.addEvent(journalEntry::superblock::areaMap::Swap(a, b));
+    PAFFS_DBG_S(PAFFS_TRACE_AREA | PAFFS_TRACE_VERBOSE,
+              "Swap Area %" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ") "
+              "with Area %" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ")",
+              a, mMap[a].position, b, mMap[b].position);
+
+    AreaPos tmp1 = mMap[a].position;
+    uint32_t tmp2 = mMap[a].erasecount;
+
+    mMap[a].position = mMap[b].position;
+    mMap[a].erasecount = mMap[b].erasecount;
+
+    mMap[b].position = tmp1;
+    mMap[b].erasecount = tmp2;
+
+    if(traceMask & PAFFS_TRACE_VERBOSE && traceMask & PAFFS_TRACE_AREA)
+    {
+        printf("After apply:\n");
+        for(AreaPos i = 0; i < areasNo; i++)
+        {
+            printf("Area %2" PTYPE_AREAPOS " on %2" PTYPE_AREAPOS " %7s %6s %c\n",
+                   i, mMap[i].position, areaNames[mMap[i].type], areaStatusNames[mMap[i].status],
+                   (i == a || i == b) ? '<' : ' ');
+        }
+    }
+}
+
+void
+Superblock::setOverallDeletions(uint64_t& deletions)
+{
+    mOverallDeletions = deletions;
+}
+uint64_t
+Superblock::getOverallDeletions()
+{
+    return mOverallDeletions;
+}
+
 Result
 Superblock::readSuperIndex(SuperIndex* index)
 {
     AreaPos logPrev[superChainElems];
     PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Reading SuperIndex.");
 
-    index->areaMap = device->areaMgmt.getMap();
-    index->activeArea = device->areaMgmt.getActiveAreas();
+    index->areaMap = mMap;
+    index->activeArea = mActiveAreas;
 
     Result r = getPathToMostRecentSuperIndex(pathToSuperIndexDirect, superChainIndexes, logPrev);
     if (r != Result::ok)
@@ -569,8 +831,8 @@ Superblock::readSuperIndex(SuperIndex* index)
     mRootnodeAddr = index->rootNode;
     mRootnodeDirty = false;
 
-    device->areaMgmt.setUsedAreas(index->usedAreas);
-    device->areaMgmt.setOverallDeletions(index->overallDeletions);
+    setUsedAreas(index->usedAreas);
+    setOverallDeletions(index->overallDeletions);
 
     return Result::ok;
 }
@@ -604,10 +866,10 @@ Superblock::commitSuperIndex(SuperIndex* newIndex, bool asDirty, bool createNew)
     // Get index of last chain elem (SuperEntry) and increase
     newIndex->no = ++superChainIndexes[jumpPadNo + 1];
     newIndex->rootNode = mRootnodeAddr;
-    newIndex->areaMap = device->areaMgmt.getMap();
-    newIndex->usedAreas = device->areaMgmt.getUsedAreas();
-    newIndex->activeArea = device->areaMgmt.getActiveAreas();
-    newIndex->overallDeletions = device->areaMgmt.getOverallDeletions();
+    newIndex->areaMap = mMap;
+    newIndex->usedAreas = getUsedAreas();
+    newIndex->activeArea = mActiveAreas;
+    newIndex->overallDeletions = getOverallDeletions();
 
     if (traceMask & PAFFS_TRACE_SUPERBLOCK)
     {
@@ -732,7 +994,7 @@ Superblock::resolveDirectToLogicalPath(Addr directPath[superChainElems],
     uint16_t d = 0;
     for (AreaPos i = 0; i < areasNo; i++)
     {
-        p = device->areaMgmt.getPos(i);
+        p = getPos(i);
         for (d = 0; d < superChainElems; d++)
         {
             if (p == extractLogicalArea(directPath[d]))
@@ -748,9 +1010,9 @@ Superblock::fillPathWithFirstSuperblockAreas(Addr directPath[superChainElems])
     uint16_t foundElems = 0;
     for (AreaPos i = 0; i < areasNo && foundElems <= superChainElems; i++)
     {
-        if (device->areaMgmt.getType(i) == AreaType::superblock)
+        if (getType(i) == AreaType::superblock)
         {
-            directPath[foundElems++] = combineAddress(device->areaMgmt.getPos(i), 0);
+            directPath[foundElems++] = combineAddress(getPos(i), 0);
             PAFFS_DBG_S(
                     PAFFS_TRACE_SUPERBLOCK, "Found new superblock area for chain %" PRId16 "", foundElems);
         }
@@ -985,17 +1247,17 @@ Superblock::readMostRecentEntryInBlock(AreaPos area,
 Result
 Superblock::insertNewAnchorEntry(Addr logPrev, AreaPos* directArea, AnchorEntry* entry)
 {
-    if (device->areaMgmt.getPos(extractLogicalArea(logPrev)) != *directArea)
+    if (getPos(extractLogicalArea(logPrev)) != *directArea)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "Logical (log: %" PRId16 "->%" PRId16 ") and direct Address (%" PRId16 ") differ!",
                   extractLogicalArea(logPrev),
-                  device->areaMgmt.getPos(extractLogicalArea(logPrev)),
+                  getPos(extractLogicalArea(logPrev)),
                   *directArea);
         return Result::bug;
     }
 
-    if (device->areaMgmt.getType(extractLogicalArea(logPrev)) != AreaType::superblock)
+    if (getType(extractLogicalArea(logPrev)) != AreaType::superblock)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
         return Result::bug;
@@ -1078,12 +1340,12 @@ Superblock::readAnchorEntry(Addr addr, AnchorEntry* entry)
 Result
 Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos* directArea, JumpPadEntry* entry)
 {
-    if (device->areaMgmt.getPos(extractLogicalArea(logPrev)) != *directArea)
+    if (getPos(extractLogicalArea(logPrev)) != *directArea)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "Logical (log: %" PRId16 "->%" PRId16 ") and direct Address (%" PRId16 ") differ!",
                   extractLogicalArea(logPrev),
-                  device->areaMgmt.getPos(extractLogicalArea(logPrev)),
+                  getPos(extractLogicalArea(logPrev)),
                   *directArea);
         return Result::bug;
     }
@@ -1092,7 +1354,7 @@ Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos* directArea, JumpPadEntr
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write not-anchor chain Elem to area 0!");
         return Result::bug;
     }
-    if (device->areaMgmt.getType(extractLogicalArea(logPrev)) != AreaType::superblock)
+    if (getType(extractLogicalArea(logPrev)) != AreaType::superblock)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
         return Result::bug;
@@ -1119,7 +1381,7 @@ Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos* directArea, JumpPadEntr
                         "log. %" PTYPE_AREAPOS " to log. %" PTYPE_AREAPOS,
                         entry->logPrev,
                         p);
-            *directArea = device->areaMgmt.getPos(p);
+            *directArea = getPos(p);
         }
         else
         {
@@ -1152,17 +1414,17 @@ Superblock::insertNewJumpPadEntry(Addr logPrev, AreaPos* directArea, JumpPadEntr
 Result
 Superblock::insertNewSuperIndex(Addr logPrev, AreaPos* directArea, SuperIndex* entry)
 {
-    if (device->areaMgmt.getPos(extractLogicalArea(logPrev)) != *directArea)
+    if (getPos(extractLogicalArea(logPrev)) != *directArea)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "Logical (log: %" PRId16 "->%" PRId16 ") and direct Address (%" PRId16 ") differ!",
                   extractLogicalArea(logPrev),
-                  device->areaMgmt.getPos(extractLogicalArea(logPrev)),
+                  getPos(extractLogicalArea(logPrev)),
                   *directArea);
         return Result::bug;
     }
 
-    if (device->areaMgmt.getType(extractLogicalArea(logPrev)) != AreaType::superblock)
+    if (getType(extractLogicalArea(logPrev)) != AreaType::superblock)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to write superIndex outside of superblock Area");
         return Result::bug;
@@ -1194,7 +1456,7 @@ Superblock::insertNewSuperIndex(Addr logPrev, AreaPos* directArea, SuperIndex* e
                         "log. %" PTYPE_AREAPOS " to log. %" PTYPE_AREAPOS,
                         entry->logPrev,
                         p);
-            *directArea = device->areaMgmt.getPos(p);
+            *directArea = getPos(p);
         }
         else
         {
@@ -1234,6 +1496,8 @@ Superblock::writeSuperPageIndex(PageAbs pageStart, SuperIndex* entry)
 
     if(!entry->isPlausible())
     {
+        entry->print();
+        device->debugPrintStatus();
         PAFFS_DBG(PAFFS_TRACE_BUG, "SuperIndex to be written is not plausible");
         return Result::bug;
     }
@@ -1421,7 +1685,7 @@ Superblock::handleBlockOverflow(PageAbs newPage, Addr logPrev, SerialNo* serial)
 Result
 Superblock::deleteSuperBlock(AreaPos area, uint8_t block)
 {
-    if (device->areaMgmt.getType(area) != AreaType::superblock)
+    if (getType(area) != AreaType::superblock)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to delete Block outside of SUPERBLOCK area");
         return Result::bug;
@@ -1429,17 +1693,17 @@ Superblock::deleteSuperBlock(AreaPos area, uint8_t block)
     // blocks are deleted sequentially, erasecount is for whole area erases
     if (block == blocksPerArea)
     {
-        device->areaMgmt.increaseErasecount(area);
-        device->areaMgmt.setStatus(area, AreaStatus::empty);
-        device->areaMgmt.setType(area, AreaType::unset);
-        device->areaMgmt.decreaseUsedAreas();
+        increaseErasecount(area);
+        setStatus(area, AreaStatus::empty);
+        setType(area, AreaType::unset);
+        decreaseUsedAreas();
         PAFFS_DBG_S(PAFFS_TRACE_AREA,
                     "Info: FREED Superblock Area %" PTYPE_AREAPOS " at pos. %" PTYPE_AREAPOS ".",
                     area,
-                    device->areaMgmt.getPos(area));
+                    getPos(area));
     }
 
-    BlockAbs block_offs = device->areaMgmt.getPos(area) * blocksPerArea;
+    BlockAbs block_offs = getPos(area) * blocksPerArea;
     return device->driver.eraseBlock(block_offs + block);
 }
 
@@ -1450,10 +1714,10 @@ Superblock::findBestNextFreeArea(AreaPos logPrev)
             PAFFS_TRACE_SUPERBLOCK, "log. Area %" PTYPE_AREAPOS " is full, finding new one...", logPrev);
     for (AreaPos i = 1; i < areasNo; i++)
     {
-        if (device->areaMgmt.getStatus(i) == AreaStatus::empty)
+        if (getStatus(i) == AreaStatus::empty)
         {
             // Following changes to areaMap may not be persistent if SuperIndex was already written
-            device->areaMgmt.setStatus(logPrev, AreaStatus::empty);
+            setStatus(logPrev, AreaStatus::empty);
 
             /**
              * The area will be empty after the next handleBlockOverflow
@@ -1464,7 +1728,7 @@ Superblock::findBestNextFreeArea(AreaPos logPrev)
              */
             device->areaMgmt.initAreaAs(i, AreaType::superblock);
             //Ignore active Area with superblocks
-            device->areaMgmt.setActiveArea(AreaType::superblock, 0);
+            setActiveArea(AreaType::superblock, 0);
             // Unset is postponed till actual deletion
 
             PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Found log. %" PTYPE_AREAPOS, i);

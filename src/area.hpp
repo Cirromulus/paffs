@@ -55,67 +55,12 @@ extractPageOffs(const Addr addr);
 
 class AreaManagement : public JournalTopic
 {
-    Area map[areasNo];
-    AreaPos activeArea[AreaType::no];
-    AreaPos usedAreas;
-    uint64_t overallDeletions;
+
     Device* dev;
 
 public:
     GarbageCollection gc;
-    AreaManagement(Device* mdev) : dev(mdev), gc(mdev)
-    {
-        clear();
-    };
-
-    void
-    clear();
-
-    AreaType
-    getType(AreaPos area);
-    AreaStatus
-    getStatus(AreaPos area);
-    uint32_t
-    getErasecount(AreaPos area);
-    AreaPos
-    getPos(AreaPos area);
-
-    void
-    setType(AreaPos area, AreaType type);
-    void
-    setStatus(AreaPos area, AreaStatus status);
-    void
-    increaseErasecount(AreaPos area);
-    void
-    setPos(AreaPos area, AreaPos pos);
-
-    AreaPos
-    getActiveArea(AreaType type);
-    void
-    setActiveArea(AreaType type, AreaPos pos);
-
-    AreaPos
-    getUsedAreas();
-    void
-    setUsedAreas(AreaPos num);
-    void
-    increaseUsedAreas();
-    void
-    decreaseUsedAreas();
-
-    void
-    swapAreaPosition(AreaPos a, AreaPos b);
-
-    void
-    setOverallDeletions(uint64_t& deletions);
-    uint64_t
-    getOverallDeletions();
-
-    // Only for serializing areMap in Superblock
-    Area*
-    getMap();
-    AreaPos*
-    getActiveAreas();
+    AreaManagement(Device* mdev) : dev(mdev), gc(mdev){};
 
     /**
      * May call garbage collection

@@ -205,7 +205,7 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs, bool journalMode)
             AreaPos  area = extractLogicalArea(pageAddr);
             PageOffs relPage = extractPageOffs(pageAddr);
 
-            if (dev->areaMgmt.getType(area) != AreaType::data)
+            if (dev->superblock.getType(area) != AreaType::data)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
                           "DELETE INODE operation of invalid area at %" PRId16 ":%" PRId16 "",
@@ -345,6 +345,10 @@ DataIO::signalEndOfLog()
     }
     journalInodeValid = false;
     modifiedInode = false;
+
+    //If an area was filled
+    dev->areaMgmt.manageActiveAreaFull(AreaType::data);
+    dev->areaMgmt.manageActiveAreaFull(AreaType::index);
 }
 
 Result
@@ -393,7 +397,7 @@ DataIO::writePageData(PageAbs  pageFrom,
         dev->lasterr = rBuf;
 
         // Handle Areas
-        if (dev->areaMgmt.getStatus(dev->areaMgmt.getActiveArea(AreaType::data))
+        if (dev->superblock.getStatus(dev->superblock.getActiveArea(AreaType::data))
             != AreaStatus::active)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned inactive area!");
@@ -403,16 +407,16 @@ DataIO::writePageData(PageAbs  pageFrom,
         // find new page to write to
         PageOffs firstFreePage = 0;
         if (dev->areaMgmt.findFirstFreePage(firstFreePage,
-                                            dev->areaMgmt.getActiveArea(AreaType::data))
+                                            dev->superblock.getActiveArea(AreaType::data))
             == Result::noSpace)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
                       "BUG: findWritableArea returned full area (%" PRId16 ").",
-                      dev->areaMgmt.getActiveArea(AreaType::data));
+                      dev->superblock.getActiveArea(AreaType::data));
             return Result::bug;
         }
         Addr newAddress =
-                combineAddress(dev->areaMgmt.getActiveArea(AreaType::data), firstFreePage);
+                combineAddress(dev->superblock.getActiveArea(AreaType::data), firstFreePage);
 
         Addr oldAddr;
         //GetPage may overwrite our driver buffer
@@ -527,7 +531,7 @@ DataIO::writePageData(PageAbs  pageFrom,
                     "%" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
                     page + 1,
                     toPage - 1,
-                    extractLogicalArea(newAddress), dev->areaMgmt.getPos(extractLogicalArea(newAddress)),
+                    extractLogicalArea(newAddress), dev->superblock.getPos(extractLogicalArea(newAddress)),
                     extractPageOffs(newAddress));
     }
     dev->journal.addEvent(journalEntry::pagestate::Success(getTopic()));
@@ -603,7 +607,7 @@ DataIO::readPageData(PageAbs  pageFrom,
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read page at "
                         "%" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS
                         ", aborting pageData Read",
-                        extractLogicalArea(pageAddr), dev->areaMgmt.getPos(extractLogicalArea(pageAddr)),
+                        extractLogicalArea(pageAddr), dev->superblock.getPos(extractLogicalArea(pageAddr)),
                         extractPageOffs(pageAddr));
                 return dev->lasterr = r;
             }
@@ -619,7 +623,7 @@ DataIO::readPageData(PageAbs  pageFrom,
 
 bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
 {
-    if (dev->areaMgmt.getType(extractLogicalArea(pageAddr)) != AreaType::data)
+    if (dev->superblock.getType(extractLogicalArea(pageAddr)) != AreaType::data)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "READ INODE operation of invalid area at %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,

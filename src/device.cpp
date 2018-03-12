@@ -103,20 +103,23 @@ Device::format(const BadBlockList& badBlockList, bool complete)
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Bad block in reserved first Area!");
             return Result::fail;
         }
-        driver.markBad(badBlockList[block]);
-        areaMgmt.setType(area, AreaType::retired);
+        if(superblock.getType(area) != AreaType::retired)
+        {
+            superblock.setPos(area, area);
+            areaMgmt.retireArea(area);
+        }
     }
 
     for (AreaPos area = 0; area < areasNo; area++)
     {
-        areaMgmt.setStatus(area, AreaStatus::empty);
-        // erasecount is already set to 0
-        areaMgmt.setPos(area, area);
-
-        if (areaMgmt.getType(area) == AreaType::retired)
+        if (superblock.getType(area) == AreaType::retired)
         {
             continue;
         }
+
+        superblock.setStatus(area, AreaStatus::empty);
+        // erasecount is already set to 0
+        superblock.setPos(area, area);
 
         bool anyBlockInAreaBad = false;
         for (BlockAbs block = 0; block < blocksPerArea; block++)
@@ -133,7 +136,7 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         }
         if (anyBlockInAreaBad)
         {
-            areaMgmt.setType(area, AreaType::retired);
+            areaMgmt.retireArea(area);
             continue;
         }
 
@@ -151,13 +154,13 @@ Device::format(const BadBlockList& badBlockList, bool complete)
                                 "retiring area %" PTYPE_AREAPOS,
                                 p + area * blocksPerArea,
                                 area);
-                    areaMgmt.setType(area, AreaType::retired);
+                    areaMgmt.retireArea(area);
                     break;
                 }
             }
-            areaMgmt.increaseErasecount(area);
+            superblock.increaseErasecount(area);
 
-            if (areaMgmt.getType(area) == AreaType::retired)
+            if (superblock.getType(area) == AreaType::retired)
             {
                 continue;
             }
@@ -166,7 +169,7 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         if (!hadAreaType.getBit(AreaType::superblock))
         {
             areaMgmt.initAreaAs(area, AreaType::superblock);
-            areaMgmt.setActiveArea(AreaType::superblock, 0);
+            superblock.setActiveArea(AreaType::superblock, 0);
             if (++hadSuperblocks == superChainElems)
             {
                 hadAreaType.setBit(AreaType::superblock);
@@ -191,7 +194,7 @@ Device::format(const BadBlockList& badBlockList, bool complete)
             continue;
         }
 
-        areaMgmt.setType(area, AreaType::unset);
+        superblock.setType(area, AreaType::unset);
     }
 
     r = tree.startNewTree();
@@ -425,7 +428,7 @@ Device::debugPrintStatus()
 {
     TraceMask bkp = traceMask;
     traceMask &= ~PAFFS_TRACE_ASCACHE;
-    printf("Info: \n\t%" PTYPE_AREAPOS " used Areas\n", areaMgmt.getUsedAreas());
+    printf("Info: \n\t%" PTYPE_AREAPOS " used Areas\n", superblock.getUsedAreas());
     for (AreaPos i = 0; i < areasNo; i++)
     {
         SummaryEntry summary[dataPagesPerArea];
@@ -446,10 +449,10 @@ Device::debugPrintStatus()
         printf("\tArea %03" PTYPE_AREAPOS " on %03" PTYPE_AREAPOS " as %6s "
                 "(%3" PTYPE_PAGEOFFS "/%3" PTYPE_PAGEOFFS " dirty/free) %s\n",
                i,
-               areaMgmt.getPos(i),
-               areaNames[areaMgmt.getType(i)],
+               superblock.getPos(i),
+               areaNames[superblock.getType(i)],
                dirtyPages, freePages,
-               areaStatusNames[areaMgmt.getStatus(i)]);
+               areaStatusNames[superblock.getStatus(i)]);
         if (i > 128)
         {
             printf("\n -- truncated 128-%" PTYPE_AREAPOS " Areas.\n", areasNo);
@@ -1132,7 +1135,7 @@ Device::mkDir(const char* fullPath, Permission mask)
     {
         return Result::readOnly;
     }
-    if (areaMgmt.getUsedAreas() > areasNo - minFreeAreas)
+    if (superblock.getUsedAreas() > areasNo - minFreeAreas)
     {
         return Result::noSpace;
     }
@@ -1378,7 +1381,7 @@ Device::createFile(SmartInodePtr& outFile, const char* fullPath, Permission mask
     {
         return Result::readOnly;
     }
-    if (areaMgmt.getUsedAreas() > areasNo - minFreeAreas)
+    if (superblock.getUsedAreas() > areasNo - minFreeAreas)
     {
         return Result::noSpace;
     }
@@ -1540,7 +1543,7 @@ Device::touch(const char* path)
     {
         return Result::readOnly;
     }
-    if (areaMgmt.getUsedAreas() > areasNo - minFreeAreas)
+    if (superblock.getUsedAreas() > areasNo - minFreeAreas)
     {   // If we use reserved Areas, extensive touching may fill flash
         return Result::noSpace;
     }
@@ -1642,7 +1645,7 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
     {
         return Result::readOnly;
     }
-    if (areaMgmt.getUsedAreas() > areasNo - minFreeAreas)
+    if (superblock.getUsedAreas() > areasNo - minFreeAreas)
     {
         return Result::noSpace;
     }
@@ -2085,7 +2088,7 @@ Device::initializeDevice()
     }
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Device is not yet mounted");
 
-    areaMgmt.clear();
+    superblock.clear();
 
     if (areasNo < AreaType::no - 2)
     {
@@ -2126,7 +2129,7 @@ Result
 Device::destroyDevice()
 {
     journalState = JournalState::ok;
-    areaMgmt.clear();
+    superblock.clear();
     inodePool.clear();
     filesPool.clear();
     dataIO.pac.clear();

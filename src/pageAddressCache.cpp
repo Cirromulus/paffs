@@ -788,7 +788,7 @@ PageAddressCache::readAddrList(Addr from, Addr list[addrsPerPage])
         memset(list, 0, addrsPerPage * sizeof(Addr));
         return Result::ok;
     }
-    if (device.areaMgmt.getType(extractLogicalArea(from)) != AreaType::index)
+    if (device.superblock.getType(extractLogicalArea(from)) != AreaType::index)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "READ ADDR LIST operation of invalid area at %" PRId16 ":%" PRId16 "",
@@ -830,7 +830,7 @@ PageAddressCache::writeAddrList(Addr& source, Addr list[addrsPerPage])
         // TODO: Reset former pagestatus, so that FS will be in a safe state
         return device.lasterr;
     }
-    if (device.areaMgmt.getActiveArea(AreaType::index) == 0)
+    if (device.superblock.getActiveArea(AreaType::index) == 0)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "findWritableArea returned 0");
         return Result::bug;
@@ -838,15 +838,15 @@ PageAddressCache::writeAddrList(Addr& source, Addr list[addrsPerPage])
     device.lasterr = r;
 
     PageOffs firstFreePage = 0;
-    if (device.areaMgmt.findFirstFreePage(firstFreePage, device.areaMgmt.getActiveArea(AreaType::index))
+    if (device.areaMgmt.findFirstFreePage(firstFreePage, device.superblock.getActiveArea(AreaType::index))
         == Result::noSpace)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "BUG: findWritableArea returned full area (%" PRId16 ").",
-                  device.areaMgmt.getActiveArea(AreaType::index));
+                  device.superblock.getActiveArea(AreaType::index));
         return device.lasterr = Result::bug;
     }
-    Addr to = combineAddress(device.areaMgmt.getActiveArea(AreaType::index), firstFreePage);
+    Addr to = combineAddress(device.superblock.getActiveArea(AreaType::index), firstFreePage);
 
     // Mark Page as used
     r = statemachine.replacePage(to, source);

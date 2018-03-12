@@ -65,6 +65,7 @@ public:
                 }
                 allBadBlocks[device][blockToBeOverwritten] = allBadBlocks[device][blockToBeDoubled];
             }
+
             for (unsigned block = 0; block < numberOfBadBlocks; block++)
             {
                 if (block >= numberOfNotifiedBlocks)
@@ -72,6 +73,7 @@ public:
                     fs.getDevice(device)->driver.markBad(allBadBlocks[device][block]);
                 }
             }
+
             printf("Device %u:\n\tListed, but not marked blocks:", device);
             for (unsigned i = 0; i < numberOfNotifiedBlocks; i++)
             {
@@ -97,52 +99,20 @@ public:
             FlashDebugInterface* dbg = drv->getDebugInterface();
             for (unsigned block = 0; block < numberOfBadBlocks; block++)
             {
+                printf("Device %u block %u: ", device, block);
+                fflush(stdout);
                 AccessValues v =
                         dbg->getAccessValues(allBadBlocks[device][block] / dbg->getPlaneSize(),
                                              allBadBlocks[device][block] % dbg->getPlaneSize(),
-                                             0,
+                                             1,
                                              0);
-
-                // count how many times the current area was forced bad by list
-                unsigned int areaAlreadyForcedBad = 0;
-                unsigned int blockAlreadyForcedBad = 0;
-                for (unsigned i = 0; i < numberOfBadBlocks; i++)
-                {
-                    if (allBadBlocks[device][i] / paffs::blocksPerArea
-                        == allBadBlocks[device][block] / paffs::blocksPerArea)
-                    {
-                        areaAlreadyForcedBad++;
-                    }
-                    if (allBadBlocks[device][i] == allBadBlocks[device][block])
-                    {
-                        blockAlreadyForcedBad++;
-                    }
-                }
 
                 // never deleted
                 ASSERT_EQ(v.times_reset, 0u);
-
-                if (block < numberOfNotifiedBlocks)
-                {
-                    // notified blocks
-                    ASSERT_EQ(v.times_read, 0u);
-                }
-                else
-                {
-                    // Self-detectable blocks
-                    if (areaAlreadyForcedBad > 1)
-                    {
-                        // It was already set to bad, so no check for badblock marker.
-                        ASSERT_EQ(v.times_read, 0u);
-                    }
-                    else
-                    {
-                        ASSERT_EQ(v.times_read, 1u);
-                    }
-                }
-                // bad Block marker gets written
-                // as many times as it got the list entry plus the tests own bbm
-                ASSERT_EQ(v.times_written, blockAlreadyForcedBad);
+                ASSERT_EQ(v.times_read, 0u);
+                //bad Block marker gets in Simudriver only written to first page
+                ASSERT_EQ(v.times_written, 0u);
+                printf("OK\n");
             }
         }
     }

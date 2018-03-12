@@ -107,7 +107,6 @@ SimuDriver::readPage(PageAbs page, void* data, uint16_t dataLen)
 	//TODO: Simple write-trough buffer by checking if same address
 
 	Nandaddress d = translatePageToAddress(page);
-
 	if(cell->readPage(d.plane, d.block, d.page, reinterpret_cast<unsigned char*>(buf)) < 0)
 	{
 		return Result::fail;
@@ -147,26 +146,25 @@ Result
 SimuDriver::markBad(BlockAbs block_no)
 {
 	memset(buf, 0, totalBytesPerPage);
-	for(unsigned page = 0; page < pagesPerBlock; page++){
-		Nandaddress d = translatePageToAddress(block_no * pagesPerBlock + page);
-		if(cell->writePage(d.plane, d.block, d.page, buf) < 0){
-			//ignore return Result::fail;
-		}
-	}
+    Nandaddress d = translatePageToAddress(block_no * pagesPerBlock);
+    // bad Block marker gets in Simudriver only written to first page to test bad block safety
+    cell->writePage(d.plane, d.block, d.page, buf);
 	return Result::ok;
 }
 Result
 SimuDriver::checkBad(BlockAbs block_no)
 {
 	memset(buf, 0, totalBytesPerPage);
-	for(unsigned page = 0; page < pagesPerBlock; page++){
-		Nandaddress d = translatePageToAddress(block_no * pagesPerBlock + page);
-		if(cell->readPage(d.plane, d.block, d.page, buf) < 0){
-			return Result::badFlash;
-		}
-		if(buf[dataBytesPerPage + 5] == 0)
-			return Result::badFlash;
-	}
+	// bad Block marker gets in Simudriver only written to first page to test bad block safety
+    Nandaddress d = translatePageToAddress(block_no * pagesPerBlock);
+    if(cell->readPage(d.plane, d.block, d.page, buf) < 0)
+    {
+        return Result::badFlash;
+    }
+    if(buf[dataBytesPerPage + 5] != 0xFF)
+    {
+        return Result::badFlash;
+    }
 	return Result::ok;
 }
 

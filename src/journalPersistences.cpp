@@ -220,12 +220,12 @@ FlashPersistence::rewind()
 {
     // TODO: ActiveArea has to be consistent even after a remount
     // TODO: Save AA in Superpage
-    if (device->areaMgmt.getActiveArea(AreaType::journal) == 0)
+    if (device->superblock.getActiveArea(AreaType::journal) == 0)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid journal Area (0)!");
         return Result::bug;
     }
-    curr.addr = combineAddress(device->areaMgmt.getActiveArea(AreaType::journal), 0);
+    curr.addr = combineAddress(device->superblock.getActiveArea(AreaType::journal), 0);
     curr.offs = 0;
     return Result::ok;
 }
