@@ -321,8 +321,6 @@ PageAddressCache::setValid()
 {
     //We only want to invalidate old Pages which may have been written.
     //It is not allowed for PAC to revert new pages after DATAIO assumes the new Data having set.
-    //TODO: Only log success if we actually wrote something
-    device.journal.addEvent(journalEntry::pagestate::Success(getTopic()));
     return statemachine.invalidateOldPages();
 }
 

@@ -1673,23 +1673,13 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
 
     Result r = dataIO.writeInodeData(*obj.dirent.node, obj.fp,
                                      bytesToWrite, bytesWritten, static_cast<const uint8_t*>(buf));
+    journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
                   "Could not write %" PTYPE_FILSIZE " of %" PTYPE_FILSIZE " bytes at %" PTYPE_FILSIZE "",
                   bytesToWrite - *bytesWritten,
                   bytesToWrite, obj.fp);
-        if (*bytesWritten > 0)
-        {
-            Result r2 = tree.updateExistingInode(*obj.dirent.node);
-            if (r2 != Result::ok)
-            {
-                PAFFS_DBG(PAFFS_TRACE_ERROR,
-                          "could not update Inode of unsuccessful inode write "
-                          "(%s)",
-                          err_msg(r2));
-            }
-        }
         return r;
     }
     if (*bytesWritten != bytesToWrite)
@@ -1702,9 +1692,6 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
         return Result::fail;
     }
 
-    obj.dirent.node->mod =
-            systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
-
     obj.fp += *bytesWritten;
     if (obj.fp > obj.dirent.node->size)
     {
@@ -1716,14 +1703,7 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
                       "which is OK if we skipped pages");
         }
     }
-    r = tree.updateExistingInode(*obj.dirent.node);
-    if (r != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update existing inode");
-        return r;
-    }
 
-    journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
     r = journal.addEvent(journalEntry::Checkpoint(getTopic()));
     if(r == Result::lowMem)
     {

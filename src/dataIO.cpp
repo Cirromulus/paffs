@@ -97,8 +97,24 @@ DataIO::writeInodeData(Inode& inode,
     {
         inode.size = *bytesWritten + offs;
     }
+    inode.mod = systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
 
-
+	//This is the success message for dataIO and pageAddressCache
+	res = dev->tree.updateExistingInode(inode);
+	if(res != Reult::ok)
+	{
+		//TODO: revert Statemachine
+		return res;
+	}
+	
+    res = statemachine.invalidateOldPages();
+    if (res != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR,
+                  "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!",
+                  resultMsg[static_cast<int>(res)]);
+    }
+	
     pac.setValid();
 
     //Checkpoint is done by device functions, because a write-truncate pair has to be kept together
@@ -256,8 +272,8 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs, bool journalMode)
     }
 
     inode.size = offs;
-    pac.setValid();
     dev->tree.updateExistingInode(inode);
+    pac.setValid();
     dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
     return Result::ok;
 }
@@ -533,14 +549,6 @@ DataIO::writePageData(PageAbs  pageFrom,
                     toPage - 1,
                     extractLogicalArea(newAddress), dev->superblock.getPos(extractLogicalArea(newAddress)),
                     extractPageOffs(newAddress));
-    }
-    dev->journal.addEvent(journalEntry::pagestate::Success(getTopic()));
-    res = statemachine.invalidateOldPages();
-    if (res != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR,
-                  "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!",
-                  resultMsg[static_cast<int>(res)]);
     }
     return Result::ok;
 }
