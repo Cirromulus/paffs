@@ -140,7 +140,7 @@ GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea,
                 dstArea,
                 dev->superblock.getPos(dstArea));
 
-    dev->journal.addEvent(journalEntry::garbageCollection::MoveValidData(dstArea));
+    dev->journal.addEvent(journalEntry::garbageCollection::MoveValidData(srcArea, dstArea));
 
     validDataLeft = false;
     for (PageOffs page = 0; page < dataPagesPerArea; page++)

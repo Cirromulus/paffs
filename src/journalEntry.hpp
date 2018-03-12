@@ -295,9 +295,11 @@ namespace journalEntry
     {
         struct MoveValidData : public GarbageCollection
         {
-            AreaPos area;
+            AreaPos from;
+            AreaPos to;
             inline
-            MoveValidData(AreaPos _area) : GarbageCollection(Operation::moveValidData), area(_area){};
+            MoveValidData(AreaPos _from, AreaPos _to) : GarbageCollection(Operation::moveValidData),
+            from(_from), to(_to){};
         };
     }
 

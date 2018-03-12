@@ -66,6 +66,28 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
             return sizeof(journalEntry::superblock::UsedAreas);
         }
         break;
+    case JournalEntry::Topic::areaMgmt:
+        switch (static_cast<const journalEntry::AreaMgmt*>(&entry)->operation)
+        {
+        case journalEntry::AreaMgmt::Operation::initAreaAs:
+            return sizeof(journalEntry::areaMgmt::InitAreaAs);
+        case journalEntry::AreaMgmt::Operation::closeArea:
+            return sizeof(journalEntry::areaMgmt::CloseArea);
+        case journalEntry::AreaMgmt::Operation::retireArea:
+            return sizeof(journalEntry::areaMgmt::RetireArea);
+        case journalEntry::AreaMgmt::Operation::deleteAreaContents:
+            return sizeof(journalEntry::areaMgmt::DeleteAreaContents);
+        case journalEntry::AreaMgmt::Operation::deleteArea:
+            return sizeof(journalEntry::areaMgmt::DeleteArea);
+        }
+        break;
+    case JournalEntry::Topic::garbage:
+        switch (static_cast<const journalEntry::GarbageCollection*>(&entry)->operation)
+        {
+        case journalEntry::GarbageCollection::Operation::moveValidData:
+            return sizeof(journalEntry::garbageCollection::MoveValidData);
+        }
+        break;
     case JournalEntry::Topic::summaryCache:
         switch (static_cast<const journalEntry::SummaryCache*>(&entry)->subtype)
         {

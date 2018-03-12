@@ -432,6 +432,48 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             break;
         }
         break;
+    case JournalEntry::Topic::areaMgmt:
+        printf("AreaMgmt area %" PTYPE_AREAPOS,
+               static_cast<const journalEntry::AreaMgmt*>(&entry)->area);
+
+        switch (static_cast<const journalEntry::AreaMgmt*>(&entry)->operation)
+        {
+        case journalEntry::AreaMgmt::Operation::initAreaAs:
+            printf("init as %s",
+                   areaNames[static_cast<const journalEntry::areaMgmt::InitAreaAs*>(&entry)->type]);
+            found = true;
+            break;
+        case journalEntry::AreaMgmt::Operation::closeArea:
+            printf("Close");
+            found = true;
+            break;
+        case journalEntry::AreaMgmt::Operation::retireArea:
+            printf("Retire");
+            found = true;
+            break;
+        case journalEntry::AreaMgmt::Operation::deleteAreaContents:
+            printf("Delete Contents");
+            found = true;
+            break;
+        case journalEntry::AreaMgmt::Operation::deleteArea:
+            printf("Delete all");
+            found = true;
+            break;
+        }
+        break;
+    case JournalEntry::Topic::garbage:
+        printf("GC ");
+        switch (static_cast<const journalEntry::GarbageCollection*>(&entry)->operation)
+        {
+        case journalEntry::GarbageCollection::Operation::moveValidData:
+            {
+            auto mvd = static_cast<const journalEntry::garbageCollection::MoveValidData*>(&entry);
+            printf("MoveValidData from %" PTYPE_AREAPOS " to %" PTYPE_AREAPOS, mvd->from, mvd->to);
+            found = true;
+            break;
+            }
+        }
+        break;
     case JournalEntry::Topic::tree:
         printf("Treenode ");
         switch (static_cast<const journalEntry::BTree*>(&entry)->op)
