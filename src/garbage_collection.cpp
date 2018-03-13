@@ -140,7 +140,7 @@ GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea,
                 dstArea,
                 dev->superblock.getPos(dstArea));
 
-    dev->journal.addEvent(journalEntry::garbageCollection::MoveValidData(srcArea, dstArea));
+    dev->journal.addEvent(journalEntry::garbageCollection::MoveValidData(srcArea));
 
     validDataLeft = false;
     for (PageOffs page = 0; page < dataPagesPerArea; page++)
@@ -414,22 +414,93 @@ void
 GarbageCollection::resetState()
 {
     state = Statemachine::ok;
+    journalTargetArea = 0;
 }
 bool
 GarbageCollection::isInterestedIn(const journalEntry::Max& entry)
 {
     return state != Statemachine::ok &&
             (entry.base.topic == JournalEntry::Topic::areaMgmt ||
-             entry.base.topic == JournalEntry::Topic::summaryCache);
+             entry.base.topic == JournalEntry::Topic::summaryCache ||
+             entry.base.topic == JournalEntry::Topic::superblock);
 }
 Result
 GarbageCollection::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 {
-    return Result::nimpl;
+    switch(entry.base.topic)
+    {
+    case JournalEntry::Topic::garbage:
+        if(entry.garbage.operation == journalEntry::GarbageCollection::Operation::moveValidData)
+        {
+            state = Statemachine::moveValidData;
+            journalTargetArea = entry.garbage_.moveValidData.from;
+        }
+        break;
+    case JournalEntry::Topic::areaMgmt:
+        switch(entry.areaMgmt.operation)
+        {
+        case journalEntry::AreaMgmt::Operation::deleteArea:
+        case journalEntry::AreaMgmt::Operation::deleteAreaContents:
+            state = Statemachine::deletedOldArea;
+            break;
+        default:
+            //ignore
+            break;
+        }
+        break;
+    case JournalEntry::Topic::superblock:
+        if(entry.superblock.type != journalEntry::Superblock::Type::areaMap)
+        {
+            break;
+        }
+        switch(entry.superblock_.areaMap.operation)
+        {
+        case journalEntry::superblock::AreaMap::Operation::swap:
+            state = Statemachine::swappedPosition;
+            break;
+        default:
+            //ignore
+            break;
+        }
+        break;
+    case JournalEntry::Topic::summaryCache:
+        if(entry.summaryCache.subtype == journalEntry::SummaryCache::Subtype::setStatusBlock)
+        {
+            state = Statemachine::setNewSummary;
+        }
+        break;
+    default:
+        //ignore
+        break;
+    }
+    return Result::ok;
 }
 void
 GarbageCollection::signalEndOfLog()
 {
+    SummaryEntry summary[dataPagesPerArea];
+    switch(state)
+    {
+    case Statemachine::ok:
+        break;
+    case Statemachine::moveValidData:
+        PAFFS_DBG_S(PAFFS_TRACE_GC | PAFFS_TRACE_JOURNAL,
+                    "deleting copied data");
+        break;
+    case Statemachine::deletedOldArea:
+        PAFFS_DBG_S(PAFFS_TRACE_GC | PAFFS_TRACE_JOURNAL,
+                    "applying copied data");
+        dev->superblock.swapAreaPosition(journalTargetArea,
+                                         dev->superblock.getActiveArea(AreaType::garbageBuffer));
+        //fall-through
+    case Statemachine::swappedPosition:
+        dev->sumCache.scanAreaForSummaryStatus(journalTargetArea, summary);
+        dev->sumCache.setSummaryStatus(journalTargetArea, summary);
+        //fall-through
+    case Statemachine::setNewSummary:
+        dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
+        break;
+    }
 
 }
 

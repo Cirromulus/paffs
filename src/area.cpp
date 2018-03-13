@@ -560,6 +560,9 @@ AreaManagement::signalEndOfLog()
             //fall-through
         case ExternOp::setStatus:
             dev->superblock.setActiveArea(mLastOp.initAreaAs.type, mLastOp.initAreaAs.area);
+            //fall-through
+        case ExternOp::setActiveArea:
+            dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
             break;
         default:
             //nothing
@@ -574,6 +577,9 @@ AreaManagement::signalEndOfLog()
             //fall-through
         case ExternOp::setStatus:
             dev->superblock.setActiveArea(dev->superblock.getType(mLastOp.closeArea.area), 0);
+            //fall-through
+        case ExternOp::setActiveArea:
+            dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
             break;
         default:
             //nothing
@@ -603,6 +609,7 @@ AreaManagement::signalEndOfLog()
                     dev->driver.markBad(dev->superblock.getPos(mLastOp.retireArea.area) * blocksPerArea + block);
                 }
             }
+            dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
             break;
         default:
             //nothing
@@ -635,6 +642,9 @@ AreaManagement::signalEndOfLog()
             //fall-through
         case ExternOp::setType:
             dev->superblock.decreaseUsedAreas();
+            //fall-through
+        case ExternOp::changeUsedAreas:
+            dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
             break;
         default:
             //nothing

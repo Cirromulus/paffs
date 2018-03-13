@@ -574,7 +574,7 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result& result)
         {
             // load one-shot AS in read only
             TwoBitList<dataPagesPerArea> buf;
-            r = readAreasummary(area, buf, true);
+            r = readAreasummary(area, buf);
             if (r == Result::ok || r == Result::biterrorCorrected)
             {
                 PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
@@ -613,14 +613,14 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result& result)
 }
 
 Result
-SummaryCache::getSummaryStatus(AreaPos area, SummaryEntry* summary, bool complete)
+SummaryCache::getSummaryStatus(AreaPos area, SummaryEntry* summary)
 {
     if (mTranslation.find(area) == mTranslation.end())
     {
         TwoBitList<dataPagesPerArea> list;
         // This one does not have to be copied into Cache
         // Because it is just for a one-shot of Garbage collection looking for the best area
-        Result r = readAreasummary(area, list, complete);
+        Result r = readAreasummary(area, list);
         if (r == Result::ok || r == Result::biterrorCorrected)
         {
             // TODO: Handle biterror
@@ -646,9 +646,46 @@ SummaryCache::getSummaryStatus(AreaPos area, SummaryEntry* summary, bool complet
 }
 
 Result
-SummaryCache::getEstimatedSummaryStatus(AreaPos area, SummaryEntry* summary)
+SummaryCache::scanAreaForSummaryStatus(AreaPos area, SummaryEntry* summary)
 {
-    return getSummaryStatus(area, summary, false);
+    uint8_t* readbuf = dev->driver.getPageBuffer();
+    for (uint16_t i = 0; i < dataPagesPerArea; i++)
+     {
+         Addr tmp = combineAddress(area, i);
+         Result r = dev->driver.readPage(getPageNumber(tmp, *dev), readbuf, totalBytesPerPage);
+         if (r != Result::ok)
+         {
+             if (r == Result::biterrorCorrected)
+             {
+                 PAFFS_DBG(PAFFS_TRACE_INFO,
+                           "Corrected biterror, triggering dirty areaSummary for "
+                           "rewrite by Garbage collection.\n\t(Hopefully it runs before an "
+                           "additional bitflip happens)");
+             }
+             else
+             {
+                 return r;
+             }
+         }
+         bool containsData = false;
+         for (uint16_t byte = 0; byte < totalBytesPerPage; byte++)
+         {
+             if (readbuf[byte] != 0xFF)
+             {
+                 containsData = true;
+                 break;
+             }
+         }
+         if (containsData)
+         {
+             summary[i] = SummaryEntry::used;
+         }
+         else
+         {
+             summary[i] = SummaryEntry::free;
+         }
+     }
+    return Result::ok;
 }
 
 /**
@@ -1032,7 +1069,7 @@ SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent)
     mTranslation[area] = nextEntry;
     mSummaryCache[nextEntry].setArea(area);
 
-    r = readAreasummary(area, *mSummaryCache[mTranslation[area]].exposeSummary(), true);
+    r = readAreasummary(area, *mSummaryCache[mTranslation[area]].exposeSummary());
     if (r == Result::ok || r == Result::biterrorCorrected)
     {
         mSummaryCache[nextEntry].setAreaSummaryWritten();
@@ -1351,7 +1388,7 @@ SummaryCache::writeAreasummary(AreaSummaryElem& elem)
 }
 
 Result
-SummaryCache::readAreasummary(AreaPos area, TwoBitList<dataPagesPerArea>& elem, bool complete)
+SummaryCache::readAreasummary(AreaPos area, TwoBitList<dataPagesPerArea>& elem)
 {
     bool bitErrorWasCorrected = false;
     PageAbs basePage = getPageNumber(combineAddress(area, dataPagesPerArea), *dev);
@@ -1396,47 +1433,39 @@ SummaryCache::readAreasummary(AreaPos area, TwoBitList<dataPagesPerArea>& elem, 
             //Extract every Bit of this bitlist
             if (BitList<areaSummarySizePacked>::getBit(i, summary))
             {
-                if (complete)
+                Addr tmp = combineAddress(area, i);
+                r = dev->driver.readPage(getPageNumber(tmp, *dev), readbuf, totalBytesPerPage);
+                if (r != Result::ok)
                 {
-                    Addr tmp = combineAddress(area, i);
-                    r = dev->driver.readPage(getPageNumber(tmp, *dev), readbuf, totalBytesPerPage);
-                    if (r != Result::ok)
+                    if (r == Result::biterrorCorrected)
                     {
-                        if (r == Result::biterrorCorrected)
-                        {
-                            bitErrorWasCorrected = true;
-                            PAFFS_DBG(PAFFS_TRACE_INFO,
-                                      "Corrected biterror, triggering dirty areaSummary for "
-                                      "rewrite by Garbage collection.\n\t(Hopefully it runs before an "
-                                      "additional bitflip happens)");
-                        }
-                        else
-                        {
-                            return r;
-                        }
-                    }
-                    bool containsData = false;
-                    for (uint16_t byte = 0; byte < totalBytesPerPage; byte++)
-                    {
-                        if (readbuf[byte] != 0xFF)
-                        {
-                            containsData = true;
-                            break;
-                        }
-                    }
-                    if (containsData)
-                    {
-                        AreaSummaryElem::setStatus(i, SummaryEntry::used, elem);
+                        bitErrorWasCorrected = true;
+                        PAFFS_DBG(PAFFS_TRACE_INFO,
+                                  "Corrected biterror, triggering dirty areaSummary for "
+                                  "rewrite by Garbage collection.\n\t(Hopefully it runs before an "
+                                  "additional bitflip happens)");
                     }
                     else
                     {
-                        AreaSummaryElem::setStatus(i, SummaryEntry::free, elem);
+                        return r;
                     }
+                }
+                bool containsData = false;
+                for (uint16_t byte = 0; byte < totalBytesPerPage; byte++)
+                {
+                    if (readbuf[byte] != 0xFF)
+                    {
+                        containsData = true;
+                        break;
+                    }
+                }
+                if (containsData)
+                {
+                    AreaSummaryElem::setStatus(i, SummaryEntry::used, elem);
                 }
                 else
                 {
-                    // This is just a guess b/c we are in incomplete mode.
-                    AreaSummaryElem::setStatus(i, SummaryEntry::used, elem);
+                    AreaSummaryElem::setStatus(i, SummaryEntry::free, elem);
                 }
             }
             else

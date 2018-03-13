@@ -310,10 +310,15 @@ namespace journalEntry
         struct MoveValidData : public GarbageCollection
         {
             AreaPos from;
-            AreaPos to;
+            //always to Area 3 (GC)
             inline
-            MoveValidData(AreaPos _from, AreaPos _to) : GarbageCollection(Operation::moveValidData),
-            from(_from), to(_to){};
+            MoveValidData(AreaPos _from) : GarbageCollection(Operation::moveValidData),
+            from(_from){};
+        };
+
+        union Max
+        {
+            MoveValidData moveValidData;
         };
     }
 
@@ -558,6 +563,8 @@ namespace journalEntry
         superblock::Max superblock_;
         AreaMgmt areaMgmt;
         areaMgmt::Max areaMgmt_;
+        GarbageCollection garbage;
+        garbageCollection::Max garbage_;
         BTree btree;
         btree::Max btree_;
         SummaryCache summaryCache;

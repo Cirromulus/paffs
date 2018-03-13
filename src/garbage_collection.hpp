@@ -26,14 +26,18 @@ class GarbageCollection : public JournalTopic
     enum class Statemachine
     {
         ok,
-        movedValidData,
-        deletedOldArea,
+        moveValidData,  //This is pre-action
+        deletedOldArea, //these are post-action
         swappedPosition,
         setNewSummary,
     } state;
+    AreaPos journalTargetArea;
 
 public:
-    inline GarbageCollection(Device* mdev) : dev(mdev), state(Statemachine::ok){};
+    inline GarbageCollection(Device* mdev) : dev(mdev)
+    {
+        resetState();
+    };
 
     /* Special case: Target=unset.
      * This frees any Type (with a favour to areas with committed AS'es)

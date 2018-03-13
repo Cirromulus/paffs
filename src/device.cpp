@@ -433,7 +433,7 @@ Device::debugPrintStatus()
     for (AreaPos i = 0; i < areasNo; i++)
     {
         SummaryEntry summary[dataPagesPerArea];
-        sumCache.getEstimatedSummaryStatus(i, summary);
+        sumCache.scanAreaForSummaryStatus(i, summary);
         PageOffs dirtyPages = 0;
         PageOffs freePages = 0;
         for(PageOffs p = 0; p < dataPagesPerArea; p++)

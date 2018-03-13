@@ -110,13 +110,13 @@ public:
      * Because it is just for a one-shot of Garbage collection looking for the best area
      */
     Result
-    getSummaryStatus(AreaPos area, SummaryEntry* summary, bool complete = true);
+    getSummaryStatus(AreaPos area, SummaryEntry* summary);
 
     /*
-     * Does not check if pages are dirty or free
+     * Reads every Page for data instead of scanning just OOB
      */
     Result
-    getEstimatedSummaryStatus(AreaPos area, SummaryEntry* summary);
+    scanAreaForSummaryStatus(AreaPos area, SummaryEntry* summary);
 
     /*
      * \warn Only for retired or unused Areas
@@ -216,11 +216,8 @@ private:
 
     Result
     commitAndEraseElem(uint16_t position);
-    /**
-     * TwoBitlist because of `complete` switch
-     */
     Result
-    readAreasummary(AreaPos area, TwoBitList<dataPagesPerArea>& elem, bool complete);
+    readAreasummary(AreaPos area, TwoBitList<dataPagesPerArea>& elem);
 
     Result
     writeAreasummary(AreaSummaryElem& elem);

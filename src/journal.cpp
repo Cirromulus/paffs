@@ -245,6 +245,8 @@ Journal::applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[Journ
             target = entry.pagestate.target;
         }
 
+        bool wasEntryConsumed = false;
+
         if (persistence.tell() >= firstUncheckpointedEntry[target])
         {
             if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
@@ -255,6 +257,7 @@ Journal::applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[Journ
                        persistence.tell().flash.addr,
                        persistence.tell().flash.offs);
             }
+            wasEntryConsumed = true;
             r = topics[target]->processEntry(entry, persistence.tell());
             if(r != Result::ok)
             {
@@ -267,17 +270,6 @@ Journal::applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[Journ
                 return r;
             }
         }
-        else
-        {
-            if (false && (traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
-            {
-                printf("_skipping_ ");
-                printMeaning(entry.base, false);
-                printf(" at %" PRIu32 ".%" PRIu16 "\n",
-                       persistence.tell().flash.addr,
-                       persistence.tell().flash.offs);
-            }
-        }
 
         //Notify other Topics of this element
         for(uint8_t t = 0; t < JournalEntry::numberOfTopics; t++)
@@ -288,9 +280,29 @@ Journal::applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[Journ
             }
             if(topics[t]->isInterestedIn(entry) && persistence.tell() >= firstUncheckpointedEntry[t])
             {
+                if(!wasEntryConsumed)
+                {
+                    printMeaning(entry.base, false);
+                    printf(" at %" PRIu32 ".%" PRIu16 "\n",
+                           persistence.tell().flash.addr,
+                           persistence.tell().flash.offs);
+                    wasEntryConsumed = true;
+                }
                 topics[t]->processEntry(entry, persistence.tell());
-                PAFFS_DBG_S(PAFFS_TRACE_JOURNAL || PAFFS_TRACE_VERBOSE,
+                PAFFS_DBG_S(PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE,
                             "informed \e[1;%um%s\e[0m of this entry.", colorMap[t], topicNames[t]);
+            }
+        }
+
+        if(false && !wasEntryConsumed)
+        {
+            if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
+            {
+                printf("_skipping_ ");
+                printMeaning(entry.base, false);
+                printf(" at %" PRIu32 ".%" PRIu16 "\n",
+                       persistence.tell().flash.addr,
+                       persistence.tell().flash.offs);
             }
         }
     }
@@ -469,7 +481,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         case journalEntry::GarbageCollection::Operation::moveValidData:
             {
             auto mvd = static_cast<const journalEntry::garbageCollection::MoveValidData*>(&entry);
-            printf("MoveValidData from %" PTYPE_AREAPOS " to %" PTYPE_AREAPOS, mvd->from, mvd->to);
+            printf("MoveValidData from %" PTYPE_AREAPOS " to GC Buffer", mvd->from);
             found = true;
             break;
             }
