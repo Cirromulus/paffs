@@ -463,13 +463,20 @@ PageAddressCache::signalEndOfLog()
     {
         //TODO: We may want to find out which cache elements are clean to suppress double versions
     }
+    Result r;
     if(mInodePtr != nullptr)
     {
         //This refreshes the Inode we will commit to Index.
         //During replay, changes to the same node are only done to index, not the PAC version
         //TODO: Link them somehow
         Inode tmp;
-        device.tree.getInode(mInodePtr->no, tmp);
+        r = device.tree.getInode(mInodePtr->no, tmp);
+        if(r != Result::ok)
+        {   //nonexisting Inode?
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Could not find Inode %" PTYPE_INODENO
+                      " for PAC commit", mInodePtr->no);
+            return;
+        }
         //This intentionally reads over the boundaries of direct array into the indirections
         memcpy(&tmp.direct, &mJournalInodeCopy.direct, (11+3) * sizeof(Addr));
         mJournalInodeCopy = tmp;

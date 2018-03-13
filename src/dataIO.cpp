@@ -26,7 +26,10 @@
 namespace paffs
 {
 
-DataIO::DataIO(Device *mdev) : dev(mdev), pac(*mdev), statemachine(mdev->journal, mdev->sumCache, &pac){};
+DataIO::DataIO(Device *mdev) : dev(mdev), pac(*mdev), statemachine(mdev->journal, mdev->sumCache, &pac)
+{
+    resetState();
+};
 
 // modifies inode->size and inode->reserved size as well
 Result
@@ -294,7 +297,7 @@ void
 DataIO::resetState()
 {
     statemachine.clear();
-    journalLastModifiedInode = 0;
+    memset(&journalLastModifiedInode, 0, sizeof(Inode));
     journalLastSize = 0;
     journalInodeValid = false;
     modifiedInode = false;
@@ -317,7 +320,7 @@ DataIO::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
         {
         case journalEntry::DataIO::Operation::newInodeSize:
             if(journalInodeValid &&
-               journalLastModifiedInode == entry.dataIO_.newInodeSize.inodeNo &&
+               journalLastModifiedInode.no == entry.dataIO_.newInodeSize.inodeNo &&
                journalLastSize == entry.dataIO_.newInodeSize.filesize)
             {
                 //If the same message comes again, we were truncating a directory (write-delete pair)
@@ -325,7 +328,7 @@ DataIO::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
                 return Result::ok;
             }
 
-            journalLastModifiedInode = entry.dataIO_.newInodeSize.inodeNo;
+            journalLastModifiedInode.no = entry.dataIO_.newInodeSize.inodeNo;
             journalLastSize = entry.dataIO_.newInodeSize.filesize;
             journalInodeValid = true;
             modifiedInode = false;
@@ -357,29 +360,31 @@ DataIO::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 void
 DataIO::signalEndOfLog()
 {
-    if(statemachine.signalEndOfLog() != JournalState::invalid && journalInodeValid && modifiedInode)
+    if(statemachine.signalEndOfLog() != JournalState::invalid && journalInodeValid)
     {
         //We succeded in replay
-        Inode inode;
-        Result r = dev->tree.getInode(journalLastModifiedInode, inode);
+        Result r = dev->tree.getInode(journalLastModifiedInode.no, journalLastModifiedInode);
         if(r != Result::ok)
         {
             //It was already deleted, so ok
             return;
         }
-        if(inode.size != journalLastSize)
+        if(journalLastModifiedInode.size != journalLastSize)
         {
             PAFFS_DBG_S(PAFFS_TRACE_DEVICE | PAFFS_TRACE_JOURNAL,
                       "Recovered Write/deletion, changing Inode %" PTYPE_INODENO " size "
                       "from %" PTYPE_FILSIZE " to %" PTYPE_FILSIZE,
-                      inode.no, inode.size, journalLastSize);
-            if(inode.size < journalLastSize)
+                      journalLastModifiedInode.no, journalLastModifiedInode.size, journalLastSize);
+            if(journalLastModifiedInode.size < journalLastSize)
             {   //write
-                inode.size = journalLastSize;
-                dev->tree.updateExistingInode(inode);
+                if(modifiedInode)
+                {
+                    journalLastModifiedInode.size = journalLastSize;
+                    dev->tree.updateExistingInode(journalLastModifiedInode);
+                }
             }else
             {   //delete
-                deleteInodeData(inode, journalLastSize);
+                deleteInodeData(journalLastModifiedInode, journalLastSize, true);
             }
         }
 

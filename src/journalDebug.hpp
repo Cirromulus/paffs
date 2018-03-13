@@ -20,8 +20,8 @@ static constexpr const char* topicNames[] =
         "GARBAGE",
         "SUMMARY CACHE",
         "TREE",
-        "PAC",
         "DATAIO",
+        "PAC",
         "DEVICE",
 };
 
@@ -35,8 +35,8 @@ static constexpr const uint8_t colorMap[JournalEntry::numberOfTopics] =
         95, //garbage collection
         36, //summaryCache
         35, //tree
-        37, //pac
         91, //dataIO
+        37, //pac
         93, //device
 };
 

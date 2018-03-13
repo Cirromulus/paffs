@@ -30,8 +30,8 @@ struct JournalEntry
         garbage,
         summaryCache,
         tree,
+        dataIO, //DataIO before PAC to invalidate pages
         pac,
-        dataIO,
         device,
     };
 
