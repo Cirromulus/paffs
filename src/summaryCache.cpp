@@ -649,7 +649,7 @@ Result
 SummaryCache::scanAreaForSummaryStatus(AreaPos area, SummaryEntry* summary)
 {
     uint8_t* readbuf = dev->driver.getPageBuffer();
-    for (uint16_t i = 0; i < dataPagesPerArea; i++)
+    for (PageOffs i = 0; i < dataPagesPerArea; i++)
      {
          Addr tmp = combineAddress(area, i);
          Result r = dev->driver.readPage(getPageNumber(tmp, *dev), readbuf, totalBytesPerPage);
@@ -965,7 +965,8 @@ SummaryCache::preScan(const journalEntry::Max& entry, JournalEntryPosition posit
         PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
         return;
     }
-    if(entry.summaryCache.subtype != journalEntry::SummaryCache::Subtype::commit)
+    if(entry.summaryCache.subtype != journalEntry::SummaryCache::Subtype::commit &&
+       entry.summaryCache.subtype != journalEntry::SummaryCache::Subtype::remove)
     {
         return;
     }

@@ -495,9 +495,24 @@ GarbageCollection::signalEndOfLog()
         //fall-through
     case Statemachine::swappedPosition:
         dev->sumCache.scanAreaForSummaryStatus(journalTargetArea, summary);
-        dev->sumCache.setSummaryStatus(journalTargetArea, summary);
+        {
+            bool containsData = false;
+            for(PageOffs i = 0; i < dataPagesPerArea; i++)
+            {
+                if(summary[i] != SummaryEntry::free)
+                {
+                    containsData = true;
+                    break;
+                }
+            }
+            if(containsData)
+            {
+                dev->sumCache.setSummaryStatus(journalTargetArea, summary);
+            }
+        }
         //fall-through
     case Statemachine::setNewSummary:
+        //FIXME Sometimes AreaType incorrect
         dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
         break;
     }

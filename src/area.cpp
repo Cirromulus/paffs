@@ -625,6 +625,9 @@ AreaManagement::signalEndOfLog()
             {
                 dev->driver.eraseBlock(dev->superblock.getPos(mLastOp.deleteAreaContents.area) * blocksPerArea + i);
             }
+            dev->superblock.increaseErasecount(mLastOp.deleteAreaContents.area);
+            //fall-through
+        case ExternOp::increaseErasecount:
             dev->sumCache.resetASWritten(mLastOp.deleteAreaContents.area);
             //fall-through
         case ExternOp::resetASWritten:
