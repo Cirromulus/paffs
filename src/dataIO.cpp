@@ -236,7 +236,7 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs, bool journalMode)
                 return Result::bug;
             }
 
-            if (!journalMode && dev->sumCache.getPageStatus(area, relPage, &r) == SummaryEntry::dirty)
+            if (!journalMode && dev->sumCache.getPageStatus(area, relPage, r) == SummaryEntry::dirty)
             {
                 //In journalMode, it may happen that a page was already deleted
                 PAFFS_DBG(PAFFS_TRACE_BUG,
@@ -615,7 +615,6 @@ DataIO::readPageData(PageAbs  pageFrom,
             continue;
         }
 
-
         if(!checkIfSaneReadAddress(pageAddr))
         {
             return Result::bug;
@@ -665,7 +664,7 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
     if (traceMask & PAFFS_TRACE_VERIFY_AS)
     {
         Result r;
-        SummaryEntry e = dev->sumCache.getPageStatus(pageAddr, &r);
+        SummaryEntry e = dev->sumCache.getPageStatus(pageAddr, r);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,

@@ -290,7 +290,7 @@ Journal::applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[Journ
             {
                 topics[t]->processEntry(entry, persistence.tell());
                 PAFFS_DBG_S(PAFFS_TRACE_JOURNAL || PAFFS_TRACE_VERBOSE,
-                            "Also informed \e[1;%um%s\e[0m of this entry.", colorMap[t], topicNames[t]);
+                            "informed \e[1;%um%s\e[0m of this entry.", colorMap[t], topicNames[t]);
             }
         }
     }

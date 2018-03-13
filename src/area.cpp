@@ -226,13 +226,15 @@ AreaManagement::findFirstFreePage(PageOffs& page, AreaPos area)
     Result r;
     for (PageOffs i = 0; i < dataPagesPerArea; i++)
     {
-        if (dev->sumCache.getPageStatus(area, i, &r) == SummaryEntry::free)
+        if (dev->sumCache.getPageStatus(area, i, r) == SummaryEntry::free)
         {
             page = i;
             return Result::ok;
         }
         if (r != Result::ok)
+        {
             return r;
+        }
     }
     return Result::noSpace;
 }

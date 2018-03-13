@@ -550,13 +550,13 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
 }
 
 SummaryEntry
-SummaryCache::getPageStatus(Addr addr, Result* result)
+SummaryCache::getPageStatus(Addr addr, Result& result)
 {
     return getPageStatus(extractLogicalArea(addr), extractPageOffs(addr), result);
 }
 
 SummaryEntry
-SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result* result)
+SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result& result)
 {
     if (page > dataPagesPerArea)
     {
@@ -564,7 +564,7 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result* result)
                   "Tried to access page out of bounds! (was: %" PRId16 ", should: < %" PRId16 "",
                   page,
                   dataPagesPerArea);
-        *result = Result::invalidInput;
+        result = Result::invalidInput;
         return SummaryEntry::error;
     }
     if (mTranslation.find(area) == mTranslation.end())
@@ -580,7 +580,7 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result* result)
                 PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                             "Loaded existing AreaSummary of %" PRId16 " without caching",
                             area);
-                *result = Result::ok;
+                result = Result::ok;
                 // TODO: Handle biterror.
                 return AreaSummaryElem::getStatus(page, buf);
             }
@@ -588,13 +588,13 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result* result)
             {
                 PAFFS_DBG_S(
                         PAFFS_TRACE_ASCACHE, "Loaded free AreaSummary of %" PRId16 " without caching", area);
-                *result = Result::ok;
+                result = Result::ok;
                 return SummaryEntry::free;
             }
         }
         if (r != Result::ok)
         {
-            *result = r;
+            result = r;
             return SummaryEntry::error;
         }
     }
@@ -604,11 +604,11 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result* result)
                   "Tried to access page out of bounds! (was: %" PRId16 ", should: < %" PRId16 "",
                   page,
                   dataPagesPerArea);
-        *result = Result::invalidInput;
+        result = Result::invalidInput;
         return SummaryEntry::error;
     }
 
-    *result = Result::ok;
+    result = Result::ok;
     return mSummaryCache[mTranslation[area]].getStatus(page);
 }
 

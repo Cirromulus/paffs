@@ -241,10 +241,7 @@ PageStateMachine<maxPages, maxPositions, topic>::signalEndOfLog()
             mPac->setJournallingInode(currentInode);
             for(uint16_t i = 0; i < pageListHWM; i++)
             {
-                if(oldPageList[i] != 0)
-                {
-                    mPac->setPage(position[i], oldPageList[i]);
-                }
+                mPac->setPage(position[i], oldPageList[i]);
             }
             mPac->commit();
         }

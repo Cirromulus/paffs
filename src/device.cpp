@@ -886,10 +886,6 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
 
     // TODO: If write more than one page, split in start and end page to reduce
     // unnecessary writes on intermediate pages.
-    if(contDir.no == 1213 && contDir.size == 345)
-    {
-        printf("Beware of the bug\n");
-    }
     r = dataIO.writeInodeData(contDir, 0, contDir.size + direntryl, &bytes, dirData.get());
     dirData.reset();
     if (bytes != contDir.size && r == Result::ok)

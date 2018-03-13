@@ -1212,7 +1212,7 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
     Result r;
     if(node.raw.self != 0)
     {
-        SummaryEntry s = dev->sumCache.getPageStatus(node.raw.self, &r);
+        SummaryEntry s = dev->sumCache.getPageStatus(node.raw.self, r);
         if (s == SummaryEntry::free)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
@@ -1325,12 +1325,13 @@ TreeCache::readTreeNode(Addr addr, TreeNode& node)
     Result r;
     if (traceMask & PAFFS_TRACE_VERIFY_AS)
     {
-        SummaryEntry s = dev->sumCache.getPageStatus(addr, &r);
+        SummaryEntry s = dev->sumCache.getPageStatus(addr, r);
         if (s == SummaryEntry::free)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "READ operation on FREE data at %X:%X",
+                      "READ operation on FREE data at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
                       extractLogicalArea(addr),
+                      dev->superblock.getPos(extractLogicalArea(addr)),
                       extractPageOffs(addr));
             return Result::bug;
         }

@@ -97,10 +97,10 @@ public:
      * Functionally same as getPageStatus(area, page, Result)
      */
     SummaryEntry
-    getPageStatus(Addr addr, Result* result);
+    getPageStatus(Addr addr, Result& result);
 
     SummaryEntry
-    getPageStatus(AreaPos area, PageOffs page, Result* result);
+    getPageStatus(AreaPos area, PageOffs page, Result& result);
 
     Result
     setSummaryStatus(AreaPos area, SummaryEntry* summary);

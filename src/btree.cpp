@@ -93,6 +93,31 @@ Btree::updateExistingInode(const Inode& inode)
             PAFFS_DBG(PAFFS_TRACE_BUG, "TreeCache is invalid");
             return Result::bug;
         }
+        if(traceMask & PAFFS_TRACE_VERIFY_AS)
+        {
+            for(uint8_t i = 0; i < 14; i++)
+            {
+                //intentionally reading over array boundary
+                if(inode.direct[i] != 0)
+                {
+                    Result r;
+                    SummaryEntry s;
+                    if((s = dev->sumCache.getPageStatus(inode.direct[i], r)) != SummaryEntry::used)
+                    {
+                        printf("Addresslist of Inode %" PTYPE_INODENO "\n", inode.no);
+                        for(uint8_t j = 0; j < 13; j++)
+                        {
+                            //intentionally over size of 11, because we print indirects too
+                            printf("%" PRIu8 "\t%" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "\n",
+                                   j, extractLogicalArea(inode.direct[j]), extractPageOffs(inode.direct[j]));
+                        }
+                        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried updating Inode %" PTYPE_INODENO " "
+                                "with invalid (%s) data at %" PRIu8 "!",
+                                  inode.no, summaryEntryNames[s], i);
+                    }
+                }
+            }
+        }
     }
 
     TreeCacheNode* node = nullptr;
