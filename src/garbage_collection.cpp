@@ -512,7 +512,6 @@ GarbageCollection::signalEndOfLog()
         }
         //fall-through
     case Statemachine::setNewSummary:
-        //FIXME Sometimes AreaType incorrect
         dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
         break;
     }

@@ -384,6 +384,8 @@ DataIO::signalEndOfLog()
                 }
             }else
             {   //delete
+                //FIXME Dont delete Inode data if we were merely writing.
+                //This may be a bug saying 'newInodeSize', but Floder gets truncated before it was written.
                 deleteInodeData(journalLastModifiedInode, journalLastSize, true);
             }
         }
