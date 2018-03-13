@@ -272,11 +272,25 @@ namespace journalEntry
 
         union Max
         {
+            AreaMgmt base;
+
             InitAreaAs initAreaAs;
             CloseArea closeArea;
             RetireArea retireArea;
             DeleteAreaContents deleteAreaContents;
             DeleteArea deleteArea;
+            inline
+            Max()
+            {
+                memset(static_cast<void*>(this), 0, sizeof(Max));
+            };
+            inline
+            ~Max(){};
+            inline
+            Max(const Max& other)
+            {
+                memcpy(static_cast<void*>(this), static_cast<const void*>(&other), sizeof(Max));
+            }
         };
     }
     struct GarbageCollection : public JournalEntry
@@ -309,6 +323,7 @@ namespace journalEntry
         {
             commit,
             remove,
+            reset,
             setStatus,
             setStatusBlock,
         };
@@ -333,6 +348,12 @@ namespace journalEntry
         {
             inline
             Remove(AreaPos _area) : SummaryCache(_area, Subtype::remove){};
+        };
+
+        struct ResetASWritten : public SummaryCache
+        {
+            inline
+            ResetASWritten(AreaPos _area) : SummaryCache(_area, Subtype::reset){};
         };
 
         struct SetStatus : public SummaryCache
@@ -412,12 +433,12 @@ namespace journalEntry
         };
     };
 
+    //TODO: Skip "operation" to save space
     struct PAC : public JournalEntry
     {
     enum class Operation : uint8_t
     {
         setAddress,
-        updateAddresslist,
     };
     Operation operation;
 
@@ -439,18 +460,8 @@ namespace journalEntry
             inodeNo(_inodeno), page(_page), addr(_addr){};
         };
 
-        struct UpdateAddressList : public PAC
-        {
-            //TODO: Build a system that allows some log entries to be received by multiple Topics
-            //This would solve many doubled messages (including this one)
-            Inode inode;
-            inline
-            UpdateAddressList(Inode _inode) : PAC(Operation::updateAddresslist), inode(_inode){};
-        };
-
         union Max {
             SetAddress setAddress;
-            UpdateAddressList updateAddressList;
         };
     }
 
@@ -538,7 +549,7 @@ namespace journalEntry
     }
 
     union Max {
-        JournalEntry base;  // Not nice?
+        JournalEntry base;
 
         Checkpoint checkpoint;
         Pagestate pagestate;

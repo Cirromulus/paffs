@@ -93,6 +93,12 @@ DataIO::writeInodeData(Inode& inode,
                         inode.size,
                         inode.reservedPages);
 
+    if(res != Result::ok)
+    {
+        //TODO: revert Statemachine
+        return res;
+    }
+
     if (inode.size < *bytesWritten + offs)
     {
         inode.size = *bytesWritten + offs;
@@ -101,7 +107,7 @@ DataIO::writeInodeData(Inode& inode,
 
 	//This is the success message for dataIO and pageAddressCache
 	res = dev->tree.updateExistingInode(inode);
-	if(res != Reult::ok)
+	if(res != Result::ok)
 	{
 		//TODO: revert Statemachine
 		return res;
@@ -292,6 +298,14 @@ DataIO::resetState()
     journalLastSize = 0;
     journalInodeValid = false;
     modifiedInode = false;
+    processedForeignSuccessElement = false;
+}
+
+bool
+DataIO::isInterestedIn(const journalEntry::Max& entry)
+{
+    return modifiedInode && !processedForeignSuccessElement &&
+            entry.base.topic == JournalEntry::Topic::tree;
 }
 
 Result
@@ -321,6 +335,17 @@ DataIO::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
     {
         modifiedInode = true;
         return statemachine.processEntry(entry);
+    }
+    else if(entry.base.topic == JournalEntry::Topic::tree)
+    {
+        if(entry.btree.op == journalEntry::BTree::Operation::update)
+        {
+            processedForeignSuccessElement = true;
+            journalEntry::Max success;
+            success.pagestate_.success = journalEntry::pagestate::Success(getTopic());
+            return statemachine.processEntry(success);
+        }
+        return Result::ok;
     }
     else
     {
@@ -359,9 +384,6 @@ DataIO::signalEndOfLog()
         }
 
     }
-    journalInodeValid = false;
-    modifiedInode = false;
-
     //If an area was filled
     dev->areaMgmt.manageActiveAreaFull(AreaType::data);
     dev->areaMgmt.manageActiveAreaFull(AreaType::index);
@@ -647,8 +669,9 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not load AreaSummary of area %" PTYPE_AREAPOS " for verification!",
-                      extractLogicalArea(pageAddr));
+                      "Could not load AreaSummary of area %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS ") for verification!",
+                      extractLogicalArea(pageAddr),
+                      dev->superblock.getPos(extractLogicalArea(pageAddr)));
             return false;
         }
         else
@@ -656,8 +679,9 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
             if (e == SummaryEntry::dirty)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
-                          "READ INODE operation of outdated (dirty) data at %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "",
+                          "READ INODE operation of outdated (dirty) data at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS "",
                           extractLogicalArea(pageAddr),
+                          dev->superblock.getPos(extractLogicalArea(pageAddr)),
                           extractPageOffs(pageAddr));
                 return false;
             }
@@ -665,8 +689,9 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
             if (e == SummaryEntry::free)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
-                          "READ INODE operation of invalid (free) data at %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "",
+                          "READ INODE operation of invalid (free) data at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS "",
                           extractLogicalArea(pageAddr),
+                          dev->superblock.getPos(extractLogicalArea(pageAddr)),
                           extractPageOffs(pageAddr));
                 return false;
             }
@@ -674,8 +699,9 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
             if (e >= SummaryEntry::error)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
-                          "READ INODE operation of data with invalid AreaSummary at area %" PTYPE_AREAPOS "!",
-                          extractLogicalArea(pageAddr));
+                          "READ INODE operation of data with invalid AreaSummary at area %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS ")!",
+                          extractLogicalArea(pageAddr),
+                          dev->superblock.getPos(extractLogicalArea(pageAddr)));
                 return false;
             }
         }

@@ -31,6 +31,8 @@ class Journal
 public:
     Journal(JournalPersistence& _persistence,
             JournalTopic& superblock,
+            JournalTopic& areaMgmt,
+            JournalTopic& garbageColl,
             JournalTopic& summaryCache,
             JournalTopic& tree,
             JournalTopic& dataIO,
@@ -40,6 +42,8 @@ public:
     {
         memset(topics, 0, sizeof(JournalTopic*) * JournalEntry::numberOfTopics);
         topics[superblock.getTopic()  ] = &superblock;
+        topics[areaMgmt.getTopic()    ] = &areaMgmt;
+        topics[garbageColl.getTopic() ] = &garbageColl;
         topics[summaryCache.getTopic()] = &summaryCache;
         topics[tree.getTopic()        ] = &tree;
         topics[dataIO.getTopic()      ] = &dataIO;

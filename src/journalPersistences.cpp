@@ -95,6 +95,8 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
             return sizeof(journalEntry::summaryCache::Commit);
         case journalEntry::SummaryCache::Subtype::remove:
             return sizeof(journalEntry::summaryCache::Remove);
+        case journalEntry::SummaryCache::Subtype::reset:
+            return sizeof(journalEntry::summaryCache::ResetASWritten);
         case journalEntry::SummaryCache::Subtype::setStatus:
             return sizeof(journalEntry::summaryCache::SetStatus);
         case journalEntry::SummaryCache::Subtype::setStatusBlock:
@@ -119,8 +121,6 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
         {
         case journalEntry::PAC::Operation::setAddress:
             return sizeof(journalEntry::pac::SetAddress);
-        case journalEntry::PAC::Operation::updateAddresslist:
-            return sizeof(journalEntry::pac::UpdateAddressList);
         }
         break;
     case JournalEntry::Topic::dataIO:

@@ -33,7 +33,8 @@ Device::Device(Driver& _driver) :
       dataIO(this),
       superblock(this),
       journalPersistence(this),
-      journal(journalPersistence, superblock, sumCache, tree,
+      journal(journalPersistence, superblock, areaMgmt,
+              areaMgmt.gc, sumCache, tree,
               dataIO, dataIO.pac, *this){};
 
 Device::~Device()
@@ -885,6 +886,10 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
 
     // TODO: If write more than one page, split in start and end page to reduce
     // unnecessary writes on intermediate pages.
+    if(contDir.no == 1213 && contDir.size == 345)
+    {
+        printf("Beware of the bug\n");
+    }
     r = dataIO.writeInodeData(contDir, 0, contDir.size + direntryl, &bytes, dirData.get());
     dirData.reset();
     if (bytes != contDir.size && r == Result::ok)
@@ -902,8 +907,6 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
                   contDir.size + direntryl);
         return r;
     }
-    contDir.mod =
-                systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
     tree.updateExistingInode(contDir);
     journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
     Result journalStatus = journal.addEvent(journalEntry::Checkpoint(getTopic()));

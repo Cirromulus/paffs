@@ -35,6 +35,7 @@ private:
     FileSize journalLastSize = 0;
     bool journalInodeValid = false;
     bool modifiedInode = false;
+    bool processedForeignSuccessElement = false;
 public:
 
     DataIO(Device* mdev);
@@ -62,6 +63,8 @@ public:
     getTopic() override;
     void
     resetState() override;
+    bool
+    isInterestedIn(const journalEntry::Max& entry) override;
     Result
     processEntry(const journalEntry::Max& entry, JournalEntryPosition position) override;
     void

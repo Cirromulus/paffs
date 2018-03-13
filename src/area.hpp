@@ -58,9 +58,27 @@ class AreaManagement : public JournalTopic
 
     Device* dev;
 
+    bool mUnfinishedTransaction = false;
+    journalEntry::areaMgmt::Max mLastOp;
+
+    enum class ExternOp
+    {
+        none,
+        setType,
+        setStatus,
+        setActiveArea,
+        changeUsedAreas,
+        increaseErasecount,
+        resetASWritten,
+        deleteSummary,
+    } mLastExternOp;
+
 public:
     GarbageCollection gc;
-    AreaManagement(Device* mdev) : dev(mdev), gc(mdev){};
+    AreaManagement(Device* mdev) : dev(mdev), gc(mdev)
+    {
+        resetState();
+    };
 
     /**
      * May call garbage collection
@@ -95,6 +113,8 @@ public:
     getTopic() override;
     void
     resetState() override;
+    bool
+    isInterestedIn(const journalEntry::Max& entry) override;
     Result
     processEntry(const journalEntry::Max& entry, JournalEntryPosition) override;
     void

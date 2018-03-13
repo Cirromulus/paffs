@@ -53,7 +53,10 @@ AddrListCacheElem::getAddr(PageNo pos)
 }
 
 PageAddressCache::PageAddressCache(Device& mdev) :
-        device(mdev), mInodePtr(nullptr), statemachine(device.journal, device.sumCache){};
+        device(mdev), statemachine(device.journal, device.sumCache)
+{
+    clear();
+};
 
 void
 PageAddressCache::clear()
@@ -70,6 +73,8 @@ PageAddressCache::clear()
 
     mInodePtr = nullptr;
     isInodeDirty = false;
+
+    processedForeignSuccessElement = false;
 }
 
 Result
@@ -366,10 +371,6 @@ PageAddressCache::commit()
         return Result::bug;
     }
 
-    //todo: doubled code, use tree update as a signal
-
-    //this would not be necessary if we got the update as a signal
-    device.journal.addEvent(journalEntry::pac::UpdateAddressList(*mInodePtr));
     r = device.tree.updateExistingInode(*mInodePtr);
 
     if(traceMask & PAFFS_TRACE_PACACHE && traceMask & PAFFS_TRACE_VERBOSE)
@@ -399,17 +400,15 @@ void
 PageAddressCache::resetState()
 {
     statemachine.clear();
+    processedForeignSuccessElement = false;
 }
 
-Result
-PageAddressCache::setJournallingInode(InodeNo no)
+bool
+PageAddressCache::isInterestedIn(const journalEntry::Max& entry)
 {
-    Result r = device.tree.getInode(no, mJournalInodeCopy);
-    if(r != Result::ok)
-    {
-        return r;
-    }
-    return setTargetInode(mJournalInodeCopy);
+    return statemachine.getState() == JournalState::invalid &&
+            !processedForeignSuccessElement &&
+            entry.base.topic == JournalEntry::Topic::tree;
 }
 
 Result
@@ -427,27 +426,6 @@ PageAddressCache::processEntry(const journalEntry::Max& entry, JournalEntryPosit
             }
             return setPage(entry.pac_.setAddress.page, entry.pac_.setAddress.addr);
         }
-        case journalEntry::PAC::Operation::updateAddresslist:
-        {
-            if(mInodePtr == nullptr || mInodePtr != &mJournalInodeCopy)
-            {
-                return Result::bug;
-            }
-            //Get newest metadata of Inode from tree
-            Inode tmp;
-            device.tree.getInode(mInodePtr->no, tmp);
-            //This intentionally reads over the boundaries of direct array into the indirections
-            memcpy(&tmp.direct, &entry.pac_.updateAddressList.inode.direct, (11+3) * sizeof(Addr));
-            mJournalInodeCopy = tmp;
-            Result r = device.tree.updateExistingInode(mJournalInodeCopy);
-            if(r != Result::ok)
-            {
-                return r;
-            }
-            journalEntry::Max success;
-            success.pagestate_.success = journalEntry::pagestate::Success(getTopic());
-            return statemachine.processEntry(success);
-        }
         }
         return Result::bug;
     }
@@ -455,6 +433,21 @@ PageAddressCache::processEntry(const journalEntry::Max& entry, JournalEntryPosit
             entry.pagestate.target == getTopic())
     {   //statemachine operations
         return statemachine.processEntry(entry);
+    }
+    else if(entry.base.topic == JournalEntry::Topic::tree)
+    {
+        if(entry.btree.op == journalEntry::BTree::Operation::update)
+        {
+            if(mInodePtr == nullptr || mInodePtr != &mJournalInodeCopy)
+            {
+                return Result::bug;
+            }
+            processedForeignSuccessElement = true;
+            journalEntry::Max success;
+            success.pagestate_.success = journalEntry::pagestate::Success(getTopic());
+            return statemachine.processEntry(success);
+        }
+        return Result::ok;
     }
     else
     {
@@ -481,7 +474,19 @@ PageAddressCache::signalEndOfLog()
         memcpy(&tmp.direct, &mJournalInodeCopy.direct, (11+3) * sizeof(Addr));
         mJournalInodeCopy = tmp;
         commit();
+        mInodePtr = nullptr;
     }
+}
+
+Result
+PageAddressCache::setJournallingInode(InodeNo no)
+{
+    Result r = device.tree.getInode(no, mJournalInodeCopy);
+    if(r != Result::ok)
+    {
+        return r;
+    }
+    return setTargetInode(mJournalInodeCopy);
 }
 
 bool

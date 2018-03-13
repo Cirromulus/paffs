@@ -304,7 +304,7 @@ AreaManagement::closeArea(AreaPos area)
 void
 AreaManagement::retireArea(AreaPos area)
 {
-    dev->journal.addEvent(journalEntry::areaMgmt::CloseArea(area));
+    dev->journal.addEvent(journalEntry::areaMgmt::RetireArea(area));
     dev->superblock.setStatus(area, AreaStatus::closed);
     if(dev->superblock.getType(area) == AreaType::unset)
     {
@@ -438,7 +438,6 @@ AreaManagement::deleteArea(AreaPos area)
 
     dev->superblock.setStatus(area, AreaStatus::empty);
     dev->superblock.setType(area, AreaType::unset);
-    dev->sumCache.deleteSummary(area);
     dev->superblock.decreaseUsedAreas();
     PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Area %" PTYPE_AREAPOS
                 " at pos. %" PTYPE_AREAPOS ".", area, dev->superblock.getPos(area));
@@ -453,16 +452,196 @@ AreaManagement::getTopic()
 void
 AreaManagement::resetState()
 {
-    //nothing
+    mUnfinishedTransaction = false;
+    memset(&mLastOp, 0, sizeof(journalEntry::areaMgmt::Max));
+    mLastExternOp = ExternOp::none;
+}
+bool
+AreaManagement::isInterestedIn(const journalEntry::Max& entry)
+{
+    return mUnfinishedTransaction &&
+            (entry.base.topic == JournalEntry::Topic::superblock ||
+             entry.base.topic == JournalEntry::Topic::summaryCache);
 }
 Result
 AreaManagement::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 {
-    return Result::nimpl;
+    if(entry.base.topic == JournalEntry::Topic::areaMgmt)
+    {
+        mUnfinishedTransaction = true;
+        mLastOp = entry.areaMgmt_;
+        return Result::ok;
+    }
+
+    if(!mUnfinishedTransaction)
+    {   //We only allow extern entries when looking at own commands
+        return Result::bug;
+    }
+
+    switch(entry.base.topic)
+    {
+    case JournalEntry::Topic::superblock:
+        switch(entry.superblock.type)
+        {
+        case journalEntry::Superblock::Type::areaMap:
+            switch (entry.superblock_.areaMap.operation)
+            {
+            case journalEntry::superblock::AreaMap::Operation::type:
+                mLastExternOp = ExternOp::setType;
+                break;
+            case journalEntry::superblock::AreaMap::Operation::status:
+                mLastExternOp = ExternOp::setStatus;
+                break;
+            case journalEntry::superblock::AreaMap::Operation::increaseErasecount:
+                mLastExternOp = ExternOp::increaseErasecount;
+                break;
+            default:
+                //ignore
+                break;
+            }
+            break;
+        case journalEntry::Superblock::Type::activeArea:
+            mLastExternOp = ExternOp::setActiveArea;
+            break;
+        case journalEntry::Superblock::Type::usedAreas:
+            mLastExternOp = ExternOp::changeUsedAreas;
+            break;
+        default:
+            //ignore
+            break;
+        }
+        break;
+    case JournalEntry::Topic::summaryCache:
+        switch(entry.summaryCache.subtype)
+        {
+        case journalEntry::SummaryCache::Subtype::remove:
+            mLastExternOp = ExternOp::deleteSummary;
+            break;
+        case journalEntry::SummaryCache::Subtype::reset:
+            mLastExternOp = ExternOp::resetASWritten;
+            break;
+        default:
+            //ignore
+            break;
+        }
+        break;
+    default:
+        //ignore
+        break;
+    }
+
+    return Result::ok;
 }
 void
 AreaManagement::signalEndOfLog()
 {
-
+    if(!mUnfinishedTransaction)
+    {
+        return;
+    }
+    switch(mLastOp.base.operation)
+    {
+    case journalEntry::AreaMgmt::Operation::initAreaAs:
+        switch(mLastExternOp)
+        {
+        case ExternOp::none:
+            dev->superblock.setType(mLastOp.initAreaAs.area, mLastOp.initAreaAs.type);
+            //fall-through
+        case ExternOp::setType:
+            if (dev->superblock.getStatus(mLastOp.initAreaAs.area) == AreaStatus::empty)
+            {
+                dev->superblock.increaseUsedAreas();
+            }
+            //fall-through
+        case ExternOp::changeUsedAreas:
+            dev->superblock.setStatus(mLastOp.initAreaAs.area, AreaStatus::active);
+            //fall-through
+        case ExternOp::setStatus:
+            dev->superblock.setActiveArea(mLastOp.initAreaAs.type, mLastOp.initAreaAs.area);
+            break;
+        default:
+            //nothing
+            break;
+        }
+        break;
+    case journalEntry::AreaMgmt::Operation::closeArea:
+        switch(mLastExternOp)
+        {
+        case ExternOp::none:
+            dev->superblock.setStatus(mLastOp.closeArea.area, AreaStatus::closed);
+            //fall-through
+        case ExternOp::setStatus:
+            dev->superblock.setActiveArea(dev->superblock.getType(mLastOp.closeArea.area), 0);
+            break;
+        default:
+            //nothing
+            break;
+        }
+        break;
+    case journalEntry::AreaMgmt::Operation::retireArea:
+        switch(mLastExternOp)
+        {
+        case ExternOp::none:
+            dev->superblock.setStatus(mLastOp.retireArea.area, AreaStatus::closed);
+            //fall-through
+        case ExternOp::setStatus:
+            if(dev->superblock.getType(mLastOp.retireArea.area) == AreaType::unset)
+            {
+                dev->superblock.increaseUsedAreas();
+            }
+            //fall-through
+        case ExternOp::changeUsedAreas:
+            dev->superblock.setType(mLastOp.retireArea.area, AreaType::retired);
+            //fall-through
+        case ExternOp::setType:
+            for (unsigned block = 0; block < blocksPerArea; block++)
+            {
+                if(dev->driver.checkBad(dev->superblock.getPos(mLastOp.retireArea.area) * blocksPerArea + block) == Result::ok)
+                {   //No badblock marker found
+                    dev->driver.markBad(dev->superblock.getPos(mLastOp.retireArea.area) * blocksPerArea + block);
+                }
+            }
+            break;
+        default:
+            //nothing
+            break;
+        }
+        break;
+    case journalEntry::AreaMgmt::Operation::deleteArea:
+    case journalEntry::AreaMgmt::Operation::deleteAreaContents:
+        switch(mLastExternOp)
+        {
+        case ExternOp::none:
+            for (unsigned int i = 0; i < blocksPerArea; i++)
+            {
+                dev->driver.eraseBlock(dev->superblock.getPos(mLastOp.deleteAreaContents.area) * blocksPerArea + i);
+            }
+            dev->sumCache.resetASWritten(mLastOp.deleteAreaContents.area);
+            //fall-through
+        case ExternOp::resetASWritten:
+            dev->sumCache.deleteSummary(mLastOp.deleteAreaContents.area);
+            if(mLastOp.base.operation == journalEntry::AreaMgmt::Operation::deleteAreaContents)
+            {
+                break;
+            }
+            //fall-through
+        case ExternOp::deleteSummary:
+            dev->superblock.setStatus(mLastOp.deleteArea.area, AreaStatus::empty);
+            //fall-through
+        case ExternOp::setStatus:
+            dev->superblock.setType(mLastOp.deleteArea.area, AreaType::unset);
+            //fall-through
+        case ExternOp::setType:
+            dev->superblock.decreaseUsedAreas();
+            break;
+        default:
+            //nothing
+            break;
+        }
+        break;
+    default:
+        //nothing
+        break;
+    }
 }
 }  // namespace paffs

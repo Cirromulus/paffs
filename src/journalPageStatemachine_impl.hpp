@@ -56,6 +56,13 @@ PageStateMachine<maxPages, maxPositions, topic>::getMinSpaceLeft()
 }
 
 template <uint16_t maxPages, uint16_t maxPositions, JournalEntry::Topic topic>
+inline JournalState
+PageStateMachine<maxPages, maxPositions, topic>::getState()
+{
+    return journalState;
+}
+
+template <uint16_t maxPages, uint16_t maxPositions, JournalEntry::Topic topic>
 inline Result
 PageStateMachine<maxPages, maxPositions, topic>::replacePage(Addr neu, Addr old)
 {

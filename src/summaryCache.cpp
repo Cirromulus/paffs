@@ -748,6 +748,7 @@ SummaryCache::resetASWritten(AreaPos area)
     {
         return;
     }
+    dev->journal.addEvent(journalEntry::summaryCache::ResetASWritten(area));
     mSummaryCache[mTranslation[area]].setAreaSummaryWritten(false);
 }
 
@@ -972,6 +973,9 @@ SummaryCache::processEntry(const journalEntry::Max& entry, JournalEntryPosition 
         return Result::bug;
     case journalEntry::SummaryCache::Subtype::remove:
         deleteSummary(entry.summaryCache.area);
+        break;
+    case journalEntry::SummaryCache::Subtype::reset:
+        resetASWritten(entry.summaryCache.area);
         break;
     case journalEntry::SummaryCache::Subtype::setStatus:
         setPageStatus(entry.summaryCache_.setStatus.area, entry.summaryCache_.setStatus.page,

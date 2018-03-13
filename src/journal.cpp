@@ -154,6 +154,7 @@ Journal::processBuffer()
 
         if(!isTopicValid(entry.base.topic))
         {
+            printMeaning(entry.base, true);
             PAFFS_DBG(PAFFS_TRACE_BUG, "Read invalid Topic identifier, probably misaligned!");
             return Result::bug;
         }
@@ -433,7 +434,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         }
         break;
     case JournalEntry::Topic::areaMgmt:
-        printf("AreaMgmt area %" PTYPE_AREAPOS,
+        printf("AreaMgmt area %" PTYPE_AREAPOS " ",
                static_cast<const journalEntry::AreaMgmt*>(&entry)->area);
 
         switch (static_cast<const journalEntry::AreaMgmt*>(&entry)->operation)
@@ -513,6 +514,10 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             printf("Remove");
             found = true;
             break;
+        case journalEntry::SummaryCache::Subtype::reset:
+            printf("Reset AS written");
+            found = true;
+            break;
         case journalEntry::SummaryCache::Subtype::setStatus:
             printf("set Page %" PTYPE_PAGEOFFS " to %s",
                    static_cast<const journalEntry::summaryCache::SetStatus*>(&entry)->page,
@@ -539,10 +544,6 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             found = true;
             break;
             }
-        case journalEntry::PAC::Operation::updateAddresslist:
-            printf("update address list");
-            found = true;
-            break;
         }
         break;
     case JournalEntry::Topic::dataIO:

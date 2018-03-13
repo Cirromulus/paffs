@@ -50,6 +50,7 @@ class PageAddressCache : public JournalTopic
 
     PageStateMachine<maxPagesPerWrite, 0, JournalEntry::Topic::pac> statemachine;
     Inode mJournalInodeCopy;
+    bool processedForeignSuccessElement;
 
 public:
     PageAddressCache(Device& mdev);
@@ -74,12 +75,14 @@ public:
     getTopic() override;
     void
     resetState() override;
-    Result
-    setJournallingInode(InodeNo no);
+    bool
+    isInterestedIn(const journalEntry::Max& entry) override;
     Result
     processEntry(const journalEntry::Max& entry, JournalEntryPosition position) override;
     void
     signalEndOfLog() override;
+    Result
+    setJournallingInode(InodeNo no);
 
 private:
     uint16_t

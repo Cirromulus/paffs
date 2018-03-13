@@ -24,8 +24,6 @@ namespace paffs
 
 //Forward declaration
 class PageAddressCache;
-class Btree;
-
 
 enum class JournalState : uint8_t
  {
@@ -66,6 +64,9 @@ public:
 
     uint16_t
     getMinSpaceLeft();
+
+    JournalState
+    getState();
 
     /**
      * \param neu May be 0 if just old page is to be deleted
