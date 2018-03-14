@@ -182,7 +182,7 @@ struct Inode
     InodeNo no;
     InodeType type;  //2 Bit;
     Permission perm : 3;
-    uint32_t reservedPages;  // Space on filesystem used in Pages
+    uint16_t reservedPages;  // Space on filesystem used in Pages
     FileSize size;           // Space on filesystem needed in bytes
     uint64_t crea;
     uint64_t mod;
