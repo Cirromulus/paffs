@@ -344,6 +344,7 @@ Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
             }
             return r;
         case journalEntry::BTree::Operation::setRootnode:
+			//FIXME THERE IS NO BTREE SETROOTNODE, use InteresetRegistry!
             {
             dev->superblock.registerRootnode(entry.btree_.setRootnode.address);
             journalEntry::Max success;
