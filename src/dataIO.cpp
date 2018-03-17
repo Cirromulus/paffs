@@ -101,7 +101,6 @@ DataIO::writeInodeData(Inode& inode,
         //TODO: revert Statemachine
         return res;
     }
-
     if (inode.size < *bytesWritten + offs)
     {
         inode.size = *bytesWritten + offs;
@@ -149,7 +148,7 @@ DataIO::readInodeData(Inode& inode,
                   "Read bigger than size of object! (was: %" PRIu32 ", max: %" PRIu32 ")",
                   offs + bytes,
                   inode.size);
-        bytes = inode.size - offs;
+        bytes = inode.size < offs ? 0 : inode.size - offs;
     }
 
     *bytesRead = 0;
@@ -404,8 +403,8 @@ DataIO::writePageData(PageAbs  pageFrom,
                       const uint8_t* data,
                       PageAddressCache& ac,
                       FileSize* bytesWritten,
-                      FileSize filesize,
-                      uint32_t& reservedPages)
+                      FileSize  filesize,
+                      uint16_t& reservedPages)
 {
     // Will be set to zero after offset is applied
     if (dev->readOnly)

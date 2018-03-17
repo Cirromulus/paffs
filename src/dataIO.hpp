@@ -82,8 +82,8 @@ private:
                   const uint8_t* data,
                   PageAddressCache& ac,
                   FileSize* bytes_written,
-                  FileSize filesize,
-                  uint32_t& reservedPages);
+                  FileSize  filesize,
+                  uint16_t& reservedPages);
     Result
     readPageData(PageAbs  pageFrom,
                  PageAbs  pageTo,
