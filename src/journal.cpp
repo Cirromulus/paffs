@@ -267,7 +267,7 @@ Journal::applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[Journ
                           persistence.tell().flash.addr,
                           persistence.tell().flash.offs);
                 printMeaning(entry.base);
-                return r;
+                //return r;
             }
         }
 

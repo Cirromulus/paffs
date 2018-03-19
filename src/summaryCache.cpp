@@ -650,41 +650,33 @@ SummaryCache::scanAreaForSummaryStatus(AreaPos area, SummaryEntry* summary)
 {
     uint8_t* readbuf = dev->driver.getPageBuffer();
     for (PageOffs i = 0; i < dataPagesPerArea; i++)
-     {
-         Addr tmp = combineAddress(area, i);
-         Result r = dev->driver.readPage(getPageNumber(tmp, *dev), readbuf, totalBytesPerPage);
-         if (r != Result::ok)
-         {
-             if (r == Result::biterrorCorrected)
-             {
-                 PAFFS_DBG(PAFFS_TRACE_INFO,
-                           "Corrected biterror, triggering dirty areaSummary for "
-                           "rewrite by Garbage collection.\n\t(Hopefully it runs before an "
-                           "additional bitflip happens)");
-             }
-             else
-             {
-                 return r;
-             }
-         }
-         bool containsData = false;
-         for (uint16_t byte = 0; byte < totalBytesPerPage; byte++)
-         {
-             if (readbuf[byte] != 0xFF)
-             {
-                 containsData = true;
-                 break;
-             }
-         }
-         if (containsData)
-         {
-             summary[i] = SummaryEntry::used;
-         }
-         else
-         {
-             summary[i] = SummaryEntry::free;
-         }
-     }
+    {
+        Addr tmp = combineAddress(area, i);
+        Result r = dev->driver.readPage(getPageNumber(tmp, *dev), readbuf, totalBytesPerPage);
+        if (r != Result::ok)
+        {
+            //ignore
+            summary[i] = SummaryEntry::dirty;
+            continue;
+        }
+        bool containsData = false;
+        for (uint16_t byte = 0; byte < totalBytesPerPage; byte++)
+        {
+            if (readbuf[byte] != 0xFF)
+            {
+                containsData = true;
+                break;
+            }
+        }
+        if (containsData)
+        {
+            summary[i] = SummaryEntry::used;
+        }
+        else
+        {
+            summary[i] = SummaryEntry::free;
+        }
+    }
     return Result::ok;
 }
 
