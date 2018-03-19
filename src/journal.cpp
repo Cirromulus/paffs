@@ -294,7 +294,7 @@ Journal::applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[Journ
             }
         }
 
-        if(false && !wasEntryConsumed)
+        if(!wasEntryConsumed)
         {
             if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
             {

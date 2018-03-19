@@ -359,9 +359,8 @@ DataIO::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 void
 DataIO::signalEndOfLog()
 {
-    if(statemachine.signalEndOfLog() != JournalState::invalid && journalInodeValid)
-    {
-        //We succeded in replay
+    if(statemachine.signalEndOfLog() == JournalState::recover && journalInodeValid)
+    {   //We succeded in replay, there was a success message
         Result r = dev->tree.getInode(journalLastModifiedInode.no, journalLastModifiedInode);
         if(r != Result::ok)
         {

@@ -1097,7 +1097,7 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
             r = dataIO.pac.commit();
             if(r != Result::ok)
             {
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit tuncated folder %" PTYPE_INODENO,
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit truncated folder %" PTYPE_INODENO,
                           contDir.no);
                 return r;
             }
