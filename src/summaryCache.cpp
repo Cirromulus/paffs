@@ -78,7 +78,7 @@ AreaSummaryElem::setStatus(PageOffs page, SummaryEntry value)
         setLoadedFromSuperPage(false);
     }
     PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "set Area %" PTYPE_AREAPOS " page %" PTYPE_PAGEOFFS " to %s",
-                getArea(), page, summaryEntryNames[value]);
+                getArea(), page, summaryEntryNames[static_cast<int>(value)]);
     setStatus(page, value, mEntries);
     if (value == SummaryEntry::dirty)
     {

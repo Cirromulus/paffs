@@ -30,10 +30,12 @@ namespace paffs
 class Btree : public JournalTopic
 {
     Device* dev;
+    JournalEntryPosition mJournalLastSuccess;
 
 public:
     TreeCache mCache;
-    Btree(Device* mdev) : dev(mdev), mCache(TreeCache(mdev)){};
+    inline
+    Btree(Device* mdev) : dev(mdev), mJournalLastSuccess(0), mCache(TreeCache(mdev)){};
 
     Result
     insertInode(const Inode& inode);
@@ -64,6 +66,8 @@ public:
     resetState() override;
     bool
     isInterestedIn(const journalEntry::Max& entry) override;
+    void
+    preScan(const journalEntry::Max& entry, JournalEntryPosition position) override;
     Result
     processEntry(const journalEntry::Max& entry, JournalEntryPosition position) override;
     void

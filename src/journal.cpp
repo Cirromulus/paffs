@@ -159,7 +159,17 @@ Journal::processBuffer()
             return Result::bug;
         }
 
-        topics[entry.base.topic]->preScan(entry, persistence.tell());
+        for(uint8_t t = 0; t < JournalEntry::numberOfTopics; t++)
+        {
+            if(topics[t] == nullptr)
+            {
+                continue;
+            }
+            if(t == entry.base.topic || topics[t]->isInterestedIn(entry))
+            {
+                topics[t]->preScan(entry, persistence.tell());
+            }
+        }
 
     } while ((r = persistence.readNextElem(entry)) == Result::ok);
     if (r != Result::notFound)

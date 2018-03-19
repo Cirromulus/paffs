@@ -258,7 +258,8 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs, bool journalMode)
             }
 
             // Mark old pages dirty
-            r = dev->sumCache.setPageStatus(area, relPage, SummaryEntry::dirty);
+            statemachine.replacePage(0, pageAddr, inode.no, page + pageFrom);
+
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR,
@@ -281,6 +282,7 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs, bool journalMode)
 
     inode.size = offs;
     dev->tree.updateExistingInode(inode);
+    statemachine.invalidateOldPages();
     pac.setValid();
     dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
     return Result::ok;
@@ -359,9 +361,11 @@ DataIO::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 void
 DataIO::signalEndOfLog()
 {
-    if(statemachine.signalEndOfLog() != JournalState::invalid && journalInodeValid
-            && processedForeignSuccessElement)
-    {   //We succeded in replay, there was a success message
+    JournalState state = statemachine.signalEndOfLog();
+    if(journalInodeValid &&
+            (state == JournalState::recover || //we continued action
+            (state == JournalState::ok && processedForeignSuccessElement))) //We just did not have a checkpoint
+    {
         Result r = dev->tree.getInode(journalLastModifiedInode.no, journalLastModifiedInode);
         if(r != Result::ok)
         {
@@ -384,7 +388,7 @@ DataIO::signalEndOfLog()
             }else
             {   //delete
                 //FIXME Dont delete Inode data if we were merely writing.
-                //This may be a bug saying 'newInodeSize', but Floder gets truncated before it was written.
+                //This may be a bug saying 'newInodeSize', but Folder gets truncated before it was written.
                 deleteInodeData(journalLastModifiedInode, journalLastSize, true);
             }
         }

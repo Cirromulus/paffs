@@ -361,6 +361,8 @@ Superblock::registerRootnode(Addr addr)
         return Result::ok;
     }
 
+    PAFFS_DBG_S(PAFFS_TRACE_SUPERBLOCK, "Set Rootnode to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+                extractLogicalArea(addr), extractPageOffs(addr));
     mRootnodeAddr = addr;
     mRootnodeDirty = true;
     device->journal.addEvent(journalEntry::superblock::Rootnode(addr));

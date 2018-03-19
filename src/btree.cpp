@@ -113,7 +113,7 @@ Btree::updateExistingInode(const Inode& inode)
                         }
                         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried updating Inode %" PTYPE_INODENO " "
                                 "with invalid (%s) data at %" PRIu8 "!",
-                                  inode.no, summaryEntryNames[s], i);
+                                  inode.no, summaryEntryNames[static_cast<int>(s)], i);
                     }
                 }
             }
@@ -285,7 +285,19 @@ void
 Btree::resetState()
 {
     mCache.resetState();
+    mJournalLastSuccess = 0;
 }
+
+void
+Btree::preScan(const journalEntry::Max& entry, JournalEntryPosition position)
+{
+    if(entry.base.topic == JournalEntry::Topic::superblock &&
+            entry.superblock.type == journalEntry::Superblock::Type::rootnode)
+    {
+        mJournalLastSuccess = position;
+    }
+}
+
 bool
 Btree::isInterestedIn(const journalEntry::Max& entry)
 {
@@ -293,11 +305,17 @@ Btree::isInterestedIn(const journalEntry::Max& entry)
             entry.superblock.type == journalEntry::Superblock::Type::rootnode;
 }
 Result
-Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
+Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition position)
 {
     Result r;
     if (entry.base.topic == getTopic())
     {   //normal operations
+        if(mJournalLastSuccess != 0 && position < mJournalLastSuccess)
+        {
+            //Skip, because these changes will be committed
+            PAFFS_DBG(PAFFS_TRACE_TREE, "Skipping, success will follow");
+            return Result::ok;
+        }
         switch (entry.btree.op)
         {
         case journalEntry::BTree::Operation::insert:
