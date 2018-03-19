@@ -93,7 +93,7 @@ Btree::updateExistingInode(const Inode& inode)
             PAFFS_DBG(PAFFS_TRACE_BUG, "TreeCache is invalid");
             return Result::bug;
         }
-        if(traceMask & PAFFS_TRACE_VERIFY_AS)
+        if(traceMask & PAFFS_TRACE_VERIFY_AS && mJournalIsEndOfLog)
         {
             for(uint8_t i = 0; i < 14; i++)
             {
@@ -286,6 +286,7 @@ Btree::resetState()
 {
     mCache.resetState();
     mJournalLastSuccess = 0;
+    mJournalIsEndOfLog = false;
 }
 
 void
@@ -391,6 +392,7 @@ Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition positio
 void
 Btree::signalEndOfLog()
 {
+    mJournalIsEndOfLog = true;
     mCache.signalEndOfLog();
 }
 

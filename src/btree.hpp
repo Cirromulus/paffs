@@ -31,11 +31,15 @@ class Btree : public JournalTopic
 {
     Device* dev;
     JournalEntryPosition mJournalLastSuccess;
+    bool mJournalIsEndOfLog;
 
 public:
     TreeCache mCache;
     inline
-    Btree(Device* mdev) : dev(mdev), mJournalLastSuccess(0), mCache(TreeCache(mdev)){};
+    Btree(Device* mdev) : dev(mdev), mCache(TreeCache(mdev))
+    {
+        resetState();
+    };
 
     Result
     insertInode(const Inode& inode);
