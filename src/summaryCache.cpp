@@ -964,7 +964,7 @@ SummaryCache::preScan(const journalEntry::Max& entry, JournalEntryPosition posit
     }
 
     firstUncommittedElem[entry.summaryCache.area] = position;
-    PAFFS_DBG(PAFFS_TRACE_ASCACHE | PAFFS_TRACE_JOURNAL,
+    PAFFS_DBG_S(PAFFS_TRACE_ASCACHE | PAFFS_TRACE_JOURNAL,
               "Commit of %" PTYPE_AREAPOS " at %" PRIu32,
               entry.summaryCache.area, position.mram.offs);
     if(mTranslation.find(entry.summaryCache.area) != mTranslation.end())
