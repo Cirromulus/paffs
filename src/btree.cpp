@@ -286,7 +286,12 @@ Btree::resetState()
 {
     mCache.resetState();
 }
-
+bool
+Btree::isInterestedIn(const journalEntry::Max& entry)
+{
+    return entry.base.topic == JournalEntry::Topic::superblock &&
+            entry.superblock.type == journalEntry::Superblock::Type::rootnode;
+}
 Result
 Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
 {
@@ -343,14 +348,6 @@ Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
                 return Result::ok;
             }
             return r;
-        case journalEntry::BTree::Operation::setRootnode:
-			//FIXME THERE IS NO BTREE SETROOTNODE, use InteresetRegistry!
-            {
-            dev->superblock.registerRootnode(entry.btree_.setRootnode.address);
-            journalEntry::Max success;
-            success.pagestate_.success = journalEntry::pagestate::Success(getTopic());
-            return mCache.processEntry(success);
-            }
         }
         return Result::bug;
     }
@@ -358,6 +355,13 @@ Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
             entry.pagestate.target == getTopic())
     {   //statemachine operations
         return mCache.processEntry(entry);
+    }
+    else if(entry.base.topic == JournalEntry::Topic::superblock &&
+            entry.superblock.type == journalEntry::Superblock::Type::rootnode)
+    {
+        journalEntry::Max success;
+        success.pagestate_.success = journalEntry::pagestate::Success(getTopic());
+        return mCache.processEntry(success);
     }
     else
     {

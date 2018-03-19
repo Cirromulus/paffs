@@ -112,8 +112,6 @@ JournalPersistence::getSizeFromJE(const JournalEntry& entry)
             return sizeof(journalEntry::btree::Update);
         case journalEntry::BTree::Operation::remove:
             return sizeof(journalEntry::btree::Remove);
-        case journalEntry::BTree::Operation::setRootnode:
-            return sizeof(journalEntry::btree::SetRootnode);
         }
         break;
     case JournalEntry::Topic::pac:

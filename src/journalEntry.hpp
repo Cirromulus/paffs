@@ -393,7 +393,6 @@ namespace journalEntry
             insert,
             update,
             remove,
-            setRootnode,
         };
         Operation op;
 
@@ -423,18 +422,10 @@ namespace journalEntry
             Remove(InodeNo _no) : BTree(Operation::remove), no(_no){};
         };
 
-        struct SetRootnode : public BTree
-        {
-            Addr address;
-        protected:
-            SetRootnode(Addr _address) : BTree(Operation::setRootnode), address(_address){};
-        };
-
         union Max {
             Insert insert;
             Update update;
             Remove remove;
-            SetRootnode setRootnode;
         };
     };
 

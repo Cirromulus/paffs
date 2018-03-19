@@ -505,12 +505,6 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             printf("remove %" PRIu32, static_cast<const journalEntry::btree::Remove*>(&entry)->no);
             found = true;
             break;
-        case journalEntry::BTree::Operation::setRootnode:
-            printf("Tree SetRootnode to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
-                   extractLogicalArea(static_cast<const journalEntry::btree::SetRootnode*>(&entry)->address),
-                   extractPageOffs(static_cast<const journalEntry::btree::SetRootnode*>(&entry)->address));
-            found = true;
-            break;
         }
         break;
     case JournalEntry::Topic::summaryCache:

@@ -62,6 +62,8 @@ public:
     getTopic() override;
     void
     resetState() override;
+    bool
+    isInterestedIn(const journalEntry::Max& entry) override;
     Result
     processEntry(const journalEntry::Max& entry, JournalEntryPosition position) override;
     void
