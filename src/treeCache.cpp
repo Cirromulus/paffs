@@ -22,7 +22,10 @@
 
 namespace paffs
 {
-TreeCache::TreeCache(Device* mdev) : dev(mdev), statemachine(mdev->journal, mdev->sumCache){};
+TreeCache::TreeCache(Device* mdev) : dev(mdev), statemachine(mdev->journal, mdev->sumCache)
+{
+    clear();
+};
 
 void
 TreeCache::setIndexUsed(uint16_t index)
@@ -74,13 +77,14 @@ TreeCache::clear()
 {
     memset(mCache, 0, treeNodeCacheSize * sizeof(TreeCacheNode));
     mCacheUsage.clear();
-    statemachine.clear();
+    resetState();
 }
 
 void
 TreeCache::resetState()
 {
     statemachine.clear();
+    mJournalIsRecovering = false;
 }
 
 Result
@@ -92,10 +96,19 @@ TreeCache::processEntry(const journalEntry::Max& entry)
 void
 TreeCache::signalEndOfLog()
 {
-    if(statemachine.signalEndOfLog() == JournalState::recover)
-    {
-        //we did not have to revert
-        //TODO: Check which nodes may be clean
+    if(statemachine.signalEndOfLog() == JournalState::invalid)
+    {   //We reverted
+        //Suppress check if dirty messages
+        mJournalIsRecovering = true;
+        for(uint16_t i = 0; i < treeNodeCacheSize; i++)
+        {
+            if(mCacheUsage.getBit(i))
+            {   //FORCE Recommit
+                mCache[i].dirty = true;
+            }
+        }
+        commitCache();
+        mJournalIsRecovering = false;
     }
     if(!isTreeCacheValid())
     {
@@ -1223,11 +1236,11 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
                       extractPageOffs(node.raw.self));
             return Result::bug;
         }
-        if (s == SummaryEntry::dirty)
+        if (s == SummaryEntry::dirty && !mJournalIsRecovering)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
                       "WRITE operation, old node is DIRTY data at %" PTYPE_AREAPOS
-                      "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
+                      "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS ,
                       extractLogicalArea(node.raw.self),
                       dev->superblock.getPos(extractLogicalArea(node.raw.self)),
                       extractPageOffs(node.raw.self));
@@ -1338,8 +1351,9 @@ TreeCache::readTreeNode(Addr addr, TreeNode& node)
         if (s == SummaryEntry::dirty)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "READ operation on DIRTY data at %X:%X",
+                      "READ operation on DIRTY data at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
                       extractLogicalArea(addr),
+                      dev->superblock.getPos(extractLogicalArea(addr)),
                       extractPageOffs(addr));
             return Result::bug;
         }

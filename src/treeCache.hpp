@@ -36,6 +36,8 @@ class TreeCache
     uint16_t mCacheHits = 0;
     uint16_t mCacheMisses = 0;
 
+    bool mJournalIsRecovering;
+
 public:
     TreeCache(Device* mdev);
 
