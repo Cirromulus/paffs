@@ -96,4 +96,12 @@ extern const char* traceDescription[];
 #define PAFFS_TRACE_ALL         0xfff7ffff
 #define PAFFS_TRACE_SOME        0xC0050071
 
+#define PAFFS_ENABLE_FAILPOINTS
+
+#if defined(PAFFS_ENABLE_FAILPOINTS)
+//sumthin
+#else
+//Lurps
+#endif
+
 // clang-format on

@@ -22,6 +22,18 @@ namespace paffs
 {
 outpost::rtos::SystemClock systemClock;
 
+#ifdef PAFFS_ENABLE_FAILPOINTS
+std::function<void(const char*, int)> failCallback = nullptr;
+void failpointFn(const char* file, int counter)
+{
+    if(failCallback != nullptr)
+    {
+        failCallback(file, counter);
+    }
+}
+#endif
+
+
 Device::Device(Driver& _driver) :
       driver(_driver),
       lasterr(Result::ok),
@@ -824,7 +836,9 @@ Device::findOrLoadInode(InodeNo no, SmartInodePtr& target)
 Result
 Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
 {
+    FAILPOINT;
     journal.addEvent(journalEntry::device::InsertIntoDir(contDir.no));
+    FAILPOINT;
     FileNamePos elemNameL = strlen(name);
     if (name[elemNameL - 1] == '/')
     {
@@ -887,6 +901,7 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
     // TODO: If write more than one page, split in start and end page to reduce
     // unnecessary writes on intermediate pages.
     r = dataIO.writeInodeData(contDir, 0, contDir.size + direntryl, &bytes, dirData.get());
+    FAILPOINT;
     dirData.reset();
     if (bytes != contDir.size && r == Result::ok)
     {
@@ -904,8 +919,11 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
         return r;
     }
     tree.updateExistingInode(contDir);
+    FAILPOINT;
     journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
+    FAILPOINT;
     Result journalStatus = journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    FAILPOINT;
 
     //FIXME Dirty hack. Actually, the Problem is with the inode reference.
     //      Inode target is located in Tree, which may have cleared the node until we commit PAC.
@@ -919,6 +937,7 @@ Device::insertInodeInDir(const char* name, Inode& contDir, Inode& newElem)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update Inode after directory insert!");
         return r;
     }
+    FAILPOINT;
     if(traceMask & PAFFS_TRACE_VERIFY_DEV)
     {
         r = checkFolderSanity(contDir.no);
@@ -1764,11 +1783,6 @@ Device::flush(Obj& obj)
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit Inode!");
-        return r;
-    }
-    if(r != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new Dir inode in parent dir");
         return r;
     }
     r = journal.addEvent(journalEntry::Checkpoint(getTopic()));
