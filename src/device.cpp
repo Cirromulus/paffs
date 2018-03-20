@@ -23,16 +23,15 @@ namespace paffs
 outpost::rtos::SystemClock systemClock;
 
 #ifdef PAFFS_ENABLE_FAILPOINTS
-std::function<void(const char*, int)> failCallback = nullptr;
-void failpointFn(const char* file, int counter)
+std::function<void(const char*, unsigned int, unsigned int)> failCallback = nullptr;
+void failpointFn(const char* file, unsigned int line, unsigned int counter)
 {
     if(failCallback != nullptr)
     {
-        failCallback(file, counter);
+        failCallback(file, line, counter);
     }
 }
 #endif
-
 
 Device::Device(Driver& _driver) :
       driver(_driver),

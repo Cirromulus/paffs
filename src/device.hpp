@@ -31,14 +31,6 @@ namespace paffs
 {
 extern outpost::rtos::SystemClock systemClock;
 
-#ifdef PAFFS_ENABLE_FAILPOINTS
-extern std::function<void(const char*, int)> failCallback;
-void failpointFn(const char*, int);
-#define FAILPOINT failpointFn(__FILE__, __COUNTER__)
-#else
-#define FAILPOINT
-#endif
-
 
 class Device : public JournalTopic
 {

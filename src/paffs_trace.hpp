@@ -19,11 +19,32 @@
 #include <string.h>
 #include <inttypes.h>
 
+//FIXME Debug
+#define PAFFS_ENABLE_FAILPOINTS
+
+#ifdef PAFFS_ENABLE_FAILPOINTS
+#include <functional>
+#endif
+
 namespace paffs
 {
 typedef uint32_t TraceMask;
 extern TraceMask traceMask;
 extern const char* traceDescription[];
+
+#ifdef PAFFS_ENABLE_FAILPOINTS
+extern std::function<void(const char*, unsigned int, unsigned int)> failCallback;
+void failpointFn(const char*, unsigned int, unsigned int);
+#define FAILPOINT                                       \
+do                                                      \
+{                                                       \
+    /*TODO: Somehow notify something of this failpoint*/\
+    failpointFn(__FILE__, __LINE__, __COUNTER__);       \
+}while(false)
+
+#else
+#define FAILPOINT
+#endif
 }
 
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
@@ -95,13 +116,5 @@ extern const char* traceDescription[];
 #define PAFFS_TRACE_BUG         0x20000000
 #define PAFFS_TRACE_ALL         0xfff7ffff
 #define PAFFS_TRACE_SOME        0xC0050071
-
-#define PAFFS_ENABLE_FAILPOINTS
-
-#if defined(PAFFS_ENABLE_FAILPOINTS)
-//sumthin
-#else
-//Lurps
-#endif
 
 // clang-format on
