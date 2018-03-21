@@ -234,9 +234,11 @@ PageAddressCache::setPage(PageNo page, Addr addr)
         {
             return Result::ok;
         }
+        FAILPOINT;
         //the event gets delayed until we are sure we don't have to commit
         //or else during replay we commit before the log commits (so we would overwrite the last element)
         device.journal.addEvent(journalEntry::pac::SetAddress(mInodePtr->no, page, addr));
+        FAILPOINT;
         mInodePtr->direct[relPage] = addr;
         isInodeDirty = true;
         return Result::ok;
@@ -253,7 +255,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
             return r;
         }
     }
-
+    FAILPOINT;
     if (relPage < addrsPerPage)
     {
         // First Indirection
@@ -277,7 +279,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
     }
     relPage -= addrsPerPage;
     PageNo addrPos;
-
+    FAILPOINT;
     if (relPage < std::pow(addrsPerPage, 2))
     {
         r = loadPath(mInodePtr->d_indir, relPage, doubl, 1, addrPos);
@@ -296,7 +298,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
         return Result::ok;
     }
     relPage -= std::pow(addrsPerPage, 2);
-
+    FAILPOINT;
     if (relPage < std::pow(addrsPerPage, 3))
     {
         r = loadPath(mInodePtr->t_indir, relPage, tripl, 2, addrPos);
@@ -324,6 +326,7 @@ PageAddressCache::setPage(PageNo page, Addr addr)
 Result
 PageAddressCache::setValid()
 {
+    FAILPOINT;
     //We only want to invalidate old Pages which may have been written.
     //It is not allowed for PAC to revert new pages after DATAIO assumes the new Data having set.
     return statemachine.invalidateOldPages();
@@ -342,7 +345,7 @@ PageAddressCache::commit()
     {
         return Result::ok;
     }
-
+    FAILPOINT;
     Result r;
     r = commitPath(mInodePtr->indir, &singl, 0);
     if (r != Result::ok)
@@ -350,14 +353,14 @@ PageAddressCache::commit()
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit first indirection!");
         return r;
     }
-
+    FAILPOINT;
     r = commitPath(mInodePtr->d_indir, doubl, 1);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit second indirection!");
         return r;
     }
-
+    FAILPOINT;
     r = commitPath(mInodePtr->t_indir, tripl, 2);
     if (r != Result::ok)
     {
@@ -370,7 +373,7 @@ PageAddressCache::commit()
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Committed all indirections, but something still dirty!");
         return Result::bug;
     }
-
+    FAILPOINT;
     r = device.tree.updateExistingInode(*mInodePtr);
 
     if(traceMask & PAFFS_TRACE_PACACHE && traceMask & PAFFS_TRACE_VERBOSE)
@@ -383,8 +386,9 @@ PageAddressCache::commit()
                    i, extractLogicalArea(mInodePtr->direct[i]), extractPageOffs(mInodePtr->direct[i]));
         }
     }
-
+    FAILPOINT;
     statemachine.invalidateOldPages();
+    FAILPOINT;
     device.journal.addEvent(journalEntry::Checkpoint(getTopic()));
     isInodeDirty = false;
     return r;
@@ -725,6 +729,7 @@ PageAddressCache::commitElem(AddrListCacheElem& parent, AddrListCacheElem& elem)
                     "parent:%" PRIu16,
                     elem.positionInParent);
         // invalidate old page.
+        FAILPOINT;
         r = device.sumCache.setPageStatus(extractLogicalArea(parent.cache[elem.positionInParent]),
                                        extractPageOffs(parent.cache[elem.positionInParent]),
                                        SummaryEntry::dirty);
@@ -778,6 +783,7 @@ PageAddressCache::loadCacheElem(Addr from, AddrListCacheElem& elem)
 Result
 PageAddressCache::writeCacheElem(Addr& source, AddrListCacheElem& elem)
 {
+    FAILPOINT;
     Result r = writeAddrList(source, elem.cache);
     if (r != Result::ok)
     {

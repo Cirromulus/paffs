@@ -651,7 +651,7 @@ TreeCache::commitNodesRecursively(TreeCacheNode& node)
         node.dirty = false;
         return r;
     }
-
+    FAILPOINT;
     for (uint16_t i = 0; i <= node.raw.keys; i++)
     {
         if (node.pointers[i] == nullptr)
@@ -667,7 +667,7 @@ TreeCache::commitNodesRecursively(TreeCacheNode& node)
             return r;
         }
     }
-
+    FAILPOINT;
     r = writeTreeNode(node);
     if (r != Result::ok)
     {
@@ -721,14 +721,14 @@ TreeCache::commitCache()
         //Since we are now in strict mode for journal, this may not be allowed
         return Result::bug;
     }
-
+    FAILPOINT;
     r = statemachine.invalidateOldPages();
     if(r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate all old pages!");
         return r;
     }
-
+    FAILPOINT;
     dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::tree));
     return Result::ok;
 }
@@ -1210,7 +1210,7 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
     {
         return dev->lasterr;
     }
-
+    FAILPOINT;
     // Handle Areas
     if (dev->superblock.getStatus(dev->superblock.getActiveArea(AreaType::index)) != AreaStatus::active)
     {
@@ -1261,28 +1261,28 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
     Addr newAddr = combineAddress(dev->superblock.getActiveArea(AreaType::index), firstFreePage);
     Addr oldSelf = node.raw.self;
     node.raw.self = newAddr;
-
+    FAILPOINT;
     // Mark Page as used
     r = statemachine.replacePage(newAddr, oldSelf);
     if(r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark tree node page used because %s", err_msg(r));
     }
-
+    FAILPOINT;
     r = dev->driver.writePage(getPageNumber(node.raw.self, *dev), &node, sizeof(TreeNode));
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write TreeNode to page");
         return r;
     }
-
+    FAILPOINT;
     r = updateFlashAddressInParent(node);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update node address in Parent!");
         return r;
     }
-
+    FAILPOINT;
     r = dev->areaMgmt.manageActiveAreaFull(AreaType::index);
     if (r != Result::ok)
     {

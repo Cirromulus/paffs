@@ -139,9 +139,9 @@ GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea,
                 dev->superblock.getPos(srcArea),
                 dstArea,
                 dev->superblock.getPos(dstArea));
-
+    FAILPOINT;
     dev->journal.addEvent(journalEntry::garbageCollection::MoveValidData(srcArea));
-
+    FAILPOINT;
     validDataLeft = false;
     for (PageOffs page = 0; page < dataPagesPerArea; page++)
     {
@@ -169,6 +169,7 @@ GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea,
                             static_cast<long unsigned>(dst));
                 return Result::badFlash;
             }
+            FAILPOINT;
         }
         else
         {
@@ -307,7 +308,7 @@ GarbageCollection::collectGarbage(AreaType targetType)
                         "GC found just partially clean area %" PRIu16 " on pos %" PRIu16 "",
                         deletionTarget,
                         dev->superblock.getPos(deletionTarget));
-
+            FAILPOINT;
             bool validDataLeft;
             r = moveValidDataToNewArea(deletionTarget,
                                        dev->superblock.getActiveArea(AreaType::garbageBuffer),
@@ -325,6 +326,7 @@ GarbageCollection::collectGarbage(AreaType targetType)
             }
             if(!validDataLeft)
             {   //We deleted the last dirty pages, nothing left
+                FAILPOINT;
                 srcAreaContainsData = false;
                 r = dev->areaMgmt.deleteArea(deletionTarget);
                 if(r != Result::ok)
@@ -335,6 +337,7 @@ GarbageCollection::collectGarbage(AreaType targetType)
             }
             else
             {
+                FAILPOINT;
                 r = dev->areaMgmt.deleteAreaContents(deletionTarget);
                 if(r != Result::ok)
                 {
@@ -347,6 +350,7 @@ GarbageCollection::collectGarbage(AreaType targetType)
         }
         else
         {
+            FAILPOINT;
             dev->areaMgmt.deleteArea(deletionTarget);
         }
 
@@ -355,12 +359,14 @@ GarbageCollection::collectGarbage(AreaType targetType)
         break;
     }
 
+    FAILPOINT;
     // swap logical position of areas to keep addresses valid
     dev->superblock.swapAreaPosition(deletionTarget,
                                    dev->superblock.getActiveArea(AreaType::garbageBuffer));
 
     if (srcAreaContainsData)
     {
+        FAILPOINT;
         // Copy the updated (no SummaryEntry::dirty pages) summary to the deletion_target
         // (it will be the fresh area!)
         r = dev->sumCache.setSummaryStatus(deletionTarget, summary);
@@ -391,9 +397,10 @@ GarbageCollection::collectGarbage(AreaType targetType)
                       dev->superblock.getPos(dev->superblock.getActiveArea(targetType)));
             return Result::bug;
         }
+        FAILPOINT;
         dev->areaMgmt.initAreaAs(deletionTarget, targetType);
     }
-
+    FAILPOINT;
     dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
 
     PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL,

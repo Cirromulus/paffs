@@ -1096,8 +1096,10 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
             //source and destination may overlap if there is more than one entry behind us
             memmove(&dirData[pointer], &dirData[pointer + entryl], restByte);
 
+            FAILPOINT;
             //This lets journal know what to do if write succeeded
             journal.addEvent(journalEntry::dataIO::NewInodeSize(contDir.no, newSize));
+            FAILPOINT;
             FileSize bw = 0;
             r = dataIO.writeInodeData(contDir, 0, newSize, &bw, dirData.get());
             if (r != Result::ok)
@@ -1105,13 +1107,13 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update Inode Data");
                 return r;
             }
-
+            FAILPOINT;
             if ((r = dataIO.deleteInodeData(contDir, newSize)) != Result::ok)
             {
                 return r;
             }
             //DeleteInodeData updated Inode in tree and also wrote checkpoint
-
+            FAILPOINT;
             r = dataIO.pac.commit();
             if(r != Result::ok)
             {
@@ -1119,7 +1121,7 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
                           contDir.no);
                 return r;
             }
-
+            FAILPOINT;
             if (traceMask & PAFFS_TRACE_VERIFY_DEV)
             {
                 r = checkFolderSanity(contDir.no);
@@ -1134,6 +1136,7 @@ Device::removeInodeFromDir(Inode& contDir, InodeNo elem)
                 PAFFS_DBG(PAFFS_TRACE_DEVICE, "Journal nearly full, flushing caches");
                 return flushAllCaches();
             }
+            FAILPOINT;
             return Result::ok;
         }
         pointer += entryl;
@@ -1171,19 +1174,22 @@ Device::mkDir(const char* fullPath, Permission mask)
         return Result::objNameTooLong;
     }
 
-
+    FAILPOINT;
     SmartInodePtr newDir;
     Result r = createDirInode(newDir, mask);
     if (r != Result::ok)
     {
         return r;
     }
+    FAILPOINT;
     journal.addEvent(journalEntry::device::MkObjInode(newDir->no));
+    FAILPOINT;
     r = tree.insertInode(*newDir);
     if (r != Result::ok)
     {
         return r;
     }
+    FAILPOINT;
     //Journal log is included in insertInodeInDir
     r = insertInodeInDir(&fullPath[lastSlash], *parDir, *newDir);
     if(r != Result::ok)
@@ -1422,14 +1428,16 @@ Device::createFile(SmartInodePtr& outFile, const char* fullPath, Permission mask
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not create fileInode: %s", err_msg(r));
         return r;
     }
-
+    FAILPOINT;
     journal.addEvent(journalEntry::device::MkObjInode(outFile->no));
+    FAILPOINT;
     r = tree.insertInode(*outFile);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert Inode into tree: %s", err_msg(r));
         return r;
     }
+    FAILPOINT;
     //Journal log is included in insertInodeInDir
     r = insertInodeInDir(&fullPath[lastSlash], *parDir, *outFile);
     if(r != Result::ok)
@@ -1437,6 +1445,7 @@ Device::createFile(SmartInodePtr& outFile, const char* fullPath, Permission mask
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not insert new fil inode in parent dir");
         return r;
     }
+    FAILPOINT;
     return Result::ok;
 }
 
@@ -1687,9 +1696,10 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
 
     //TODO: Is inconsistent between write and update filsize.
     //TODO: Maybe include in dataIO!
-
+    FAILPOINT;
     Result r = dataIO.writeInodeData(*obj.dirent.node, obj.fp,
                                      bytesToWrite, bytesWritten, static_cast<const uint8_t*>(buf));
+    FAILPOINT;
     journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
     if (r != Result::ok)
     {
@@ -1699,6 +1709,7 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
                   bytesToWrite, obj.fp);
         return r;
     }
+    FAILPOINT;
     if (*bytesWritten != bytesToWrite)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR,
@@ -1707,6 +1718,12 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
                   *bytesWritten);
         // TODO: Handle error, maybe rewrite
         return Result::fail;
+    }
+    r = journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    if(r == Result::lowMem)
+    {
+        PAFFS_DBG(PAFFS_TRACE_DEVICE, "Journal nearly full, flushing caches");
+        return flushAllCaches();
     }
 
     obj.fp += *bytesWritten;
@@ -1719,13 +1736,6 @@ Device::write(Obj& obj, const void* buf, FileSize bytesToWrite,
                       "Reserved size is smaller than actual size "
                       "which is OK if we skipped pages");
         }
-    }
-
-    r = journal.addEvent(journalEntry::Checkpoint(getTopic()));
-    if(r == Result::lowMem)
-    {
-        PAFFS_DBG(PAFFS_TRACE_DEVICE, "Journal nearly full, flushing caches");
-        return flushAllCaches();
     }
     return Result::ok;
 }
@@ -1825,13 +1835,14 @@ Device::truncate(const char* path, FileSize newLength, bool fromUserspace)
             return Result::dirNotEmpty;
         }
     }
-
+    FAILPOINT;
     r = dataIO.deleteInodeData(*object, newLength);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete Inode Data");
         return r;
     }
+    FAILPOINT;
     r = dataIO.pac.commit();
     if (r != Result::ok)
     {
@@ -1876,33 +1887,36 @@ Device::remove(const char* path)
     {
         return r;
     }
-
+    FAILPOINT;
     journal.addEvent(journalEntry::device::RemoveObj(object->no, parentDir->no));
-
+    FAILPOINT;
     r = truncate(path, 0, false);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete the files contents");
         return r;
     }
-
+    FAILPOINT;
     if ((r = removeInodeFromDir(*parentDir, object->no)) != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not remove InodeNo from Dir");
         return r;
     }
+    FAILPOINT;
     r = tree.deleteInode(object->no);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete Inode");
         return r;
     }
+    FAILPOINT;
     r = journal.addEvent(journalEntry::Checkpoint(getTopic()));
     if(r == Result::lowMem)
     {
         PAFFS_DBG(PAFFS_TRACE_DEVICE, "Journal nearly full, flushing caches");
         return flushAllCaches();
     }
+    FAILPOINT;
     return Result::ok;
 }
 

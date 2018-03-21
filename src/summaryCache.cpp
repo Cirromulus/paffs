@@ -502,8 +502,9 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
         PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Skipping set status b.c. status is the same");
         return Result::ok;
     }
-
+    FAILPOINT;
     dev->journal.addEvent(journalEntry::summaryCache::SetStatus(area, page, state));
+    FAILPOINT;
     mSummaryCache[mTranslation[area]].setStatus(page, state);
     if (!journalReplayMode && state == SummaryEntry::dirty)
     {

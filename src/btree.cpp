@@ -51,7 +51,7 @@ Btree::insertInode(const Inode& inode)
     }
 
     mCache.lockTreeCacheNode(*node);  // prevents own node from clear
-
+    FAILPOINT;
     // This prevents the cache from a commit inside invalid state
     r = mCache.reserveNodes(calculateMaxNeededNewNodesForInsertion(*node));
     if (r != Result::ok)
@@ -59,11 +59,11 @@ Btree::insertInode(const Inode& inode)
         PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not reserve enough nodes in treecache!");
         return r;
     }
-
+    FAILPOINT;
     mCache.unlockTreeCacheNode(*node);
 
     dev->journal.addEvent(journalEntry::btree::Insert(inode));
-
+    FAILPOINT;
     /* Case: leaf has room for key and pointer.
      */
     if (node->raw.keys < leafOrder)
@@ -149,9 +149,9 @@ Btree::updateExistingInode(const Inode& inode)
     {   //There is no change of the inode
         return Result::ok;
     }
-
+    FAILPOINT;
     dev->journal.addEvent(journalEntry::btree::Update(inode));
-
+    FAILPOINT;
     node->raw.as.leaf.pInodes[pos] = inode;
     node->dirty = true;
 

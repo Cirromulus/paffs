@@ -81,11 +81,12 @@ DataIO::writeInodeData(Inode& inode,
         }
     }
 
+    FAILPOINT;
     if (inode.size < bytes + offs)
     {   //this will only be applied if write succeeds
         dev->journal.addEvent(journalEntry::dataIO::NewInodeSize(inode.no, bytes + offs));
     }
-
+    FAILPOINT;
     res = writePageData(pageFrom,
                         toPage,
                         offs % dataBytesPerPage,
@@ -95,7 +96,7 @@ DataIO::writeInodeData(Inode& inode,
                         bytesWritten,
                         inode.size,
                         inode.reservedPages);
-
+    FAILPOINT;
     if(res != Result::ok)
     {
         //TODO: revert Statemachine
@@ -114,7 +115,7 @@ DataIO::writeInodeData(Inode& inode,
 		//TODO: revert Statemachine
 		return res;
 	}
-	
+	FAILPOINT;
     res = statemachine.invalidateOldPages();
     if (res != Result::ok)
     {
@@ -206,9 +207,9 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs, bool journalMode)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "could not set new Inode!");
         return r;
     }
-
+    FAILPOINT;
     dev->journal.addEvent(journalEntry::dataIO::NewInodeSize(inode.no, offs));
-
+    FAILPOINT;
     if (pageFrom <= toPage && inode.reservedPages != 0)
     {
         //If we dont need one or more page anymore, mark them dirty
@@ -237,7 +238,7 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs, bool journalMode)
                           extractPageOffs(pageAddr));
                 return Result::bug;
             }
-
+            FAILPOINT;
             if (!journalMode && dev->sumCache.getPageStatus(area, relPage, r) == SummaryEntry::dirty)
             {
                 //In journalMode, it may happen that a page was already deleted
@@ -256,7 +257,7 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs, bool journalMode)
                           area);
                 return r;
             }
-
+            FAILPOINT;
             // Mark old pages dirty
             statemachine.replacePage(0, pageAddr, inode.no, page + pageFrom);
 
@@ -268,23 +269,26 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs, bool journalMode)
                           area);
                 return r;
             }
-
+            FAILPOINT;
             r = pac.setPage(page + pageFrom, 0);
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete page %" PRIu32 " to %" PRIu32 "", pageFrom, toPage);
                 return r;
             }
-
+            FAILPOINT;
             inode.reservedPages--;
         }
     }
-
     inode.size = offs;
     dev->tree.updateExistingInode(inode);
+    FAILPOINT;
     statemachine.invalidateOldPages();
+    FAILPOINT;
     pac.setValid();
+    FAILPOINT;
     dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
+    FAILPOINT;
     return Result::ok;
 }
 
@@ -443,7 +447,7 @@ DataIO::writePageData(PageAbs  pageFrom,
             return dev->lasterr;
         }
         dev->lasterr = rBuf;
-
+        FAILPOINT;
         // Handle Areas
         if (dev->superblock.getStatus(dev->superblock.getActiveArea(AreaType::data))
             != AreaStatus::active)
@@ -465,7 +469,7 @@ DataIO::writePageData(PageAbs  pageFrom,
         }
         Addr newAddress =
                 combineAddress(dev->superblock.getActiveArea(AreaType::data), firstFreePage);
-
+        FAILPOINT;
         Addr oldAddr;
         //GetPage may overwrite our driver buffer
         res = ac.getPage(page + pageFrom, &oldAddr);
@@ -483,7 +487,7 @@ DataIO::writePageData(PageAbs  pageFrom,
         {
             btw = dataBytesPerPage - offs;
         }
-
+        FAILPOINT;
         //This has to be done before we write into the pagebuffer, this may modify it!
         res = statemachine.replacePage(newAddress, oldAddr, ac.getTargetInode(), page + pageFrom);
         if (res != Result::ok)
@@ -549,7 +553,7 @@ DataIO::writePageData(PageAbs  pageFrom,
             memcpy(buf, &data[*bytesWritten], btw);
             *bytesWritten += btw;
         }
-
+        FAILPOINT;
         res = dev->driver.writePage(getPageNumber(newAddress, *dev), buf, btw);
         if (res != Result::ok)
         {
@@ -559,14 +563,14 @@ DataIO::writePageData(PageAbs  pageFrom,
             //TODO: Revert all new Pages
             return res;
         }
-
+        FAILPOINT;
         ac.setPage(page + pageFrom, newAddress);
 
         if (oldAddr == 0)
         {   //we added a new page to this file
             reservedPages++;
         }
-
+        FAILPOINT;
         // this may have filled the flash
         res = dev->areaMgmt.manageActiveAreaFull(AreaType::data);
         if (res != Result::ok)

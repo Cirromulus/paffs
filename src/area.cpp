@@ -277,22 +277,32 @@ AreaManagement::initAreaAs(AreaPos area, AreaType type)
                 static_cast<unsigned int>(dev->superblock.getPos(area)),
                 areaNames[dev->superblock.getType(area)]);
 
+    FAILPOINT;
     dev->journal.addEvent(journalEntry::areaMgmt::InitAreaAs(area, type));
+    FAILPOINT;
     dev->superblock.setType(area, type);
     if (dev->superblock.getStatus(area) == AreaStatus::empty)
     {
+        FAILPOINT;
         dev->superblock.increaseUsedAreas();
     }
+    FAILPOINT;
     dev->superblock.setStatus(area, AreaStatus::active);
+    FAILPOINT;
     dev->superblock.setActiveArea(type, area);
+    FAILPOINT;
     dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    FAILPOINT;
 }
 
 Result
 AreaManagement::closeArea(AreaPos area)
 {
+    FAILPOINT;
     dev->journal.addEvent(journalEntry::areaMgmt::CloseArea(area));
+    FAILPOINT;
     dev->superblock.setStatus(area, AreaStatus::closed);
+    FAILPOINT;
     dev->superblock.setActiveArea(dev->superblock.getType(area), 0);
     PAFFS_DBG_S(PAFFS_TRACE_AREA,
                 "Info: Closed %s Area %" PTYPE_AREAPOS " at pos. %" PTYPE_AREAPOS ".",
@@ -300,18 +310,25 @@ AreaManagement::closeArea(AreaPos area)
                 area,
                 dev->superblock.getPos(area));
     dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    FAILPOINT;
+    FAILPOINT;
     return Result::ok;
 }
 
 void
 AreaManagement::retireArea(AreaPos area)
 {
+    FAILPOINT;
     dev->journal.addEvent(journalEntry::areaMgmt::RetireArea(area));
+    FAILPOINT;
     dev->superblock.setStatus(area, AreaStatus::closed);
+    FAILPOINT;
     if(dev->superblock.getType(area) == AreaType::unset)
     {
+        FAILPOINT;
         dev->superblock.increaseUsedAreas();
     }
+    FAILPOINT;
     dev->superblock.setType(area, AreaType::retired);
     for (unsigned block = 0; block < blocksPerArea; block++)
     {
@@ -320,7 +337,9 @@ AreaManagement::retireArea(AreaPos area)
             dev->driver.markBad(dev->superblock.getPos(area) * blocksPerArea + block);
         }
     }
+    FAILPOINT;
     dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    FAILPOINT;
     PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: RETIRED Area %" PTYPE_AREAPOS " at pos. %" PTYPE_AREAPOS ".", area, dev->superblock.getPos(area));
 }
 
@@ -352,9 +371,11 @@ AreaManagement::deleteAreaContents(AreaPos area, bool noJournalLogging)
 
     if(!noJournalLogging)
     {
+        FAILPOINT;
         dev->journal.addEvent(journalEntry::areaMgmt::DeleteAreaContents(area));
     }
     Result r = Result::ok;
+    FAILPOINT;
     for (unsigned int i = 0; i < blocksPerArea; i++)
     {
         r = dev->driver.eraseBlock(dev->superblock.getPos(area) * blocksPerArea + i);
@@ -369,10 +390,11 @@ AreaManagement::deleteAreaContents(AreaPos area, bool noJournalLogging)
             break;
         }
     }
+    FAILPOINT;
     dev->superblock.increaseErasecount(area);
     //if area is not cached, this call gets ignored
+    FAILPOINT;
     dev->sumCache.resetASWritten(area);
-
     if (r == Result::badFlash)
     {
         PAFFS_DBG_S(PAFFS_TRACE_GC,
@@ -394,11 +416,14 @@ AreaManagement::deleteAreaContents(AreaPos area, bool noJournalLogging)
         }
     }
     PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: Deleted Area %" PTYPE_AREAPOS " Contents at pos. %" PTYPE_AREAPOS ".", area, dev->superblock.getPos(area));
+    FAILPOINT;
     dev->sumCache.deleteSummary(area);
     if(!noJournalLogging)
     {
+        FAILPOINT;
         dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
     }
+    FAILPOINT;
     return r;
 }
 
@@ -427,9 +452,8 @@ AreaManagement::deleteArea(AreaPos area)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "deleted active area %" PTYPE_AREAPOS ", is this OK?", area);
     }
-
+    FAILPOINT;
     dev->journal.addEvent(journalEntry::areaMgmt::DeleteArea(area));
-
     Result r = deleteAreaContents(area, true);
     if(r != Result::ok)
     {
@@ -438,11 +462,17 @@ AreaManagement::deleteArea(AreaPos area)
         return r;
     }
 
+    FAILPOINT;
     dev->superblock.setStatus(area, AreaStatus::empty);
+    FAILPOINT;
     dev->superblock.setType(area, AreaType::unset);
+    FAILPOINT;
     dev->superblock.decreaseUsedAreas();
+    FAILPOINT;
     PAFFS_DBG_S(PAFFS_TRACE_AREA, "Info: FREED Area %" PTYPE_AREAPOS
                 " at pos. %" PTYPE_AREAPOS ".", area, dev->superblock.getPos(area));
+    dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    FAILPOINT;
     return r;
 }
 
