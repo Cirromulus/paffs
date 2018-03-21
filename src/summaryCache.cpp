@@ -268,25 +268,61 @@ SummaryCache::printStatus()
             {
                 printf(" UNPLAUSIBLE (too High/Low)");
             }
-            if(mTranslation.find(mSummaryCache[i].getArea()) == mTranslation.end())
+            if(!existsSummaryElem(mSummaryCache[i].getArea()))
             {
                 printf(" NOT IN TRANSLATION");
             }
-            if(mTranslation[mSummaryCache[i].getArea()] != i)
+            if(getSummaryElemPos(mSummaryCache[i].getArea()) != i)
             {
                 printf(" UNPLAUSIBLE (Position %" PRIu8 " vs %" PRIu8 ")",
-                       i, mTranslation[mSummaryCache[i].getArea()]);
+                       i, getSummaryElemPos(mSummaryCache[i].getArea()));
             }
-            if(mSummaryCache[mTranslation[mSummaryCache[i].getArea()]].getArea() !=
+            if(mSummaryCache[getSummaryElemPos(mSummaryCache[i].getArea())].getArea() !=
                     mSummaryCache[i].getArea())
             {
                 printf(" UNPLAUSIBLE (Position %" PTYPE_AREAPOS " vs %" PTYPE_AREAPOS ")",
-                       mSummaryCache[mTranslation[mSummaryCache[i].getArea()]].getArea(),
+                       mSummaryCache[getSummaryElemPos(mSummaryCache[i].getArea())].getArea(),
                        mSummaryCache[i].getArea());
             }
             printf("\n");
         }
     }
+}
+
+void
+SummaryCache::enableSummaryElem(uint16_t pos, AreaPos area)
+{
+    if(existsSummaryElem(area))
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried adding an existent Summary Elem!");
+    }
+    mTranslation[area] = pos;
+    mSummaryCache[pos].setArea(area);
+}
+void
+SummaryCache::removeSummaryElem(AreaPos area)
+{
+    if(!existsSummaryElem(area))
+    {
+        return;
+    }
+    mSummaryCache[getSummaryElemPos(area)].clear();
+    mTranslation.erase(area);
+}
+
+uint16_t
+SummaryCache::getSummaryElemPos(AreaPos area)
+{
+    if(!existsSummaryElem(area))
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried getting a nonexistent Summary Elem!");
+    }
+    return mTranslation[area];
+}
+bool
+SummaryCache::existsSummaryElem(AreaPos area)
+{
+    return mTranslation.find(area) != mTranslation.end();
 }
 
 Result
@@ -363,13 +399,14 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition, bool desperat
             return Result::bug;
         }
     }
-    if (mTranslation.find(favouriteArea) == mTranslation.end())
+    if (!existsSummaryElem(favouriteArea))
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Could not find swapping area in cache?");
         clearedAreaCachePosition = -1;
         return Result::bug;
     }
-    cachePos = mTranslation[favouriteArea];
+
+    cachePos = getSummaryElemPos(favouriteArea);
 
     PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                 "Commit Hard swaps GC Area %" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ")"
@@ -477,7 +514,7 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
                   "but this is only allowed by deleting the Area!",
                   area, page);
     }
-    if (mTranslation.find(area) == mTranslation.end())
+    if (!existsSummaryElem(area))
     {
         Result r = loadUnbufferedArea(area, true);
         if (r != Result::ok)
@@ -497,7 +534,7 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
         return Result::bug;
     }
 
-    if (mSummaryCache[mTranslation[area]].getStatus(page) == state)
+    if (mSummaryCache[getSummaryElemPos(area)].getStatus(page) == state)
     {
         PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Skipping set status b.c. status is the same");
         return Result::ok;
@@ -505,7 +542,7 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
     FAILPOINT;
     dev->journal.addEvent(journalEntry::summaryCache::SetStatus(area, page, state));
     FAILPOINT;
-    mSummaryCache[mTranslation[area]].setStatus(page, state);
+    mSummaryCache[getSummaryElemPos(area)].setStatus(page, state);
     if (!journalReplayMode && state == SummaryEntry::dirty)
     {
         if (traceMask & PAFFS_WRITE_VERIFY_AS)
@@ -519,8 +556,8 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
 
         if (traceMask & PAFFS_TRACE_VERIFY_AS)
         {
-            PageOffs dirtyPagesCheck = countDirtyPages(mTranslation[area]);
-            if (dirtyPagesCheck != mSummaryCache[mTranslation[area]].getDirtyPages())
+            PageOffs dirtyPagesCheck = countDirtyPages(getSummaryElemPos(area));
+            if (dirtyPagesCheck != mSummaryCache[getSummaryElemPos(area)].getDirtyPages())
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
                           "DirtyPages differ from actual count! "
@@ -529,17 +566,17 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
                           area,
                           dev->superblock.getPos(area),
                           dirtyPagesCheck,
-                          mSummaryCache[mTranslation[area]].getDirtyPages());
+                          mSummaryCache[getSummaryElemPos(area)].getDirtyPages());
                 return Result::fail;
             }
         }
 
         // Commit to Flash, nothing will change the data pages in flash
-        if (mSummaryCache[mTranslation[area]].getDirtyPages() == dataPagesPerArea
-            && !mSummaryCache[mTranslation[area]].isAreaSummaryWritten())
+        if (mSummaryCache[getSummaryElemPos(area)].getDirtyPages() == dataPagesPerArea
+            && !mSummaryCache[getSummaryElemPos(area)].isAreaSummaryWritten())
         {
             //TODO: Delete AreaSummary and set as UNSET for GC
-            Result r = writeAreasummary(mSummaryCache[mTranslation[area]]);
+            Result r = writeAreasummary(mSummaryCache[getSummaryElemPos(area)]);
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write AreaSummary");
@@ -568,7 +605,7 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result& result)
         result = Result::invalidInput;
         return SummaryEntry::error;
     }
-    if (mTranslation.find(area) == mTranslation.end())
+    if (!existsSummaryElem(area))
     {
         Result r = loadUnbufferedArea(area, false);
         if (r == Result::noSpace)
@@ -610,13 +647,13 @@ SummaryCache::getPageStatus(AreaPos area, PageOffs page, Result& result)
     }
 
     result = Result::ok;
-    return mSummaryCache[mTranslation[area]].getStatus(page);
+    return mSummaryCache[getSummaryElemPos(area)].getStatus(page);
 }
 
 Result
 SummaryCache::getSummaryStatus(AreaPos area, SummaryEntry* summary)
 {
-    if (mTranslation.find(area) == mTranslation.end())
+    if (!existsSummaryElem(area))
     {
         TwoBitList<dataPagesPerArea> list;
         // This one does not have to be copied into Cache
@@ -641,7 +678,7 @@ SummaryCache::getSummaryStatus(AreaPos area, SummaryEntry* summary)
         return r;
     }else
     {
-        unpackStatusArray(mTranslation[area], summary);
+        unpackStatusArray(getSummaryElemPos(area), summary);
         return Result::ok;
     }
 }
@@ -689,7 +726,7 @@ SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary)
 {
     // Dont set Dirty, because GC just deleted AS and dirty Pages
     // This area ist likely to be used soon
-    if (mTranslation.find(area) == mTranslation.end())
+    if (!existsSummaryElem(area))
     {
         Result r = loadUnbufferedArea(area, false);
         if (r == Result::notFound)
@@ -711,16 +748,16 @@ SummaryCache::setSummaryStatus(AreaPos area, SummaryEntry* summary)
         }
     }
 
-    packStatusArray(mTranslation[area], summary);
+    packStatusArray(getSummaryElemPos(area), summary);
     dev->journal.addEvent(journalEntry::summaryCache::SetStatusBlock(
-            area, *mSummaryCache[mTranslation[area]].exposeSummary()));
+            area, *mSummaryCache[getSummaryElemPos(area)].exposeSummary()));
     return Result::ok;
 }
 
 Result
 SummaryCache::deleteSummary(AreaPos area)
 {
-    if (mTranslation.find(area) == mTranslation.end())
+    if (!existsSummaryElem(area))
     {
         // This is not a bug, because an uncached area may also be deleted
         PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Tried to delete nonexisting Area %" PRId16 "", area);
@@ -729,9 +766,8 @@ SummaryCache::deleteSummary(AreaPos area)
 
     dev->journal.addEvent(journalEntry::summaryCache::Remove(area));
 
-    mSummaryCache[mTranslation[area]].setDirty(false);
-    mSummaryCache[mTranslation[area]].clear();
-    mTranslation.erase(area);
+    mSummaryCache[getSummaryElemPos(area)].setDirty(false);
+    removeSummaryElem(area);
     PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Deleted cache entry of area %" PRId16 "", area);
     return Result::ok;
 }
@@ -740,15 +776,15 @@ SummaryCache::deleteSummary(AreaPos area)
 bool
 SummaryCache::shouldClearArea(AreaPos area)
 {
-    if (mTranslation.find(area) == mTranslation.end())
+    if (!existsSummaryElem(area))
     {   //not cached
         return false;
     }
-    if(!mSummaryCache[mTranslation[area]].isAreaSummaryWritten())
+    if(!mSummaryCache[getSummaryElemPos(area)].isAreaSummaryWritten())
     {   //not AS written
         return false;
     }
-    if(!mSummaryCache[mTranslation[area]].isDirty())
+    if(!mSummaryCache[getSummaryElemPos(area)].isDirty())
     {   //Not dirty
         return false;
     }
@@ -759,7 +795,7 @@ SummaryCache::shouldClearArea(AreaPos area)
 bool
 SummaryCache::wasAreaSummaryWritten(AreaPos area)
 {
-    if (mTranslation.find(area) == mTranslation.end())
+    if (!existsSummaryElem(area))
     {
         if (dev->superblock.getStatus(area) == AreaStatus::empty)
             return false;
@@ -767,29 +803,26 @@ SummaryCache::wasAreaSummaryWritten(AreaPos area)
         // It has to have an AS written.
         return true;
     }
-    return mSummaryCache[mTranslation[area]].isAreaSummaryWritten();
+    return mSummaryCache[getSummaryElemPos(area)].isAreaSummaryWritten();
 }
 
 // For Garbage collection that has deleted the AS too
 void
 SummaryCache::resetASWritten(AreaPos area)
 {
-    if (mTranslation.find(area) == mTranslation.end())
+    if (!existsSummaryElem(area))
     {
         return;
     }
     dev->journal.addEvent(journalEntry::summaryCache::ResetASWritten(area));
-    mSummaryCache[mTranslation[area]].setAreaSummaryWritten(false);
+    mSummaryCache[getSummaryElemPos(area)].setAreaSummaryWritten(false);
 }
 
 Result
 SummaryCache::loadAreaSummaries()
 {
     // Assumes unused Summary Cache
-    for (AreaPos i = 0; i < areaSummaryCacheSize; i++)
-    {
-        mSummaryCache[i].clear();
-    }
+    clear();
 
     PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "cleared summary Cache");
     SuperIndex index;
@@ -812,8 +845,7 @@ SummaryCache::loadAreaSummaries()
     {
         if (index.areaSummaryPositions[i] > 0)
         {
-            mTranslation[index.areaSummaryPositions[i]] = i;
-            mSummaryCache[i].setArea(index.areaSummaryPositions[i]);
+            enableSummaryElem(i, index.areaSummaryPositions[i]);
             mSummaryCache[i].setDirtyPages(countDirtyPages(i));
             mSummaryCache[i].setLoadedFromSuperPage();
 
@@ -968,13 +1000,12 @@ SummaryCache::preScan(const journalEntry::Max& entry, JournalEntryPosition posit
     PAFFS_DBG_S(PAFFS_TRACE_ASCACHE | PAFFS_TRACE_JOURNAL,
               "Commit of %" PTYPE_AREAPOS " at %" PRIu32,
               entry.summaryCache.area, position.mram.offs);
-    if(mTranslation.find(entry.summaryCache.area) != mTranslation.end())
+    if(!existsSummaryElem(entry.summaryCache.area))
     {   //This area was loaded from a superpage, but is now committed elsewhere
         //so force an update by deleting it now.
-        PAFFS_DBG(PAFFS_TRACE_ASCACHE | PAFFS_TRACE_JOURNAL,
+        PAFFS_DBG_S(PAFFS_TRACE_ASCACHE | PAFFS_TRACE_JOURNAL,
                   "Commit overwrote superpage info");
-        mSummaryCache[mTranslation[entry.summaryCache.area]].clear();
-        mTranslation.erase(entry.summaryCache.area);
+        removeSummaryElem(entry.summaryCache.area);
     }
 }
 Result
@@ -1060,10 +1091,9 @@ SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent)
             return Result::bug;
         }
     }
-    mTranslation[area] = nextEntry;
-    mSummaryCache[nextEntry].setArea(area);
+    enableSummaryElem(nextEntry, area);
 
-    r = readAreasummary(area, *mSummaryCache[mTranslation[area]].exposeSummary());
+    r = readAreasummary(area, *mSummaryCache[getSummaryElemPos(area)].exposeSummary());
     if (r == Result::ok || r == Result::biterrorCorrected)
     {
         mSummaryCache[nextEntry].setAreaSummaryWritten();
@@ -1071,7 +1101,7 @@ SummaryCache::loadUnbufferedArea(AreaPos area, bool urgent)
                 r == Result::biterrorCorrected);  // Rewrites corrected Bit upon next commit
         PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Loaded existing AreaSummary of "
                 "%" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ") to cache", area, dev->superblock.getPos(area));
-        mSummaryCache[mTranslation[area]].setDirtyPages(countDirtyPages(mTranslation[area]));
+        mSummaryCache[getSummaryElemPos(area)].setDirtyPages(countDirtyPages(getSummaryElemPos(area)));
     }
     else if (r == Result::notFound)
     {
@@ -1113,8 +1143,7 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
                             "Deleted non-dirty cache entry "
                             "of area %" PTYPE_AREAPOS,
                             mSummaryCache[i].getArea());
-                mTranslation.erase(mSummaryCache[i].getArea());
-                mSummaryCache[i].clear();
+                removeSummaryElem(mSummaryCache[i].getArea());
                 fav = i;
             }
         }
@@ -1294,8 +1323,7 @@ SummaryCache::commitAndEraseElem(uint16_t position)
                 "Committed and deleted cache "
                 "entry of area %" PRId16 "",
                 mSummaryCache[position].getArea());
-    mTranslation.erase(mSummaryCache[position].getArea());
-    mSummaryCache[position].clear();
+    removeSummaryElem(mSummaryCache[position].getArea());
     return Result::ok;
 }
 

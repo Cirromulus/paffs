@@ -179,6 +179,10 @@ PageStateMachine<maxPages, maxPositions, topic>::processEntry(const journalEntry
             position   [pageListHWM  ] = action.replacePagePos.pos;
             //fall-through
         case journalEntry::Pagestate::Type::replacePage:
+            if(pageListHWM > maxPages)
+            {
+                PAFFS_DBG(PAFFS_TRACE_BUG, "Too many pages to scan! (max: %" PRIu16 ")", maxPages);
+            }
             newPageList[pageListHWM  ] = action.replacePage.neu;
             oldPageList[pageListHWM++] = action.replacePage.old;
             break;
@@ -194,22 +198,12 @@ PageStateMachine<maxPages, maxPositions, topic>::processEntry(const journalEntry
         switch(entry.pagestate.type)
         {
         case journalEntry::Pagestate::Type::replacePagePos:
-            currentInode = action.replacePagePos.nod;
-            position   [pageListHWM  ] = action.replacePagePos.pos;
-            //fall-through
         case journalEntry::Pagestate::Type::replacePage:
-            newPageList[pageListHWM  ] = action.replacePage.neu;
-            oldPageList[pageListHWM++] = action.replacePage.old;
-            journalState = JournalState::invalid;
-            break;
         case journalEntry::Pagestate::Type::success:
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid operation in state RECOVER");
             return Result::bug;
         case journalEntry::Pagestate::Type::invalidateOldPages:
             //The only time we should see this is if we broke down before setting checkpoint
-            //TODO: Should we produce a checkpoint now? Maybe not, because PAC has many cycles
-            //through statemachine until checkpoint comes
-            //mJournal.addEvent(journalEntry::Checkpoint(topic));
             journalState = JournalState::ok;
             clear();
             break;
@@ -252,7 +246,7 @@ PageStateMachine<maxPages, maxPositions, topic>::signalEndOfLog()
             }
             mPac->commit();
         }
-
+        mJournal.addEvent(journalEntry::pagestate::InvalidateOldPages(topic));
         clear();
         return JournalState::invalid;
     case JournalState::recover:
@@ -264,6 +258,7 @@ PageStateMachine<maxPages, maxPositions, topic>::signalEndOfLog()
                 mSummaryCache.setPageStatus(oldPageList[i], SummaryEntry::dirty);
             }
         }
+        mJournal.addEvent(journalEntry::pagestate::InvalidateOldPages(topic));
         clear();
         return JournalState::recover;
     }

@@ -172,6 +172,16 @@ public:
 
 
 private:
+    void
+    enableSummaryElem(uint16_t pos, AreaPos area);
+    void
+    removeSummaryElem(AreaPos area);
+    uint16_t
+    getSummaryElemPos(AreaPos area);
+    bool
+    existsSummaryElem(AreaPos area);
+
+
     /**
      * @Brief uses garbageCollection-buffer to swap a whole Area,
      * committing its new AS.
