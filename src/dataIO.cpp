@@ -313,7 +313,8 @@ bool
 DataIO::isInterestedIn(const journalEntry::Max& entry)
 {
     return modifiedInode && !processedForeignSuccessElement &&
-            entry.base.topic == JournalEntry::Topic::tree;
+            entry.base.topic == JournalEntry::Topic::tree &&
+            entry.btree.op == journalEntry::BTree::Operation::update;
 }
 
 Result
@@ -401,6 +402,7 @@ DataIO::signalEndOfLog()
     //If an area was filled
     dev->areaMgmt.manageActiveAreaFull(AreaType::data);
     dev->areaMgmt.manageActiveAreaFull(AreaType::index);
+    dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
 }
 
 Result

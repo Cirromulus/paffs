@@ -2029,7 +2029,7 @@ Device::signalEndOfLog()
     case JournalState::makeObj:
         //we never got to insert it into directory
         tree.deleteInode(targetInodeNo);
-        return;
+        break;
     case JournalState::insertObj:
         //Maybe we inserted Obj into dir
         //We dont need the real Obj for that. It may have been deleted by aborted JournalRecover.
@@ -2046,12 +2046,12 @@ Device::signalEndOfLog()
             if(r == Result::notFound)
             {   //usually, this will happen
                 tree.deleteInode(targetInodeNo);
-                return;
+                break;
             }
             PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Could restore file '%.*s', "
                     "\n\twow such journal many log, much restore", namelength, name);
             //to supress deletion of node in endOfLog
-            return;
+            break;
         }
     case JournalState::removeObj:
         r = tree.getInode(targetInodeNo, obj);
@@ -2081,8 +2081,9 @@ Device::signalEndOfLog()
             return;
         }
         removeInodeFromDir(folder, targetInodeNo);
-        return;
+        break;
     }
+    journal.addEvent(journalEntry::Checkpoint(getTopic()));
 }
 
 Result

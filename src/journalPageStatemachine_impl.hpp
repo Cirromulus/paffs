@@ -194,7 +194,14 @@ PageStateMachine<maxPages, maxPositions, topic>::processEntry(const journalEntry
         switch(entry.pagestate.type)
         {
         case journalEntry::Pagestate::Type::replacePagePos:
+            currentInode = action.replacePagePos.nod;
+            position   [pageListHWM  ] = action.replacePagePos.pos;
+            //fall-through
         case journalEntry::Pagestate::Type::replacePage:
+            newPageList[pageListHWM  ] = action.replacePage.neu;
+            oldPageList[pageListHWM++] = action.replacePage.old;
+            journalState = JournalState::invalid;
+            break;
         case journalEntry::Pagestate::Type::success:
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid operation in state RECOVER");
             return Result::bug;
