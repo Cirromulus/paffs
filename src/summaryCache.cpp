@@ -1138,6 +1138,7 @@ SummaryCache::freeNextBestSummaryCacheEntry(bool urgent)
                               "not set to an status (Type %s)",
                               mSummaryCache[i].getArea(),
                               areaNames[dev->superblock.getType(mSummaryCache[i].getArea())]);
+                    mSummaryCache[i].setDirty(false);
                 }
                 PAFFS_DBG_S(PAFFS_TRACE_ASCACHE,
                             "Deleted non-dirty cache entry "
