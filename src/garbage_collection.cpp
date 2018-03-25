@@ -143,6 +143,7 @@ GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea,
     dev->journal.addEvent(journalEntry::garbageCollection::MoveValidData(srcArea));
     FAILPOINT;
     validDataLeft = false;
+    Result ret = Result::ok;
     for (PageOffs page = 0; page < dataPagesPerArea; page++)
     {
         if (summary[page] == SummaryEntry::used)
@@ -156,18 +157,17 @@ GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea,
             // Any Biterror gets corrected here by being moved
             if (r != Result::ok && r != Result::biterrorCorrected)
             {
-                PAFFS_DBG_S(PAFFS_TRACE_ERROR,
-                            "Could not read page n° %lu!",
-                            static_cast<long unsigned>(src));
-                return r;
+                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read page Area %" PTYPE_AREAPOS "(%" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
+                 srcArea, dev->superblock.getPos(srcArea), page);
+                 ret = r > ret ? r : ret;
             }
             r = dev->driver.writePage(dst, buf, totalBytesPerPage);
             if (r != Result::ok)
             {
-                PAFFS_DBG_S(PAFFS_TRACE_ERROR,
+                PAFFS_DBG(PAFFS_TRACE_ERROR,
                             "Could not write page n° %lu!",
                             static_cast<long unsigned>(dst));
-                return Result::badFlash;
+                ret = Result::badFlash > ret ? Result::badFlash : ret;
             }
             FAILPOINT;
         }
@@ -176,7 +176,7 @@ GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea,
             summary[page] = SummaryEntry::free;
         }
     }
-    return Result::ok;
+    return ret;
 }
 
 /**

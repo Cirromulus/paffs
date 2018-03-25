@@ -34,7 +34,7 @@ Journal::addEvent(const JournalEntry& entry)
     }
     if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
     {
-        printf("Add event ");
+        fprintf(stderr, "Add event ");
         printMeaning(entry);
     }
 
@@ -180,10 +180,10 @@ Journal::processBuffer()
 
     if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
     {
-        printf("FirstUncheckpointedEntry:\n");
+        fprintf(stderr, "FirstUncheckpointedEntry:\n");
         for (unsigned i = 0; i < JournalEntry::numberOfTopics; i++)
         {
-            printf("\t\e[1;%um%s\e[0m: %" PRIu32 ".%" PRIu16 "\n",
+            fprintf(stderr, "\t\e[1;%um%s\e[0m: %" PRIu32 ".%" PRIu16 "\n",
                    colorMap[i],
                    topicNames[i],
                    firstUncheckpointedEntry[i].flash.addr,
@@ -261,9 +261,9 @@ Journal::applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[Journ
         {
             if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
             {
-                printf("Processing ");
+                fprintf(stderr, "Processing ");
                 printMeaning(entry.base, false);
-                printf(" at %" PRIu32 ".%" PRIu16 "\n",
+                fprintf(stderr, " at %" PRIu32 ".%" PRIu16 "\n",
                        persistence.tell().flash.addr,
                        persistence.tell().flash.offs);
             }
@@ -293,7 +293,7 @@ Journal::applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[Journ
                 if(!wasEntryConsumed)
                 {
                     printMeaning(entry.base, false);
-                    printf(" at %" PRIu32 ".%" PRIu16 "\n",
+                    fprintf(stderr, " at %" PRIu32 ".%" PRIu16 "\n",
                            persistence.tell().flash.addr,
                            persistence.tell().flash.offs);
                     wasEntryConsumed = true;
@@ -308,9 +308,9 @@ Journal::applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[Journ
         {
             if ((traceMask & PAFFS_TRACE_JOURNAL) && (traceMask & PAFFS_TRACE_VERBOSE))
             {
-                printf("_skipping_ ");
+                fprintf(stderr, "_skipping_ ");
                 printMeaning(entry.base, false);
-                printf(" at %" PRIu32 ".%" PRIu16 "\n",
+                fprintf(stderr, " at %" PRIu32 ".%" PRIu16 "\n",
                        persistence.tell().flash.addr,
                        persistence.tell().flash.offs);
             }
@@ -337,15 +337,15 @@ void
 Journal::printMeaning(const JournalEntry& entry, bool withNewline)
 {
     bool found = false;
-    printf("\e[1;%um", colorMap[entry.topic]);
+    fprintf(stderr, "\e[1;%um", colorMap[entry.topic]);
     switch (entry.topic)
     {
     case JournalEntry::Topic::invalid:
-        printf("\tInvalid/Empty");
+        fprintf(stderr, "\tInvalid/Empty");
         found = true;
         break;
     case JournalEntry::Topic::checkpoint:
-        printf("\tcheckpoint of \e[1;%um%s",
+        fprintf(stderr, "\tcheckpoint of \e[1;%um%s",
                colorMap[static_cast<const journalEntry::Checkpoint*>(&entry)->target],
                topicNames[static_cast<const journalEntry::Checkpoint*>(&entry)->target]);
         found = true;
@@ -353,7 +353,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
     case JournalEntry::Topic::pagestate:
     {
         auto ps = static_cast<const journalEntry::Pagestate*>(&entry);
-        printf("Pagestate for \e[1;%um%s \e[1;%um",
+        fprintf(stderr, "Pagestate for \e[1;%um%s \e[1;%um",
                colorMap[ps->target],
                topicNames[ps->target],
                colorMap[entry.topic]);
@@ -362,7 +362,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         case journalEntry::Pagestate::Type::replacePage:
          {
              auto repl = static_cast<const journalEntry::pagestate::ReplacePage*>(&entry);
-             printf("new Page: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ", old: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+             fprintf(stderr, "new Page: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ", old: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
                     extractLogicalArea(repl->neu),
                     extractPageOffs(repl->neu),
                     extractLogicalArea(repl->old),
@@ -373,7 +373,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         case journalEntry::Pagestate::Type::replacePagePos:
          {
              auto repl = static_cast<const journalEntry::pagestate::ReplacePagePos*>(&entry);
-             printf("new Page: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ", old: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS
+             fprintf(stderr, "new Page: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ", old: %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS
                     " at pos %" PTYPE_PAGEABS,
                     extractLogicalArea(repl->neu),
                     extractPageOffs(repl->neu),
@@ -384,11 +384,11 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
              break;
          }
         case journalEntry::Pagestate::Type::success:
-            printf("success");
+            fprintf(stderr, "success");
             found = true;
             break;
         case journalEntry::Pagestate::Type::invalidateOldPages:
-            printf("invalidateAllOldPages");
+            fprintf(stderr, "invalidateAllOldPages");
             found = true;
             break;
         }
@@ -398,144 +398,144 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         switch (static_cast<const journalEntry::Superblock*>(&entry)->type)
         {
         case journalEntry::Superblock::Type::rootnode:
-            printf("Superblock Rootnode to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+            fprintf(stderr, "Superblock Rootnode to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
                    extractLogicalArea(static_cast<const journalEntry::superblock::Rootnode*>(&entry)->addr),
                    extractPageOffs(static_cast<const journalEntry::superblock::Rootnode*>(&entry)->addr));
             found = true;
             break;
         case journalEntry::Superblock::Type::areaMap:
-            printf("AreaMap %" PTYPE_AREAPOS " ",
+            fprintf(stderr, "AreaMap %" PTYPE_AREAPOS " ",
                    static_cast<const journalEntry::superblock::AreaMap*>(&entry)->offs);
             switch (static_cast<const journalEntry::superblock::AreaMap*>(&entry)->operation)
             {
             case journalEntry::superblock::AreaMap::Operation::type:
-                printf("set Type to %s",
+                fprintf(stderr, "set Type to %s",
                        areaNames[static_cast<const journalEntry::superblock::areaMap::Type*>(&entry)
                                          ->type]);
                 found = true;
                 break;
             case journalEntry::superblock::AreaMap::Operation::status:
-                printf("set Status to %s",
+                fprintf(stderr, "set Status to %s",
                        areaStatusNames[static_cast<const journalEntry::superblock::areaMap::Status*>(
                                                &entry)
                                                ->status]);
                 found = true;
                 break;
             case journalEntry::superblock::AreaMap::Operation::increaseErasecount:
-                printf("increase Erasecount");
+                fprintf(stderr, "increase Erasecount");
                 found = true;
                 break;
             case journalEntry::superblock::AreaMap::Operation::position:
             {
                 const journalEntry::superblock::areaMap::Position* p =
                         static_cast<const journalEntry::superblock::areaMap::Position*>(&entry);
-                printf("set Position to %02X:%03X",
+                fprintf(stderr, "set Position to %02X:%03X",
                        extractLogicalArea(p->position),
                        extractPageOffs(p->position));
                 found = true;
                 break;
             }
             case journalEntry::superblock::AreaMap::Operation::swap:
-                printf("Swap with %" PTYPE_AREAPOS,
+                fprintf(stderr, "Swap with %" PTYPE_AREAPOS,
                        static_cast<const journalEntry::superblock::areaMap::Swap*>(&entry)->b);
                 found = true;
                 break;
             }
             break;
         case journalEntry::Superblock::Type::activeArea:
-            printf("Set ActiveArea of %s to %" PTYPE_AREAPOS,
+            fprintf(stderr, "Set ActiveArea of %s to %" PTYPE_AREAPOS,
                    areaNames[static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->type],
                    static_cast<const journalEntry::superblock::ActiveArea*>(&entry)->area);
             found = true;
             break;
         case journalEntry::Superblock::Type::usedAreas:
-            printf("Set used Areas to %" PTYPE_AREAPOS,
+            fprintf(stderr, "Set used Areas to %" PTYPE_AREAPOS,
                    static_cast<const journalEntry::superblock::UsedAreas*>(&entry)->usedAreas);
             found = true;
             break;
         }
         break;
     case JournalEntry::Topic::areaMgmt:
-        printf("AreaMgmt area %" PTYPE_AREAPOS " ",
+        fprintf(stderr, "AreaMgmt area %" PTYPE_AREAPOS " ",
                static_cast<const journalEntry::AreaMgmt*>(&entry)->area);
 
         switch (static_cast<const journalEntry::AreaMgmt*>(&entry)->operation)
         {
         case journalEntry::AreaMgmt::Operation::initAreaAs:
-            printf("init as %s",
+            fprintf(stderr, "init as %s",
                    areaNames[static_cast<const journalEntry::areaMgmt::InitAreaAs*>(&entry)->type]);
             found = true;
             break;
         case journalEntry::AreaMgmt::Operation::closeArea:
-            printf("Close");
+            fprintf(stderr, "Close");
             found = true;
             break;
         case journalEntry::AreaMgmt::Operation::retireArea:
-            printf("Retire");
+            fprintf(stderr, "Retire");
             found = true;
             break;
         case journalEntry::AreaMgmt::Operation::deleteAreaContents:
-            printf("Delete Contents");
+            fprintf(stderr, "Delete Contents");
             found = true;
             break;
         case journalEntry::AreaMgmt::Operation::deleteArea:
-            printf("Delete all");
+            fprintf(stderr, "Delete all");
             found = true;
             break;
         }
         break;
     case JournalEntry::Topic::garbage:
-        printf("GC ");
+        fprintf(stderr, "GC ");
         switch (static_cast<const journalEntry::GarbageCollection*>(&entry)->operation)
         {
         case journalEntry::GarbageCollection::Operation::moveValidData:
             {
             auto mvd = static_cast<const journalEntry::garbageCollection::MoveValidData*>(&entry);
-            printf("MoveValidData from %" PTYPE_AREAPOS " to GC Buffer", mvd->from);
+            fprintf(stderr, "MoveValidData from %" PTYPE_AREAPOS " to GC Buffer", mvd->from);
             found = true;
             break;
             }
         }
         break;
     case JournalEntry::Topic::tree:
-        printf("Treenode ");
+        fprintf(stderr, "Treenode ");
         switch (static_cast<const journalEntry::BTree*>(&entry)->op)
         {
         case journalEntry::BTree::Operation::insert:
-            printf("insert %" PRIu32,
+            fprintf(stderr, "insert %" PRIu32,
                    static_cast<const journalEntry::btree::Insert*>(&entry)->inode.no);
             found = true;
             break;
         case journalEntry::BTree::Operation::update:
-            printf("update %" PRIu32,
+            fprintf(stderr, "update %" PRIu32,
                    static_cast<const journalEntry::btree::Update*>(&entry)->inode.no);
             found = true;
             break;
         case journalEntry::BTree::Operation::remove:
-            printf("remove %" PRIu32, static_cast<const journalEntry::btree::Remove*>(&entry)->no);
+            fprintf(stderr, "remove %" PRIu32, static_cast<const journalEntry::btree::Remove*>(&entry)->no);
             found = true;
             break;
         }
         break;
     case JournalEntry::Topic::summaryCache:
-        printf("SummaryCache Area %" PTYPE_AREAPOS " ",
+        fprintf(stderr, "SummaryCache Area %" PTYPE_AREAPOS " ",
                static_cast<const journalEntry::SummaryCache*>(&entry)->area);
         switch (static_cast<const journalEntry::SummaryCache*>(&entry)->subtype)
         {
         case journalEntry::SummaryCache::Subtype::commit:
-            printf("Commit");
+            fprintf(stderr, "Commit");
             found = true;
             break;
         case journalEntry::SummaryCache::Subtype::remove:
-            printf("Remove");
+            fprintf(stderr, "Remove");
             found = true;
             break;
         case journalEntry::SummaryCache::Subtype::reset:
-            printf("Reset AS written");
+            fprintf(stderr, "Reset AS written");
             found = true;
             break;
         case journalEntry::SummaryCache::Subtype::setStatus:
-            printf("set Page %" PTYPE_PAGEOFFS " to %s",
+            fprintf(stderr, "set Page %" PTYPE_PAGEOFFS " to %s",
                    static_cast<const journalEntry::summaryCache::SetStatus*>(&entry)->page,
                    summaryEntryNames[static_cast<unsigned>(
                            static_cast<const journalEntry::summaryCache::SetStatus*>(&entry)
@@ -543,19 +543,19 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             found = true;
             break;
         case journalEntry::SummaryCache::Subtype::setStatusBlock:
-            printf("set Statusblock");
+            fprintf(stderr, "set Statusblock");
             found = true;
             break;
         }
         break;
     case JournalEntry::Topic::pac:
-        printf("pac ");
+        fprintf(stderr, "pac ");
         switch (static_cast<const journalEntry::PAC*>(&entry)->operation)
         {
         case journalEntry::PAC::Operation::setAddress:
             {
             auto sa = static_cast<const journalEntry::pac::SetAddress*>(&entry);
-            printf("set Address of %" PTYPE_INODENO " at %" PTYPE_PAGEOFFS " to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+            fprintf(stderr, "set Address of %" PTYPE_INODENO " at %" PTYPE_PAGEOFFS " to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
                    sa->inodeNo, sa->page, extractLogicalArea(sa->addr), extractPageOffs(sa->addr));
             found = true;
             break;
@@ -566,7 +566,7 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         switch(static_cast<const journalEntry::DataIO*>(&entry)->operation)
         {
         case journalEntry::DataIO::Operation::newInodeSize:
-            printf("Change Size of Inode %" PTYPE_INODENO " to %" PTYPE_FILSIZE,
+            fprintf(stderr, "Change Size of Inode %" PTYPE_INODENO " to %" PTYPE_FILSIZE,
                    static_cast<const journalEntry::dataIO::NewInodeSize*>(&entry)->inodeNo,
                    static_cast<const journalEntry::dataIO::NewInodeSize*>(&entry)->filesize);
             found = true;
@@ -574,21 +574,21 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         }
         break;
     case JournalEntry::Topic::device:
-        printf("device ");
+        fprintf(stderr, "device ");
         switch(static_cast<const journalEntry::Device*>(&entry)->action)
         {
         case journalEntry::Device::Action::mkObjInode:
-            printf("make Obj Inode %" PTYPE_INODENO,
+            fprintf(stderr, "make Obj Inode %" PTYPE_INODENO,
                    static_cast<const journalEntry::device::MkObjInode*>(&entry)->inode);
             found = true;
             break;
         case journalEntry::Device::Action::insertIntoDir:
-            printf("insert inode into dir %" PTYPE_INODENO,
+            fprintf(stderr, "insert inode into dir %" PTYPE_INODENO,
                    static_cast<const journalEntry::device::InsertIntoDir*>(&entry)->dirInode);
             found = true;
             break;
         case journalEntry::Device::Action::removeObj:
-            printf("remove Obj %" PTYPE_INODENO " from dir %" PTYPE_INODENO ,
+            fprintf(stderr, "remove Obj %" PTYPE_INODENO " from dir %" PTYPE_INODENO ,
                    static_cast<const journalEntry::device::RemoveObj*>(&entry)->obj,
                    static_cast<const journalEntry::device::RemoveObj*>(&entry)->parDir);
             found = true;
@@ -597,10 +597,10 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
         break;
     }
     if (!found)
-        printf("Unrecognized");
-    printf("\e[0m event");
+        fprintf(stderr, "Unrecognized");
+    fprintf(stderr, "\e[0m event");
     if (withNewline)
-        printf(".\n");
+        fprintf(stderr, ".\n");
 }
 
 void
