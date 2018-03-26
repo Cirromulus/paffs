@@ -22,10 +22,12 @@
 
 namespace paffs
 {
+
 void
 GarbageCollection::countDirtyAndUsedPages(PageOffs& dirty, PageOffs &used, SummaryEntry* summary)
 {
     dirty = 0;
+    used = 0;
     for (PageOffs i = 0; i < dataPagesPerArea; i++)
     {
         if (summary[i] == SummaryEntry::dirty)
@@ -441,6 +443,7 @@ GarbageCollection::processEntry(const journalEntry::Max& entry, JournalEntryPosi
         {
             state = Statemachine::moveValidData;
             journalTargetArea = entry.garbage_.moveValidData.from;
+            journalTargetAreaType = dev->superblock.getType(journalTargetArea);
         }
         break;
     case JournalEntry::Topic::areaMgmt:
@@ -489,10 +492,11 @@ GarbageCollection::signalEndOfLog()
     switch(state)
     {
     case Statemachine::ok:
-        break;
+        return;
     case Statemachine::moveValidData:
         PAFFS_DBG_S(PAFFS_TRACE_GC | PAFFS_TRACE_JOURNAL,
                     "deleting copied data");
+        dev->areaMgmt.deleteAreaContents(dev->superblock.getActiveArea(AreaType::garbageBuffer));
         break;
     case Statemachine::deletedOldArea:
         PAFFS_DBG_S(PAFFS_TRACE_GC | PAFFS_TRACE_JOURNAL,
@@ -515,14 +519,19 @@ GarbageCollection::signalEndOfLog()
             if(containsData)
             {
                 dev->sumCache.setSummaryStatus(journalTargetArea, summary);
+                if(journalTargetAreaType == AreaType::unset)
+                {
+                    PAFFS_DBG(PAFFS_TRACE_BUG, "UNSET Type containing Data");
+                    break;
+                }
+                dev->areaMgmt.initAreaAs(journalTargetArea, journalTargetAreaType);
             }
         }
         //fall-through
     case Statemachine::setNewSummary:
-        dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
         break;
     }
-
+    dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
 }
 
 }

@@ -32,6 +32,7 @@ class GarbageCollection : public JournalTopic
         setNewSummary,
     } state;
     AreaPos journalTargetArea;
+    AreaType journalTargetAreaType;
 
 public:
     inline GarbageCollection(Device* mdev) : dev(mdev)

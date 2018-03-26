@@ -36,11 +36,11 @@ extern const char* traceDescription[];
 extern std::function<void(const char*, unsigned int, unsigned int)> failCallback;
 void failpointFn(const char*, unsigned int, unsigned int);
 #define FAILPOINT                                       \
-do                                                      \
+if(true)                                                \
 {                                                       \
     /*TODO: Somehow notify something of this failpoint*/\
     failpointFn(__FILE__, __LINE__, __COUNTER__);       \
-}while(false)
+}
 
 #else
 #define FAILPOINT

@@ -427,7 +427,7 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition, bool desperat
 
     if (r != Result::ok)
     {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not move Data for AS commit!");
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Could not move Data for AS commit!");
         clearedAreaCachePosition = -1;
         return r;
     }
