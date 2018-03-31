@@ -896,11 +896,12 @@ Result
 SummaryCache::commitAreaSummaries(bool createNew)
 {
     // commit all Areas except two
-
     Result r;
-    /** TODO: Maybe commit closed Areas?
-     *  - No, Most of the time a page is much bigger than a summary
-     */
+    if(traceMask & PAFFS_TRACE_ASCACHE)
+    {
+        PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "Committing AreaSummaries:");
+        printStatus();
+    }
     while (mTranslation.size() > 2)
     {
         r = freeNextBestSummaryCacheEntry(true);
@@ -1008,7 +1009,7 @@ SummaryCache::preScan(const journalEntry::Max& entry, JournalEntryPosition posit
     PAFFS_DBG_S(PAFFS_TRACE_ASCACHE | PAFFS_TRACE_JOURNAL,
               "Commit of %" PTYPE_AREAPOS " at %" PRIu32,
               entry.summaryCache.area, position.mram.offs);
-    if(!existsSummaryElem(entry.summaryCache.area))
+    if(existsSummaryElem(entry.summaryCache.area))
     {   //This area was loaded from a superpage, but is now committed elsewhere
         //so force an update by deleting it now.
         PAFFS_DBG_S(PAFFS_TRACE_ASCACHE | PAFFS_TRACE_JOURNAL,
@@ -1070,6 +1071,11 @@ void
 SummaryCache::signalEndOfLog()
 {
     journalReplayMode = false;
+    if(traceMask & PAFFS_TRACE_ASCACHE)
+    {
+        PAFFS_DBG_S(PAFFS_TRACE_ASCACHE, "EndOfLog AreaSummaries:");
+        printStatus();
+    }
 }
 
 Result
