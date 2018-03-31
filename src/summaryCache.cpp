@@ -952,6 +952,14 @@ SummaryCache::commitAreaSummaries(bool createNew)
 
     dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
 
+    //fixme this is needed for superblock cleanup, todo: make commit sane
+    r = dev->superblock.readSuperIndex(&index);
+    if (r != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not reread superindex");
+        return r;
+    }
+
     for (std::pair<AreaPos, uint16_t> cacheElem : mTranslation)
     {
     	mSummaryCache[cacheElem.second].setDirty(false);
