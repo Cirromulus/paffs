@@ -32,22 +32,21 @@ typedef uint32_t TraceMask;
 extern TraceMask traceMask;
 extern const char* traceDescription[];
 
+#define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+
 #ifdef PAFFS_ENABLE_FAILPOINTS
 extern std::function<void(const char*, unsigned int, unsigned int)> failCallback;
 void failpointFn(const char*, unsigned int, unsigned int);
 #define FAILPOINT                                       \
-if(true)                                                \
+do                                                      \
 {                                                       \
     /*TODO: Somehow notify something of this failpoint*/\
-    failpointFn(__FILE__, __LINE__, __COUNTER__);       \
-}
-
+    failpointFn(__FILENAME__, __LINE__, __COUNTER__);       \
+}while(false)
 #else
 #define FAILPOINT
 #endif
 }
-
-#define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
 // clang-format off
 

@@ -81,8 +81,12 @@ public:
     write(Obj& obj, const void* buf, FileSize bytesToWrite, FileSize* bytesWritten);
     Result
     seek(Obj& obj, FileSizeDiff m, Seekmode mode = Seekmode::set);
+    //Flushes single Element
     Result
     flush(Obj& obj);
+    //Flushes complete Filesystem
+    Result
+    flush();
     Result
     truncate(const char* path, FileSize newLength);
 

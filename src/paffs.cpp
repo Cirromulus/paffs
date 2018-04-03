@@ -442,6 +442,12 @@ Paffs::flush(Obj& obj)
 }
 
 Result
+Paffs::flush()
+{
+    return devices[0]->flushAllCaches();
+}
+
+Result
 Paffs::truncate(const char* path, FileSize newLength)
 {
     return devices[0]->truncate(path, newLength);
