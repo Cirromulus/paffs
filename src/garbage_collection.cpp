@@ -384,7 +384,7 @@ GarbageCollection::collectGarbage(AreaType targetType)
         {
             // Safe, because we can assume deletion targetType is same Type as we want (from
             // getNextBestArea)
-            dev->superblock.setStatus(deletionTarget, AreaStatus::active);
+            dev->superblock.setActiveArea(targetType, deletionTarget);
         }
     }
 

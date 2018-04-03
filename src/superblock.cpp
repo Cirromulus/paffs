@@ -467,6 +467,15 @@ Superblock::setStatus(AreaPos area, AreaStatus status)
                   areasNo);
         return;
     }
+    if(status == AreaStatus::active)
+    {
+        if(getActiveArea(mMap[area].type) != 0)
+        {
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Set Area %" PTYPE_AREAPOS ": Already "
+                    "other active area %" PTYPE_AREAPOS " of this type (%s)!"
+                    , area, getActiveArea(mMap[area].type), areaNames[mMap[area].type]);
+        }
+    }
     if (mMap[area].type != AreaType::superblock && traceMask & PAFFS_TRACE_VERIFY_AS)
     {
         if(status == AreaStatus::active)
@@ -548,12 +557,8 @@ Superblock::setActiveArea(AreaType type, AreaPos pos)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to set ActiveArea of invalid Type!");
         return;
     }
-    if (mMap[pos].status != AreaStatus::active)
-    {
-        PAFFS_DBG(
-                PAFFS_TRACE_BUG, "SetActiveArea of Pos %" PTYPE_AREAPOS ", but area is not active!", pos);
-    }
     PAFFS_DBG_S(PAFFS_TRACE_AREA, "Set Active area of %s to %" PTYPE_AREAPOS, areaNames[type], pos);
+    mMap[pos].status = AreaStatus::active;
     device->journal.addEvent(journalEntry::superblock::ActiveArea(type, pos));
     mActiveAreas[type] = pos;
 }

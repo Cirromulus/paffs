@@ -287,8 +287,6 @@ AreaManagement::initAreaAs(AreaPos area, AreaType type)
         dev->superblock.increaseUsedAreas();
     }
     FAILPOINT;
-    dev->superblock.setStatus(area, AreaStatus::active);
-    FAILPOINT;
     dev->superblock.setActiveArea(type, area);
     FAILPOINT;
     dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
@@ -586,9 +584,6 @@ AreaManagement::signalEndOfLog()
             }
             //fall-through
         case ExternOp::changeUsedAreas:
-            dev->superblock.setStatus(mLastOp.initAreaAs.area, AreaStatus::active);
-            //fall-through
-        case ExternOp::setStatus:
             dev->superblock.setActiveArea(mLastOp.initAreaAs.type, mLastOp.initAreaAs.area);
             //fall-through
         case ExternOp::setActiveArea:
