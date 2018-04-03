@@ -671,8 +671,10 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
     if (dev->superblock.getType(extractLogicalArea(pageAddr)) != AreaType::data)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "READ INODE operation of invalid area at %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+                  "READ INODE operation of invalid area (%s) at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
+                  areaNames[dev->superblock.getType(extractLogicalArea(pageAddr))],
                   extractLogicalArea(pageAddr),
+                  dev->superblock.getPos(extractLogicalArea(pageAddr)),
                   extractPageOffs(pageAddr));
         return false;
     }

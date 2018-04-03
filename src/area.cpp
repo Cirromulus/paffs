@@ -668,6 +668,10 @@ AreaManagement::signalEndOfLog()
             }
             //fall-through
         case ExternOp::deleteSummary:
+            if(mLastOp.base.operation == journalEntry::AreaMgmt::Operation::deleteAreaContents)
+            {   //this command is also from Garbage collection (deleteAreaContents)
+                break;
+            }
             dev->superblock.setStatus(mLastOp.deleteArea.area, AreaStatus::empty);
             //fall-through
         case ExternOp::setStatus:
@@ -688,5 +692,6 @@ AreaManagement::signalEndOfLog()
         //nothing
         break;
     }
+    dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
 }
 }  // namespace paffs

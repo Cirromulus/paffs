@@ -524,7 +524,10 @@ GarbageCollection::signalEndOfLog()
                     PAFFS_DBG(PAFFS_TRACE_BUG, "UNSET Type containing Data");
                     break;
                 }
-                dev->areaMgmt.initAreaAs(journalTargetArea, journalTargetAreaType);
+                if(dev->superblock.getActiveArea(journalTargetAreaType) == 0)
+                {   //We were about to search for a writable area
+                    dev->areaMgmt.initAreaAs(journalTargetArea, journalTargetAreaType);
+                }
             }
         }
         //fall-through
