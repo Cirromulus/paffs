@@ -1384,11 +1384,13 @@ TreeCache::readTreeNode(Addr addr, TreeNode& node)
     if (node.self != addr)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Read Treenode at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS ", but its content stated that it was on %X:%X",
+                  "Read Treenode at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS ", but its content "
+                          "stated that it was on %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
                   extractLogicalArea(addr),
                   dev->superblock.getPos(extractLogicalArea(addr)),
                   extractPageOffs(addr),
                   extractLogicalArea(node.self),
+                  dev->superblock.getPos(extractLogicalArea(node.self)),
                   extractPageOffs(node.self));
         return Result::bug;
     }

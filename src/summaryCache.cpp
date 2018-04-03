@@ -527,10 +527,10 @@ SummaryCache::setPageStatus(AreaPos area, PageOffs page, SummaryEntry state)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "Tried setting Pagestatus on UNSET area "
-                  "%" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ", status %" PRIu8 ")",
+                  "%" PTYPE_AREAPOS " (on %" PTYPE_AREAPOS ", status %s)",
                   area,
                   dev->superblock.getPos(area),
-                  dev->superblock.getStatus(area));
+                  areaStatusNames[dev->superblock.getStatus(area)]);
         return Result::bug;
     }
 

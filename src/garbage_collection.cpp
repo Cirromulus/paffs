@@ -379,26 +379,10 @@ GarbageCollection::collectGarbage(AreaType targetType)
                         deletionTarget);
             return r;
         }
-        // Notify for used Pages
-        if (targetType != AreaType::unset)
-        {
-            // Safe, because we can assume deletion targetType is same Type as we want (from
-            // getNextBestArea)
-            dev->superblock.setActiveArea(targetType, deletionTarget);
-        }
     }
 
     if (targetType != AreaType::unset)
     {
-        // This assumes that current activearea is closed...
-        if (dev->superblock.getActiveArea(targetType) != 0)
-        {
-            PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "old active Area (%" PRIu16 " on %" PRIu16 ") is not closed!",
-                      dev->superblock.getActiveArea(targetType),
-                      dev->superblock.getPos(dev->superblock.getActiveArea(targetType)));
-            return Result::bug;
-        }
         FAILPOINT;
         dev->areaMgmt.initAreaAs(deletionTarget, targetType);
     }
