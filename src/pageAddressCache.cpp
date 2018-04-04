@@ -106,6 +106,10 @@ PageAddressCache::setTargetInode(Inode& node)
     singl.active = false;
     mInodePtr = &node;
 
+    //to force-load Inode into Tree for journal
+    Inode dummy;
+    device.tree.getInode(node.no, dummy);
+
     //journal setInode is delayed until something is really changed
 
     return Result::ok;

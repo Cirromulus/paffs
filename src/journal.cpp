@@ -623,3 +623,9 @@ Journal::enable()
     }
     return persistence.rewind();
 }
+
+bool
+Journal::isEnabled()
+{
+    return !disabled;
+}

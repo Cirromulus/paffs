@@ -72,8 +72,6 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         return Result::alrMounted;
     }
 
-    journal.disable();
-
     Result r = initializeDevice();
     if (r != Result::ok)
     {
@@ -209,6 +207,7 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         superblock.setType(area, AreaType::unset);
     }
 
+    journal.enable();   //actually, this could be at the start.
     r = tree.startNewTree();
     if (r != Result::ok)
     {
@@ -247,7 +246,6 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         return r;
     }
 
-    journal.enable();
     destroyDevice();
     driver.deInitializeNand();
     return Result::ok;

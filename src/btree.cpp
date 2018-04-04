@@ -321,6 +321,7 @@ Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition positio
         {
         case journalEntry::BTree::Operation::insert:
             r = insertInode(entry.btree_.insert.inode);
+            mCache.printTreeCache();
             if(r == Result::exists)
             {   //It was already added by a commit
                 return Result::ok;
@@ -350,15 +351,16 @@ Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition positio
                            extractLogicalArea(node.direct[i]), extractPageOffs(node.direct[i]));
                 }
             }
-                r = updateExistingInode(entry.btree_.update.inode);
-                if(r == Result::ok || r == Result::notFound)
-                {   //If it was deleted later on
-                    return Result::ok;
-                }
-                else
-                {
-                    return r;
-                }
+            r = updateExistingInode(entry.btree_.update.inode);
+            mCache.printTreeCache();
+            if(r == Result::ok || r == Result::notFound)
+            {   //If it was deleted later on
+                return Result::ok;
+            }
+            else
+            {
+                return r;
+            }
         }
         case journalEntry::BTree::Operation::remove:
             r = deleteInode(entry.btree_.remove.no);

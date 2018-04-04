@@ -42,8 +42,9 @@ inline void
 PageStateMachine<maxPages, maxPositions, topic>::clear()
 {
     journalState = JournalState::ok;
-    memset(newPageList, 0, sizeof(uint16_t) * pageListHWM);
-    memset(oldPageList, 0, sizeof(uint16_t) * pageListHWM);
+    memset(newPageList, 0, sizeof(Addr) * maxPages);
+    memset(oldPageList, 0, sizeof(Addr) * maxPages);
+    memset(position, 0, sizeof(PageAbs) * maxPositions);
     pageListHWM = 0;
     currentInode = 0;
 }

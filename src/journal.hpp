@@ -89,7 +89,8 @@ public:
     disable();
     Result
     enable();
-
+    bool
+    isEnabled();
 private:
     bool
     isTopicValid(JournalEntry::Topic topic);

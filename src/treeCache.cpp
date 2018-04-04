@@ -107,6 +107,7 @@ TreeCache::signalEndOfLog()
                 mCache[i].dirty = true;
             }
         }
+        printTreeCache();
         commitCache();
         mJournalIsRecovering = false;
     }
@@ -684,6 +685,11 @@ TreeCache::commitNodesRecursively(TreeCacheNode& node)
 Result
 TreeCache::commitCache()
 {
+    if(!dev->journal.isEnabled())
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tree Cache Commit may never happen during replay!");
+        return Result::bug;
+    }
     dev->lasterr = Result::ok;
     if(mCacheRoot < 0)
     {
@@ -1137,8 +1143,13 @@ TreeCache::printNode(TreeCacheNode& node)
                 }
             }
         }
-        printf("] (%" PRIu16 "/%" PRIu16 ")\n", node.raw.keys,
-               node.raw.isLeaf ? leafOrder : branchOrder-1);
+        printf("] (%" PRIu16 "/%" PRIu16 "), "
+                "self: %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_AREAPOS "\n",
+                node.raw.keys,
+                node.raw.isLeaf ? leafOrder : branchOrder-1,
+                extractLogicalArea(node.raw.self),
+                dev->superblock.getPos(extractLogicalArea(node.raw.self)),
+                extractPageOffs(node.raw.self));
 }
 
 void
