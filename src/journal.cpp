@@ -475,7 +475,8 @@ Journal::printMeaning(const JournalEntry& entry, bool withNewline)
             found = true;
             break;
         case journalEntry::AreaMgmt::Operation::deleteAreaContents:
-            fprintf(stderr, "Delete Contents");
+            fprintf(stderr, "Delete Contents on phys. %" PTYPE_AREAPOS,
+                    static_cast<const journalEntry::areaMgmt::DeleteAreaContents*>(&entry)->physPos);
             found = true;
             break;
         case journalEntry::AreaMgmt::Operation::deleteArea:

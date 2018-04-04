@@ -438,11 +438,12 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition, bool desperat
     }
     else
     {
-        //deletes a cache position here, resets AsWritten
-        dev->areaMgmt.deleteAreaContents(favouriteArea);
         // swap logical position of areas to keep addresses valid
         dev->superblock.swapAreaPosition(favouriteArea,
                                        dev->superblock.getActiveArea(AreaType::garbageBuffer));
+        //deletes a cache position here, resets AsWritten
+        dev->areaMgmt.deleteAreaContents(favouriteArea,
+                                         dev->superblock.getPos(dev->superblock.getActiveArea(AreaType::garbageBuffer)));
 
         setSummaryStatus(favouriteArea, summary);
     }

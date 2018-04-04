@@ -45,12 +45,12 @@ GarbageCollection::countDirtyAndUsedPages(PageOffs& dirty, PageOffs &used, Summa
 AreaPos
 GarbageCollection::findNextBestArea(AreaType target,
                                     SummaryEntry* summaryOut,
-                                    bool* srcAreaContainsData)
+                                    bool& srcAreaContainsValidData)
 {
     AreaPos favourite_area = 0;
     PageOffs favDirtyPages = 0;
     uint32_t favErases = ~0;
-    *srcAreaContainsData = false;
+    srcAreaContainsValidData = false;
     SummaryEntry curr[dataPagesPerArea];
 
     // Look for the most dirty area.
@@ -79,7 +79,7 @@ GarbageCollection::findNextBestArea(AreaType target,
                         (dev->superblock.getErasecount(i) < dev->superblock.getOverallDeletions() / areasNo)))
                 {
                     // We can't find a block with more dirty pages in it
-                    *srcAreaContainsData = false;
+                    srcAreaContainsValidData = false;
                     memcpy(summaryOut, curr, dataPagesPerArea);
                     return i;
                 }
@@ -97,9 +97,9 @@ GarbageCollection::findNextBestArea(AreaType target,
                 {
                     favourite_area = i;
                     favDirtyPages = dirtyPages;
-                    if(usedPages > 0 || dev->sumCache.wasAreaSummaryWritten(i))
+                    if(usedPages > 0)
                     {
-                        *srcAreaContainsData = true;
+                        srcAreaContainsValidData = true;
                     }
                     favErases = dev->superblock.getErasecount(i);
                     memcpy(summaryOut, curr, dataPagesPerArea);
@@ -115,9 +115,9 @@ GarbageCollection::findNextBestArea(AreaType target,
                     //       i, dirtyPages, favourite_area, favDirtyPages);
                     favourite_area = i;
                     favDirtyPages = dirtyPages;
-                    if(usedPages > 0 || dev->sumCache.wasAreaSummaryWritten(i))
+                    if(usedPages > 0)
                     {
-                        *srcAreaContainsData = true;
+                        srcAreaContainsValidData = true;
                     }
                     memcpy(summaryOut, curr, dataPagesPerArea);
                 }
@@ -141,19 +141,18 @@ GarbageCollection::moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea,
                 dev->superblock.getPos(srcArea),
                 dstArea,
                 dev->superblock.getPos(dstArea));
+    validDataLeft = false;
     FAILPOINT;
     dev->journal.addEvent(journalEntry::garbageCollection::MoveValidData(srcArea));
     FAILPOINT;
-    validDataLeft = false;
     Result ret = Result::ok;
     for (PageOffs page = 0; page < dataPagesPerArea; page++)
     {
         if (summary[page] == SummaryEntry::used)
         {
-            validDataLeft = true;
             PageAbs src = dev->superblock.getPos(srcArea) * totalPagesPerArea + page;
             PageAbs dst = dev->superblock.getPos(dstArea) * totalPagesPerArea + page;
-
+            validDataLeft = true;
             uint8_t* buf = dev->driver.getPageBuffer();
             Result r = dev->driver.readPage(src, buf, totalBytesPerPage);
             // Any Biterror gets corrected here by being moved
@@ -191,10 +190,9 @@ GarbageCollection::collectGarbage(AreaType targetType)
 {
     SummaryEntry summary[dataPagesPerArea];
     memset(summary, 0xFF, dataPagesPerArea);
-    bool srcAreaContainsData = false;
+    bool srcAreaContainsValidData = false;
     AreaPos deletionTarget = 0;
     Result r;
-    AreaPos lastDeletionTarget = 0;
 
     if (traceMask & PAFFS_TRACE_VERIFY_AS)
     {
@@ -218,147 +216,47 @@ GarbageCollection::collectGarbage(AreaType targetType)
         }
     }
 
-    while (1)
+    deletionTarget = findNextBestArea(targetType, summary, srcAreaContainsValidData);
+    if (deletionTarget == 0 ||
+            (srcAreaContainsValidData && dev->superblock.getActiveArea(AreaType::garbageBuffer) == 0))
     {
-        deletionTarget = findNextBestArea(targetType, summary, &srcAreaContainsData);
-        if (deletionTarget == 0
-                || (lastDeletionTarget != 0 && srcAreaContainsData))
+        return Result::noSpace;
+    }
+
+    // TODO: more Safety switches like comparison of lastDeletion targetType
+
+    if (srcAreaContainsValidData)
+    {
+        // still some valid data, copy to new area
+        PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL,
+                    "GC found just partially clean area %" PRIu16 " on pos %" PRIu16 "",
+                    deletionTarget,
+                    dev->superblock.getPos(deletionTarget));
+        FAILPOINT;
+        bool validDataLeft;
+        r = moveValidDataToNewArea(deletionTarget,
+                                   dev->superblock.getActiveArea(AreaType::garbageBuffer),
+                                   validDataLeft, summary);
+        //this should not differ to the information from findNextBestArea
+        if (validDataLeft != true || r != Result::ok)
         {
-            //This is really bad. Either we can not find a next area, or
-            //we moved old data from an area to garbageBuffer,
-            //but area could not be deleted for giving back garbage buffer!
-
-
-            PAFFS_DBG_S(PAFFS_TRACE_GC,
-                        "Could not find any GC'able pages for type %s!",
-                        areaNames[targetType]);
-
-            // TODO: Only use this Mode for the "higher needs", i.e. unmounting.
-            // might as well be for INDEX also, as tree is cached and needs to be
-            // committed even for read operations.
-
-            if (targetType != AreaType::index)
-            {
-                PAFFS_DBG_S(PAFFS_TRACE_GC, "And we use reserved Areas for INDEX only.");
-                return Result::noSpace;
-            }
-
-            if (dev->superblock.getUsedAreas() <= areasNo)
-            {
-                PAFFS_DBG_S(PAFFS_TRACE_GC, "and have no reserved Areas left.");
-                return Result::noSpace;
-            }
-
-            // This happens if we couldn't erase former srcArea which was not empty
-            // The last resort is using our protected GC_BUFFER block...
-            PAFFS_DBG_S(PAFFS_TRACE_GC,
-                        "GC did not find next place for GC_BUFFER! "
-                        "Using reserved Areas.");
-
-            AreaPos nextPos;
-            for (nextPos = 0; nextPos < areasNo; nextPos++)
-            {
-                if (dev->superblock.getStatus(nextPos) == AreaStatus::empty)
-                {
-                    dev->areaMgmt.initAreaAs(nextPos, targetType);
-                    PAFFS_DBG_S(PAFFS_TRACE_AREA, "Found empty Area %" PRIu16 "", nextPos);
-                }
-            }
-            if (nextPos == areasNo)
-            {
-                PAFFS_DBG(PAFFS_TRACE_BUG,
-                          "Used Areas said we had space left (%" PRIu16 " areas), "
-                          "but no empty area was found!",
-                          dev->superblock.getUsedAreas());
-                return Result::bug;
-            }
-
-            /* If lastArea contained data, it is already copied to gc_buffer. 'summary' is untouched
-             * and valid.
-             * If it did not contain data (or this is the first round), 'summary' contains
-             * {SummaryEntry::free}.
-             */
-            if (lastDeletionTarget == 0)
-            {
-                // this is first round, without having something deleted.
-                // Just init and return nextPos.
-                dev->superblock.setActiveArea(AreaType::index, nextPos);
-                return Result::ok;
-            }
-
-            // Resurrect area, fill it with the former summary. In end routine, positions will be
-            // swapped.
-            dev->areaMgmt.initAreaAs(lastDeletionTarget, dev->superblock.getType(deletionTarget));
-            r = dev->sumCache.setSummaryStatus(lastDeletionTarget, summary);
-            if (r != Result::ok)
-            {
-                PAFFS_DBG(PAFFS_TRACE_ERROR,
-                          "Could not move former Summary to area %" PRIu16 "!",
-                          lastDeletionTarget);
-                return r;
-            }
-            deletionTarget = lastDeletionTarget;
-            break;
-        }
-
-        // TODO: more Safety switches like comparison of lastDeletion targetType
-
-        if (srcAreaContainsData)
-        {
-            // still some valid data, copy to new area
-            PAFFS_DBG_S(PAFFS_TRACE_GC_DETAIL,
-                        "GC found just partially clean area %" PRIu16 " on pos %" PRIu16 "",
+            PAFFS_DBG_S(PAFFS_TRACE_ERROR,
+                        "Could not copy valid pages from area %" PRIu16 " to %" PRIu16 "!",
                         deletionTarget,
-                        dev->superblock.getPos(deletionTarget));
-            FAILPOINT;
-            bool validDataLeft;
-            r = moveValidDataToNewArea(deletionTarget,
-                                       dev->superblock.getActiveArea(AreaType::garbageBuffer),
-                                       validDataLeft, summary);
-
-            if (r != Result::ok)
-            {
-                PAFFS_DBG_S(PAFFS_TRACE_ERROR,
-                            "Could not copy valid pages from area %" PRIu16 " to %" PRIu16 "!",
-                            deletionTarget,
-                            dev->superblock.getActiveArea(AreaType::garbageBuffer));
-                // TODO: Handle something, maybe put area in ReadOnly or copy somewhere else..
-                // TODO: Maybe copy rest of Pages before quitting
-                return r;
-            }
-            if(!validDataLeft)
-            {   //We deleted the last dirty pages, nothing left
-                FAILPOINT;
-                srcAreaContainsData = false;
-                r = dev->areaMgmt.deleteArea(deletionTarget);
-                if(r != Result::ok)
-                {
-                    //TODO: Handle this better
-                    continue;
-                }
-            }
-            else
-            {
-                FAILPOINT;
-                r = dev->areaMgmt.deleteAreaContents(deletionTarget);
-                if(r != Result::ok)
-                {
-                    //This restarts the loop to find a place for the GC-Buffer.
-                    //FIXME: findNextBestArea has to find a completely free area.
-                    continue;
-                }
-            }
-
+                        dev->superblock.getActiveArea(AreaType::garbageBuffer));
+            // TODO: Handle something, maybe put area in ReadOnly or copy somewhere else..
+            // TODO: Maybe copy rest of Pages before quitting
+            return r;
         }
-        else
-        {
-            FAILPOINT;
-            dev->areaMgmt.deleteArea(deletionTarget);
-        }
-
-        lastDeletionTarget = deletionTarget;
-
-        break;
+    }
+    else
+    {
+        FAILPOINT;
+         r = dev->areaMgmt.deleteArea(deletionTarget);
+         if(r != Result::ok)
+         {
+             //TODO: find a new place for Garbage Buffer
+         }
     }
 
     FAILPOINT;
@@ -366,9 +264,17 @@ GarbageCollection::collectGarbage(AreaType targetType)
     dev->superblock.swapAreaPosition(deletionTarget,
                                    dev->superblock.getActiveArea(AreaType::garbageBuffer));
 
-    if (srcAreaContainsData)
+    if(srcAreaContainsValidData)
     {
         FAILPOINT;
+        r = dev->areaMgmt.deleteAreaContents(deletionTarget,
+                         dev->superblock.getPos(dev->superblock.getActiveArea(AreaType::garbageBuffer)));
+        if(r != Result::ok)
+        {
+            PAFFS_DBG_S(PAFFS_TRACE_ALWAYS, "Could not delete Area! Giving up Garbage buffer to continue...");
+            //TODO Find new place for GC in desperate mode
+            dev->superblock.setActiveArea(AreaType::garbageBuffer, 0);
+        }
         // Copy the updated (no SummaryEntry::dirty pages) summary to the deletion_target
         // (it will be the fresh area!)
         r = dev->sumCache.setSummaryStatus(deletionTarget, summary);
@@ -479,16 +385,17 @@ GarbageCollection::signalEndOfLog()
         return;
     case Statemachine::moveValidData:
         PAFFS_DBG_S(PAFFS_TRACE_GC | PAFFS_TRACE_JOURNAL,
-                    "deleting copied data");
-        dev->areaMgmt.deleteAreaContents(dev->superblock.getActiveArea(AreaType::garbageBuffer));
-        break;
-    case Statemachine::deletedOldArea:
-        PAFFS_DBG_S(PAFFS_TRACE_GC | PAFFS_TRACE_JOURNAL,
                     "applying copied data");
         dev->superblock.swapAreaPosition(journalTargetArea,
                                          dev->superblock.getActiveArea(AreaType::garbageBuffer));
-        //fall-through
+        break;
     case Statemachine::swappedPosition:
+        PAFFS_DBG_S(PAFFS_TRACE_GC | PAFFS_TRACE_JOURNAL,
+                    "deleting copied data");
+        dev->areaMgmt.deleteAreaContents(journalTargetArea,
+                            dev->superblock.getPos(dev->superblock.getActiveArea(AreaType::garbageBuffer)));
+        //fall-through
+    case Statemachine::deletedOldArea:
         dev->sumCache.scanAreaForSummaryStatus(journalTargetArea, summary);
         {
             bool containsData = false;

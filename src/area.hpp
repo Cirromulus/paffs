@@ -103,9 +103,10 @@ public:
     retireArea(AreaPos area);
     /**
      * \param noJournalLogging is active if called from deleteArea.
+     * \param physpos specifies the physical position (if called from GC after swapping areapositions)
      */
     Result
-    deleteAreaContents(AreaPos area, bool noJournalLogging = false);
+    deleteAreaContents(AreaPos area, AreaPos physPos = 0, bool noJournalLogging = false);
     Result
     deleteArea(AreaPos area);
 

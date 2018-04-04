@@ -67,6 +67,6 @@ private:
     void
     countDirtyAndUsedPages(PageOffs& dirty, PageOffs &used, SummaryEntry* summary);
     AreaPos
-    findNextBestArea(AreaType target, SummaryEntry* summaryOut, bool* srcAreaContainsData);
+    findNextBestArea(AreaType target, SummaryEntry* summaryOut, bool& srcAreaContainsValidData);
 };
 }

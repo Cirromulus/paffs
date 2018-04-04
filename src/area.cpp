@@ -140,7 +140,7 @@ AreaManagement::findWritableArea(AreaType areaType)
     if (dev->superblock.getUsedAreas() < areasNo - minFreeAreas)
     {
         /**We only take new areas, if we dont hit the reserved pool.
-         * The exeption is Index area, which is needed for committing caches.
+         * The exception is Index area, which is needed for committing caches.
         **/
         for (unsigned int area = 0; area < areasNo; area++)
         {
@@ -342,7 +342,7 @@ AreaManagement::retireArea(AreaPos area)
 }
 
 Result
-AreaManagement::deleteAreaContents(AreaPos area, bool noJournalLogging)
+AreaManagement::deleteAreaContents(AreaPos area, AreaPos physPos, bool noJournalLogging)
 {
     if (area >= areasNo)
     {
@@ -366,22 +366,25 @@ AreaManagement::deleteAreaContents(AreaPos area, bool noJournalLogging)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "deleted content of active area %" PTYPE_AREAPOS ", is this OK?", area);
     }
-
+    if(physPos == 0)
+    {
+        physPos = dev->superblock.getPos(area);
+    }
     if(!noJournalLogging)
     {
         FAILPOINT;
-        dev->journal.addEvent(journalEntry::areaMgmt::DeleteAreaContents(area));
+        dev->journal.addEvent(journalEntry::areaMgmt::DeleteAreaContents(area, physPos));
     }
     Result r = Result::ok;
     FAILPOINT;
     for (unsigned int i = 0; i < blocksPerArea; i++)
     {
-        r = dev->driver.eraseBlock(dev->superblock.getPos(area) * blocksPerArea + i);
+        r = dev->driver.eraseBlock(physPos * blocksPerArea + i);
         if (r != Result::ok)
         {
             PAFFS_DBG_S(PAFFS_TRACE_GC,
                         "Could not delete block n° %" PTYPE_AREAPOS " (Area %" PTYPE_AREAPOS ")!",
-                        dev->superblock.getPos(area) * blocksPerArea + i,
+                        physPos * blocksPerArea + i,
                         area);
             retireArea(area);
             r = Result::badFlash;
@@ -399,7 +402,7 @@ AreaManagement::deleteAreaContents(AreaPos area, bool noJournalLogging)
                     "Could not delete block in area %" PTYPE_AREAPOS " "
                     "on position %" PTYPE_AREAPOS "! Retired Area.",
                     area,
-                    dev->superblock.getPos(area));
+                    physPos);
         if (traceMask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL))
         {
             printf("Info: \n");
@@ -452,7 +455,7 @@ AreaManagement::deleteArea(AreaPos area)
     }
     FAILPOINT;
     dev->journal.addEvent(journalEntry::areaMgmt::DeleteArea(area));
-    Result r = deleteAreaContents(area, true);
+    Result r = deleteAreaContents(area, 0, true);
     if(r != Result::ok)
     {
         PAFFS_DBG_S(PAFFS_TRACE_AREA, "Could not delete Area %" PTYPE_AREAPOS
