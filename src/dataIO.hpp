@@ -36,6 +36,7 @@ private:
     bool journalInodeValid = false;
     bool modifiedInode = false;
     bool processedForeignSuccessElement = false;
+    bool journalIsWriteTruncatePair = false;
 public:
 
     DataIO(Device* mdev);

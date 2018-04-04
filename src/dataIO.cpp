@@ -307,6 +307,7 @@ DataIO::resetState()
     journalInodeValid = false;
     modifiedInode = false;
     processedForeignSuccessElement = false;
+    journalIsWriteTruncatePair = false;
 }
 
 bool
@@ -331,6 +332,7 @@ DataIO::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
             {
                 //If the same message comes again, we were truncating a directory (write-delete pair)
                 //so we dont reset the "modified Inode" switch
+                journalIsWriteTruncatePair = true;
                 return Result::ok;
             }
 
@@ -369,6 +371,7 @@ DataIO::signalEndOfLog()
     JournalState state = statemachine.signalEndOfLog();
     if(journalInodeValid &&
             (state == JournalState::recover || //we continued action
+            (state == JournalState::invalid && journalIsWriteTruncatePair) ||
             (state == JournalState::ok && processedForeignSuccessElement))) //We just did not have a checkpoint
     {
         Result r = dev->tree.getInode(journalLastModifiedInode.no, journalLastModifiedInode);
