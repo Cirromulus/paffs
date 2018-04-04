@@ -97,10 +97,7 @@ GarbageCollection::findNextBestArea(AreaType target,
                 {
                     favourite_area = i;
                     favDirtyPages = dirtyPages;
-                    if(usedPages > 0)
-                    {
-                        srcAreaContainsValidData = true;
-                    }
+                    srcAreaContainsValidData = usedPages > 0;
                     favErases = dev->superblock.getErasecount(i);
                     memcpy(summaryOut, curr, dataPagesPerArea);
                 }
@@ -115,10 +112,7 @@ GarbageCollection::findNextBestArea(AreaType target,
                     //       i, dirtyPages, favourite_area, favDirtyPages);
                     favourite_area = i;
                     favDirtyPages = dirtyPages;
-                    if(usedPages > 0)
-                    {
-                        srcAreaContainsValidData = true;
-                    }
+                    srcAreaContainsValidData = usedPages > 0;
                     memcpy(summaryOut, curr, dataPagesPerArea);
                 }
             }
@@ -238,7 +232,14 @@ GarbageCollection::collectGarbage(AreaType targetType)
                                    dev->superblock.getActiveArea(AreaType::garbageBuffer),
                                    validDataLeft, summary);
         //this should not differ to the information from findNextBestArea
-        if (validDataLeft != true || r != Result::ok)
+        if(validDataLeft != true)
+        {
+            PAFFS_DBG(PAFFS_TRACE_BUG, "should copy valid data, but didnt"
+                        "from area %" PRIu16 " to %" PRIu16 "!",
+                        deletionTarget,
+                        dev->superblock.getActiveArea(AreaType::garbageBuffer));
+        }
+        if (r != Result::ok)
         {
             PAFFS_DBG_S(PAFFS_TRACE_ERROR,
                         "Could not copy valid pages from area %" PRIu16 " to %" PRIu16 "!",
@@ -385,13 +386,12 @@ GarbageCollection::signalEndOfLog()
         return;
     case Statemachine::moveValidData:
         PAFFS_DBG_S(PAFFS_TRACE_GC | PAFFS_TRACE_JOURNAL,
-                    "applying copied data");
-        dev->superblock.swapAreaPosition(journalTargetArea,
-                                         dev->superblock.getActiveArea(AreaType::garbageBuffer));
+                    "deleting copied data");
+        dev->areaMgmt.deleteAreaContents(dev->superblock.getActiveArea(AreaType::garbageBuffer), 0);
         break;
     case Statemachine::swappedPosition:
         PAFFS_DBG_S(PAFFS_TRACE_GC | PAFFS_TRACE_JOURNAL,
-                    "deleting copied data");
+                    "appying copied data");
         dev->areaMgmt.deleteAreaContents(journalTargetArea,
                             dev->superblock.getPos(dev->superblock.getActiveArea(AreaType::garbageBuffer)));
         //fall-through
@@ -419,6 +419,10 @@ GarbageCollection::signalEndOfLog()
                 {   //We were about to search for a writable area
                     dev->areaMgmt.initAreaAs(journalTargetArea, journalTargetAreaType);
                 }
+            }
+            else
+            {
+
             }
         }
         //fall-through
