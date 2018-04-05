@@ -106,7 +106,7 @@ public:
      * \param physpos specifies the physical position (if called from GC after swapping areapositions)
      */
     Result
-    deleteAreaContents(AreaPos area, AreaPos physPos = 0, bool noJournalLogging = false);
+    deleteAreaContents(AreaPos area, AreaPos swappedArea, bool noJournalLogging = false);
     Result
     deleteArea(AreaPos area);
 

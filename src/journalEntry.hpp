@@ -261,10 +261,10 @@ namespace journalEntry
         };
         struct DeleteAreaContents : public AreaMgmt
         {
-            AreaPos physPos;
+            AreaPos swappedArea;
             inline
-            DeleteAreaContents(AreaPos target, AreaPos _physPos) :
-                AreaMgmt(target, Operation::deleteAreaContents), physPos(_physPos){};
+            DeleteAreaContents(AreaPos target, AreaPos _swappedArea) :
+                AreaMgmt(target, Operation::deleteAreaContents), swappedArea(_swappedArea){};
         };
         struct DeleteArea : public AreaMgmt
         {

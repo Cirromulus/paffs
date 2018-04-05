@@ -256,7 +256,9 @@ GarbageCollection::collectGarbage(AreaType targetType)
          r = dev->areaMgmt.deleteArea(deletionTarget);
          if(r != Result::ok)
          {
-             //TODO: find a new place for Garbage Buffer
+             //No valid data lost, we are lucky.
+             //Just call next round.
+             return collectGarbage(targetType);
          }
     }
 
@@ -269,7 +271,7 @@ GarbageCollection::collectGarbage(AreaType targetType)
     {
         FAILPOINT;
         r = dev->areaMgmt.deleteAreaContents(deletionTarget,
-                         dev->superblock.getPos(dev->superblock.getActiveArea(AreaType::garbageBuffer)));
+                         dev->superblock.getActiveArea(AreaType::garbageBuffer));
         if(r != Result::ok)
         {
             PAFFS_DBG_S(PAFFS_TRACE_ALWAYS, "Could not delete Area! Giving up Garbage buffer to continue...");
@@ -393,7 +395,7 @@ GarbageCollection::signalEndOfLog()
         PAFFS_DBG_S(PAFFS_TRACE_GC | PAFFS_TRACE_JOURNAL,
                     "appying copied data");
         dev->areaMgmt.deleteAreaContents(journalTargetArea,
-                            dev->superblock.getPos(dev->superblock.getActiveArea(AreaType::garbageBuffer)));
+                            dev->superblock.getActiveArea(AreaType::garbageBuffer));
         //fall-through
     case Statemachine::deletedOldArea:
         dev->sumCache.scanAreaForSummaryStatus(journalTargetArea, summary);

@@ -443,7 +443,7 @@ SummaryCache::commitAreaSummaryHard(int& clearedAreaCachePosition, bool desperat
                                        dev->superblock.getActiveArea(AreaType::garbageBuffer));
         //deletes a cache position here, resets AsWritten
         dev->areaMgmt.deleteAreaContents(favouriteArea,
-                                         dev->superblock.getPos(dev->superblock.getActiveArea(AreaType::garbageBuffer)));
+                                         dev->superblock.getActiveArea(AreaType::garbageBuffer));
 
         setSummaryStatus(favouriteArea, summary);
     }

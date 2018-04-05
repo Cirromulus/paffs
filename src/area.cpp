@@ -342,7 +342,7 @@ AreaManagement::retireArea(AreaPos area)
 }
 
 Result
-AreaManagement::deleteAreaContents(AreaPos area, AreaPos physPos, bool noJournalLogging)
+AreaManagement::deleteAreaContents(AreaPos area, AreaPos swappedArea, bool noJournalLogging)
 {
     if (area >= areasNo)
     {
@@ -353,7 +353,7 @@ AreaManagement::deleteAreaContents(AreaPos area, AreaPos physPos, bool noJournal
                   areasNo);
         return Result::bug;
     }
-    if (dev->superblock.getPos(area) == AreaType::retired)
+    if (dev->superblock.getType(area) == AreaType::retired)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "Tried deleting a retired area contents! %" PTYPE_AREAPOS " on %" PTYPE_AREAPOS,
@@ -366,27 +366,27 @@ AreaManagement::deleteAreaContents(AreaPos area, AreaPos physPos, bool noJournal
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "deleted content of active area %" PTYPE_AREAPOS ", is this OK?", area);
     }
-    if(physPos == 0)
+    if(swappedArea == 0)
     {
-        physPos = dev->superblock.getPos(area);
+        swappedArea = area;
     }
     if(!noJournalLogging)
     {
         FAILPOINT;
-        dev->journal.addEvent(journalEntry::areaMgmt::DeleteAreaContents(area, physPos));
+        dev->journal.addEvent(journalEntry::areaMgmt::DeleteAreaContents(area, swappedArea));
     }
     Result r = Result::ok;
     FAILPOINT;
     for (unsigned int i = 0; i < blocksPerArea; i++)
     {
-        r = dev->driver.eraseBlock(physPos * blocksPerArea + i);
+        r = dev->driver.eraseBlock(dev->superblock.getPos(swappedArea) * blocksPerArea + i);
         if (r != Result::ok)
         {
             PAFFS_DBG_S(PAFFS_TRACE_GC,
                         "Could not delete block n° %" PTYPE_AREAPOS " (Area %" PTYPE_AREAPOS ")!",
-                        physPos * blocksPerArea + i,
+                        dev->superblock.getPos(swappedArea) * blocksPerArea + i,
                         area);
-            retireArea(area);
+            retireArea(swappedArea);
             r = Result::badFlash;
             break;
         }
@@ -402,7 +402,7 @@ AreaManagement::deleteAreaContents(AreaPos area, AreaPos physPos, bool noJournal
                     "Could not delete block in area %" PTYPE_AREAPOS " "
                     "on position %" PTYPE_AREAPOS "! Retired Area.",
                     area,
-                    physPos);
+                    dev->superblock.getPos(swappedArea));
         if (traceMask & (PAFFS_TRACE_AREA | PAFFS_TRACE_GC_DETAIL))
         {
             printf("Info: \n");
