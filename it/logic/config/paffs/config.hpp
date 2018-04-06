@@ -27,11 +27,12 @@ static constexpr uint8_t  jumpPadNo = 1;				//Should scale with max(0, log2(bloc
 
 //MRam config
 static constexpr uint32_t mramSize = 4096 * 512;		//Should be a multiple of 512 for viewer
-
+static constexpr uint16_t reservedLogsize = 4096;       	//bytes
 //Cache sizes
 static constexpr uint8_t  treeNodeCacheSize = 5;		//max. 1,5 * dataBytesPerPage(TreeNode) Bytes per Entry
 static constexpr uint8_t  areaSummaryCacheSize = 8;		//Currently  2 Bit per dataPagesPerArea
 static constexpr uint8_t  maxNumberOfDevices = 1;
 static constexpr uint8_t  maxNumberOfInodes = 10;		//limits simultaneously open files/folders excluding duplicates
 static constexpr uint8_t  maxNumberOfFiles = 10;		//limits simultaneously open files including duplicates
+static constexpr uint16_t maxPagesPerWrite     = 256;   //limits the size of a single write to a file or folder
 };
