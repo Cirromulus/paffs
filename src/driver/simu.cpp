@@ -43,6 +43,32 @@ getDriverSpecial(const uint8_t, void* fc, void *mram){
 }
 
 
+SimuDriver::SimuDriver()
+{
+    selfLoadedFlash = true;
+    selfLoadedMRAM = true;
+    cell = new FlashCell();
+    mram = new Mram(mramSize);
+}
+SimuDriver::SimuDriver(void *c)
+{
+    selfLoadedMRAM = true;
+    cell = static_cast<FlashCell*>(c);
+    mram = new Mram(mramSize);
+}
+SimuDriver::SimuDriver(void *c, void *m){
+    cell = static_cast<FlashCell*>(c);
+    mram = static_cast<Mram*>(m);
+}
+
+SimuDriver::~SimuDriver()
+{
+    if(selfLoadedFlash)
+        delete cell;
+    if(selfLoadedMRAM)
+        delete mram;
+}
+
 Result
 SimuDriver::initializeNand(){
 	memset(buf, 0xFF, totalBytesPerPage);

@@ -191,9 +191,6 @@ Journal::processBuffer()
         }
     }
 
-    //FIXME DEBUG
-    static_cast<Device*>(topics[JournalEntry::Topic::device])->debugPrintStatus();
-
     PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "Applying log...");
 
     r = applyJournalEntries(firstUncheckpointedEntry);

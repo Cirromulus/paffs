@@ -18,15 +18,7 @@
 #include "commonTest.hpp"
 
 class TreeTest : public InitFs
-{
-    void SetUp()
-    {
-        InitFs::SetUp();
-        //This stops the log from filling
-        paffs::Device* d = fs.getDevice(0);
-        d->journal.disable();
-    }
-};
+{};
 
 TEST_F(TreeTest, Sizes)
 {

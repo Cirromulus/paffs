@@ -27,28 +27,10 @@ class SimuDriver : public Driver{
 	bool selfLoadedFlash = false;
 	bool selfLoadedMRAM = false;
 public:
-	SimuDriver(){
-		selfLoadedFlash = true;
-		selfLoadedMRAM = true;
-		cell = new FlashCell();
-		mram = new Mram(mramSize);
-	}
-	SimuDriver(void *c){
-		selfLoadedMRAM = true;
-		cell = static_cast<FlashCell*>(c);
-		mram = new Mram(mramSize);
-	};
-	SimuDriver(void *c, void *m){
-		cell = static_cast<FlashCell*>(c);
-		mram = static_cast<Mram*>(m);
-	};
-
-	~SimuDriver(){
-		if(selfLoadedFlash)
-			delete cell;
-		if(selfLoadedMRAM)
-			delete mram;
-	}
+	SimuDriver();
+	SimuDriver(void *c);
+	SimuDriver(void *c, void *m);
+	~SimuDriver();
 
 	//DEBUG
 	FlashDebugInterface* getDebugInterface(){

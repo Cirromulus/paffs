@@ -2015,10 +2015,6 @@ Device::signalEndOfLog()
     Inode folder;
     Result r;
 
-    //fixme Debug
-    printf("device cleanup\n");
-    debugPrintStatus();
-
     switch(journalState)
     {
     case JournalState::ok:
