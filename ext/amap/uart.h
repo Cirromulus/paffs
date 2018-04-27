@@ -13,8 +13,8 @@
 
 #include <outpost/hal/serial.h>
 #include <outpost/utils.h>
-#include <outpost/utils/deque.h>
-#include <outpost/utils/bounded_array.h>
+#include <outpost/utils/container/deque.h>
+#include <outpost/utils/container/slice.h>
 
 #include "amap.h"
 
@@ -52,8 +52,8 @@ public:
              uint32_t baseAddress,
              std::size_t hardwareTxBufferSize,
              std::size_t hardwareRxBufferSize,
-             outpost::BoundedArray<uint8_t> txBuffer,
-             outpost::BoundedArray<uint8_t> rxBuffer);
+             outpost::Slice<uint8_t> txBuffer,
+             outpost::Slice<uint8_t> rxBuffer);
 
     virtual
     ~UartBase();
@@ -88,11 +88,11 @@ public:
     isAvailable(void);
 
     virtual std::size_t
-    read(outpost::BoundedArray<uint8_t> data,
+    read(outpost::Slice<uint8_t> data,
          time::Duration timeout = time::Duration::maximum());
 
     virtual std::size_t
-    write(outpost::BoundedArray<const uint8_t> data,
+    write(outpost::Slice<const uint8_t> data,
           time::Duration timeout = time::Duration::maximum());
 
     virtual void
@@ -242,7 +242,7 @@ protected:
     struct Channel
     {
         Channel(std::size_t totalSize,
-                outpost::BoundedArray<uint8_t> buffer) :
+                outpost::Slice<uint8_t> buffer) :
                 mBuffer(&buffer[0], buffer.getNumberOfElements()), mAmap()
         {
             mAmap.mTotalSize = totalSize;
@@ -322,9 +322,9 @@ public:
          std::size_t hardwareRxBufferSize) :
             UartBase(amap, baseAddress, hardwareTxBufferSize,
                     hardwareRxBufferSize,
-                    outpost::BoundedArray < uint8_t
+                    outpost::Slice < uint8_t
                             > (mTxBuffer, sizeof(mTxBuffer)),
-                    outpost::BoundedArray < uint8_t
+                    outpost::Slice < uint8_t
                             > (mRxBuffer, sizeof(mRxBuffer)))
     {
     }

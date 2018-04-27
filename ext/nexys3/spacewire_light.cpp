@@ -178,7 +178,7 @@ outpost::leon3::SpaceWireLight::receive(ReceiveBuffer& buffer, outpost::time::Du
     if (status == RTEMS_SUCCESSFUL)
     {
         buffer = ReceiveBuffer(
-        		outpost::BoundedArray<const uint8_t>(
+        		outpost::Slice<const uint8_t>::unsafe(
 				static_cast<const uint8_t *>(data), bytesReceived),
         		toEopMarker(eopFlags));
         return Result::Type::success;

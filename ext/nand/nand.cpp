@@ -3,7 +3,7 @@
 #include <cstdio>
 
 #include <spacewire_light.h>
-#include <outpost/utils/serialize.h>
+#include <outpost/utils/storage/serialize.h>
 
 //#define DEBUG
 
