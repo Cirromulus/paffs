@@ -39,8 +39,19 @@ pipeline {
                         url: 'https://hbryavsci1l.hb.dlr.de:8929/avionics-software-open/satfon-simulation.git'
                 }
                 dir('outpost-core') {
-                    git credentialsId: 'd895b75a-06cc-4446-a936-afe31d36d02b',
-                        url: 'https://hbryavsci1l.hb.dlr.de:8929/avionics-software-open/outpost-core.git'
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: '*/master']],
+                        doGenerateSubmoduleConfigurations: false,
+                        extensions: [
+                            [$class: 'SubmoduleOption', parentCredentials: true, recursiveSubmodules: true]
+                        ],
+                        submoduleCfg: [],
+                        userRemoteConfigs: [[
+                            credentialsId: 'jenkins-ssh-gitlab',
+                            url: 'ssh://git@hbryavsci1l.hb.dlr.de:10022/avionics-software-open/outpost-core.git'
+                        ]]
+                    ])
                 }
                 stash includes: 'paffs/**', name: 'paffs'
                 stash includes: 'scons-build-tools/**', name: 'scons-build-tools'

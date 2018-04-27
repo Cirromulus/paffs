@@ -18,8 +18,8 @@ UartBase::UartBase(Amap *amap,
                    uint32_t baseAddress,
                    std::size_t hardwareTxBufferSize,
                    std::size_t hardwareRxBufferSize,
-                   outpost::BoundedArray<uint8_t> txBuffer,
-                   outpost::BoundedArray<uint8_t> rxBuffer) :
+                   outpost::Slice<uint8_t> txBuffer,
+                   outpost::Slice<uint8_t> rxBuffer) :
         mAmap(amap), mBaseAddress(baseAddress), mInitialized(false),
         mControlRegister(0), mTx(hardwareTxBufferSize, txBuffer),
         mRx(hardwareRxBufferSize, rxBuffer)
@@ -85,7 +85,7 @@ UartBase::isAvailable()
 //}
 
 std::size_t
-UartBase::read(outpost::BoundedArray<uint8_t> data,
+UartBase::read(outpost::Slice<uint8_t> data,
                time::Duration /*timeout*/)
 {
     std::size_t i = 0;
@@ -112,7 +112,7 @@ UartBase::read(outpost::BoundedArray<uint8_t> data,
 }
 
 std::size_t
-UartBase::write(outpost::BoundedArray<const uint8_t> data,
+UartBase::write(outpost::Slice<const uint8_t> data,
                 time::Duration /*timeout*/)
 {
     std::size_t i = 0;

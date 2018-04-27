@@ -335,7 +335,7 @@ public:
 private:
 
     static void
-    writeHeader(outpost::BoundedArray<uint8_t> buffer,
+    writeHeader(outpost::Slice<uint8_t> buffer,
                 Operation operation,
                 uint32_t address,
                 std::size_t length);
