@@ -63,6 +63,9 @@ TEST_F(TreeTest, coalesceTree)
     paffs::Result r;
     const unsigned numberOfNodes = paffs::leafOrder * paffs::branchOrder + 1;
 
+    d->journal.clear();   //Regularly clear Journal to prevent overflow.
+                          //it is not tested here.
+
     // insert
     for (unsigned int i = 1; i <= numberOfNodes; i++)
     {
@@ -73,6 +76,8 @@ TEST_F(TreeTest, coalesceTree)
         if (r != paffs::Result::ok)
             std::cerr << paffs::err_msg(r) << std::endl;
         ASSERT_EQ(paffs::Result::ok, r);
+
+        d->journal.clear();
     }
 
     // delete reverse
@@ -82,6 +87,8 @@ TEST_F(TreeTest, coalesceTree)
         if (r != paffs::Result::ok)
             std::cerr << paffs::err_msg(r) << std::endl;
         ASSERT_EQ(paffs::Result::ok, r);
+
+        d->journal.clear();
     }
 
     // insert
@@ -94,6 +101,8 @@ TEST_F(TreeTest, coalesceTree)
         if (r != paffs::Result::ok)
             std::cerr << paffs::err_msg(r) << std::endl;
         ASSERT_EQ(paffs::Result::ok, r);
+
+        d->journal.clear();
     }
 
     // delete forward
@@ -103,6 +112,8 @@ TEST_F(TreeTest, coalesceTree)
         if (r != paffs::Result::ok)
             std::cerr << paffs::err_msg(r) << std::endl;
         ASSERT_EQ(paffs::Result::ok, r);
+
+        d->journal.clear();
     }
 }
 
@@ -111,6 +122,9 @@ TEST_F(TreeTest, redistributeTree)
     paffs::Device* d = fs.getDevice(0);
     paffs::Result r;
     const unsigned numberOfNodes = paffs::leafOrder * (paffs::branchOrder + 1);
+
+    d->journal.clear();   //Regularly clear Journal to prevent overflow.
+                          //it is not tested here.
 
     // insert odd numbers
     for (unsigned int i = 1; i <= numberOfNodes; i++)
@@ -126,6 +140,8 @@ TEST_F(TreeTest, redistributeTree)
         if (r != paffs::Result::ok)
             std::cerr << paffs::err_msg(r) << std::endl;
         ASSERT_EQ(paffs::Result::ok, r);
+
+        d->journal.clear();
     }
     //insert even numbers to fill the nodes to a maximum (not just halves)
     for (unsigned int i = 1; i <= numberOfNodes; i++)
@@ -141,6 +157,8 @@ TEST_F(TreeTest, redistributeTree)
         if (r != paffs::Result::ok)
             std::cerr << paffs::err_msg(r) << std::endl;
         ASSERT_EQ(paffs::Result::ok, r);
+
+        d->journal.clear();
     }
 
     // delete
@@ -150,5 +168,7 @@ TEST_F(TreeTest, redistributeTree)
         if (r != paffs::Result::ok)
             std::cerr << paffs::err_msg(r) << std::endl;
         ASSERT_EQ(paffs::Result::ok, r);
+
+        d->journal.clear();
     }
 }
