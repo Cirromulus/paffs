@@ -27,7 +27,7 @@ using namespace paffs;
 Result
 Journal::addEvent(const JournalEntry& entry)
 {
-    if (disabled)
+    if (disabled || mramSize == 0)
     {
         // Skipping, because we are currently replaying a buffer or formatting fs
         return Result::ok;
@@ -95,12 +95,20 @@ Journal::clear()
             uncheckpointedChanges.setBit(topic->getTopic());
         }
     }
+    if(mramSize == 0)
+    {
+        return Result::ok;
+    }
     return persistence.clear();
 }
 
 Result
 Journal::processBuffer()
 {
+    if(mramSize == 0)
+    {
+        return Result::ok;
+    }
     journalEntry::Max entry;
     JournalEntryPosition firstUncheckpointedEntry[JournalEntry::numberOfTopics];
 

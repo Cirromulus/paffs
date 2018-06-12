@@ -195,6 +195,10 @@ MramPersistence::appendEntry(const JournalEntry& entry)
 bool
 MramPersistence::isLowMem()
 {
+    if(mramSize == 0)
+    {
+        return false;
+    }
     return mramSize - curr < reservedLogsize;
 }
 
@@ -328,6 +332,10 @@ FlashPersistence::appendEntry(const JournalEntry& entry)
 bool
 FlashPersistence::isLowMem()
 {
+    if(mramSize == 0)
+    {
+        return false;
+    }
     return totalPagesPerArea * dataBytesPerPage - extractPageOffs(curr.addr) < reservedLogsize;
 }
 

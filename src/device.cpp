@@ -324,7 +324,7 @@ Device::mnt(bool readOnlyMode)
                 rootDir->perm & W ? "w" : "-",
                         rootDir->perm & X ? "x" : "-"
                 );
-        printf("   Size: %" PTYPE_FILSIZE " Byte (%" PRIu32 " pages)\n",
+        printf("   Size: %" PTYPE_FILSIZE " Byte (%" PRIu16 " pages)\n",
                rootDir->size, rootDir->reservedPages);
         for(uint8_t i = 0; i < directAddrCount + 3; i++)
         {   //Intentionally reading over boundary of direct array into indirect
@@ -977,7 +977,7 @@ Device::checkFolderSanity(InodeNo folderNo)
         {
             // We have an error while reading
             PAFFS_DBG(PAFFS_TRACE_BUG, "Dirname length was bigger than possible "
-                    "(%" PTYPE_FILNAMEPOS " > %" PTYPE_FILNAMEPOS ")!",
+                    "(%" PTYPE_FILNAMEPOS " > %" PTYPE_FILSIZE ")!",
                     direntryl, folder->size - p);
             return Result::bug;
         }
@@ -1273,7 +1273,7 @@ Device::openDir(const char* path)
         {
             // We have an error while reading
             PAFFS_DBG(PAFFS_TRACE_BUG, "Dirname length was bigger than possible "
-                    "(%" PTYPE_FILNAMEPOS " > %" PTYPE_FILNAMEPOS ")!",
+                    "(%" PTYPE_FILNAMEPOS " > %" PTYPE_FILSIZE ")!",
                     dirnamel, dirPinode->size - p);
             delete[] dir->childs;
             delete dir->self;

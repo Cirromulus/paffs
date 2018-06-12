@@ -40,20 +40,22 @@ using namespace paffs;
 // const BlockAbs badBlocksDev1[] = {1059, 1771, 2372, 3434, 3484};
 
 // initial bad blocks on NAND board 3
-const BlockAbs badBlocksDev0[] = {862, 3128};
-const BlockAbs badBlocksDev1[] = {61, 248, 1158, 1476, 2001, 2198};
-const BlockAbs badBlocksDev2[] = {0};
-const BlockAbs badBlocksDev3[] = {0};
+//const BlockAbs badBlocksDev0[] = {862, 3128};
+//const BlockAbs badBlocksDev1[] = {61, 248, 1158, 1476, 2001, 2198};
+//const BlockAbs badBlocksDev2[] = {0};
+//const BlockAbs badBlocksDev3[] = {0};
 
 // initial bad blocks on NAND board 4
-// const BlockAbs badBlocksDev0[] = {835, 2860, 3858, 4046};
-// const BlockAbs badBlocksDev1[] = {367, 2786};
+const BlockAbs badBlocksDev0[] = {835, 2860, 3858, 4046};
+const BlockAbs badBlocksDev1[] = {367, 2786};
 
 // initial bad blocks on NAND board 5
 // const BlockAbs badBlocksDev0[] = {314, 1818, 1925, 2967};
 // const BlockAbs badBlocksDev1[] = {614, 2315, 2400, 2906, 2907, 2908, 2909, 3751};
 // const BlockAbs badBlocksDev2[] = {418, 1690, 3787};
 // const BlockAbs badBlocksDev3[] = {931, 3067};
+
+uint8_t paffsRaw[sizeof(Paffs)];
 
 rtems_task task_system_init(rtems_task_argument)
 {
@@ -73,7 +75,7 @@ rtems_task task_system_init(rtems_task_argument)
     SevenSegment::write(2, 'F');
     SevenSegment::write(3, 'S');
 
-    BadBlockList badBlocks[] = {BadBlockList(badBlocksDev0, 2), BadBlockList(badBlocksDev1, 6)};
+    BadBlockList badBlocks[] = {BadBlockList(badBlocksDev0, 4), BadBlockList(badBlocksDev1, 2)};
 
     uint8_t leds = 0;
     for (uint_fast8_t i = 0; i < 10; ++i)
@@ -86,10 +88,11 @@ rtems_task task_system_init(rtems_task_argument)
 
     std::vector<paffs::Driver*> drv;
     drv.push_back(paffs::getDriver(0));
-    Paffs* fs = new Paffs(drv);
+    Paffs* fs = new(paffsRaw) Paffs(drv);
     fs->setTraceMask(PAFFS_TRACE_SOME);
 
-    printf("Trying to mount FS...\n");
+    printf("Trying to mount FS...");
+    fflush(stdout);
     Result r = fs->mount();
     printf("\t %s\n", err_msg(r));
 

@@ -338,7 +338,7 @@ Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition positio
                         node.perm & W ? "w" : "-",
                         node.perm & X ? "x" : "-"
                         );
-                printf("   Size: %" PTYPE_FILSIZE " Byte (%" PRIu32 " pages)\n",
+                printf("   Size: %" PTYPE_FILSIZE " Byte (%" PRIu16 " pages)\n",
                        node.size, node.reservedPages);
                 for(uint8_t i = 0; i < directAddrCount ; i++)
                 {
