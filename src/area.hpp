@@ -48,9 +48,9 @@ getBlockNumberFromDirect(const Addr addr);
  */
 Addr
 combineAddress(const AreaPos logicalArea, const PageOffs page);
-unsigned int
+AreaPos
 extractLogicalArea(const Addr addr);
-unsigned int
+PageOffs
 extractPageOffs(const Addr addr);
 
 class AreaManagement : public JournalTopic

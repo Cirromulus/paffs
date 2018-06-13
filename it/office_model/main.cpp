@@ -65,6 +65,22 @@ rtems_task task_system_init(rtems_task_argument)
     printf("\n\n\n\nBuild: " __DATE__ " " __TIME__ "\n");
     rtems_stack_checker_report_usage();
 
+    AreaPos area = 7;
+    PageOffs page = 255;
+    Addr addr = combineAddress(area, page);
+    if(extractLogicalArea(addr) != area)
+    {
+        printf("Error in Addr storage! (area = %" PTYPE_AREAPOS ", but should %" PTYPE_AREAPOS ")\n",
+               extractLogicalArea(addr), area);
+        return;
+    }
+    if(extractPageOffs(addr) != page)
+    {
+        printf("Error in Addr storage! (page = %" PTYPE_AREAPOS ", but should %" PTYPE_AREAPOS ")\n",
+               extractPageOffs(addr), page);
+        return;
+    }
+
     ObjInfo inf;
     Obj* file;
     FileSize br;
@@ -101,7 +117,7 @@ rtems_task task_system_init(rtems_task_argument)
         char buf = 0;
         while (buf != 'y' && buf != 'n' && buf != 'c' && buf != '\n')
         {
-            printf("There was no valid image found. Format?\n(y/c/N) ");
+            printf("There was no valid image found. Format?\n(y(es)/c(omplete)/N(o)) ");
             fflush(stdout);
             scanf("%1c", &buf);
         }
@@ -195,6 +211,9 @@ rtems_task task_system_init(rtems_task_argument)
     {
         printf("ok.\n");
     }
+    r = fs->close(*file);
+    printf("Close File: %s\n", err_msg(r));
+
     r = fs->unmount();
     printf("Unmount: %s\n", err_msg(r));
 

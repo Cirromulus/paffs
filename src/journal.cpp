@@ -619,6 +619,10 @@ Result
 Journal::enable()
 {
     disabled = false;
+    if(mramSize == 0)
+    {
+        return Result::ok;
+    }
     for(JournalTopic* topic : topics)
     {
         if(topic != nullptr)

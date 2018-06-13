@@ -114,6 +114,6 @@ do                                                      \
 #define PAFFS_TRACE_ERROR       0x10000000
 #define PAFFS_TRACE_BUG         0x20000000
 #define PAFFS_TRACE_ALL         0xfff7ffff
-#define PAFFS_TRACE_SOME        0xC0050071
+#define PAFFS_TRACE_SOME        0x30800071
 
 // clang-format on

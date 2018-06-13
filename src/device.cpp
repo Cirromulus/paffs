@@ -77,16 +77,14 @@ Device::format(const BadBlockList& badBlockList, bool complete)
     {
         return r;
     }
+    PAFFS_DBG_S(PAFFS_TRACE_INFO, "Initialized Program.");
     r = driver.initializeNand();
     if (r != Result::ok)
     {
         return r;
     }
+    PAFFS_DBG_S(PAFFS_TRACE_INFO, "Initialized NAND Devices.");
 
-    if (complete)
-    {
-        PAFFS_DBG_S(PAFFS_TRACE_VERBOSE, "Deleting all areas.\n");
-    }
 
     BitList<AreaType::no> hadAreaType;
     uint8_t hadSuperblocks = 0;
@@ -120,13 +118,30 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         }
     }
 
+    PAFFS_DBG_S(PAFFS_TRACE_INFO, "Handled Badblocklist.");
+    if (complete)
+    {
+        PAFFS_DBG_S(PAFFS_TRACE_INFO, "Initing areas...");
+    }
+
     for (AreaPos area = 0; area < areasNo; area++)
     {
         if (superblock.getType(area) == AreaType::retired)
         {
             continue;
         }
-
+        if((traceMask & PAFFS_TRACE_INFO))
+        {
+            printf("\rChecking Area %" PTYPE_AREAPOS "/%" PTYPE_AREAPOS, area+1, areasNo);
+            if(area + 1 < areasNo)
+            {
+                fflush(stdout);
+            }
+            else
+            {
+                printf("\n");
+            }
+        }
         superblock.setStatus(area, AreaStatus::empty);
         // erasecount is already set to 0
         superblock.setPos(area, area);
@@ -207,7 +222,7 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         superblock.setType(area, AreaType::unset);
     }
 
-    journal.enable();   //actually, this could be at the start.
+    journal.enable();
     r = tree.startNewTree();
     if (r != Result::ok)
     {
@@ -233,18 +248,24 @@ Device::format(const BadBlockList& badBlockList, bool complete)
             return r;
         }
     }
+
+    PAFFS_DBG_S(PAFFS_TRACE_INFO, "Writing Inode tree...");
+
     r = tree.commitCache();
     if (r != Result::ok)
     {
         destroyDevice();
         return r;
     }
+    PAFFS_DBG_S(PAFFS_TRACE_INFO, "Writing Superindex structure...");
     r = sumCache.commitAreaSummaries(true);
     if (r != Result::ok)
     {
         destroyDevice();
         return r;
     }
+
+    PAFFS_DBG_S(PAFFS_TRACE_INFO, "Done");
 
     destroyDevice();
     driver.deInitializeNand();

@@ -89,21 +89,21 @@ combineAddress(const AreaPos logicalArea, const PageOffs page)
 {
     Addr addr = 0;
     memcpy(&addr, &page, sizeof(PageOffs));
-    memcpy(&reinterpret_cast<char*>(&addr)[sizeof(PageOffs)], &logicalArea, sizeof(AreaPos));
+    memcpy(&reinterpret_cast<AreaPos*>(&addr)[1], &logicalArea, sizeof(AreaPos));
     return addr;
 }
 
-unsigned int
+AreaPos
 extractLogicalArea(const Addr addr)
 {
-    unsigned int area = 0;
-    memcpy(&area, &reinterpret_cast<const char*>(&addr)[sizeof(PageOffs)], sizeof(AreaPos));
+    AreaPos area = 0;
+    memcpy(&area, &reinterpret_cast<const AreaPos*>(&addr)[1], sizeof(AreaPos));
     return area;
 }
-unsigned int
+PageOffs
 extractPageOffs(const Addr addr)
 {
-    unsigned int page = 0;
+    PageOffs page = 0;
     memcpy(&page, &addr, sizeof(PageOffs));
     return page;
 }
