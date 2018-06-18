@@ -20,7 +20,10 @@ extern "C" {
 #include <paffs.hpp>
 #include <sevensegment.h>
 
+#include "../misc/cmd.hpp"
+
 #include <string.h>
+#include <stdio.h>
 
 using namespace outpost::nexys3;
 using namespace paffs;
@@ -65,24 +68,11 @@ rtems_task task_system_init(rtems_task_argument)
     printf("\n\n\n\nBuild: " __DATE__ " " __TIME__ "\n");
     rtems_stack_checker_report_usage();
 
-    AreaPos area = 7;
-    PageOffs page = 255;
-    Addr addr = combineAddress(area, page);
-    if(extractLogicalArea(addr) != area)
-    {
-        printf("Error in Addr storage! (area = %" PTYPE_AREAPOS ", but should %" PTYPE_AREAPOS ")\n",
-               extractLogicalArea(addr), area);
-        return;
-    }
-    if(extractPageOffs(addr) != page)
-    {
-        printf("Error in Addr storage! (page = %" PTYPE_AREAPOS ", but should %" PTYPE_AREAPOS ")\n",
-               extractPageOffs(addr), page);
-        return;
-    }
-
+    Result r;
     ObjInfo inf;
-    Obj* file;
+    Obj* obj;
+    Dir* dir;
+    Dirent* entry;
     FileSize br;
 
     SevenSegment::clear();
@@ -99,7 +89,7 @@ rtems_task task_system_init(rtems_task_argument)
         leds >>= 1;
         leds |= 0b10000000;
         Gpio::set(leds);
-        rtems_task_wake_after(100);
+        rtems_task_wake_after(25);
     }
 
     std::vector<paffs::Driver*> drv;
@@ -107,11 +97,16 @@ rtems_task task_system_init(rtems_task_argument)
     Paffs* fs = new(paffsRaw) Paffs(drv);
     fs->setTraceMask(PAFFS_TRACE_SOME);
 
+    CmdParser parser;
+    const uint16_t buffersize = 500;
+    char line[buffersize];
+
     printf("Trying to mount FS...");
     fflush(stdout);
-    Result r = fs->mount();
+    r = fs->mount();
     printf("\t %s\n", err_msg(r));
 
+    //Ask for formatting if could not mount
     if (r != Result::ok)
     {
         char buf = 0;
@@ -147,76 +142,138 @@ rtems_task task_system_init(rtems_task_argument)
         r = fs->mount();
         printf("\t %s\n", err_msg(r));
         if (r != Result::ok)
+        {
             goto idle;
+        }
     }
 
-    file = fs->open("/test.txt", FR | FW | FE);  // open read/write and only existing
-    if (file == nullptr)
+    obj = fs->open("/log.txt", FR | FW | FC);  // open read/write and only existing
+    if (obj == nullptr)
     {
-        if (fs->getLastErr() == Result::notFound)
-        {
-            fs->resetLastErr();
-            printf("File not found, creating new...\n");
-            r = fs->touch("/test.txt");
-            if (r != Result::ok)
-            {
-                printf("Touch error: %s\n", err_msg(r));
-                goto idle;
-            }
-            printf("Trying to reopen file...\n");
-            file = fs->open("/test.txt", FR | FE);
-            if (file == nullptr || fs->getLastErr() != Result::ok)
-            {
-                printf("Error opening file: %s\n", err_msg(fs->getLastErr()));
-                goto idle;
-            }
-        }
-        else
-        {
-            printf("Error opening file: %s\n", err_msg(fs->getLastErr()));
-            goto idle;
-        }
+        printf("Error opening file: %s\n", err_msg(fs->getLastErr()));
+        goto idle;
     }
 
-    printf("File was found.\n");
-    fs->getObjInfo("/test.txt", inf);
-    printf("Size: %lu Byte\n", inf.size);
-
-    if (inf.size != 0)
+    printf("log.txt was found.\n");
+    r = fs->seek(*obj, 0, Seekmode::end);
+    if (r != Result::ok)
     {
-        printf("Reading contents of file:\n");
-        char rbuf[inf.size + 1];
-        r = fs->read(*file, rbuf, inf.size, &br);
-        rbuf[inf.size] = 0;
-        if (r != Result::ok)
-        {
-            printf("Error reading file: %s\n", err_msg(r));
-            goto idle;
-        }
-        if (br != inf.size)
-        {
-            printf("Error reading file, size differs (%" PTYPE_FILSIZE ")\n", br);
-            goto idle;
-        }
-        printf("----------\n%s\n----------\n", rbuf);
+        printf("Error seeking file: %s\n", err_msg(r));
+        goto idle;
     }
-
-    r = fs->write(*file, wbuf, strlen(wbuf), &br);
+    r = fs->write(*obj, wbuf, strlen(wbuf), &br);
     if (r != Result::ok)
     {
         printf("Error writing file: %s\n", err_msg(r));
         goto idle;
     }
-    else
-    {
-        printf("ok.\n");
+    r = fs->close(*obj);
+
+    //interactive
+    printf("CMD:\n");
+    while (true) {
+        r = Result::ok;
+        fgets(line, buffersize, stdin);
+        if ((strlen(line) > 0) && (line[strlen (line) - 1] == '\n'))
+        {   //remove trailing newline
+            line[strlen (line) - 1] = '\0';
+        }
+        CmdParser::Command cmd = parser.parse(line);
+        switch(cmd.commandId)
+        {
+        case CmdParser::CommandID::quit:
+            r = fs->unmount();
+            if(r != Result::ok)
+            {
+                printf("Unmount error: %s\n", resultMsg[static_cast<uint8_t>(r)]);
+                goto idle;
+            }
+            printf("Unmounted. You are now safe to turn off your computer.\n");
+            goto idle;
+            break;
+        case CmdParser::CommandID::cat:
+        {
+            r = fs->getObjInfo(cmd.argument1, inf);
+            if(r != Result::ok)
+            {
+                break;
+            }
+            printf("Filesize: %" PTYPE_FILSIZE " Byte\n", inf.size);
+            obj = fs->open(cmd.argument1, FR);
+            if (obj == nullptr)
+            {
+                break;
+            }
+            char buf[inf.size];
+            r = fs->read(*obj, buf, inf.size, &br);
+            if(r != Result::ok)
+            {
+                break;
+            }
+            printf("%.*s\n", static_cast<int>(inf.size), buf);
+            fs->close(*obj);
+            break;
+        }
+        case CmdParser::CommandID::ls:
+        {
+            const char* path = cmd.argument1 == NULL ? "/" : cmd.argument1;
+            dir = fs->openDir(path);
+            if (dir == nullptr)
+            {
+                r = fs->getLastErr();
+                break;
+            }
+            printf("Contents of %s:\n", path);
+            while((entry = fs->readDir(*dir)) != nullptr)
+            {
+               printf("\t%s\n", entry->name);
+            }
+            fs->closeDir(dir);
+            break;
+        }
+        case CmdParser::CommandID::cd:
+            printf("Command not implemented yet\n");
+            break;
+        case CmdParser::CommandID::append:
+            obj = fs->open(cmd.argument1, FW | FA | FC);
+            if (obj == nullptr)
+            {
+                break;
+            }
+            r = fs->write(*obj, cmd.argument2, strlen(cmd.argument2), &br);
+            if(r != Result::ok)
+            {
+                break;
+            }
+            fs->close(*obj);
+            break;
+        case CmdParser::CommandID::mkdir:
+            r = fs->mkDir(cmd.argument1, R | W | X);
+            break;
+        case CmdParser::CommandID::touch:
+            r = fs->touch(cmd.argument1);
+            break;
+        case CmdParser::CommandID::del:
+            r = fs->remove(cmd.argument1);
+            break;
+        case CmdParser::CommandID::mount:
+            r = fs->mount();
+            break;
+        case CmdParser::CommandID::unmount:
+            r = fs->unmount();
+            break;
+        case CmdParser::CommandID::format:
+            r = fs->format(badBlocks, !strcmp(cmd.argument1, "complete"));
+            break;
+        default:
+            printf("Unknown or invalid command.\n");
+        //fall-through
+        case CmdParser::CommandID::help:
+            parser.listCommands();
+            break;
+        }
+        printf("%s\n", resultMsg[static_cast<uint8_t>(r)]);
     }
-    r = fs->close(*file);
-    printf("Close File: %s\n", err_msg(r));
-
-    r = fs->unmount();
-    printf("Unmount: %s\n", err_msg(r));
-
 idle:
     printf("Now idling.\n");
     rtems_stack_checker_report_usage();
