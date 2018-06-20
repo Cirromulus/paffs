@@ -5,13 +5,9 @@ Import('envGlobal')
 
 print("NEXYSDRIVER")
 
-amappath   = os.path.join('$EXTPATH', 'amap')
-nandpath   = os.path.join('$EXTPATH', 'nand')
 nexys3path = os.path.join('$EXTPATH', 'nexys3')
 
 envGlobal.Append(CPPPATH=[
-	amappath,
-	nandpath,
 	nexys3path,
 ])
 
@@ -21,8 +17,6 @@ files  = [
     'office_model_nexys3.cpp',
     'yaffs_ecc.cpp'
 ]
-files.extend(env.Glob(amappath+'/*.cpp'))
-files.extend(env.Glob(nandpath+'/*.cpp'))
 files.extend(env.Glob(nexys3path+'/*.cpp'))
 files.extend(env.Glob(nexys3path+'/*.c'))
 

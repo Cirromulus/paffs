@@ -20,7 +20,7 @@
 
 
 #include <outpost/hal/spacewire.h>
-#include <spacewire_light.h>
+#include <outpost/leon3/spacewire_light.h>
 #include <new>
 #include "../../ext/artix7/amap.h"
 #include "../../ext/artix7/nand.h"
@@ -31,27 +31,36 @@ using namespace outpost::hal;
 using namespace outpost::iff;
 using namespace outpost::leon3;
 
-class OfficeModelNexys3Driver : public Driver{
+class OfficeModel2Artix7Driver : public Driver{
 	uint8_t mBank, mDevice;
 	SpaceWireLight mSpacewire;
 	uint8_t mNandRaw[sizeof(Nand)];
 	uint8_t mAmapRaw[sizeof(Amap)];
 	Nand *mNand;
 	Amap *mIfFpga;
+	static constexpr uint32_t* MCFG1 =
+	        reinterpret_cast<uint32_t*>(0x80000000);  //Memory config register 1
+	static constexpr uint8_t PROMwEnable = 11;  //PROM write enable bit
+	static constexpr uint32_t* MRAMStartAddr =
+	        reinterpret_cast<uint32_t*>(0x00000010);  //Reserve some Space for bootloader to fail
+
 public:
 	inline
-	OfficeModelNexys3Driver(uint8_t _bank, uint8_t _device)
-			: mBank(_bank), mDevice(_device), mSpacewire(0){
+	OfficeModel2Artix7Driver(uint8_t _bank, uint8_t _device)
+			: mBank(_bank), mDevice(_device), mSpacewire(1){
 
 		if(!initSpaceWire()){
 			printf("Spacewire connection failed!");
 		}
 		mIfFpga = new(mNandRaw) Amap(mSpacewire);
 		mNand = new(mAmapRaw) Nand(*mIfFpga, 0x00200000);
+
+		//Enable MRAM write
+		*MCFG1 |= 1 << PROMwEnable;
 	}
 
 	inline
-	~OfficeModelNexys3Driver(){};
+	~OfficeModel2Artix7Driver(){};
 
 	Result
 	initializeNand() override;
@@ -67,6 +76,10 @@ public:
 	markBad(BlockAbs blockNo) override;
 	Result
 	checkBad(BlockAbs blockNo) override;
+	Result
+	writeMRAM(PageAbs startByte, const void* data, uint32_t dataLen);
+	Result
+	readMRAM(PageAbs startByte, void* data, uint32_t dataLen);
 private:
 	bool initSpaceWire();
 };

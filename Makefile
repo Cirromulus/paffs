@@ -12,14 +12,17 @@ else
 endif
 
 TESTDIR=./test/
-EMBEDDEDINTEGRATIONDIR=./it/office_model
+OM1INTEGRATIONDIR=./it/office_model
+OM2INTEGRATIONDIR=./it/office_model2
 INTEGRATIONDIR=./it/logic
 MISCDIR=./it/misc
 
 all: build-integration-debug build-misc
 
-build-embedded:
-	@scons $(MAKEJOBS) -C $(EMBEDDEDINTEGRATIONDIR)
+build-embedded-om1:
+	@scons $(MAKEJOBS) -C $(OM1INTEGRATIONDIR)
+build-embedded-om2:
+	@scons $(MAKEJOBS) -C $(OM2INTEGRATIONDIR)
 	
 build-integration:
 	@scons $(MAKEJOBS) -C $(INTEGRATIONDIR) --release-build	
@@ -53,8 +56,11 @@ test-integration: build-integration
 test-integration-bigflash: build-integration-bigflash
 	./build/release/it/bigflash/integrationtest --gtest_output=xml:./build/release/test/integration_coverage.xml
 
-test-embedded: build-embedded
+test-embedded-om1: build-embedded-om1
 	/opt/grmon-eval-2.0.83/linux64/bin/grmon -uart /dev/cobc_dsu_3 -stack 0x40fffff0 -baud 460800 -gdb
+	
+test-embedded-om2: build-embedded-om2
+	/opt/grmon-eval-2.0.83/linux64/bin/grmon -uart /dev/tty_rcn0001_dsu -stack 0x40fffff0 -baud 460800 -gdb
 
 test-misc: build-misc
 	./build/debug/misc/misctest 
@@ -68,9 +74,12 @@ get-dep:
 doc:
 	@$(MAKE) -C doc/PAFFS_DOCUMENTATION
 
+.PHONY: doc
+
 clean:
 	@scons -C $(TESTDIR) -c
 	@scons -C $(INTEGRATIONDIR) -c
-	@scons -C $(EMBEDDEDINTEGRATIONDIR) -c
+	@scons -C $(OM1INTEGRATIONDIR) -c
+	@scons -C $(OM2INTEGRATIONDIR) -c
 	rm -rf build/
 	@$(MAKE) -C doc/PAFFS_DOCUMENTATION clean
