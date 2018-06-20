@@ -159,7 +159,7 @@ return true;
 
 // ----------------------------------------------------------------------------
 
-void
+bool
 Nand::readPage(uint8_t bank,
                uint8_t device,
                uint32_t page,
@@ -195,11 +195,13 @@ address = baseAddress;
 
 if (!amap.read(address, buffer, 4224 / 4, outpost::time::Milliseconds(2)))
 {
-printf("read failed!\n");
+    printf("read failed!\n");
+    return false;
 }
+return true;
 }
 
-void
+bool
 Nand::writePage(uint8_t bank,
                 uint8_t device,
                 uint32_t page,
@@ -209,7 +211,8 @@ Nand::writePage(uint8_t bank,
 uint32_t address = baseAddress;
 if (!amap.write(address, buffer, 4224 / 4, outpost::time::Milliseconds(2)))
 {
-printf("write failed!\n");
+    printf("write failed!\n");
+    return false;
 }
 
   // send flash command to write RAM buffer content to page
@@ -225,16 +228,18 @@ if (!amap.write(address, commandBuffer, 1, outpost::time::Milliseconds(2)))
 LOG(printf("NAND: Failure to write flash command (write page)\n")
 ;
 )
+    return false;
 }
 else
 {
-		LOG(printf("NAND: write Page %" PRIu32 "\n", page);)
+    LOG(printf("NAND: write Page %" PRIu32 "\n", page);)
 }
 
 while (!Nand::isReady())
 {
   // wait until flash is ready
 }
+return true;
 }
 
 void

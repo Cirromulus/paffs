@@ -371,7 +371,7 @@ Amap::checkResponseHeader(hal::SpaceWire::ReceiveBuffer& buffer,
     if (buffer.getEndMarker() != hal::SpaceWire::eop || buffer.getLength() < responseHeaderSize)
     {
         // Wrong packet size
-        printf("Amap::checkResponseHeader : wrong packet size\n");
+        printf("Amap::checkResponseHeader : wrong packet size (was %zu)\n", buffer.getLength());
         mErrorCounter.responsePacketSize++;
         return false;
     }

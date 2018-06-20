@@ -79,8 +79,7 @@ OfficeModel2Artix7Driver::writePage(PageAbs page,
     for(int i = 0; i < dataBytesPerPage; i+=256, p+=3)
         YaffsEcc::calc(&buf[i], p);
 
-	mNand->writePage(mBank, mDevice, page, buf);
-	return Result::ok;
+	return mNand->writePage(mBank, mDevice, page, buf) ? Result::ok : Result::fail;
 }
 Result
 OfficeModel2Artix7Driver::readPage(PageAbs page,
@@ -92,7 +91,10 @@ OfficeModel2Artix7Driver::readPage(PageAbs page,
 		return Result::invalidInput;
 	}
 
-	mNand->readPage(mBank, mDevice, page, reinterpret_cast<uint8_t*>(buf));
+	if(!mNand->readPage(mBank, mDevice, page, reinterpret_cast<uint8_t*>(buf)))
+	{
+	    return Result::fail;
+	}
 	uint8_t read_ecc[3];
 	uint8_t *p = &buf[dataBytesPerPage + 2];
     Result ret = Result::ok;

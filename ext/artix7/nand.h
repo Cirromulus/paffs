@@ -54,7 +54,7 @@ public:
 	 * @param *buffer
 	 * 		contains page data when reading has finished
 	 */
-	void
+	bool
 	readPage(uint8_t bank, uint8_t device, uint32_t page, uint8_t *buffer);
 
 	/**
@@ -69,7 +69,7 @@ public:
 	 * @param *buffer
 	 * 		buffer that contains data to write into the page
 	 */
-	void
+	bool
 	writePage(uint8_t bank, uint8_t device, uint32_t page, const uint8_t *buffer);
 
 	/**

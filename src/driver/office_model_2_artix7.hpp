@@ -41,7 +41,7 @@ class OfficeModel2Artix7Driver : public Driver{
 	static constexpr uint32_t* MCFG1 =
 	        reinterpret_cast<uint32_t*>(0x80000000);  //Memory config register 1
 	static constexpr uint8_t PROMwEnable = 11;  //PROM write enable bit
-	static constexpr uint32_t* MRAMStartAddr =
+	static constexpr volatile uint32_t* MRAMStartAddr =
 	        reinterpret_cast<uint32_t*>(0x00000010);  //Reserve some Space for bootloader to fail
 
 public:
