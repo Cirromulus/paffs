@@ -364,6 +364,60 @@ Amap::writeHeader(outpost::Slice<uint8_t> buffer,
 
 }
 
+void
+Amap::hexDump (char *desc, const void *addr, int len) {
+    int i;
+    unsigned char buff[17];
+    const uint8_t* pc = static_cast<const uint8_t*>(addr);
+
+    // Output description if given.
+    if (desc != NULL)
+        printf ("%s:\n", desc);
+
+    if (len == 0) {
+        printf("  ZERO LENGTH\n");
+        return;
+    }
+    if (len < 0) {
+        printf("  NEGATIVE LENGTH: %i\n",len);
+        return;
+    }
+
+    // Process every byte in the data.
+    for (i = 0; i < len; i++) {
+        // Multiple of 16 means new line (with line offset).
+
+        if ((i % 16) == 0) {
+            // Just don't print ASCII for the zeroth line.
+            if (i != 0)
+                printf ("  %s\n", buff);
+
+            // Output the offset.
+            printf ("  %04x ", i);
+        }
+
+        // Now the hex code for the specific character.
+        printf (" %02x", pc[i]);
+
+        // And store a printable ASCII character for later.
+        if ((pc[i] < 0x20) || (pc[i] > 0x7e))
+            buff[i % 16] = '.';
+        else
+            buff[i % 16] = pc[i];
+        buff[(i % 16) + 1] = '\0';
+    }
+
+    // Pad out last line if not exactly 16 characters.
+    while ((i % 16) != 0)
+    {
+        printf ("   ");
+        i++;
+    }
+
+    // And print the final ASCII bit.
+    printf ("  %s\n", buff);
+}
+
 bool
 Amap::checkResponseHeader(hal::SpaceWire::ReceiveBuffer& buffer,
                           std::size_t expectedPayloadLength)
@@ -371,7 +425,11 @@ Amap::checkResponseHeader(hal::SpaceWire::ReceiveBuffer& buffer,
     if (buffer.getEndMarker() != hal::SpaceWire::eop || buffer.getLength() < responseHeaderSize)
     {
         // Wrong packet size
-        printf("Amap::checkResponseHeader : wrong packet size (was %zu)\n", buffer.getLength());
+        printf("Amap::checkResponseHeader : wrong packet size (was %zu, should >= %zu)\n"
+                "Or invalid endMarker (was %u, should %u)\n",
+               buffer.getLength(), responseHeaderSize,
+               static_cast<uint8_t>(buffer.getEndMarker()), static_cast<uint8_t>(hal::SpaceWire::eop));
+        hexDump(NULL, &buffer.getData()[0], buffer.getLength());
         mErrorCounter.responsePacketSize++;
         return false;
     }

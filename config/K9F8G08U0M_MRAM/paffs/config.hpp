@@ -25,7 +25,7 @@ namespace paffs{
     static constexpr uint8_t  jumpPadNo         = 3;        //Should scale with max(0, log2(blocks / 32))
 
     //MRam config
-    static constexpr uint32_t mramSize             = 4095*512;     //Should be a multiple of 512 for viewer
+    static constexpr uint32_t mramSize             = 4095*512;     //2 KiB - 512 Byte
     static constexpr uint16_t reservedLogsize      = 4096;         //bytes
     //Cache sizes
     static constexpr uint8_t  treeNodeCacheSize    = 5;     //max. 1,5 * dataBytesPerPage(TreeNode) Bytes per Entry

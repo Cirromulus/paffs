@@ -45,7 +45,7 @@ Result
 OfficeModel2Artix7Driver::initializeNand()
 {
 	mNand->enableLatchUpProtection();
-	return Result::ok;
+	return mNand->isReady() ? Result::ok : Result::fail;
 }
 Result
 OfficeModel2Artix7Driver::deInitializeNand()
@@ -143,22 +143,110 @@ OfficeModel2Artix7Driver::checkBad(BlockAbs block)
 
 Result
 OfficeModel2Artix7Driver::writeMRAM(PageAbs startByte,
-                      const void* , uint32_t dataLen)
+                      const void* data, uint32_t dataLen)
 {
     if(startByte + dataLen > mramSize)
     {
         return Result::invalidInput;
     }
-    return Result::nimpl;
-}
-Result
-OfficeModel2Artix7Driver::readMRAM(PageAbs startByte,
-                     void* , uint32_t dataLen){
-    if(startByte + dataLen > mramSize)
+    if(dataLen > sizeof(journalEntry::Max))
     {
         return Result::invalidInput;
     }
-    return Result::nimpl;
+
+    bool startMisaligned = startByte % 4 != 0 || (startByte + dataLen) % 4 != 0;
+
+    uint32_t cur = 0;
+    const uint8_t* bytewiseData = static_cast<const uint8_t*>(data);
+
+    if(startMisaligned)
+    {
+        uint32_t word = MRAMStartAddr[startByte / 4];
+        uint8_t bytesMisaligned = 4 - startByte % 4;
+        if(bytesMisaligned > dataLen)
+        {
+            bytesMisaligned = dataLen;
+        }
+        memcpy(reinterpret_cast<uint8_t*>(&word) + startByte % 4, bytewiseData, bytesMisaligned);
+        MRAMStartAddr[startByte / 4] = word;
+        cur = bytesMisaligned;
+    }
+
+    if(cur == dataLen)
+    {   //write smaller than one word (4 Byte)
+        return Result::ok;
+    }
+
+    uint32_t alignedEnd = ((startByte + dataLen) / 4) * 4;
+
+    //align rest of the input bytes
+    memcpy(mJEBuf, &bytewiseData[cur], dataLen - cur);
+    for(uint_fast16_t i = 0; i * 4 < alignedEnd - (startByte + cur); i++)
+    {   //copy in word-width
+        MRAMStartAddr[((startByte + cur)/ 4) + i] = mJEBuf[i];
+    }
+    cur = alignedEnd;
+
+    if(alignedEnd != startByte + dataLen)
+    {
+        uint32_t word = MRAMStartAddr[(startByte + dataLen) / 4];
+        uint8_t bytesMisaligned = (startByte + dataLen) % 4;
+        memcpy(&word, &bytewiseData[cur], bytesMisaligned);
+        MRAMStartAddr[(startByte + dataLen) / 4] = word;
+    }
+
+    return Result::ok;
+}
+Result
+OfficeModel2Artix7Driver::readMRAM(PageAbs startByte,
+                     void* data, uint32_t dataLen){
+    if(startByte + dataLen > mramSize)
+    {
+        return Result::noSpace;
+    }
+    if(dataLen > sizeof(journalEntry::Max))
+    {
+        return Result::invalidInput;
+    }
+    bool startMisaligned = startByte % 4 != 0 || (startByte + dataLen) % 4 != 0;
+
+    uint32_t cur = 0;
+    uint8_t* bytewiseData = static_cast<uint8_t*>(data);
+
+    if(startMisaligned)
+    {
+        uint32_t word = MRAMStartAddr[startByte / 4];
+        uint8_t bytesMisaligned = 4 - startByte % 4;
+        if(bytesMisaligned > dataLen)
+        {
+            bytesMisaligned = dataLen;
+        }
+        memcpy(bytewiseData, reinterpret_cast<uint8_t*>(&word) + startByte % 4, bytesMisaligned);
+        cur = bytesMisaligned;
+    }
+
+    if(cur == dataLen)
+    {   //read smaller than one word (4 Byte)
+        return Result::ok;
+    }
+
+    uint32_t alignedEnd = ((startByte + dataLen) / 4) * 4;
+
+    //align rest of the input bytes
+    for(uint_fast16_t i = 0; i * 4 < alignedEnd - (startByte + cur); i++)
+    {   //copy in word-width
+        mJEBuf[i] = MRAMStartAddr[((startByte + cur)/ 4) + i];
+    }
+    memcpy(&bytewiseData[cur], mJEBuf, dataLen - cur);
+    cur = alignedEnd;
+
+    if(alignedEnd != startByte + dataLen)
+    {
+        uint32_t word = MRAMStartAddr[(startByte + dataLen) / 4];
+        uint8_t bytesMisaligned = (startByte + dataLen) % 4;
+        memcpy(&bytewiseData[cur], &word, bytesMisaligned);
+    }
+    return Result::ok;
 }
 
 bool

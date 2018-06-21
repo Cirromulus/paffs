@@ -63,7 +63,6 @@ rtems_task task_system_init(rtems_task_argument)
                        "This is a test write into a file. Hello world!\n";
 
     printf("\n\n\n\nBuild: " __DATE__ " " __TIME__ "\n");
-    rtems_stack_checker_report_usage();
 
     Result r;
     ObjInfo inf;
@@ -77,7 +76,7 @@ rtems_task task_system_init(rtems_task_argument)
     std::vector<paffs::Driver*> drv;
     drv.push_back(paffs::getDriver(0));
     Paffs* fs = new(paffsRaw) Paffs(drv);
-    fs->setTraceMask(PAFFS_TRACE_SOME);
+    fs->setTraceMask(PAFFS_TRACE_SOME | PAFFS_TRACE_JOURNAL);
 
     CmdParser parser;
     const uint16_t buffersize = 500;
@@ -150,9 +149,10 @@ rtems_task task_system_init(rtems_task_argument)
     r = fs->close(*obj);
 
     //interactive
-    printf("CMD:\n");
     while (true) {
         r = Result::ok;
+        printf("> ");
+        fflush(stdout);
         fgets(line, buffersize, stdin);
         if ((strlen(line) > 0) && (line[strlen (line) - 1] == '\n'))
         {   //remove trailing newline
