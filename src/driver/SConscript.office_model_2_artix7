@@ -5,17 +5,13 @@ Import('envGlobal')
 
 print("ARTIXDRIVER")
 
-artix7path = os.path.join('$EXTPATH', 'artix7')
+extpath = envGlobal['EXTPATH']
+
 
 envGlobal.Append(CPPPATH=[
-	artix7path,
+	extpath,
 ])
 
-envGlobal.SConscript([
-        os.path.join(envGlobal['OUTPOST_PLATFORM_PATH'], 'modules/hal/src/SConscript'),
-    ],
-    exports='envGlobal'
-)
 
 env = envGlobal.Clone()
 
@@ -23,13 +19,15 @@ files  = [
     'office_model_2_artix7.cpp',
     'yaffs_ecc.cpp'
 ]
-files.extend(env.Glob(artix7path+'/*.cpp'))
+
+files.extend(env.Glob(extpath+'/*.cpp'))
+files.extend(env.Glob(extpath+'/*.c'))
+
 
 library = env.StaticLibrary('artixDriver', files)
 
 envGlobal.Append(LIBS=[
 	'artixDriver',
-	'outpost_leon',
 	'outpost_hal',
 	'outpost_rtos',
 	'outpost_utils',

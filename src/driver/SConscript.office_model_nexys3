@@ -5,9 +5,11 @@ Import('envGlobal')
 
 print("NEXYSDRIVER")
 
+extpath = envGlobal['EXTPATH']
 nexys3path = os.path.join('$EXTPATH', 'nexys3')
 
 envGlobal.Append(CPPPATH=[
+    extpath,
 	nexys3path,
 ])
 
@@ -17,8 +19,10 @@ files  = [
     'office_model_nexys3.cpp',
     'yaffs_ecc.cpp'
 ]
+
 files.extend(env.Glob(nexys3path+'/*.cpp'))
-files.extend(env.Glob(nexys3path+'/*.c'))
+files.extend(env.Glob(extpath+'/*.cpp'))
+files.extend(env.Glob(extpath+'/*.c'))
 
 library = env.StaticLibrary('nexysDriver', files)
 

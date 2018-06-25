@@ -1,8 +1,8 @@
-#include "../artix7/nand.h"
+#include "nand.h"
 
 #include <cstdio>
 
-#include <outpost/leon3/spacewire_light.h>
+#include <spacewire_light.h>
 #include <outpost/utils/storage/serialize.h>
 
 //#define DEBUG

@@ -1,4 +1,4 @@
-#include "../artix7/amap.h"
+#include "amap.h"
 
 #include <cstring>
 #include <stdio.h>

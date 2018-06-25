@@ -2,7 +2,7 @@
 #ifndef NAND_H
 #define NAND_H
 
-#include "../artix7/amap.h"
+#include "amap.h"
 
 /**
  *

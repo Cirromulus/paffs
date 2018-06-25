@@ -32,4 +32,3 @@ Expected structure
 
 Optional for integration tests:
 - satfon-simulation/        (simulation)
-- outpost-platform-leon/    (artix7)
