@@ -160,6 +160,9 @@ Journal::processBuffer()
             continue;
         }
 
+        //TODO: JUST DEBUG
+        printMeaning(entry.base, true);
+
         if(!isTopicValid(entry.base.topic))
         {
             printMeaning(entry.base, true);

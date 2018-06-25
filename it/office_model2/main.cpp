@@ -59,9 +59,6 @@ uint8_t paffsRaw[sizeof(Paffs)];
 
 rtems_task task_system_init(rtems_task_argument)
 {
-    const char* wbuf = "\nBuild: " __DATE__ " " __TIME__ "\n"
-                       "This is a test write into a file. Hello world!\n";
-
     printf("\n\n\n\nBuild: " __DATE__ " " __TIME__ "\n");
 
     Result r;
@@ -76,82 +73,12 @@ rtems_task task_system_init(rtems_task_argument)
     std::vector<paffs::Driver*> drv;
     drv.push_back(paffs::getDriver(0));
     Paffs* fs = new(paffsRaw) Paffs(drv);
-    fs->setTraceMask(PAFFS_TRACE_SOME | PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL | PAFFS_TRACE_JOUR_PERS);
+    fs->setTraceMask(PAFFS_TRACE_SOME);
 
     CmdParser parser;
     const uint16_t buffersize = 500;
     char line[buffersize];
 
-    printf("Trying to mount FS...");
-    fflush(stdout);
-    r = fs->mount();
-    printf("\t %s\n", err_msg(r));
-
-    //Ask for formatting if could not mount
-    if (r != Result::ok)
-    {
-        char buf = 0;
-        while (buf != 'y' && buf != 'n' && buf != 'c' && buf != '\n')
-        {
-            printf("There was no valid image found. Format?\n(y(es)/c(omplete)/N(o)) ");
-            fflush(stdout);
-            scanf("%1c", &buf);
-        }
-        if (buf == 'y' || buf == 'c')
-        {
-            printf("You chose yes.\n");
-            r = fs->format(badBlocks, buf == 'c');
-            if (r == Result::ok)
-            {
-                printf("Success.\n");
-            }
-            else
-            {
-                printf("%s!\n", err_msg(r));
-                goto idle;
-            }
-        }
-        else
-        {
-            printf("You chose no. \n");
-            goto idle;
-        }
-
-        printf("Trying to mount FS again ...\n");
-
-        r = fs->mount();
-        printf("\t %s\n", err_msg(r));
-        if (r != Result::ok)
-        {
-            goto idle;
-        }
-    }
-
-    fs->setTraceMask(PAFFS_TRACE_SOME);
-
-    obj = fs->open("/log.txt", FR | FW | FC);  // open read/write and only existing
-    if (obj == nullptr)
-    {
-        printf("Error opening file: %s\n", err_msg(fs->getLastErr()));
-        goto idle;
-    }
-
-    printf("log.txt was found.\n");
-    r = fs->seek(*obj, 0, Seekmode::end);
-    if (r != Result::ok)
-    {
-        printf("Error seeking file: %s\n", err_msg(r));
-        goto idle;
-    }
-    r = fs->write(*obj, wbuf, strlen(wbuf), &br);
-    if (r != Result::ok)
-    {
-        printf("Error writing file: %s\n", err_msg(r));
-        goto idle;
-    }
-    r = fs->close(*obj);
-
-    //interactive
     while (true) {
         r = Result::ok;
         printf("> ");
@@ -165,14 +92,16 @@ rtems_task task_system_init(rtems_task_argument)
         switch(cmd.commandId)
         {
         case CmdParser::CommandID::quit:
+            fs->setTraceMask(PAFFS_TRACE_SOME | PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL | PAFFS_TRACE_JOUR_PERS);
             r = fs->unmount();
+            fs->setTraceMask(PAFFS_TRACE_SOME);
             if(r != Result::ok)
             {
                 printf("Unmount error: %s\n", resultMsg[static_cast<uint8_t>(r)]);
-                goto idle;
+                goto exit;
             }
             printf("Unmounted. You are now safe to turn off your computer.\n");
-            goto idle;
+            goto exit;
             break;
         case CmdParser::CommandID::cat:
         {
@@ -242,13 +171,15 @@ rtems_task task_system_init(rtems_task_argument)
         case CmdParser::CommandID::mount:
             {
                 TraceMask bak = fs->getTraceMask();
-                fs->setTraceMask(bak | PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL);
+                fs->setTraceMask(bak | PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL | PAFFS_TRACE_JOUR_PERS);
                 r = fs->mount();
                 fs->setTraceMask(bak);
                 break;
             }
         case CmdParser::CommandID::unmount:
+            fs->setTraceMask(PAFFS_TRACE_SOME | PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL | PAFFS_TRACE_JOUR_PERS);
             r = fs->unmount();
+            fs->setTraceMask(PAFFS_TRACE_SOME);
             break;
         case CmdParser::CommandID::format:
             r = fs->format(badBlocks, !strcmp(cmd.argument1, "complete"));
@@ -260,14 +191,11 @@ rtems_task task_system_init(rtems_task_argument)
             parser.listCommands();
             break;
         }
-        printf("%s\n", resultMsg[static_cast<uint8_t>(r)]);
+        printf("%s ", resultMsg[static_cast<uint8_t>(r)]);
     }
-idle:
-    printf("Now idling.\n");
-    rtems_stack_checker_report_usage();
-    while (1)
+exit:
+    while(true)
     {
-        //todo: Fancy blinking of LEDs
-        rtems_task_wake_after(75);
+        rtems_task_wake_after(1000);
     }
 }

@@ -137,12 +137,13 @@ private:
 
     bool mFirstTransmit;
     rtos::Semaphore mTxSync;
-    TransmitBuffer mTxBuffer;
 
     // Flash page size is 4096+128 byte (=4224) + 9 byte AMAP overhead
     // => 4233 byte minimum
     uint8_t mTxBufferData_[maxPacketLength];
     outpost::Slice<uint8_t> mTxBufferData;
+
+    TransmitBuffer mTxBuffer;
     struct spwl_txbuf mSpwlBuffer;
 
 };

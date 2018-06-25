@@ -8,7 +8,7 @@
 
 using namespace outpost::iff;
 
-//#define AMAP_DEBUG
+#define AMAP_DEBUG
 //#define AMAP_DEBUG_EXT
 
 #ifdef AMAP_DEBUG

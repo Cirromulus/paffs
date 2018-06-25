@@ -14,7 +14,7 @@
  */
 // ----------------------------------------------------------------------------
 
-#include "../nexys3/spacewire_light.h"
+#include "spacewire_light.h"
 #include <outpost/rtos/rtems/interval.h>
 
 #include <stdio.h>
@@ -27,8 +27,8 @@ outpost::leon3::SpaceWireLight::SpaceWireLight(uint32_t index) :
     mHandle(0),
     mFirstTransmit(true),
     mTxSync(1),
-	mTxBuffer(mTxBufferData),
-	mTxBufferData(mTxBufferData_)
+	mTxBufferData(mTxBufferData_),
+    mTxBuffer(mTxBufferData)
 {
 }
 

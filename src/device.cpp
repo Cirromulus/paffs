@@ -149,7 +149,7 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         // erasecount is already set to 0
         superblock.setPos(area, area);
 
-        if (complete ||
+        if ((complete || area <  superChainElems + 4) ||
                 !(hadAreaType.getBit(AreaType::superblock) &&
                   hadAreaType.getBit(AreaType::garbageBuffer)))
         {
@@ -269,12 +269,13 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         destroyDevice();
         return r;
     }
-
+    journal.clear();
     PAFFS_DBG_S(PAFFS_TRACE_INFO, "Done");
 
     destroyDevice();
     driver.deInitializeNand();
     return Result::ok;
+;
 }
 
 Result

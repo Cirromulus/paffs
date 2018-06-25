@@ -63,9 +63,10 @@ files = env.Glob('*.cpp')
 files.append(os.path.abspath('../misc/cmd.cpp'))
 
 programElf = env.Program('paffs-artix7.elf', files)
-programBin = env.Bin(programElf) 
+programBin = env.Bin(programElf)
+#programListing = env.Listing(programElf)
 
-envGlobal.Alias('build', programBin)
+envGlobal.Alias('build', [programBin])
 envGlobal.Install('$BUILDPATH', programElf)
 envGlobal.Install('$BUILDPATH', programBin)
 envGlobal.Default('build')

@@ -215,7 +215,7 @@ MramPersistence::readNextElem(journalEntry::Max& entry)
 {
     PageAbs hwm;
     device->driver.readMRAM(0, &hwm, sizeof(PageAbs));
-    if (hwm == UINT32_MAX && curr >= hwm)
+    if (hwm == UINT32_MAX || curr >= hwm)
     {
         return Result::notFound;
     }
