@@ -76,7 +76,7 @@ rtems_task task_system_init(rtems_task_argument)
     std::vector<paffs::Driver*> drv;
     drv.push_back(paffs::getDriver(0));
     Paffs* fs = new(paffsRaw) Paffs(drv);
-    fs->setTraceMask(PAFFS_TRACE_SOME | PAFFS_TRACE_JOURNAL);
+    fs->setTraceMask(PAFFS_TRACE_SOME | PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL | PAFFS_TRACE_JOUR_PERS);
 
     CmdParser parser;
     const uint16_t buffersize = 500;
@@ -118,6 +118,7 @@ rtems_task task_system_init(rtems_task_argument)
         }
 
         printf("Trying to mount FS again ...\n");
+
         r = fs->mount();
         printf("\t %s\n", err_msg(r));
         if (r != Result::ok)
@@ -125,6 +126,8 @@ rtems_task task_system_init(rtems_task_argument)
             goto idle;
         }
     }
+
+    fs->setTraceMask(PAFFS_TRACE_SOME);
 
     obj = fs->open("/log.txt", FR | FW | FC);  // open read/write and only existing
     if (obj == nullptr)
@@ -237,8 +240,13 @@ rtems_task task_system_init(rtems_task_argument)
             r = fs->remove(cmd.argument1);
             break;
         case CmdParser::CommandID::mount:
-            r = fs->mount();
-            break;
+            {
+                TraceMask bak = fs->getTraceMask();
+                fs->setTraceMask(bak | PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL);
+                r = fs->mount();
+                fs->setTraceMask(bak);
+                break;
+            }
         case CmdParser::CommandID::unmount:
             r = fs->unmount();
             break;

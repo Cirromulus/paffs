@@ -39,15 +39,14 @@ class OfficeModel2Artix7Driver : public Driver{
 	SpaceWireLight mSpacewire;
 	uint8_t mNandRaw[sizeof(Nand)];
 	uint8_t mAmapRaw[sizeof(Amap)];
-	uint32_t mJEBuf[(sizeof(journalEntry::Max) + 3) / 4];   //This holds a aligned journal Entry
 	Nand *mNand;
 	Amap *mIfFpga;
 
 	static constexpr volatile uint32_t* MCFG1 =
 	        reinterpret_cast<uint32_t*>(0x80000000);  //Memory config register 1
 	static constexpr uint8_t PROMwEnable = 11;  //PROM write enable bit
-	static constexpr volatile uint32_t* MRAMStartAddr =
-	        reinterpret_cast<uint32_t*>(0x00000010);  //Reserve some Space for bootloader to fail
+	static constexpr uint8_t* MRAMStartAddr =
+	        reinterpret_cast<uint8_t*>(0x00000010);  //Reserve some Space for bootloader to fail
 
 public:
 	inline
@@ -62,16 +61,6 @@ public:
 
 		//Enable MRAM write
 		*MCFG1 |= 1 << PROMwEnable;
-
-		char testSbuffer[sizeof(journalEntry::Max) / 2];
-		memset(testSbuffer, 'C', sizeof(testSbuffer));
-		char testRbuffer[sizeof(testSbuffer)];
-
-		writeMRAM(5, testSbuffer, sizeof(testRbuffer));
-
-		readMRAM(5, testRbuffer, sizeof(testRbuffer));
-
-		printf("%.*s\n", sizeof(testRbuffer), testRbuffer);
 	}
 
 	inline
