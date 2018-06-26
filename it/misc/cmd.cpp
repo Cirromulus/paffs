@@ -24,6 +24,7 @@ const char* commandNames[] =
     "ls",
     "cd",
     "append",
+    "fill",
     "mkdir",
     "touch",
     "del",
@@ -42,6 +43,7 @@ const char* commandUsage[] =
     "[path to folder]",
     "path to folder",
     "filename text",
+    "filename [numOfRepeatedWrites]",
     "filename",
     "foldername",
     "filename",
@@ -102,6 +104,14 @@ CmdParser::Command CmdParser::parse(char* string)
     else if(strcmp(cmd, commandNames[CommandID::append]) == 0)
     {
         if(arg1 == NULL || arg2 == NULL)
+        {
+            return Invalid();
+        }
+        return Append(arg1, arg2);
+    }
+    else if(strcmp(cmd, commandNames[CommandID::fill]) == 0)
+    {
+        if(arg1 == NULL)
         {
             return Invalid();
         }

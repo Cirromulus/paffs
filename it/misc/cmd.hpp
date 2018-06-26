@@ -28,6 +28,7 @@ class CmdParser
         ls,
         cd,
         append,
+        fill,
         mkdir,
         touch,
         del,
@@ -97,6 +98,12 @@ class CmdParser
     {
         inline
         Append(char* path, char* string) : Command(CommandID::append, path, string){};
+    };
+
+    struct Fill : public Command
+    {
+        inline
+        Fill(char* path, char* number) : Command(CommandID::fill, path, number){};
     };
 
     struct Mkdir : public Command

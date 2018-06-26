@@ -182,6 +182,18 @@ Paffs::printCacheSizes()
                 maxNumberOfDevices,
                 sizeof(Device) * maxNumberOfDevices);
 
+
+    PAFFS_DBG_S(PAFFS_TRACE_INFO,
+                "Pagesize: %" PRIu16 ". Number of Pages: %" PRIu16 ".\n"
+                "\tOverall Flash Size: %" PRIu16 " Byte",
+                dataBytesPerPage + oobBytesPerPage,
+                pagesPerBlock + blocksTotal,
+                (dataBytesPerPage + oobBytesPerPage) * (pagesPerBlock + blocksTotal));
+
+    PAFFS_DBG_S(PAFFS_TRACE_INFO,
+                "Mram size: %" PRIu32 ". Reserved Bytes: %" PRIu16 "\n",
+                mramSize, reservedLogsize);
+
     if(areaSummaryIsPacked)
     {
         PAFFS_DBG_S(PAFFS_TRACE_ALWAYS, "\nWARNING: Using packed AreaSummaries (slower)");

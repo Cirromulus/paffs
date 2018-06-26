@@ -149,7 +149,7 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         // erasecount is already set to 0
         superblock.setPos(area, area);
 
-        if ((complete || area <  superChainElems + 4) ||
+        if ((complete || area <= superChainElems + 4) ||
                 !(hadAreaType.getBit(AreaType::superblock) &&
                   hadAreaType.getBit(AreaType::garbageBuffer)))
         {

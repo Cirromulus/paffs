@@ -20,6 +20,7 @@ extern "C" {
 
 #include "../misc/cmd.hpp"
 
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -59,7 +60,12 @@ uint8_t paffsRaw[sizeof(Paffs)];
 
 rtems_task task_system_init(rtems_task_argument)
 {
+    char sampleText[] = "This is an example text for testing file writes.\n"
+            "Build: " __DATE__ " " __TIME__ "\n\n";
+
     printf("\n\n\n\nBuild: " __DATE__ " " __TIME__ "\n");
+
+
 
     Result r;
     ObjInfo inf;
@@ -78,7 +84,7 @@ rtems_task task_system_init(rtems_task_argument)
     CmdParser parser;
     const uint16_t buffersize = 500;
     char line[buffersize];
-
+    CmdParser::Command lastCommand(CmdParser::Invalid);
     while (true) {
         r = Result::ok;
         printf("> ");
@@ -159,6 +165,29 @@ rtems_task task_system_init(rtems_task_argument)
             }
             fs->close(*obj);
             break;
+        case CmdParser::CommandID::fill:
+            {
+            unsigned long n;
+            if(cmd.argument2 == NULL || (n = strtol(cmd.argument2, NULL, 10)) == 0)
+            {
+                n = 1;
+            }
+            obj = fs->open(cmd.argument1, FW | FA | FC);
+            if (obj == nullptr)
+            {
+                break;
+            }
+            for(uint16_t i = 0; i < n; i++)
+            {
+                r = fs->write(*obj, sampleText, strlen(sampleText), &br);
+                if(r != Result::ok)
+                {
+                    break;
+                }
+            }
+            fs->close(*obj);
+            break;
+            }
         case CmdParser::CommandID::mkdir:
             r = fs->mkDir(cmd.argument1, R | W | X);
             break;
