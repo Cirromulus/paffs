@@ -21,6 +21,7 @@ const char* commandNames[] =
     "quit",
     "help",
     "cat",
+    "info",
     "ls",
     "cd",
     "append",
@@ -39,6 +40,7 @@ const char* commandUsage[] =
 {
     "",
     "",
+    "filename",
     "filename",
     "[path to folder]",
     "path to folder",
@@ -81,6 +83,14 @@ CmdParser::Command CmdParser::parse(char* string)
         }
         return Cat(arg1);
     }
+    else if(strcmp(cmd, commandNames[CommandID::info]) == 0)
+    {
+        if(arg1 == NULL)
+        {
+            return Invalid();
+        }
+        return Info(arg1);
+    }
     else if(strcmp(cmd, commandNames[CommandID::quit]) == 0)
     {
         return Quit();
@@ -115,7 +125,7 @@ CmdParser::Command CmdParser::parse(char* string)
         {
             return Invalid();
         }
-        return Append(arg1, arg2);
+        return Fill(arg1, arg2);
     }
     else if(strcmp(cmd, commandNames[CommandID::mkdir]) == 0)
     {

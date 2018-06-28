@@ -25,6 +25,7 @@ class CmdParser
         quit = 0,
         help,
         cat,
+        info,
         ls,
         cd,
         append,
@@ -78,6 +79,13 @@ class CmdParser
     {
         inline
         Cat(char* path) : Command(CommandID::cat, path){};
+    };
+
+
+    struct Info : public Command
+    {
+        inline
+        Info(char* path) : Command(CommandID::info, path){};
     };
 
     struct Ls : public Command

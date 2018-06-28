@@ -60,6 +60,7 @@ Journal::addEvent(const JournalEntry& entry)
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not append Entry to persistence");
             return r;
         }
+        //To suppress multiple checkpoints of the same topic following each other
         if(entry.topic == JournalEntry::Topic::checkpoint)
         {
             uncheckpointedChanges.resetBit(static_cast<const journalEntry::Checkpoint*>(&entry)->target);

@@ -84,7 +84,7 @@ rtems_task task_system_init(rtems_task_argument)
     CmdParser parser;
     const uint16_t buffersize = 500;
     char line[buffersize];
-    CmdParser::Command lastCommand(CmdParser::Invalid);
+    CmdParser::Command lastCommand = CmdParser::Invalid();
     while (true) {
         r = Result::ok;
         printf("> ");
@@ -95,10 +95,23 @@ rtems_task task_system_init(rtems_task_argument)
             line[strlen (line) - 1] = '\0';
         }
         CmdParser::Command cmd = parser.parse(line);
+        //recognize "up" key
+        if(line[0] == 0x1B && line[1] == 0x5B)
+        {
+            //Arrow keys
+            if(line[2] == 0x41)
+            {   //up key
+                cmd = lastCommand;
+            }
+        }
+        if(cmd.commandId != CmdParser::CommandID::invalid)
+        {
+            lastCommand = cmd;
+        }
         switch(cmd.commandId)
         {
         case CmdParser::CommandID::quit:
-            fs->setTraceMask(PAFFS_TRACE_SOME | PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL | PAFFS_TRACE_JOUR_PERS);
+            fs->setTraceMask(PAFFS_TRACE_SOME | PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL);
             r = fs->unmount();
             fs->setTraceMask(PAFFS_TRACE_SOME);
             if(r != Result::ok)
@@ -122,14 +135,35 @@ rtems_task task_system_init(rtems_task_argument)
             {
                 break;
             }
-            char buf[inf.size];
-            r = fs->read(*obj, buf, inf.size, &br);
+            for(uint16_t i = 0; i < (inf.size + 1023) / 1024; i++)
+            {
+                char buf[1024];
+                uint16_t btr = inf.size - 1024 * i > 1024 ? 1024 : inf.size - 1024 * i;
+                r = fs->read(*obj, buf, btr, &br);
+                if(r != Result::ok)
+                {
+                    break;
+                }
+                printf("%.*s", static_cast<int>(btr), buf);
+            }
+            printf("\n");
+            fs->close(*obj);
+            break;
+        }
+        case CmdParser::CommandID::info:
+        {
+            r = fs->getObjInfo(cmd.argument1, inf);
             if(r != Result::ok)
             {
                 break;
             }
-            printf("%.*s\n", static_cast<int>(inf.size), buf);
-            fs->close(*obj);
+            printf("%s\n", inf.isDir ? "Directory" : "File");
+            printf("\tsize: %" PTYPE_FILSIZE " Byte\n", inf.size);
+            printf("\tperm: %c%c%c\n", inf.perm & R ? 'r' : '-',
+                                         inf.perm & W ? 'w' : '-',
+                                         inf.perm & X ? 'x' : '-');
+            printf("\tcrea: %" PRIu64 " seconds since epoch\n", inf.created.timeSinceEpoch().seconds());
+            printf("\tmod.: %" PRIu64 " seconds since epoch\n", inf.modified.timeSinceEpoch().seconds());
             break;
         }
         case CmdParser::CommandID::ls:
@@ -175,6 +209,7 @@ rtems_task task_system_init(rtems_task_argument)
             obj = fs->open(cmd.argument1, FW | FA | FC);
             if (obj == nullptr)
             {
+                r = fs->getLastErr();
                 break;
             }
             for(uint16_t i = 0; i < n; i++)
@@ -200,13 +235,13 @@ rtems_task task_system_init(rtems_task_argument)
         case CmdParser::CommandID::mount:
             {
                 TraceMask bak = fs->getTraceMask();
-                fs->setTraceMask(bak | PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL | PAFFS_TRACE_JOUR_PERS);
+                fs->setTraceMask(bak | PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL);
                 r = fs->mount();
                 fs->setTraceMask(bak);
                 break;
             }
         case CmdParser::CommandID::unmount:
-            fs->setTraceMask(PAFFS_TRACE_SOME | PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL | PAFFS_TRACE_JOUR_PERS);
+            fs->setTraceMask(PAFFS_TRACE_SOME | PAFFS_TRACE_VERBOSE | PAFFS_TRACE_JOURNAL);
             r = fs->unmount();
             fs->setTraceMask(PAFFS_TRACE_SOME);
             break;
