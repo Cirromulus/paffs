@@ -1639,7 +1639,7 @@ Device::getObjInfo(const char* fullPath, ObjInfo& nfo)
         return lasterr = r;
     }
     nfo.created = outpost::time::GpsTime::afterEpoch(outpost::time::Milliseconds(object->crea));
-    nfo.modified = outpost::time::GpsTime::afterEpoch(outpost::time::Milliseconds(object->crea));
+    nfo.modified = outpost::time::GpsTime::afterEpoch(outpost::time::Milliseconds(object->mod));
     ;
     nfo.perm = object->perm;
     nfo.size = object->size;
