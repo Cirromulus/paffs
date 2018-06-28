@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <paffs.hpp>
+
 extern const char* commandNames[];
 extern const char* commandUsage[];
 
@@ -152,4 +154,17 @@ class CmdParser
 
     void
     listCommands();
+};
+
+class CmdHandler
+{
+    paffs::Paffs* fs;
+    paffs::BadBlockList* badBlocks;
+public:
+    inline
+    CmdHandler(paffs::Paffs* filesystem, paffs::BadBlockList* badBlockList)
+        : fs(filesystem), badBlocks(badBlockList){};
+
+    void
+    prompt();
 };
