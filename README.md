@@ -1,7 +1,9 @@
-Welches Projekt was macht und sie zusammenh\ngen
+
+PAFFS
+=====
 
 Overview
-========
+--------
 
 This project contains the filesystem Paffs and its drivers for interfacing simulated or real hardware.
 
@@ -20,7 +22,7 @@ This project contains the filesystem Paffs and its drivers for interfacing simul
 
 
 How to use
-==========
+----------
 
 This Filesystem expects an outpost-core and a scons-build-tools checkout in the parent directory.
 For Integration Tests, it needs the satfon-simulation repo in the parent directory.
@@ -36,8 +38,8 @@ To build with a special driver, modify the SConstruct file of your project. For 
 
 Note: The office_model2 integration test is designed for a combination of the OM1-IFF connected to SPW1 (the lower connector) of the OM2-Leon.
 
-Expected structure
-------
+### Expected structure
+
 - paffs/
 - scons-build-tools/
 - outpost-core/
