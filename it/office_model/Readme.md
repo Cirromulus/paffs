@@ -1,5 +1,5 @@
-HowTo use Debugger with GRMON on NEXYS3 Board 
-=============================================
+HowTo use Debugger with GRMON on NEXYS3 Board (OM1)
+---------------------------------------------
 
 1. Build
 2. Start GRMON:

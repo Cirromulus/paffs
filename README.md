@@ -15,6 +15,10 @@ This project contains the filesystem Paffs and its drivers for interfacing simul
  -- Snapshot of spacewire, amap and nand drivers. Will be deprecated with newer outpost-platform-leon
 - ./it
  -- Integration tests (can be used as examples for using filesystem)
+    - logic -- standard selftest
+    - misc  -- Sandbox for trying FS on desktop (also to create images for embedded)
+    - om1   -- Sandbox for office model 1
+    - om2   -- Sandbox for office model 2
 - ./src
  -- Source files
 - ./test

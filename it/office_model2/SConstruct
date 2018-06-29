@@ -20,7 +20,7 @@ envGlobal = Environment(toolpath=[os.path.join(pluginpath, 'scons-build-tools/si
                         CCFLAGS_debug=['-g'],
                         ENV=os.environ)
 
-buildfolder = os.path.join(buildpath, 'it_debug/')
+buildfolder = os.path.join(buildpath, 'om2')
 envGlobal.ParseFlags('-DDEBUG')
 envGlobal['CCFLAGS_optimize'] = ['-O0']
 envGlobal['RTEMS_ROOT_FOLDER'] = '/opt/rtems-4.10.x'

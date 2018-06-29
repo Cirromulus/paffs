@@ -1,0 +1,74 @@
+# Aliases for USB Serial Ports of
+#
+# to view details about all connected FT2232 (assuming unchanged vid/pid)
+# lsusb -v -d 0403:6010
+
+# finfing the ID of FT2232 (has to be programmed by MPROG first)
+# ls /dev/serial/by-id
+# usb-FTDI_USB__-__Serial_Cable_AV2OEO6V-if00-port0
+# (..)
+# AV2OEO6V  <- serial
+
+# to reload rules:
+# sudo udevadm control --reload && sudo udevadm trigger
+
+
+################################################################################
+# ScOSA RCN Breadbaord SN: 001
+################################################################################
+ATTRS{serial}=="AV2OH6PB", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="tty_rcn0001_dsu"
+ATTRS{serial}=="AV2OH6PB", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="tty_rcn0001_spare0"
+# FT2232 on LEON3 module
+ATTRS{serial}=="AV2OH6PA", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="tty_rcn0001_console"
+ATTRS{serial}=="AV2OH6PA", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="tty_rcn0001_spare1"
+# FT2232 on IFF module
+ATTRS{serial}=="AV2OH6P9", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="tty_rcn0001_iff0"
+ATTRS{serial}=="AV2OH6P9", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="tty_rcn0001_spare2"
+
+################################################################################
+# ScOSA RCN Breadbaord SN: 0002
+################################################################################
+ATTRS{serial}=="AV2OH6TZ", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="tty_rcn0002_dsu"
+ATTRS{serial}=="AV2OH6TZ", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="tty_rcn0002_spare0"
+# FT2232 on LEON3 module
+ATTRS{serial}=="AV2OH6U1", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="tty_rcn0002_console"
+ATTRS{serial}=="AV2OH6U1", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="tty_rcn0002_spare1"
+# FT2232 on IFF module
+ATTRS{serial}=="AV2OH6U0", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="tty_rcn0002_iff0"
+ATTRS{serial}=="AV2OH6U0", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="tty_rcn0002_spare2"
+
+################################################################################
+# ScOSA RCN Breadbaord SN: 0003
+################################################################################
+ATTRS{serial}=="AV2OH53K", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="tty_rcn0003_dsu"
+ATTRS{serial}=="AV2OH53K", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="tty_rcn0003_spare0"
+# FT2232 on LEON3 module
+ATTRS{serial}=="AV2OH5AC", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="tty_rcn0003_console"
+ATTRS{serial}=="AV2OH5AC", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="tty_rcn0003_spare1"
+# FT2232 on IFF module
+ATTRS{serial}=="AV2OH5AD", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="tty_rcn0003_iff0"
+ATTRS{serial}=="AV2OH5AD", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="tty_rcn0003_spare2"
+
+################################################################################
+# ScOSA RCN Breadbaord SN: 0004
+################################################################################
+ATTRS{serial}=="AV2OH5O8", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="tty_rcn0004_dsu"
+ATTRS{serial}=="AV2OH5O8", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="tty_rcn0004_spare0"
+# FT2232 on LEON3 module
+ATTRS{serial}=="AV2OH5O9", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="tty_rcn0004_console"
+ATTRS{serial}=="AV2OH5O9", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="tty_rcn0004_spare1"
+# FT2232 on IFF module
+ATTRS{serial}=="AV2OH5O7", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="tty_rcn0004_iff0"
+ATTRS{serial}=="AV2OH5O7", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="tty_rcn0004_spare2"
+
+################################################################################
+# ScOSA RCN Breadbaord SN: 0005
+################################################################################
+ATTRS{serial}=="AV2OHA21", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="tty_rcn0005_dsu"
+ATTRS{serial}=="AV2OHA21", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="tty_rcn0005_spare0"
+# FT2232 on LEON3 module
+ATTRS{serial}=="AV2OHA22", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="tty_rcn0005_console"
+ATTRS{serial}=="AV2OHA22", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="tty_rcn0005_spare1"
+# FT2232 on IFF module
+ATTRS{serial}=="AV2OHA20", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="tty_rcn0005_iff0"
+ATTRS{serial}=="AV2OHA20", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="tty_rcn0005_spare2"
