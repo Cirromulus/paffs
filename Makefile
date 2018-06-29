@@ -16,7 +16,7 @@ EMBEDDEDINTEGRATIONDIR=./it/office_model
 INTEGRATIONDIR=./it/logic
 MISCDIR=./it/misc
 
-all: build-integration-debug
+all: build-integration-debug build-misc
 
 build-embedded:
 	@scons $(MAKEJOBS) -C $(EMBEDDEDINTEGRATIONDIR)
@@ -54,7 +54,7 @@ test-integration-bigflash: build-integration-bigflash
 	./build/release/it/bigflash/integrationtest --gtest_output=xml:./build/release/test/integration_coverage.xml
 
 test-embedded: build-embedded
-	/opt/grmon-eval-2.0.83/linux64/bin/grmon -uart /dev/cobc_dsu_2 -stack 0x40fffff0 -baud 460800 -gdb
+	/opt/grmon-eval-2.0.83/linux64/bin/grmon -uart /dev/cobc_dsu_3 -stack 0x40fffff0 -baud 460800 -gdb
 
 test-misc: build-misc
 	./build/debug/misc/misctest 

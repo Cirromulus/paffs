@@ -16,6 +16,7 @@
 
 #include "bitlist.hpp"
 #include "commonTypes.hpp"
+#include "journalPageStatemachine.hpp"
 
 #include <functional>
 
@@ -37,29 +38,51 @@ struct AddrListCacheElem
     getAddr(PageNo pos);
 };
 
-class PageAddressCache
+class PageAddressCache : public JournalTopic
 {
     //The three caches for each indirection layer
     AddrListCacheElem tripl[3];
     AddrListCacheElem doubl[2];  // name clash with double
     AddrListCacheElem singl;
     Device& device;
-    Inode* inode;
-    typedef std::function<void(Addr)> InformJournalFunc;
+    Inode* mInodePtr;
+    bool isInodeDirty = false;
+
+    PageStateMachine<maxPagesPerWrite, 0, JournalEntry::Topic::pac> statemachine;
+    Inode mJournalInodeCopy;
+    bool processedForeignSuccessElement;
 
 public:
-    inline
-    PageAddressCache(Device& mdev) : device(mdev), inode(nullptr){};
+    PageAddressCache(Device& mdev);
+    void
+    clear();
     Result
     setTargetInode(Inode& node);
+    InodeNo
+    getTargetInode();
     Result
     getPage(PageNo page, Addr* addr);
     Result
     setPage(PageNo page, Addr addr);
     Result
+    setValid();
+    Result
     commit();
     bool
     isDirty();
+
+    JournalEntry::Topic
+    getTopic() override;
+    void
+    resetState() override;
+    bool
+    isInterestedIn(const journalEntry::Max& entry) override;
+    Result
+    processEntry(const journalEntry::Max& entry, JournalEntryPosition position) override;
+    void
+    signalEndOfLog() override;
+    Result
+    setJournallingInode(InodeNo no);
 
 private:
     uint16_t
@@ -67,7 +90,7 @@ private:
     void
     informJournal(uint16_t cacheID, const PageNo pos, const Addr newAddr);
     /**
-     * @param target outputs the address of the wanted page
+     * @param addrPos is the position of the wanted page in end list
      */
     Result
     loadPath(Addr& anchor,

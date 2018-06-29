@@ -16,6 +16,8 @@
 #include "bitlist.hpp"
 #include "commonTypes.hpp"
 #include "treeTypes.hpp"
+#include "journalEntry.hpp"
+#include "journalPageStatemachine.hpp"
 
 namespace paffs
 {
@@ -28,13 +30,16 @@ class TreeCache
     TreeCacheNode mCache[treeNodeCacheSize];
 
     BitList<treeNodeCacheSize> mCacheUsage;
+    PageStateMachine<treeNodeCacheSize, 0, JournalEntry::Topic::tree> statemachine;
 
     // Just for debug/tuning purposes
     uint16_t mCacheHits = 0;
     uint16_t mCacheMisses = 0;
 
+    bool mJournalIsRecovering;
+
 public:
-    TreeCache(Device* mdev) : dev(mdev){};
+    TreeCache(Device* mdev);
 
     /**
      * Commits complete Tree to Flash
@@ -47,13 +52,25 @@ public:
      */
     Result
     reserveNodes(uint16_t neededNodes);
-    //--------------------------------------
 
     /**
      * Clears all internal Memory Structures
      */
     void
     clear();
+
+    /**
+     * resets only statemachine
+     */
+    void
+    resetState();
+
+    Result
+    processEntry(const journalEntry::Max& entry);
+
+    void
+    signalEndOfLog();
+
 
     /**
      * This locks specified treeCache node and its path to Rootnode
@@ -78,6 +95,9 @@ public:
 
     Result
     removeNode(TreeCacheNode& tcn);
+
+    Result
+    commitIfNodesWereRemoved();
 
     Result
     setRoot(TreeCacheNode& rootTcn);
@@ -159,6 +179,7 @@ private:
     isParentPathClean(TreeCacheNode& tcn);
     Result
     updateFlashAddressInParent(TreeCacheNode& node);
+
     /**
      * returns true if any sibling is dirty
      * stops at first occurrence.

@@ -19,18 +19,32 @@
 #include "commonTypes.hpp"
 #include "pageAddressCache.hpp"
 #include "superblock.hpp"
+#include "journalPageStatemachine.hpp"
 
 namespace paffs
 {
-class DataIO
+
+class DataIO : public JournalTopic
 {
     Device* dev;
-
 public:
     PageAddressCache pac;
+private:
+    PageStateMachine<maxPagesPerWrite, maxPagesPerWrite, JournalEntry::Topic::dataIO> statemachine;
+    Inode journalLastModifiedInode;
+    FileSize journalLastSize = 0;
+    bool journalInodeValid = false;
+    bool modifiedInode = false;
+    bool processedForeignSuccessElement = false;
+    bool journalIsWriteTruncatePair = false;
+public:
 
-    DataIO(Device* mdev) : dev(mdev), pac(*mdev){};
-    // Updates changes to treeCache as well
+    DataIO(Device* mdev);
+
+    /**
+     *  requires a checkpoint to be done from the outside because
+     *  it may be combined to a write-truncate pair
+     */
     Result
     writeInodeData(Inode& inode,
                    FileSize offs,
@@ -44,7 +58,18 @@ public:
                   FileSize* bytesRead,
                   uint8_t* data);
     Result
-    deleteInodeData(Inode& inode, unsigned int offs);
+    deleteInodeData(Inode& inode, unsigned int offs, bool journalMode = false);
+
+    JournalEntry::Topic
+    getTopic() override;
+    void
+    resetState() override;
+    bool
+    isInterestedIn(const journalEntry::Max& entry) override;
+    Result
+    processEntry(const journalEntry::Max& entry, JournalEntryPosition position) override;
+    void
+    signalEndOfLog() override;
 
 private:
     /**
@@ -58,8 +83,8 @@ private:
                   const uint8_t* data,
                   PageAddressCache& ac,
                   FileSize* bytes_written,
-                  FileSize filesize,
-                  uint32_t& reservedPages);
+                  FileSize  filesize,
+                  uint16_t& reservedPages);
     Result
     readPageData(PageAbs  pageFrom,
                  PageAbs  pageTo,

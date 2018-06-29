@@ -113,29 +113,89 @@ struct SuperIndex
 class Superblock : public JournalTopic
 {
     Device* device;
+
     Addr mRootnodeAddr = 0;
     bool mRootnodeDirty = 0;
+    Area mMap[areasNo];
+    AreaPos mActiveAreas[AreaType::no];
+    AreaPos mUsedAreas;
+    uint64_t mOverallDeletions;
+
     Addr pathToSuperIndexDirect[superChainElems];  // Direct Addresses
     SerialNo superChainIndexes[superChainElems];
     bool testmode = false;
 
     //This buffer is only used for reading/writing the superindex.
     //TODO: Use another pagebuf that is unused during superindex commit
-    uint8_t buf[SuperIndex::getNeededBytes(2)];
+    uint8_t mBuf[SuperIndex::getNeededBytes(2)];
 
 public:
-    Superblock(Device* mdev) : device(mdev){};
-    Result
-    registerRootnode(Addr addr);
-    Addr
-    getRootnodeAddr();
+    Superblock(Device* mdev) : device(mdev)
+    {
+        clear();
+    };
 
     JournalEntry::Topic
     getTopic() override;
     void
-    processEntry(JournalEntry& entry) override;
+    resetState() override;
+    /**
+     * AreaMap contains the phys. Positions of the areas.
+     * An area move instruction changes the position of older elements as well.
+     * We need to have the latest Version of the Areamap before
+     * other topics start processing the log.
+     */
     void
-    processUncheckpointedEntry(JournalEntry& entry) override;
+    preScan(const journalEntry::Max& entry, JournalEntryPosition position) override;
+    Result
+    processEntry(const journalEntry::Max& entry, JournalEntryPosition position) override;
+
+    void
+    clear();
+
+    Result
+    registerRootnode(Addr addr);
+    Addr
+    getRootnodeAddr();
+    AreaType
+    getType(AreaPos area);
+    AreaStatus
+    getStatus(AreaPos area);
+    uint32_t
+    getErasecount(AreaPos area);
+    AreaPos
+    getPos(AreaPos area);
+
+    void
+    setType(AreaPos area, AreaType type);
+    void
+    setStatus(AreaPos area, AreaStatus status);
+    void
+    increaseErasecount(AreaPos area);
+    void
+    setPos(AreaPos area, AreaPos pos);
+
+    AreaPos
+    getActiveArea(AreaType type);
+    void
+    setActiveArea(AreaType type, AreaPos pos);
+
+    AreaPos
+    getUsedAreas();
+    void
+    setUsedAreas(AreaPos num);
+    void
+    increaseUsedAreas();
+    void
+    decreaseUsedAreas();
+
+    void
+    swapAreaPosition(AreaPos a, AreaPos b);
+
+    void
+    setOverallDeletions(uint64_t& deletions);
+    uint64_t
+    getOverallDeletions();
 
     // returns PAFFS_NF if no superindex is in flash
     Result

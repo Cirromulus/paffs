@@ -21,30 +21,34 @@
 namespace paffs
 {
 //Note: Order is different
-const Param stdParam{totalBytesPerPage,
-                     pagesPerBlock,
-                     blocksTotal,
-                     oobBytesPerPage,
-                     jumpPadNo,
-                     dataBytesPerPage,
-                     dataPagesPerArea,
-                     totalPagesPerArea,
-                     areaSummarySizePacked,
-                     blocksPerArea,
-                     superChainElems,
-                     areasNo,
+const Param stdParam{
+    totalBytesPerPage,
+    pagesPerBlock,
+    blocksTotal,
+    oobBytesPerPage,
+    jumpPadNo,
+    dataBytesPerPage,
+    dataPagesPerArea,
+    totalPagesPerArea,
+    areaSummarySizePacked,
+    blocksPerArea,
+    superChainElems,
+    areasNo,
+    mramSize,
 };
 
 TraceMask traceMask =
-        // PAFFS_TRACE_VERBOSE |
+        //PAFFS_TRACE_VERBOSE |
+        //PAFFS_TRACE_JOURNAL |
         // PAFFS_TRACE_READ |
         PAFFS_TRACE_INFO |
         // PAFFS_TRACE_AREA |
-        PAFFS_TRACE_ERROR | PAFFS_TRACE_BUG |
+        PAFFS_TRACE_ERROR |
+        PAFFS_TRACE_BUG |
         // PAFFS_TRACE_TREE |
         // PAFFS_TRACE_TREECACHE |
         // PAFFS_TRACE_ASCACHE |
-        // PAFFS_TRACE_SCAN |
+        // PAFFS_TRACE_JOUR_PERS |
         // PAFFS_TRACE_WRITE |
         // PAFFS_TRACE_SUPERBLOCK |
         // PAFFS_TRACE_ALLOCATE |
@@ -57,11 +61,11 @@ TraceMask traceMask =
 
 const char* traceDescription[] =
    {
-       "INVALID",
+       "ALWAYS",
        "INFO",
        "OS",
        "DEVICE",
-       "SCAN",
+       "JPERSIST",
        "BAD_BLOCKS",
        "ERASE",
        "GC",
@@ -71,7 +75,7 @@ const char* traceDescription[] =
        "BUFFERS",
        "NANDACCESS",
        "GC_DETAIL",
-       "SCAN_DEBUG",
+       "PAGE_SM",
        "AREA",
        "PACACHE",
        "VERIFY_TC",
@@ -88,7 +92,6 @@ const char* traceDescription[] =
        "JOURNAL",
        "ERROR",
        "BUG",
-       "ALWAYS"
    };
 
 const char* resultMsg[] = {
@@ -273,6 +276,19 @@ Paffs::format(const BadBlockList badBlockList[maxNumberOfDevices], bool complete
 
     PAFFS_DBG_S(PAFFS_TRACE_INFO, "--------------------\n");
 
+    if(traceMask & PAFFS_TRACE_INFO)
+    {
+        printf("Tracing ");
+        for(uint8_t i = 0; i < sizeof(TraceMask) * 8; i++)
+        {
+            if(1 << i & traceMask)
+            {
+                printf("%s ", traceDescription[i + 1]);
+            }
+        }
+        printf("\n");
+    }
+
     Result globalReturn = Result::ok;
     for (uint8_t i = 0; i < maxNumberOfDevices; i++)
     {
@@ -301,7 +317,8 @@ Paffs::mount(bool readOnly)
             Result deviceReturn = devices[i]->mnt(readOnly);
             if (deviceReturn > globalReturn)
             {   //Results are (somewhat) ordered by badness
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mount device %" PRId16 "!", i);
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mount device %" PRId16 " (%s)"
+                          , i, err_msg(deviceReturn));
                 globalReturn = deviceReturn;
             }
         }
@@ -320,7 +337,8 @@ Paffs::unmount()
             Result deviceReturn = devices[i]->unmnt();
             if (deviceReturn > globalReturn)
             {   //Results are (somewhat) ordered by badness
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not unmount device %" PRId16 "!", i);
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not unmount device %" PRId16 " (%s)"
+                          , i, err_msg(deviceReturn));
                 globalReturn = deviceReturn;
             }
         }
@@ -421,6 +439,12 @@ Result
 Paffs::flush(Obj& obj)
 {
     return devices[0]->flush(obj);
+}
+
+Result
+Paffs::flush()
+{
+    return devices[0]->flushAllCaches();
 }
 
 Result

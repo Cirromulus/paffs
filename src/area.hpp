@@ -48,74 +48,37 @@ getBlockNumberFromDirect(const Addr addr);
  */
 Addr
 combineAddress(const AreaPos logicalArea, const PageOffs page);
-unsigned int
+AreaPos
 extractLogicalArea(const Addr addr);
-unsigned int
+PageOffs
 extractPageOffs(const Addr addr);
 
-class AreaManagement
+class AreaManagement : public JournalTopic
 {
-    Area map[areasNo];
-    AreaPos activeArea[AreaType::no];
-    AreaPos usedAreas;
-    uint64_t overallDeletions;
+
     Device* dev;
+
+    bool mUnfinishedTransaction = false;
+    journalEntry::areaMgmt::Max mLastOp;
+
+    enum class ExternOp
+    {
+        none,
+        setType,
+        setStatus,
+        setActiveArea,
+        changeUsedAreas,
+        increaseErasecount,
+        resetASWritten,
+        deleteSummary,
+    } mLastExternOp;
 
 public:
     GarbageCollection gc;
     AreaManagement(Device* mdev) : dev(mdev), gc(mdev)
     {
-        clear();
+        resetState();
     };
-
-    void
-    clear();
-
-    AreaType
-    getType(AreaPos area);
-    AreaStatus
-    getStatus(AreaPos area);
-    uint32_t
-    getErasecount(AreaPos area);
-    AreaPos
-    getPos(AreaPos area);
-
-    void
-    setType(AreaPos area, AreaType type);
-    void
-    setStatus(AreaPos area, AreaStatus status);
-    void
-    increaseErasecount(AreaPos area);
-    void
-    setPos(AreaPos area, AreaPos pos);
-
-    AreaPos
-    getActiveArea(AreaType type);
-    void
-    setActiveArea(AreaType type, AreaPos pos);
-
-    AreaPos
-    getUsedAreas();
-    void
-    setUsedAreas(AreaPos num);
-    void
-    increaseUsedAreas();
-    void
-    decreaseUsedAreas();
-
-    void
-    swapAreaPosition(AreaPos a, AreaPos b);
-
-    void
-    setOverallDeletions(uint64_t& deletions);
-    uint64_t
-    getOverallDeletions();
-
-    // Only for serializing areMap in Superblock
-    Area*
-    getMap();
-    AreaPos*
-    getActiveAreas();
 
     /**
      * May call garbage collection
@@ -133,17 +96,30 @@ public:
     manageActiveAreaFull(AreaType areaType);
 
     void
-    initArea(AreaPos area);
-    void
     initAreaAs(AreaPos area, AreaType type);
     Result
     closeArea(AreaPos area);
     void
     retireArea(AreaPos area);
+    /**
+     * \param noJournalLogging is active if called from deleteArea.
+     * \param physpos specifies the physical position (if called from GC after swapping areapositions)
+     */
     Result
-    deleteAreaContents(AreaPos area);
+    deleteAreaContents(AreaPos area, AreaPos swappedArea, bool noJournalLogging = false);
     Result
     deleteArea(AreaPos area);
+
+    JournalEntry::Topic
+    getTopic() override;
+    void
+    resetState() override;
+    bool
+    isInterestedIn(const journalEntry::Max& entry) override;
+    Result
+    processEntry(const journalEntry::Max& entry, JournalEntryPosition) override;
+    void
+    signalEndOfLog() override;
 };
 
 }  // namespace paffs

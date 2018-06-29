@@ -134,7 +134,7 @@ OfficeModelNexys3Driver::checkBad(BlockAbs block)
         size_t pageNumber = block * pagesPerBlock + page;
         mNand->readPage(mBank, mDevice, pageNumber, buf);
         if (static_cast<uint8_t>(buf[4096]) != 0xFF)
-            return Result::badflash;
+            return Result::badFlash;
     }
 	return Result::ok;
 }

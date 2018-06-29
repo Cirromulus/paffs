@@ -31,11 +31,23 @@ namespace paffs
 {
 extern outpost::rtos::SystemClock systemClock;
 
-class Device
+
+class Device : public JournalTopic
 {
     InodePool<maxNumberOfInodes> inodePool;
     ObjectPool<Obj, maxNumberOfFiles> filesPool;
     bool useJournal = false;
+
+    InodeNo targetInodeNo = 0;
+    InodeNo folderInodeNo = 0;
+    enum class JournalState
+    {
+        ok,
+        makeObj,
+        insertObj,
+        removeObj,
+    } journalState = JournalState::ok;
+
 public:
     Driver& driver;
     Result lasterr;
@@ -66,7 +78,12 @@ public:
     Result
     mnt(bool readOnlyMode = false);
     Result
+    flushAllCaches();
+    Result
     unmnt();
+
+    void
+    debugPrintStatus();
 
     // Directory
     Result
@@ -98,7 +115,7 @@ public:
     Result
     flush(Obj& obj);
     Result
-    truncate(const char* path, FileSize newLength);
+    truncate(const char* path, FileSize newLength, bool fromUserspace = true);
     Result
     remove(const char* path);
     Result
@@ -109,6 +126,18 @@ public:
     getNumberOfOpenFiles();
     uint8_t
     getNumberOfOpenInodes();
+    Result
+    checkFolderSanity(InodeNo folderNo);
+
+
+    JournalEntry::Topic
+    getTopic() override;
+    void
+    resetState() override;
+    Result
+    processEntry(const journalEntry::Max& entry, JournalEntryPosition position) override;
+    void
+    signalEndOfLog() override;
 
 private:
     Result
@@ -127,14 +156,15 @@ private:
     Result
     getInodeNoInDir(InodeNo& outInode, Inode& folder, const char* name);
     /**
-     * @param outInode has to point to an Inode, it is used as a buffer!
+     * \param namelength[in,out] input is used as the max length the name will get copied into outName.
+     *  Output marks the length of the name in bytes
      */
+    Result
+    getNameOfInodeInDir(InodeNo target, Inode& folder, char* outName, uint8_t &namelength);
+
     Result
     getInodeOfElem(SmartInodePtr& outInode, const char* fullPath);
     /**
-     * @warn does not store the target into List, just checks whether it has to load it from tree
-     * TODO: Future possibility is to store this target into cache (no buffer needed)
-     *
      * @param target shall not point to valid data
      */
     Result

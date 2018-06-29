@@ -16,6 +16,8 @@
 #include "dataIO.hpp"
 #include "device.hpp"
 #include "driver/driver.hpp"
+#include "journalEntry.hpp"
+#include "journalPageStatemachine_impl.hpp"
 #include <cmath>
 #include <inttypes.h>
 
@@ -32,6 +34,10 @@ AddrListCacheElem::setAddr(PageNo pos, Addr addr)
                   pos,
                   addrsPerPage);
     }
+    if(cache[pos] == addr)
+    {
+        return;
+    }
     cache[pos] = addr;
     dirty = true;
 }
@@ -46,14 +52,43 @@ AddrListCacheElem::getAddr(PageNo pos)
     return cache[pos];
 }
 
+PageAddressCache::PageAddressCache(Device& mdev) :
+        device(mdev), statemachine(device.journal, device.sumCache)
+{
+    clear();
+};
+
+void
+PageAddressCache::clear()
+{
+    for (AddrListCacheElem& elem : tripl)
+    {
+        elem.active = false;
+    }
+    for (AddrListCacheElem& elem : doubl)
+    {
+        elem.active = false;
+    }
+    singl.active = false;
+
+    mInodePtr = nullptr;
+    isInodeDirty = false;
+
+    processedForeignSuccessElement = false;
+}
+
 Result
 PageAddressCache::setTargetInode(Inode& node)
 {
-    if (&node == inode)
+    //to force-load Inode into Tree for journal
+    Inode dummy;
+    device.tree.getInode(node.no, dummy);
+
+    if (&node == mInodePtr)
     {
         return Result::ok;
     }
-    PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Set new target inode");
+    PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Set new target inode %" PTYPE_INODENO, node.no);
     if (isDirty())
     {
         PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Target Inode differs, committing old Inode");
@@ -73,26 +108,39 @@ PageAddressCache::setTargetInode(Inode& node)
         elem.active = false;
     }
     singl.active = false;
-    inode = &node;
+    mInodePtr = &node;
+
+    //journal setInode is delayed until something is really changed
+
     return Result::ok;
+}
+
+InodeNo
+PageAddressCache::getTargetInode()
+{
+    if(mInodePtr == nullptr)
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get InodeNo without Inode!");
+        return 0;
+    }
+    return mInodePtr->no;
 }
 
 Result
 PageAddressCache::getPage(PageNo page, Addr* addr)
 {
-    if (inode == nullptr)
+    if (mInodePtr == nullptr)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
         return Result::bug;
     }
-    if (traceMask & PAFFS_TRACE_VERBOSE)
-    {
-        PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "GetPage at %" PRIu32, page);
-    }
 
     if (page < directAddrCount)
     {
-        *addr = inode->direct[page];
+        *addr = mInodePtr->direct[page];
+        PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "GetPage at %" PRIu32
+                    " (direct, %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ")",
+                    page, extractLogicalArea(*addr), extractPageOffs(*addr));
         return Result::ok;
     }
     page -= directAddrCount;
@@ -100,10 +148,10 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
 
     if (page < addrsPerPage)
     {
-        PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Accessing first indirection at %" PRIu32, page);
+        PAFFS_DBG_S(PAFFS_TRACE_VERBOSE | PAFFS_TRACE_PACACHE, "Accessing first indirection at %" PRIu32, page);
         if (!singl.active)
         {
-            r = loadCacheElem(inode->indir, singl);
+            r = loadCacheElem(mInodePtr->indir, singl);
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read first indirection!");
@@ -111,6 +159,9 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
             }
         }
         *addr = singl.getAddr(page);
+        PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "GetPage at %" PRIu32
+                    " (first, %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ")",
+                    page, extractLogicalArea(*addr), extractPageOffs(*addr));
         return Result::ok;
     }
     page -= addrsPerPage;
@@ -118,41 +169,47 @@ PageAddressCache::getPage(PageNo page, Addr* addr)
 
     if (page < std::pow(addrsPerPage, 2))
     {
-        PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Accessing second indirection at %" PRIu32, page);
-        r = loadPath(inode->d_indir, page, doubl, 1, addrPos);
+        PAFFS_DBG_S(PAFFS_TRACE_VERBOSE | PAFFS_TRACE_PACACHE, "Accessing second indirection at %" PRIu32, page);
+        r = loadPath(mInodePtr->d_indir, page, doubl, 1, addrPos);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load second indirection!");
             return r;
         }
         *addr = doubl[1].getAddr(addrPos);
+        PAFFS_DBG_S( PAFFS_TRACE_PACACHE, "GetPage at %" PRIu32
+                    " (second, %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ")",
+                    page, extractLogicalArea(*addr), extractPageOffs(*addr));
         return Result::ok;
     }
     page -= std::pow(addrsPerPage, 2);
 
     if (page < std::pow(addrsPerPage, 3))
     {
-        PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "Accessing third indirection at %" PRIu32, page);
-        r = loadPath(inode->t_indir, page, tripl, 2, addrPos);
+        PAFFS_DBG_S(PAFFS_TRACE_VERBOSE | PAFFS_TRACE_PACACHE, "Accessing third indirection at %" PRIu32, page);
+        r = loadPath(mInodePtr->t_indir, page, tripl, 2, addrPos);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load third indirection!");
             return r;
         }
         *addr = tripl[2].getAddr(addrPos);
+        PAFFS_DBG_S(PAFFS_TRACE_PACACHE, "GetPage at %" PRIu32
+                    " (third, %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS ")",
+                    page, extractLogicalArea(*addr), extractPageOffs(*addr));
         return Result::ok;
     }
 
     PAFFS_DBG(PAFFS_TRACE_ERROR,
               "Get Page bigger than allowed! (was --, should <--)");
     // TODO: Actual calculation of values
-    return Result::toobig;
+    return Result::tooBig;
 }
 
 Result
 PageAddressCache::setPage(PageNo page, Addr addr)
 {
-    if (inode == nullptr)
+    if (mInodePtr == nullptr)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
         return Result::bug;
@@ -166,94 +223,149 @@ PageAddressCache::setPage(PageNo page, Addr addr)
     if (traceMask & PAFFS_TRACE_VERBOSE)
     {
         PAFFS_DBG_S(PAFFS_TRACE_PACACHE,
-                    "SetPage to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " at %" PRIu32,
+                    "SetPage of %" PTYPE_INODENO " to %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " at %" PRIu32,
+                    mInodePtr->no,
                     extractLogicalArea(addr),
                     extractPageOffs(addr),
                     page);
     }
 
-    if (page < directAddrCount)
+    PageNo relPage = page;
+
+    if (relPage < directAddrCount)
     {
-        inode->direct[page] = addr;
+        if(mInodePtr->direct[relPage] == addr)
+        {
+            return Result::ok;
+        }
+        FAILPOINT;
+        //the event gets delayed until we are sure we don't have to commit
+        //or else during replay we commit before the log commits (so we would overwrite the last element)
+        device.journal.addEvent(journalEntry::pac::SetAddress(mInodePtr->no, page, addr));
+        FAILPOINT;
+        mInodePtr->direct[relPage] = addr;
+        isInodeDirty = true;
         return Result::ok;
     }
-    page -= directAddrCount;
+    relPage -= directAddrCount;
     Result r;
 
-    if (page < addrsPerPage)
+    if(statemachine.getMinSpaceLeft() < 6)
+    {
+        r = commit();
+        if(r != Result::ok)
+        {
+            PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit PAC for statemachine cache!");
+            return r;
+        }
+    }
+    FAILPOINT;
+    if (relPage < addrsPerPage)
     {
         // First Indirection
         if (!singl.active)
         {
-            r = loadCacheElem(inode->indir, singl);
+            r = loadCacheElem(mInodePtr->indir, singl);
             if (r != Result::ok)
             {
                 PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read first indirection!");
                 return r;
             }
         }
-        singl.setAddr(page, addr);
+        if(singl.getAddr(relPage) == addr)
+        {
+            return Result::ok;
+        }
+        device.journal.addEvent(journalEntry::pac::SetAddress(mInodePtr->no, page, addr));
+        singl.setAddr(relPage, addr);
+        isInodeDirty = true;
         return Result::ok;
     }
-    page -= addrsPerPage;
+    relPage -= addrsPerPage;
     PageNo addrPos;
-
-    if (page < std::pow(addrsPerPage, 2))
+    FAILPOINT;
+    if (relPage < std::pow(addrsPerPage, 2))
     {
-        r = loadPath(inode->d_indir, page, doubl, 1, addrPos);
+        r = loadPath(mInodePtr->d_indir, relPage, doubl, 1, addrPos);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load second indirection!");
             return r;
         }
+        if(doubl[1].getAddr(addrPos) == addr)
+        {
+            return Result::ok;
+        }
+        device.journal.addEvent(journalEntry::pac::SetAddress(mInodePtr->no, page, addr));
         doubl[1].setAddr(addrPos, addr);
+        isInodeDirty = true;
         return Result::ok;
     }
-    page -= std::pow(addrsPerPage, 2);
-
-    if (page < std::pow(addrsPerPage, 3))
+    relPage -= std::pow(addrsPerPage, 2);
+    FAILPOINT;
+    if (relPage < std::pow(addrsPerPage, 3))
     {
-        r = loadPath(inode->t_indir, page, tripl, 2, addrPos);
+        r = loadPath(mInodePtr->t_indir, relPage, tripl, 2, addrPos);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not load third indirection!");
             return r;
         }
+        if(tripl[2].getAddr(addrPos) == addr)
+        {
+            return Result::ok;
+        }
+        device.journal.addEvent(journalEntry::pac::SetAddress(mInodePtr->no, page, addr));
         tripl[2].setAddr(addrPos, addr);
+        isInodeDirty = true;
         return Result::ok;
     }
 
     PAFFS_DBG(PAFFS_TRACE_ERROR,
               "Get Page bigger than allowed! (was --, should <--)");
     // TODO: Actual calculation of values
-    return Result::toobig;
+    return Result::tooBig;
+}
+
+Result
+PageAddressCache::setValid()
+{
+    FAILPOINT;
+    //We only want to invalidate old Pages which may have been written.
+    //It is not allowed for PAC to revert new pages after DATAIO assumes the new Data having set.
+    return statemachine.invalidateOldPages();
 }
 
 Result
 PageAddressCache::commit()
 {
-    if (inode == nullptr)
+    if (mInodePtr == nullptr)
     {
-        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to get Page of null inode");
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried to commit null inode");
         return Result::bug;
     }
 
+    if(!isInodeDirty)
+    {
+        return Result::ok;
+    }
+    FAILPOINT;
     Result r;
-    r = commitPath(inode->indir, &singl, 0);
+    r = commitPath(mInodePtr->indir, &singl, 0);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit first indirection!");
         return r;
     }
-
-    r = commitPath(inode->d_indir, doubl, 1);
+    FAILPOINT;
+    r = commitPath(mInodePtr->d_indir, doubl, 1);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit second indirection!");
         return r;
     }
-
-    r = commitPath(inode->t_indir, tripl, 2);
+    FAILPOINT;
+    r = commitPath(mInodePtr->t_indir, tripl, 2);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit third indirection!");
@@ -265,8 +377,131 @@ PageAddressCache::commit()
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Committed all indirections, but something still dirty!");
         return Result::bug;
     }
+    FAILPOINT;
+    r = device.tree.updateExistingInode(*mInodePtr);
 
-    return device.tree.updateExistingInode(*inode);
+    if(traceMask & PAFFS_TRACE_PACACHE && traceMask & PAFFS_TRACE_VERBOSE)
+    {
+        printf("Resulting Addresslist of Inode %" PTYPE_INODENO "\n", mInodePtr->no);
+        for(uint8_t i = 0; i < 13; i++)
+        {
+            //intentionally over size of 11, because we print indirects too
+            printf("%" PRIu8 "\t%" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "\n",
+                   i, extractLogicalArea(mInodePtr->direct[i]), extractPageOffs(mInodePtr->direct[i]));
+        }
+    }
+    FAILPOINT;
+    statemachine.invalidateOldPages();
+    FAILPOINT;
+    device.journal.addEvent(journalEntry::Checkpoint(getTopic()));
+    isInodeDirty = false;
+    return r;
+}
+
+JournalEntry::Topic
+PageAddressCache::getTopic()
+{
+    return JournalEntry::Topic::pac;
+}
+
+void
+PageAddressCache::resetState()
+{
+    statemachine.clear();
+    processedForeignSuccessElement = false;
+}
+
+bool
+PageAddressCache::isInterestedIn(const journalEntry::Max& entry)
+{
+    return statemachine.getState() == JournalState::invalid &&
+            !processedForeignSuccessElement &&
+            entry.base.topic == JournalEntry::Topic::tree;
+}
+
+Result
+PageAddressCache::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
+{
+    if (entry.base.topic == getTopic())
+    {   //normal operations
+        switch (entry.pac.operation)
+        {
+        case journalEntry::PAC::Operation::setAddress:
+        {
+            if(mInodePtr == nullptr || entry.pac_.setAddress.inodeNo != mInodePtr->no)
+            {
+                setJournallingInode(entry.pac_.setAddress.inodeNo);
+            }
+            return setPage(entry.pac_.setAddress.page, entry.pac_.setAddress.addr);
+        }
+        }
+        return Result::bug;
+    }
+    else if(entry.base.topic == JournalEntry::Topic::pagestate &&
+            entry.pagestate.target == getTopic())
+    {   //statemachine operations
+        return statemachine.processEntry(entry);
+    }
+    else if(entry.base.topic == JournalEntry::Topic::tree)
+    {
+        if(entry.btree.op == journalEntry::BTree::Operation::update)
+        {
+            if(mInodePtr == nullptr || mInodePtr != &mJournalInodeCopy)
+            {
+                return Result::bug;
+            }
+            processedForeignSuccessElement = true;
+            journalEntry::Max success;
+            success.pagestate_.success = journalEntry::pagestate::Success(getTopic());
+            return statemachine.processEntry(success);
+        }
+        return Result::ok;
+    }
+    else
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
+        return Result::invalidInput;
+    }
+}
+
+void
+PageAddressCache::signalEndOfLog()
+{
+    if(statemachine.signalEndOfLog() == JournalState::recover)
+    {
+        //TODO: We may want to find out which cache elements are clean to suppress double versions
+    }
+    Result r;
+    if(mInodePtr != nullptr)
+    {
+        //This refreshes the Inode we will commit to Index.
+        //During replay, changes to the same node are only done to index, not the PAC version
+        //TODO: Link them somehow
+        Inode tmp;
+        r = device.tree.getInode(mInodePtr->no, tmp);
+        if(r != Result::ok)
+        {   //nonexisting Inode?
+            PAFFS_DBG(PAFFS_TRACE_BUG, "Could not find Inode %" PTYPE_INODENO
+                      " for PAC commit", mInodePtr->no);
+            return;
+        }
+        //This intentionally reads over the boundaries of direct array into the indirections
+        memcpy(&tmp.direct, &mJournalInodeCopy.direct, (11+3) * sizeof(Addr));
+        mJournalInodeCopy = tmp;
+        commit();
+        mInodePtr = nullptr;
+    }
+}
+
+Result
+PageAddressCache::setJournallingInode(InodeNo no)
+{
+    Result r = device.tree.getInode(no, mJournalInodeCopy);
+    if(r != Result::ok)
+    {
+        return r;
+    }
+    return setTargetInode(mJournalInodeCopy);
 }
 
 bool
@@ -414,6 +649,7 @@ PageAddressCache::loadPath(Addr& anchor,
 Result
 PageAddressCache::commitPath(Addr& anchor, AddrListCacheElem* path, unsigned char depth)
 {
+    //Journal set here
     Result r;
     for (uint16_t i = depth; i > 0; i--)
     {
@@ -464,7 +700,6 @@ PageAddressCache::commitPath(Addr& anchor, AddrListCacheElem* path, unsigned cha
             return r;
         }
     }
-
     path[0].dirty = false;
     return Result::ok;
 }
@@ -498,6 +733,7 @@ PageAddressCache::commitElem(AddrListCacheElem& parent, AddrListCacheElem& elem)
                     "parent:%" PRIu16,
                     elem.positionInParent);
         // invalidate old page.
+        FAILPOINT;
         r = device.sumCache.setPageStatus(extractLogicalArea(parent.cache[elem.positionInParent]),
                                        extractPageOffs(parent.cache[elem.positionInParent]),
                                        SummaryEntry::dirty);
@@ -551,6 +787,7 @@ PageAddressCache::loadCacheElem(Addr from, AddrListCacheElem& elem)
 Result
 PageAddressCache::writeCacheElem(Addr& source, AddrListCacheElem& elem)
 {
+    FAILPOINT;
     Result r = writeAddrList(source, elem.cache);
     if (r != Result::ok)
     {
@@ -571,7 +808,7 @@ PageAddressCache::readAddrList(Addr from, Addr list[addrsPerPage])
         memset(list, 0, addrsPerPage * sizeof(Addr));
         return Result::ok;
     }
-    if (device.areaMgmt.getType(extractLogicalArea(from)) != AreaType::index)
+    if (device.superblock.getType(extractLogicalArea(from)) != AreaType::index)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "READ ADDR LIST operation of invalid area at %" PRId16 ":%" PRId16 "",
@@ -613,7 +850,7 @@ PageAddressCache::writeAddrList(Addr& source, Addr list[addrsPerPage])
         // TODO: Reset former pagestatus, so that FS will be in a safe state
         return device.lasterr;
     }
-    if (device.areaMgmt.getActiveArea(AreaType::index) == 0)
+    if (device.superblock.getActiveArea(AreaType::index) == 0)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "findWritableArea returned 0");
         return Result::bug;
@@ -621,15 +858,23 @@ PageAddressCache::writeAddrList(Addr& source, Addr list[addrsPerPage])
     device.lasterr = r;
 
     PageOffs firstFreePage = 0;
-    if (device.areaMgmt.findFirstFreePage(firstFreePage, device.areaMgmt.getActiveArea(AreaType::index))
-        == Result::nospace)
+    if (device.areaMgmt.findFirstFreePage(firstFreePage, device.superblock.getActiveArea(AreaType::index))
+        == Result::noSpace)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "BUG: findWritableArea returned full area (%" PRId16 ").",
-                  device.areaMgmt.getActiveArea(AreaType::index));
+                  device.superblock.getActiveArea(AreaType::index));
         return device.lasterr = Result::bug;
     }
-    Addr to = combineAddress(device.areaMgmt.getActiveArea(AreaType::index), firstFreePage);
+    Addr to = combineAddress(device.superblock.getActiveArea(AreaType::index), firstFreePage);
+
+    // Mark Page as used
+    r = statemachine.replacePage(to, source);
+    if (r != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
+        return r;
+    }
 
     r = device.driver.writePage(
             getPageNumber(to, device), reinterpret_cast<char*>(list), addrsPerPage * sizeof(Addr));
@@ -639,33 +884,12 @@ PageAddressCache::writeAddrList(Addr& source, Addr list[addrsPerPage])
         return r;
     }
 
-    // Mark Page as used
-    r = device.sumCache.setPageStatus(
-            device.areaMgmt.getActiveArea(AreaType::index), firstFreePage, SummaryEntry::used);
-    if (r != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
-        return r;
-    }
-
-    Addr formerPosition = source;
     source = to;
 
     r = device.areaMgmt.manageActiveAreaFull(AreaType::index);
     if (r != Result::ok)
     {
         return r;
-    }
-
-    if (formerPosition != 0)
-    {
-        r = device.sumCache.setPageStatus(formerPosition, SummaryEntry::dirty);
-        if (r != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not invalidate old Page! "
-                      "Ignoring Errors to continue...");
-        }
     }
 
     return Result::ok;

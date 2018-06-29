@@ -17,12 +17,20 @@
 #include "device.hpp"
 #include "driver/driver.hpp"
 #include "paffs_trace.hpp"
+#include "journalPageStatemachine_impl.hpp"
+
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 
 namespace paffs
 {
+
+DataIO::DataIO(Device *mdev) : dev(mdev), pac(*mdev), statemachine(mdev->journal, mdev->sumCache, &pac)
+{
+    resetState();
+};
+
 // modifies inode->size and inode->reserved size as well
 Result
 DataIO::writeInodeData(Inode& inode,
@@ -41,13 +49,19 @@ DataIO::writeInodeData(Inode& inode,
         PAFFS_DBG(PAFFS_TRACE_BUG, "Write size 0! Bug?");
         return Result::invalidInput;
     }
-
     // todo: use pageFrom as offset to reduce memory usage and IO
     FileSize pageFrom = offs / dataBytesPerPage;
     FileSize toPage = (offs + bytes) / dataBytesPerPage;
     if ((offs + bytes) % dataBytesPerPage == 0)
     {
         toPage--;
+    }
+
+    if(toPage - pageFrom > maxPagesPerWrite)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Due to the journal, only %" PRIu16 " pages "
+                "are allowed per single write", maxPagesPerWrite);
+        return Result::tooBig;
     }
 
     Result res = pac.setTargetInode(inode);
@@ -67,6 +81,12 @@ DataIO::writeInodeData(Inode& inode,
         }
     }
 
+    FAILPOINT;
+    if (inode.size < bytes + offs)
+    {   //this will only be applied if write succeeds
+        dev->journal.addEvent(journalEntry::dataIO::NewInodeSize(inode.no, bytes + offs));
+    }
+    FAILPOINT;
     res = writePageData(pageFrom,
                         toPage,
                         offs % dataBytesPerPage,
@@ -76,14 +96,37 @@ DataIO::writeInodeData(Inode& inode,
                         bytesWritten,
                         inode.size,
                         inode.reservedPages);
-
+    FAILPOINT;
+    if(res != Result::ok)
+    {
+        //TODO: revert Statemachine
+        return res;
+    }
     if (inode.size < *bytesWritten + offs)
     {
         inode.size = *bytesWritten + offs;
     }
+    inode.mod = systemClock.now().convertTo<outpost::time::GpsTime>().timeSinceEpoch().milliseconds();
 
-    // the Tree UpdateExistingInode has to be done by high level functions,
-    // bc they may modify it by themselves
+	//This is the success message for dataIO and pageAddressCache
+	res = dev->tree.updateExistingInode(inode);
+	if(res != Result::ok)
+	{
+		//TODO: revert Statemachine
+		return res;
+	}
+	FAILPOINT;
+    res = statemachine.invalidateOldPages();
+    if (res != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR,
+                  "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!",
+                  resultMsg[static_cast<int>(res)]);
+    }
+	
+    pac.setValid();
+
+    //Checkpoint is done by device functions, because a write-truncate pair has to be kept together
     return res;
 }
 
@@ -106,7 +149,7 @@ DataIO::readInodeData(Inode& inode,
                   "Read bigger than size of object! (was: %" PRIu32 ", max: %" PRIu32 ")",
                   offs + bytes,
                   inode.size);
-        bytes = inode.size - offs;
+        bytes = inode.size < offs ? 0 : inode.size - offs;
     }
 
     *bytesRead = 0;
@@ -129,12 +172,17 @@ DataIO::readInodeData(Inode& inode,
 
 // inode->size and inode->reservedSize is altered.
 Result
-DataIO::deleteInodeData(Inode& inode, unsigned int offs)
+DataIO::deleteInodeData(Inode& inode, unsigned int offs, bool journalMode)
 {
     if (dev->readOnly)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried deleting InodeData in readOnly mode!");
         return Result::bug;
+    }
+
+    if(inode.size == offs)
+    {   //nothing to do
+        return Result::ok;
     }
 
     FileSize pageFrom = offs / dataBytesPerPage;
@@ -147,18 +195,6 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
     {
         toPage--;
     }
-    if (pageFrom > toPage)
-    {
-        // We are deleting just some bytes on the same page
-        inode.size = offs;
-        return Result::ok;
-    }
-    if (inode.reservedPages == 0)
-    {
-        inode.size = offs;
-        return Result::ok;
-    }
-
     if (inode.size < offs)
     {
         // Offset bigger than actual filesize
@@ -171,69 +207,205 @@ DataIO::deleteInodeData(Inode& inode, unsigned int offs)
         PAFFS_DBG(PAFFS_TRACE_ERROR, "could not set new Inode!");
         return r;
     }
-
-    for (int32_t page = (toPage - pageFrom); page >= 0; page--)
+    FAILPOINT;
+    dev->journal.addEvent(journalEntry::dataIO::NewInodeSize(inode.no, offs));
+    FAILPOINT;
+    if (pageFrom <= toPage && inode.reservedPages != 0)
     {
-        Addr pageAddr;
-        r = pac.getPage(page + pageFrom, &pageAddr);
-        if (r != Result::ok)
+        //If we dont need one or more page anymore, mark them dirty
+        for (int32_t page = (toPage - pageFrom); page >= 0; page--)
         {
-            PAFFS_DBG(PAFFS_TRACE_ERROR, "Coud not get Page %" PRId32 " for read", page + pageFrom);
-            return r;
-        }
-        unsigned int area = extractLogicalArea(pageAddr);
-        unsigned int relPage = extractPageOffs(pageAddr);
+            Addr pageAddr;
+            r = pac.getPage(page + pageFrom, &pageAddr);
+            if (r != Result::ok)
+            {
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Coud not get Page %" PRId32 " for read", page + pageFrom);
+                return r;
+            }
+            if(pageAddr == 0)
+            {   //If we continue an aborted deletions
+                continue;
+            }
 
-        if (dev->areaMgmt.getType(area) != AreaType::data)
-        {
-            PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "DELETE INODE operation of invalid area at %" PRId16 ":%" PRId16 "",
-                      extractLogicalArea(pageAddr),
-                      extractPageOffs(pageAddr));
-            return Result::bug;
-        }
+            AreaPos  area = extractLogicalArea(pageAddr);
+            PageOffs relPage = extractPageOffs(pageAddr);
 
-        if (dev->sumCache.getPageStatus(area, relPage, &r) == SummaryEntry::dirty)
-        {
-            PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "DELETE INODE operation of outdated (dirty)"
-                      " data at %" PRId16 ":%" PRId16 "",
-                      extractLogicalArea(pageAddr),
-                      extractPageOffs(pageAddr));
-            return Result::bug;
-        }
-        if (r != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not load AreaSummary for area %" PRId16 ","
-                      " so no invalidation of data!",
-                      area);
-            return r;
-        }
+            if (dev->superblock.getType(area) != AreaType::data)
+            {
+                PAFFS_DBG(PAFFS_TRACE_BUG,
+                          "DELETE INODE operation of invalid area at %" PRId16 ":%" PRId16 "",
+                          extractLogicalArea(pageAddr),
+                          extractPageOffs(pageAddr));
+                return Result::bug;
+            }
+            FAILPOINT;
+            if (!journalMode && dev->sumCache.getPageStatus(area, relPage, r) == SummaryEntry::dirty)
+            {
+                //In journalMode, it may happen that a page was already deleted
+                PAFFS_DBG(PAFFS_TRACE_BUG,
+                          "DELETE INODE operation of outdated (dirty)"
+                          " data at %" PRId16 ":%" PRId16 "",
+                          extractLogicalArea(pageAddr),
+                          extractPageOffs(pageAddr));
+                return Result::bug;
+            }
+            if (r != Result::ok)
+            {
+                PAFFS_DBG(PAFFS_TRACE_ERROR,
+                          "Could not load AreaSummary for area %" PRId16 ","
+                          " so no invalidation of data!",
+                          area);
+                return r;
+            }
+            FAILPOINT;
+            // Mark old pages dirty
+            statemachine.replacePage(0, pageAddr, inode.no, page + pageFrom);
 
-        // Mark old pages dirty
-        r = dev->sumCache.setPageStatus(area, relPage, SummaryEntry::dirty);
-        if (r != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not write AreaSummary for area %" PRId16 ","
-                      " so no invalidation of data!",
-                      area);
-            return r;
+            if (r != Result::ok)
+            {
+                PAFFS_DBG(PAFFS_TRACE_ERROR,
+                          "Could not write AreaSummary for area %" PRId16 ","
+                          " so no invalidation of data!",
+                          area);
+                return r;
+            }
+            FAILPOINT;
+            r = pac.setPage(page + pageFrom, 0);
+            if (r != Result::ok)
+            {
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete page %" PRIu32 " to %" PRIu32 "", pageFrom, toPage);
+                return r;
+            }
+            FAILPOINT;
+            inode.reservedPages--;
         }
-
-        r = pac.setPage(page + pageFrom, 0);
-        if (r != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not delete page %" PRIu32 " to %" PRIu32 "", pageFrom, toPage);
-            return r;
-        }
-
-        inode.reservedPages--;
     }
-
     inode.size = offs;
+    dev->tree.updateExistingInode(inode);
+    FAILPOINT;
+    statemachine.invalidateOldPages();
+    FAILPOINT;
+    pac.setValid();
+    FAILPOINT;
+    dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::dataIO));
+    FAILPOINT;
     return Result::ok;
+}
+
+JournalEntry::Topic
+DataIO::getTopic()
+{
+    return JournalEntry::Topic::dataIO;
+}
+
+void
+DataIO::resetState()
+{
+    statemachine.clear();
+    memset(&journalLastModifiedInode, 0, sizeof(Inode));
+    journalLastSize = 0;
+    journalInodeValid = false;
+    modifiedInode = false;
+    processedForeignSuccessElement = false;
+    journalIsWriteTruncatePair = false;
+}
+
+bool
+DataIO::isInterestedIn(const journalEntry::Max& entry)
+{
+    return modifiedInode && !processedForeignSuccessElement &&
+            entry.base.topic == JournalEntry::Topic::tree &&
+            entry.btree.op == journalEntry::BTree::Operation::update;
+}
+
+Result
+DataIO::processEntry(const journalEntry::Max& entry, JournalEntryPosition)
+{
+    if(entry.base.topic == getTopic())
+    {
+        switch(entry.dataIO.operation)
+        {
+        case journalEntry::DataIO::Operation::newInodeSize:
+            if(journalInodeValid &&
+               journalLastModifiedInode.no == entry.dataIO_.newInodeSize.inodeNo &&
+               journalLastSize == entry.dataIO_.newInodeSize.filesize)
+            {
+                //If the same message comes again, we were truncating a directory (write-delete pair)
+                //so we dont reset the "modified Inode" switch
+                journalIsWriteTruncatePair = true;
+                return Result::ok;
+            }
+
+            journalLastModifiedInode.no = entry.dataIO_.newInodeSize.inodeNo;
+            journalLastSize = entry.dataIO_.newInodeSize.filesize;
+            journalInodeValid = true;
+            modifiedInode = false;
+        }
+    }
+    else if(entry.base.topic == JournalEntry::Topic::pagestate)
+    {
+        modifiedInode = true;
+        return statemachine.processEntry(entry);
+    }
+    else if(entry.base.topic == JournalEntry::Topic::tree)
+    {
+        if(entry.btree.op == journalEntry::BTree::Operation::update)
+        {
+            processedForeignSuccessElement = true;
+            journalEntry::Max success;
+            success.pagestate_.success = journalEntry::pagestate::Success(getTopic());
+            return statemachine.processEntry(success);
+        }
+        return Result::ok;
+    }
+    else
+    {
+        return Result::bug;
+    }
+    return Result::ok;
+}
+
+void
+DataIO::signalEndOfLog()
+{
+    JournalState state = statemachine.signalEndOfLog();
+    if(journalInodeValid &&
+            (state == JournalState::recover || //we continued action
+            (state == JournalState::invalid && journalIsWriteTruncatePair) ||
+            (state == JournalState::ok && processedForeignSuccessElement))) //We just did not have a checkpoint
+    {
+        Result r = dev->tree.getInode(journalLastModifiedInode.no, journalLastModifiedInode);
+        if(r != Result::ok)
+        {
+            //It was already deleted, so ok
+            return;
+        }
+        if(journalLastModifiedInode.size != journalLastSize)
+        {
+            PAFFS_DBG_S(PAFFS_TRACE_DEVICE | PAFFS_TRACE_JOURNAL,
+                      "Recovered Write/deletion, changing Inode %" PTYPE_INODENO " size "
+                      "from %" PTYPE_FILSIZE " to %" PTYPE_FILSIZE,
+                      journalLastModifiedInode.no, journalLastModifiedInode.size, journalLastSize);
+            if(journalLastModifiedInode.size < journalLastSize)
+            {   //write
+                if(modifiedInode)
+                {
+                    journalLastModifiedInode.size = journalLastSize;
+                    dev->tree.updateExistingInode(journalLastModifiedInode);
+                }
+            }else
+            {   //delete
+                //FIXME Dont delete Inode data if we were merely writing.
+                //This may be a bug saying 'newInodeSize', but Folder gets truncated before it was written.
+                deleteInodeData(journalLastModifiedInode, journalLastSize, true);
+            }
+        }
+
+    }
+    //If an area was filled
+    dev->areaMgmt.manageActiveAreaFull(AreaType::data);
+    dev->areaMgmt.manageActiveAreaFull(AreaType::index);
+    dev->journal.addEvent(journalEntry::Checkpoint(getTopic()));
 }
 
 Result
@@ -244,8 +416,8 @@ DataIO::writePageData(PageAbs  pageFrom,
                       const uint8_t* data,
                       PageAddressCache& ac,
                       FileSize* bytesWritten,
-                      FileSize filesize,
-                      uint32_t& reservedPages)
+                      FileSize  filesize,
+                      uint16_t& reservedPages)
 {
     // Will be set to zero after offset is applied
     if (dev->readOnly)
@@ -275,12 +447,14 @@ DataIO::writePageData(PageAbs  pageFrom,
             // TODO: Return to a safe state by trying to resurrect dirty marked pages
             //		Mark fresh written pages as dirty. If old pages have been deleted,
             //		use the Journal to resurrect (not currently implemented)
+            PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find writable area");
+            dev->debugPrintStatus();
             return dev->lasterr;
         }
         dev->lasterr = rBuf;
-
+        FAILPOINT;
         // Handle Areas
-        if (dev->areaMgmt.getStatus(dev->areaMgmt.getActiveArea(AreaType::data))
+        if (dev->superblock.getStatus(dev->superblock.getActiveArea(AreaType::data))
             != AreaStatus::active)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned inactive area!");
@@ -290,20 +464,20 @@ DataIO::writePageData(PageAbs  pageFrom,
         // find new page to write to
         PageOffs firstFreePage = 0;
         if (dev->areaMgmt.findFirstFreePage(firstFreePage,
-                                            dev->areaMgmt.getActiveArea(AreaType::data))
-            == Result::nospace)
+                                            dev->superblock.getActiveArea(AreaType::data))
+            == Result::noSpace)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
                       "BUG: findWritableArea returned full area (%" PRId16 ").",
-                      dev->areaMgmt.getActiveArea(AreaType::data));
+                      dev->superblock.getActiveArea(AreaType::data));
             return Result::bug;
         }
-        Addr pageAddress =
-                combineAddress(dev->areaMgmt.getActiveArea(AreaType::data), firstFreePage);
-
-        Addr pageAddr;
+        Addr newAddress =
+                combineAddress(dev->superblock.getActiveArea(AreaType::data), firstFreePage);
+        FAILPOINT;
+        Addr oldAddr;
         //GetPage may overwrite our driver buffer
-        res = ac.getPage(page + pageFrom, &pageAddr);
+        res = ac.getPage(page + pageFrom, &oldAddr);
         if (res != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
@@ -317,6 +491,15 @@ DataIO::writePageData(PageAbs  pageFrom,
         if ((btw + offs) > dataBytesPerPage)
         {
             btw = dataBytesPerPage - offs;
+        }
+        FAILPOINT;
+        //This has to be done before we write into the pagebuffer, this may modify it!
+        res = statemachine.replacePage(newAddress, oldAddr, ac.getTargetInode(), page + pageFrom);
+        if (res != Result::ok)
+        {
+            PAFFS_DBG(PAFFS_TRACE_ERROR,
+                      "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!",
+                      resultMsg[static_cast<int>(res)]);
         }
 
         uint8_t* buf = dev->driver.getPageBuffer();
@@ -341,7 +524,7 @@ DataIO::writePageData(PageAbs  pageFrom,
                 }
             }
 
-            if (pageAddr != 0)  // not an empty page TODO: doubled code)
+            if (oldAddr != 0)  // not an empty page TODO: doubled code)
             {  // not a skipped page (thus containing no information)
                 // We are overriding real data, not just empty space
                 FileSize bytesRead = 0;
@@ -375,52 +558,24 @@ DataIO::writePageData(PageAbs  pageFrom,
             memcpy(buf, &data[*bytesWritten], btw);
             *bytesWritten += btw;
         }
-
-        res = dev->driver.writePage(getPageNumber(pageAddress, *dev), buf, btw);
+        FAILPOINT;
+        res = dev->driver.writePage(getPageNumber(newAddress, *dev), buf, btw);
         if (res != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
                       "ERR: write returned FAIL at phy.P: %" PTYPE_PAGEABS,
-                      getPageNumber(pageAddress, *dev));
+                      getPageNumber(newAddress, *dev));
+            //TODO: Revert all new Pages
             return res;
         }
-        res = dev->sumCache.setPageStatus(
-                dev->areaMgmt.getActiveArea(AreaType::data), firstFreePage, SummaryEntry::used);
-        if (res != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!",
-                      resultMsg[static_cast<int>(res)]);
-        }
-        ac.setPage(page + pageFrom, pageAddress);
+        FAILPOINT;
+        ac.setPage(page + pageFrom, newAddress);
 
-        // if we have overwriting existing data...
-        if (pageAddr != 0)  // not an empty page
-        {
-            // Mark old pages dirty
-            // mark old Page in Areamap
-            AreaPos  oldArea = extractLogicalArea(pageAddr);
-            PageOffs oldPage = extractPageOffs(pageAddr);
-
-            res = dev->sumCache.setPageStatus(oldArea, oldPage, SummaryEntry::dirty);
-            if (res != Result::ok)
-            {
-                PAFFS_DBG(PAFFS_TRACE_ERROR,
-                          "Could not set Pagestatus bc. %s. This is not handled. Expect Errors!",
-                          resultMsg[static_cast<int>(res)]);
-                PAFFS_DBG_S(PAFFS_TRACE_WRITE,
-                            "At pagelistindex %" PTYPE_PAGEABS ", oldArea: %" PTYPE_AREAPOS ", oldPage: %" PTYPE_PAGEOFFS,
-                            page + pageFrom,
-                            oldArea,
-                            oldPage);
-            }
-        }
-        else
-        {
-            // or we added a new page to this file
+        if (oldAddr == 0)
+        {   //we added a new page to this file
             reservedPages++;
         }
-
+        FAILPOINT;
         // this may have filled the flash
         res = dev->areaMgmt.manageActiveAreaFull(AreaType::data);
         if (res != Result::ok)
@@ -429,10 +584,12 @@ DataIO::writePageData(PageAbs  pageFrom,
         }
 
         PAFFS_DBG_S(PAFFS_TRACE_WRITE,
-                    "write r.P: %" PTYPE_PAGEOFFS "/%" PTYPE_PAGEABS ", phy.P: %" PTYPE_PAGEABS,
+                    "write r.P: %" PTYPE_PAGEOFFS "/%" PTYPE_PAGEABS ", "
+                    "%" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
                     page + 1,
-                    toPage + 1,
-                    getPageNumber(pageAddress, *dev));
+                    toPage - 1,
+                    extractLogicalArea(newAddress), dev->superblock.getPos(extractLogicalArea(newAddress)),
+                    extractPageOffs(newAddress));
     }
     return Result::ok;
 }
@@ -477,15 +634,14 @@ DataIO::readPageData(PageAbs  pageFrom,
             continue;
         }
 
-
         if(!checkIfSaneReadAddress(pageAddr))
         {
             return Result::bug;
         }
 
-        PageAbs addr = getPageNumber(pageAddr, *dev);
+        PageAbs physPage = getPageNumber(pageAddr, *dev);
         uint8_t* buf = dev->driver.getPageBuffer();
-        r = dev->driver.readPage(addr, buf, btr);
+        r = dev->driver.readPage(physPage, buf, btr);
         if (r != Result::ok)
         {
             if (r == Result::biterrorCorrected)
@@ -496,7 +652,11 @@ DataIO::readPageData(PageAbs  pageFrom,
             }
             else
             {
-                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read page, aborting pageData Read");
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not read page at "
+                        "%" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS
+                        ", aborting pageData Read",
+                        extractLogicalArea(pageAddr), dev->superblock.getPos(extractLogicalArea(pageAddr)),
+                        extractPageOffs(pageAddr));
                 return dev->lasterr = r;
             }
         }
@@ -511,11 +671,13 @@ DataIO::readPageData(PageAbs  pageFrom,
 
 bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
 {
-    if (dev->areaMgmt.getType(extractLogicalArea(pageAddr)) != AreaType::data)
+    if (dev->superblock.getType(extractLogicalArea(pageAddr)) != AreaType::data)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "READ INODE operation of invalid area at %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS,
+                  "READ INODE operation of invalid area (%s) at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
+                  areaNames[dev->superblock.getType(extractLogicalArea(pageAddr))],
                   extractLogicalArea(pageAddr),
+                  dev->superblock.getPos(extractLogicalArea(pageAddr)),
                   extractPageOffs(pageAddr));
         return false;
     }
@@ -523,12 +685,13 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
     if (traceMask & PAFFS_TRACE_VERIFY_AS)
     {
         Result r;
-        SummaryEntry e = dev->sumCache.getPageStatus(pageAddr, &r);
+        SummaryEntry e = dev->sumCache.getPageStatus(pageAddr, r);
         if (r != Result::ok)
         {
             PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not load AreaSummary of area %" PTYPE_AREAPOS " for verification!",
-                      extractLogicalArea(pageAddr));
+                      "Could not load AreaSummary of area %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS ") for verification!",
+                      extractLogicalArea(pageAddr),
+                      dev->superblock.getPos(extractLogicalArea(pageAddr)));
             return false;
         }
         else
@@ -536,8 +699,9 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
             if (e == SummaryEntry::dirty)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
-                          "READ INODE operation of outdated (dirty) data at %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "",
+                          "READ INODE operation of outdated (dirty) data at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS "",
                           extractLogicalArea(pageAddr),
+                          dev->superblock.getPos(extractLogicalArea(pageAddr)),
                           extractPageOffs(pageAddr));
                 return false;
             }
@@ -545,8 +709,9 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
             if (e == SummaryEntry::free)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
-                          "READ INODE operation of invalid (free) data at %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "",
+                          "READ INODE operation of invalid (free) data at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS "",
                           extractLogicalArea(pageAddr),
+                          dev->superblock.getPos(extractLogicalArea(pageAddr)),
                           extractPageOffs(pageAddr));
                 return false;
             }
@@ -554,8 +719,9 @@ bool DataIO::checkIfSaneReadAddress(Addr pageAddr)
             if (e >= SummaryEntry::error)
             {
                 PAFFS_DBG(PAFFS_TRACE_BUG,
-                          "READ INODE operation of data with invalid AreaSummary at area %" PTYPE_AREAPOS "!",
-                          extractLogicalArea(pageAddr));
+                          "READ INODE operation of data with invalid AreaSummary at area %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS ")!",
+                          extractLogicalArea(pageAddr),
+                          dev->superblock.getPos(extractLogicalArea(pageAddr)));
                 return false;
             }
         }

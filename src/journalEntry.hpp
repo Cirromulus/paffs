@@ -14,31 +14,28 @@
 
 #pragma once
 #include "commonTypes.hpp"
-#include <type_traits>
+#include "bitlist.hpp"
 
 namespace paffs
 {
-template <typename E>
-constexpr typename std::underlying_type<E>::type
-toUnderlying(E e) noexcept
-{
-    return static_cast<typename std::underlying_type<E>::type>(e);
-}
-
 struct JournalEntry
 {
-    enum class Topic : uint8_t
+    enum Topic : uint8_t
     {
         invalid = 0,
         checkpoint,
-        success,
+        pagestate,
         superblock,
-        tree,
+        areaMgmt,
+        garbage,
         summaryCache,
-        inode,
+        tree,
+        dataIO, //DataIO before PAC to invalidate pages
+        pac,
+        device,
     };
 
-    static constexpr const unsigned char numberOfTopics = 6;
+    static constexpr const unsigned char numberOfTopics = 11;
     Topic topic;
 
 protected:
@@ -50,17 +47,70 @@ namespace journalEntry
 {
     struct Checkpoint : public JournalEntry
     {
-        inline
-        Checkpoint() : JournalEntry(Topic::checkpoint){};
-    };
-
-    struct Success : public JournalEntry
-    {
         // Target should only be Superblock and Tree.
         Topic target;
         inline
-        Success(Topic _target) : JournalEntry(Topic::success), target(_target){};
+        Checkpoint(Topic _target) : JournalEntry(Topic::checkpoint), target(_target){};
     };
+
+    struct Pagestate : public JournalEntry
+    {
+        enum class Type : uint8_t
+        {
+            replacePage,
+            replacePagePos,
+            success,    ///> Warn: This is not to be written into journal, only interpreted by topic from other actions
+            invalidateOldPages,
+        };
+        Topic target;
+        Type type;
+    protected:
+        inline
+        Pagestate(Topic _target, Type _type) : JournalEntry(Topic::pagestate),
+        target(_target), type(_type){};
+    };
+
+    namespace pagestate
+    {
+        struct ReplacePage : public Pagestate
+        {
+            Addr neu;
+            Addr old;
+            inline
+            ReplacePage(Topic _target, Addr _new, Addr _old) :
+                Pagestate(_target, Type::replacePage), neu(_new), old(_old){};
+        };
+
+        struct ReplacePagePos : public Pagestate
+        {
+            Addr    neu;
+            Addr    old;
+            InodeNo nod;
+            PageAbs pos;
+            inline
+            ReplacePagePos(Topic _target, Addr _new, Addr _old, InodeNo _nod, Addr _pos) :
+                Pagestate(_target, Type::replacePagePos), neu(_new), old(_old), nod(_nod), pos(_pos){};
+        };
+
+        struct Success : public Pagestate
+        {
+            inline
+            Success(Topic _target) : Pagestate(_target, Type::success){};
+        };
+        struct InvalidateOldPages : public Pagestate
+        {
+            inline
+            InvalidateOldPages(Topic _target) : Pagestate(_target, Type::invalidateOldPages){};
+        };
+
+        union Max
+        {
+            ReplacePage replacePage;
+            ReplacePagePos replacePagePos;
+            Success success;
+            InvalidateOldPages invalidateOldPages;
+        };
+    }
 
     struct Superblock : public JournalEntry
     {
@@ -82,9 +132,8 @@ namespace journalEntry
     {
         struct Rootnode : public Superblock
         {
-            Addr rootnode;
-            inline
-            Rootnode(Addr _rootnode) : Superblock(Type::rootnode), rootnode(_rootnode){};
+            Addr addr;
+            Rootnode(Addr _addr) : Superblock(Type::rootnode), addr(_addr){};
         };
 
         struct AreaMap : public Superblock
@@ -144,6 +193,7 @@ namespace journalEntry
                 Status status;
                 IncreaseErasecount erasecount;
                 Position position;
+                Swap swap;
             };
         };
 
@@ -167,51 +217,112 @@ namespace journalEntry
             Rootnode rootnode;
             AreaMap areaMap;
             areaMap::Max areaMap_;
+            ActiveArea activeArea;
+            UsedAreas usedAreas;
         };
     };
 
-    struct BTree : public JournalEntry
+    struct AreaMgmt : public JournalEntry
     {
         enum class Operation : uint8_t
         {
-            insert,
-            update,
-            remove,
+            initAreaAs,
+            closeArea,
+            retireArea,
+            deleteAreaContents,
+            deleteArea,
         };
-        Operation op;
-
+        AreaPos area;
+        Operation operation;
     protected:
         inline
-        BTree(Operation _operation) : JournalEntry(Topic::tree), op(_operation){};
+        AreaMgmt(AreaPos _area, Operation _operation) : JournalEntry(Topic::areaMgmt),
+            area(_area), operation(_operation){};
     };
 
-    namespace btree
+    namespace areaMgmt
     {
-        struct Insert : public BTree
+        struct InitAreaAs : public AreaMgmt
         {
-            paffs::Inode inode;
+            AreaType type;
             inline
-            Insert(Inode _inode) : BTree(Operation::insert), inode(_inode){};
+            InitAreaAs(AreaPos _area, AreaType _type) : AreaMgmt(_area, Operation::initAreaAs),
+                    type(_type){};
         };
-        struct Update : public BTree
+        struct CloseArea : public AreaMgmt
         {
-            paffs::Inode inode;
             inline
-            Update(Inode _inode) : BTree(Operation::update), inode(_inode){};
+            CloseArea(AreaPos _area) : AreaMgmt(_area, Operation::closeArea){};
         };
-        struct Remove : public BTree
+        struct RetireArea : public AreaMgmt
         {
-            InodeNo no;
             inline
-            Remove(InodeNo _no) : BTree(Operation::remove), no(_no){};
+            RetireArea(AreaPos _area) : AreaMgmt(_area, Operation::retireArea){};
+        };
+        struct DeleteAreaContents : public AreaMgmt
+        {
+            AreaPos swappedArea;
+            inline
+            DeleteAreaContents(AreaPos target, AreaPos _swappedArea) :
+                AreaMgmt(target, Operation::deleteAreaContents), swappedArea(_swappedArea){};
+        };
+        struct DeleteArea : public AreaMgmt
+        {
+            inline
+            DeleteArea(AreaPos target) : AreaMgmt(target, Operation::deleteArea){};
         };
 
-        union Max {
-            Insert insert;
-            Update update;
-            Remove remove;
+        union Max
+        {
+            AreaMgmt base;
+
+            InitAreaAs initAreaAs;
+            CloseArea closeArea;
+            RetireArea retireArea;
+            DeleteAreaContents deleteAreaContents;
+            DeleteArea deleteArea;
+            inline
+            Max()
+            {
+                memset(static_cast<void*>(this), 0, sizeof(Max));
+            };
+            inline
+            ~Max(){};
+            inline
+            Max(const Max& other)
+            {
+                memcpy(static_cast<void*>(this), static_cast<const void*>(&other), sizeof(Max));
+            }
         };
+    }
+    struct GarbageCollection : public JournalEntry
+    {
+        enum class Operation : uint8_t
+        {
+            moveValidData,
+        };
+        Operation operation;
+    protected:
+        inline
+        GarbageCollection(Operation _operation) : JournalEntry(Topic::garbage), operation(_operation){};
     };
+
+    namespace garbageCollection
+    {
+        struct MoveValidData : public GarbageCollection
+        {
+            AreaPos from;
+            //always to Area 3 (GC)
+            inline
+            MoveValidData(AreaPos _from) : GarbageCollection(Operation::moveValidData),
+            from(_from){};
+        };
+
+        union Max
+        {
+            MoveValidData moveValidData;
+        };
+    }
 
     struct SummaryCache : public JournalEntry
     {
@@ -219,7 +330,9 @@ namespace journalEntry
         {
             commit,
             remove,
+            reset,
             setStatus,
+            setStatusBlock,
         };
         AreaPos area;
         Subtype subtype;
@@ -244,86 +357,217 @@ namespace journalEntry
             Remove(AreaPos _area) : SummaryCache(_area, Subtype::remove){};
         };
 
+        struct ResetASWritten : public SummaryCache
+        {
+            inline
+            ResetASWritten(AreaPos _area) : SummaryCache(_area, Subtype::reset){};
+        };
+
         struct SetStatus : public SummaryCache
         {
             PageOffs page;
             SummaryEntry status;
-            inline
-            SetStatus(AreaPos _area, PageOffs _page, SummaryEntry _status) :
-                SummaryCache(_area, Subtype::setStatus), page(_page), status(_status){};
+            inline SetStatus(AreaPos _area, PageOffs _page, SummaryEntry _status) :
+                    SummaryCache(_area, Subtype::setStatus), page(_page), status(_status){};
+        };
+
+        struct SetStatusBlock : public SummaryCache
+        {
+            TwoBitList<dataPagesPerArea> status;
+            inline SetStatusBlock(AreaPos _area, TwoBitList<dataPagesPerArea>& _status) :
+                    SummaryCache(_area, Subtype::setStatusBlock), status(_status){};
         };
 
         union Max
         {
             Commit commit;
+            Remove remove;
             SetStatus setStatus;
+            SetStatusBlock setStatusBlock;
         };
     }
 
-    struct Inode : public JournalEntry
+
+    struct BTree : public JournalEntry
     {
-    enum class Operation : uint8_t
-    {
-        add,
-        write,
-        remove,
-        commit
-    };
-    Operation operation;
-    InodeNo inode;
+        enum class Operation : uint8_t
+        {
+            insert,
+            update,
+            remove,
+        };
+        Operation op;
 
     protected:
         inline
-        Inode(Operation _operation, InodeNo _inode) :
-            JournalEntry(Topic::inode), operation(_operation), inode(_inode){};
+        BTree(Operation _operation) : JournalEntry(Topic::tree), op(_operation){};
     };
 
-    namespace inode
+    namespace btree
     {
-        // TODO
-        struct Add : public Inode
+        struct Insert : public BTree
         {
+            Inode inode;
             inline
-            Add(InodeNo _inode) : Inode(Operation::add, _inode){};
+            Insert(Inode _inode) : BTree(Operation::insert), inode(_inode){};
         };
-
-        struct Write : public Inode
+        struct Update : public BTree
         {
+            Inode inode;
             inline
-            Write(InodeNo _inode) : Inode(Operation::write, _inode){};
+            Update(Inode _inode) : BTree(Operation::update), inode(_inode){};
         };
-
-        struct Remove : public Inode
+        struct Remove : public BTree
         {
+            InodeNo no;
             inline
-            Remove(InodeNo _inode) : Inode(Operation::remove, _inode){};
-        };
-        struct Commit : public Inode
-        {
-            inline
-            Commit(InodeNo _inode) : Inode(Operation::commit, _inode){};
+            Remove(InodeNo _no) : BTree(Operation::remove), no(_no){};
         };
 
         union Max {
-            Add add;
-            Write write;
+            Insert insert;
+            Update update;
             Remove remove;
-            Commit commit;
+        };
+    };
+
+    //TODO: Skip "operation" to save space
+    struct PAC : public JournalEntry
+    {
+    enum class Operation : uint8_t
+    {
+        setAddress,
+    };
+    Operation operation;
+
+    protected:
+        inline
+        PAC(Operation _operation) :
+            JournalEntry(Topic::pac), operation(_operation){};
+    };
+
+    namespace pac
+    {
+        struct SetAddress : public PAC
+        {
+            InodeNo inodeNo;
+            PageOffs page;
+            Addr addr;
+            inline
+            SetAddress(InodeNo _inodeno, PageOffs _page, Addr _addr) : PAC(Operation::setAddress),
+            inodeNo(_inodeno), page(_page), addr(_addr){};
+        };
+
+        union Max {
+            SetAddress setAddress;
         };
     }
+
+    struct DataIO : public JournalEntry
+    {
+        enum class Operation : uint8_t
+        {
+            newInodeSize,
+        } operation;
+    protected:
+        inline
+        DataIO(Operation _operation) : JournalEntry(Topic::dataIO), operation(_operation){};
+    };
+
+    namespace dataIO
+    {
+        struct NewInodeSize : public DataIO
+        {
+            InodeNo inodeNo;
+            FileSize filesize;
+            inline
+            NewInodeSize(InodeNo _inodeNo, FileSize _filesize) : DataIO(Operation::newInodeSize),
+                         inodeNo(_inodeNo), filesize(_filesize){};
+        };
+
+        union Max
+        {
+            NewInodeSize newInodeSize;
+        };
+    }
+
+
+
+    struct Device : public JournalEntry
+    {
+        enum Action : uint8_t
+        {
+            mkObjInode,
+            insertIntoDir,
+            removeObj,
+        };
+
+        Action action;
+    protected:
+        inline
+        Device(Action _action) :
+            JournalEntry(Topic::device), action(_action){};
+    };
+
+    namespace device
+    {
+        struct MkObjInode : public Device
+        {
+            InodeNo inode;
+        public:
+            inline
+            MkObjInode(InodeNo _inode) : Device(Action::mkObjInode), inode(_inode){};
+        };
+
+        struct InsertIntoDir : public Device
+        {
+            InodeNo dirInode;
+        public:
+            inline
+            InsertIntoDir(InodeNo _dirInode) : Device(Action::insertIntoDir), dirInode(_dirInode){};
+        };
+
+        struct RemoveObj : public Device
+        {
+            InodeNo obj;
+            InodeNo parDir;
+        public:
+            inline
+            RemoveObj(InodeNo _obj, InodeNo _parDir) : Device(Action::removeObj),
+                obj(_obj), parDir(_parDir){};
+        };
+
+
+        union Max
+        {
+            MkObjInode mkObjInode;
+            InsertIntoDir insertIntoDir;
+            RemoveObj removeObj;
+        };
+    }
+
     union Max {
-        JournalEntry base;  // Not nice?
+        JournalEntry base;
 
         Checkpoint checkpoint;
-        Success success;
+        Pagestate pagestate;
+        pagestate::Max pagestate_;
         Superblock superblock;
         superblock::Max superblock_;
+        AreaMgmt areaMgmt;
+        areaMgmt::Max areaMgmt_;
+        GarbageCollection garbage;
+        garbageCollection::Max garbage_;
         BTree btree;
         btree::Max btree_;
         SummaryCache summaryCache;
         summaryCache::Max summaryCache_;
-        Inode inode;
-        inode::Max inode_;
+        PAC pac;
+        pac::Max pac_;
+        DataIO dataIO;
+        dataIO::Max dataIO_;
+        Device device;
+        device::Max device_;
         inline
         Max()
         {

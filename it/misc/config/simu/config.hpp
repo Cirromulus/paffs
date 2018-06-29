@@ -28,7 +28,10 @@ static constexpr uint16_t planesPerCell = 8;
 
 static constexpr float tidFlipStartInPercent = 0.85;
 
-static constexpr unsigned long usecRead  = 25;
-static constexpr unsigned long usecWrite = 200;
-static constexpr unsigned long usecErase = 1500;
+static constexpr unsigned long FlashReadUsec  = 25;
+static constexpr unsigned long FlashWriteUsec = 200;
+static constexpr unsigned long FlashEraseUsec = 1500;
+
+static constexpr unsigned long MramReadNsec  = 35;
+static constexpr unsigned long MramWriteNsec = 35;
 };

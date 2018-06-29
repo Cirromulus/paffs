@@ -16,35 +16,69 @@
 #include "journalEntry.hpp"
 #include "journalPersistence.hpp"
 #include "journalTopic.hpp"
+#include "journalDebug.hpp"
 
 namespace paffs
 {
+
 class Journal
 {
-    JournalTopic* topics[3];
+    JournalTopic* topics[JournalEntry::numberOfTopics];
+    BitList<JournalEntry::numberOfTopics> uncheckpointedChanges;
 
     JournalPersistence& persistence;
     bool disabled;
-
 public:
     Journal(JournalPersistence& _persistence,
             JournalTopic& superblock,
+            JournalTopic& areaMgmt,
+            JournalTopic& garbageColl,
             JournalTopic& summaryCache,
-            JournalTopic& tree)
+            JournalTopic& tree,
+            JournalTopic& dataIO,
+            JournalTopic& pac,
+            JournalTopic& device)
         : persistence(_persistence)
     {
-        topics[0] = &superblock;
-        topics[1] = &summaryCache;
-        topics[2] = &tree;
-        // TODO Inode
+        memset(topics, 0, sizeof(JournalTopic*) * JournalEntry::numberOfTopics);
+        topics[superblock.getTopic()  ] = &superblock;
+        topics[areaMgmt.getTopic()    ] = &areaMgmt;
+        topics[garbageColl.getTopic() ] = &garbageColl;
+        topics[summaryCache.getTopic()] = &summaryCache;
+        topics[tree.getTopic()        ] = &tree;
+        topics[dataIO.getTopic()      ] = &dataIO;
+        topics[pac.getTopic()         ] = &pac;
+        topics[device.getTopic()      ] = &device;
 
-        disabled = true;
+        disabled = false;
+        for(JournalTopic* topic : topics)
+        {
+            if(topic != nullptr)
+            {
+                uncheckpointedChanges.setBit(topic->getTopic());
+            }
+        }
+
+        if(traceMask & PAFFS_TRACE_VERBOSE)
+        {
+            for(JournalTopic *topic : topics)
+            {
+                if(topic == nullptr)
+                {
+                    continue;
+                }
+                PAFFS_DBG_S(PAFFS_TRACE_JOURNAL, "registered %s", topicNames[topic->getTopic()]);
+            }
+        }
     }
 
+    /**
+     * \return Result::ok and Result::lowMem both indicate a success.
+     * Result::lowMem signals the urgency to flush all caches.
+     * return Result::noSpace or others if not successful.
+     */
     Result
     addEvent(const JournalEntry& entry);
-    Result
-    checkpoint();
     Result
     clear();
     Result
@@ -55,16 +89,12 @@ public:
     disable();
     Result
     enable();
-
+    bool
+    isEnabled();
 private:
+    bool
+    isTopicValid(JournalEntry::Topic topic);
     Result
-    applyCheckpointedJournalEntries(
-            EntryIdentifier& from,
-            EntryIdentifier& to,
-            EntryIdentifier firstUnsuccededEntry[JournalEntry::numberOfTopics]);
-    Result
-    applyUncheckpointedJournalEntries(EntryIdentifier& from);
-    PageAbs
-    getSizeFromMax(const journalEntry::Max& entry);
+    applyJournalEntries(JournalEntryPosition firstUncheckpointedEntry[JournalEntry::numberOfTopics]);
 };
 };

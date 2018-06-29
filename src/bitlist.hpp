@@ -230,14 +230,14 @@ public:
         setValue(pos, value, mList);
     }
     static inline uint8_t
-    getValue(size_t pos, const uint8_t list[(numberOfElements + 3) / 4])
+    getValue(const size_t pos, const uint8_t list[(numberOfElements + 3) / 4])
     {
         //Mask bitfield byte leaving inactive bytes to zero, then right shift to bottom
         return (list[pos / 4] & (0b11 << (pos % 4) * 2))
             >> (pos % 4) * 2;
     }
     inline uint8_t
-    getValue(size_t pos)
+    getValue(size_t pos) const
     {
         return getValue(pos, mList);
     }

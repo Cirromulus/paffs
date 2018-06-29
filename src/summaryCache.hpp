@@ -36,7 +36,7 @@ public:
     SummaryEntry
     getStatus(PageOffs page);
     static SummaryEntry
-    getStatus(PageOffs page, TwoBitList<dataPagesPerArea>& list);
+    getStatus(PageOffs page, const TwoBitList<dataPagesPerArea>& list);
     void
     setStatus(PageOffs page, SummaryEntry value);
     static void
@@ -78,6 +78,8 @@ class SummaryCache : public JournalTopic
     std::unordered_map<AreaPos, uint16_t> mTranslation;  // from area number to array offset
     Device* dev;
 
+    bool journalReplayMode = false;
+    JournalEntryPosition firstUncommittedElem[areasNo];
 public:
     SummaryCache(Device* mdev);
     ~SummaryCache();
@@ -95,10 +97,10 @@ public:
      * Functionally same as getPageStatus(area, page, Result)
      */
     SummaryEntry
-    getPageStatus(Addr addr, Result* result);
+    getPageStatus(Addr addr, Result& result);
 
     SummaryEntry
-    getPageStatus(AreaPos area, PageOffs page, Result* result);
+    getPageStatus(AreaPos area, PageOffs page, Result& result);
 
     Result
     setSummaryStatus(AreaPos area, SummaryEntry* summary);
@@ -108,13 +110,13 @@ public:
      * Because it is just for a one-shot of Garbage collection looking for the best area
      */
     Result
-    getSummaryStatus(AreaPos area, SummaryEntry* summary, bool complete = true);
+    getSummaryStatus(AreaPos area, SummaryEntry* summary);
 
     /*
-     * Does not check if pages are dirty or free
+     * Reads every Page for data instead of scanning just OOB
      */
     Result
-    getEstimatedSummaryStatus(AreaPos area, SummaryEntry* summary);
+    scanAreaForSummaryStatus(AreaPos area, SummaryEntry* summary);
 
     /*
      * \warn Only for retired or unused Areas
@@ -126,14 +128,15 @@ public:
      * Used by Garbage collection to consider cached AS-Areas before others
      */
     bool
-    isCached(AreaPos area);
+    shouldClearArea(AreaPos area);
+
     /**
-     * Used by Garbage collection to consider committed AS-Areas before others
+     * Used by Garbage collection to consider dirty AS-Areas before others
      */
-    bool
-    wasASWritten(AreaPos area);
+    bool wasAreaSummaryWritten(AreaPos area);
+
     /**
-     * Used by Garbage collection that can delete the AS too
+     * Used by Garbage collection that can delete the AS too. Does nothing if area is not cached.
      */
     void
     resetASWritten(AreaPos area);
@@ -152,22 +155,41 @@ public:
      */
     Result
     commitAreaSummaries(bool createNew = false);
-
+    void
+    clear();
     JournalEntry::Topic
     getTopic() override;
     void
-    processEntry(JournalEntry& entry) override;
+    resetState() override;
     void
-    processUncheckpointedEntry(JournalEntry& entry) override;
+    preScan(const journalEntry::Max& entry, JournalEntryPosition position) override;
+    Result
+    processEntry(const journalEntry::Max& entry, JournalEntryPosition position) override;
+    void
+    signalEndOfLog() override;
+    void
+    printStatus();
+
 
 private:
+    void
+    enableSummaryElem(uint16_t pos, AreaPos area);
+    void
+    removeSummaryElem(AreaPos area);
+    uint16_t
+    getSummaryElemPos(AreaPos area);
+    bool
+    existsSummaryElem(AreaPos area);
+
+
     /**
      * @Brief uses garbageCollection-buffer to swap a whole Area,
      * committing its new AS.
      * @warn Decreases wear leveling if used regularly.
+     * @param desperate is used if even non-dirty elems have to be written if they are not active.
      */
     Result
-    commitAreaSummaryHard(int& clearedAreaCachePosition);
+    commitAreaSummaryHard(int& clearedAreaCachePosition, bool desperate = false);
 
     SummaryEntry
     getPackedStatus(uint16_t position, PageOffs page);
@@ -184,6 +206,9 @@ private:
     int
     findNextFreeCacheEntry();
 
+    /**
+     * \param urgent if not urgent, it stops before calling garbagecollection
+     */
     Result
     loadUnbufferedArea(AreaPos area, bool urgent);
 
@@ -201,11 +226,8 @@ private:
 
     Result
     commitAndEraseElem(uint16_t position);
-    /**
-     * TwoBitlist because of `complete` switch
-     */
     Result
-    readAreasummary(AreaPos area, TwoBitList<dataPagesPerArea>& elem, bool complete);
+    readAreasummary(AreaPos area, TwoBitList<dataPagesPerArea>& elem);
 
     Result
     writeAreasummary(AreaSummaryElem& elem);

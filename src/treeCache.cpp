@@ -16,11 +16,17 @@
 #include "btree.hpp"
 #include "dataIO.hpp"
 #include "device.hpp"
+#include "journalPageStatemachine_impl.hpp"
 #include <inttypes.h>
 #include <string.h>
 
 namespace paffs
 {
+TreeCache::TreeCache(Device* mdev) : dev(mdev), statemachine(mdev->journal, mdev->sumCache)
+{
+    clear();
+};
+
 void
 TreeCache::setIndexUsed(uint16_t index)
 {
@@ -71,6 +77,44 @@ TreeCache::clear()
 {
     memset(mCache, 0, treeNodeCacheSize * sizeof(TreeCacheNode));
     mCacheUsage.clear();
+    resetState();
+}
+
+void
+TreeCache::resetState()
+{
+    statemachine.clear();
+    mJournalIsRecovering = false;
+}
+
+Result
+TreeCache::processEntry(const journalEntry::Max& entry)
+{
+    return statemachine.processEntry(entry);
+}
+
+void
+TreeCache::signalEndOfLog()
+{
+    if(statemachine.signalEndOfLog() == JournalState::invalid)
+    {   //We reverted
+        //Suppress check if dirty messages
+        mJournalIsRecovering = true;
+        for(uint16_t i = 0; i < treeNodeCacheSize; i++)
+        {
+            if(mCacheUsage.getBit(i))
+            {   //FORCE Recommit
+                mCache[i].dirty = true;
+            }
+        }
+        printTreeCache();
+        commitCache();
+        mJournalIsRecovering = false;
+    }
+    if(!isTreeCacheValid())
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Something happened during Journal replay!");
+    }
 }
 
 Result
@@ -82,7 +126,7 @@ TreeCache::tryAddNewCacheNode(TreeCacheNode*& newTcn)
         PAFFS_DBG_S(PAFFS_TRACE_TREECACHE, "Cache is full!");
         if (traceMask & PAFFS_TRACE_TREECACHE)
             printTreeCache();
-        return Result::lowmem;
+        return Result::lowMem;
     }
     newTcn = &mCache[index];
     memset(newTcn, 0, sizeof(TreeCacheNode));
@@ -121,7 +165,7 @@ TreeCache::addNewCacheNode(TreeCacheNode*& newTcn)
     Result r = tryAddNewCacheNode(newTcn);
     if (r == Result::ok)
         return r;
-    if (r != Result::lowmem)
+    if (r != Result::lowMem)
         return r;
     if (traceMask & PAFFS_TRACE_VERIFY_TC && !isTreeCacheValid())
     {
@@ -200,8 +244,9 @@ TreeCache::isSubTreeValid(TreeCacheNode& node,
 
     if (node.raw.self == 0 && !node.dirty)
     {
+        printNode(node);
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Node n° %d is not dirty, but has no flash address!",
+                  "Node on pos %d is not dirty, but has no flash address!",
                   getIndexFromPointer(node));
         return false;
     }
@@ -588,12 +633,13 @@ TreeCache::updateFlashAddressInParent(TreeCacheNode& node)
     return Result::notFound;
 }
 
-
 Result
 TreeCache::commitNodesRecursively(TreeCacheNode& node)
 {
     if (!node.dirty)
+    {
         return Result::ok;
+    }
     Result r;
     if (node.raw.isLeaf)
     {
@@ -606,7 +652,7 @@ TreeCache::commitNodesRecursively(TreeCacheNode& node)
         node.dirty = false;
         return r;
     }
-
+    FAILPOINT;
     for (uint16_t i = 0; i <= node.raw.keys; i++)
     {
         if (node.pointers[i] == nullptr)
@@ -622,7 +668,7 @@ TreeCache::commitNodesRecursively(TreeCacheNode& node)
             return r;
         }
     }
-
+    FAILPOINT;
     r = writeTreeNode(node);
     if (r != Result::ok)
     {
@@ -639,10 +685,22 @@ TreeCache::commitNodesRecursively(TreeCacheNode& node)
 Result
 TreeCache::commitCache()
 {
+    if(!dev->journal.isEnabled())
+    {
+        PAFFS_DBG(PAFFS_TRACE_BUG, "Tree Cache Commit may never happen during replay!");
+        return Result::bug;
+    }
     dev->lasterr = Result::ok;
+    if(mCacheRoot < 0)
+    {
+        //We have no root, so nothing is to be written
+        return Result::ok;
+    }
     resolveDirtyPaths(mCache[mCacheRoot]);
     if (dev->lasterr != Result::ok)
+    {
         return dev->lasterr;
+    }
     Result r = commitNodesRecursively(mCache[mCacheRoot]);
     if (r != Result::ok)
     {
@@ -669,8 +727,15 @@ TreeCache::commitCache()
         //Since we are now in strict mode for journal, this may not be allowed
         return Result::bug;
     }
-
-    dev->journal.addEvent(journalEntry::Success(JournalEntry::Topic::tree));
+    FAILPOINT;
+    r = statemachine.invalidateOldPages();
+    if(r != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not invalidate all old pages!");
+        return r;
+    }
+    FAILPOINT;
+    dev->journal.addEvent(journalEntry::Checkpoint(JournalEntry::Topic::tree));
     return Result::ok;
 }
 
@@ -704,22 +769,37 @@ TreeCache::freeNodes(uint16_t neededCleanNodes)
         return Result::bug;
     }
 
+    Result r;
 
-    cleanFreeLeafNodes(neededCleanNodes);
+    r = cleanFreeLeafNodes(neededCleanNodes);
+    if(r != Result::ok)
+        return r;
     if (neededCleanNodes == 0)
         return Result::ok;
 
-    cleanFreeNodes(neededCleanNodes);
+    r = cleanFreeNodes(neededCleanNodes);
+    if(r != Result::ok)
+        return r;
     if (neededCleanNodes == 0)
         return Result::ok;
 
-    commitCache();
+    r = commitCache();
+    if(r != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not commit cache");
+        return r;
+    }
 
-    cleanFreeLeafNodes(neededCleanNodes);
+
+    r = cleanFreeLeafNodes(neededCleanNodes);
+    if(r != Result::ok)
+        return r;
     if (neededCleanNodes == 0)
         return Result::ok;
 
-    cleanFreeNodes(neededCleanNodes);
+    r = cleanFreeNodes(neededCleanNodes);
+    if(r != Result::ok)
+        return r;
     if (neededCleanNodes == 0)
         return Result::ok;
 
@@ -729,7 +809,7 @@ TreeCache::freeNodes(uint16_t neededCleanNodes)
     }
     PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Even hard commit could not allocate "
             "remaining %" PRIu16 " treenodes!", neededCleanNodes);
-    return Result::lowmem;
+    return Result::lowMem;
 }
 
 /**
@@ -962,6 +1042,19 @@ TreeCache::removeNode(TreeCacheNode& tcn)
 }
 
 Result
+TreeCache::commitIfNodesWereRemoved()
+{
+    if(statemachine.getMinSpaceLeft() == treeNodeCacheSize)
+    {
+        //nothing was removed
+        return Result::ok;
+    }
+    //One or more Nodes were removed, so update whole tree (Just for Ausfallsicherheit!)
+    //Note: This also dirtifies removed nodes
+    return commitCache();
+}
+
+Result
 TreeCache::setRoot(TreeCacheNode& rootTcn)
 {
     if (rootTcn.parent != &rootTcn)
@@ -997,11 +1090,13 @@ TreeCache::getCacheHits()
 {
     return mCacheHits;
 }
+
 uint16_t
 TreeCache::getCacheMisses()
 {
     return mCacheMisses;
 }
+
 void
 TreeCache::printNode(TreeCacheNode& node)
 {
@@ -1048,9 +1143,15 @@ TreeCache::printNode(TreeCacheNode& node)
                 }
             }
         }
-        printf("] (%" PRIu16 "/%" PRIu16 ")\n", node.raw.keys,
-               node.raw.isLeaf ? leafOrder : branchOrder-1);
+        printf("] (%" PRIu16 "/%" PRIu16 "), "
+                "self: %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_AREAPOS "\n",
+                node.raw.keys,
+                node.raw.isLeaf ? leafOrder : branchOrder-1,
+                extractLogicalArea(node.raw.self),
+                dev->superblock.getPos(extractLogicalArea(node.raw.self)),
+                extractPageOffs(node.raw.self));
 }
+
 void
 TreeCache::printSubtree(int layer, BitList<treeNodeCacheSize>& reached, TreeCacheNode& node)
 {
@@ -1069,6 +1170,7 @@ TreeCache::printSubtree(int layer, BitList<treeNodeCacheSize>& reached, TreeCach
     }
 
 }
+
 void
 TreeCache::printTreeCache()
 {
@@ -1119,74 +1221,84 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
     {
         return dev->lasterr;
     }
+    FAILPOINT;
     // Handle Areas
-    if (dev->areaMgmt.getStatus(dev->areaMgmt.getActiveArea(AreaType::index)) != AreaStatus::active)
+    if (dev->superblock.getStatus(dev->superblock.getActiveArea(AreaType::index)) != AreaStatus::active)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: findWritableArea returned inactive area!");
         return Result::bug;
     }
-    if (dev->areaMgmt.getActiveArea(AreaType::index) == 0)
+    if (dev->superblock.getActiveArea(AreaType::index) == 0)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "WRITE TREE NODE findWritableArea returned 0");
         return Result::bug;
     }
-
+    Result r;
+    if(node.raw.self != 0)
+    {
+        SummaryEntry s = dev->sumCache.getPageStatus(node.raw.self, r);
+        if (s == SummaryEntry::free)
+        {
+            PAFFS_DBG(PAFFS_TRACE_BUG,
+                      "WRITE operation, old node is FREE data at %" PTYPE_AREAPOS
+                      "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
+                      extractLogicalArea(node.raw.self),
+                      dev->superblock.getPos(extractLogicalArea(node.raw.self)),
+                      extractPageOffs(node.raw.self));
+            return Result::bug;
+        }
+        if (s == SummaryEntry::dirty && !mJournalIsRecovering)
+        {
+            PAFFS_DBG(PAFFS_TRACE_BUG,
+                      "WRITE operation, old node is DIRTY data at %" PTYPE_AREAPOS
+                      "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS ,
+                      extractLogicalArea(node.raw.self),
+                      dev->superblock.getPos(extractLogicalArea(node.raw.self)),
+                      extractPageOffs(node.raw.self));
+            return Result::bug;
+        }
+    }
     PageOffs firstFreePage = 0;
     if (dev->areaMgmt.findFirstFreePage(firstFreePage,
-                                        dev->areaMgmt.getActiveArea(AreaType::index))
-        == Result::nospace)
+                                        dev->superblock.getActiveArea(AreaType::index))
+        == Result::noSpace)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "BUG: findWritableArea returned full area (%" PTYPE_AREAPOS " on %" PTYPE_AREAPOS ").",
-                  dev->areaMgmt.getActiveArea(AreaType::index),
-                  dev->areaMgmt.getPos(dev->areaMgmt.getActiveArea(AreaType::index)));
+                  dev->superblock.getActiveArea(AreaType::index),
+                  dev->superblock.getPos(dev->superblock.getActiveArea(AreaType::index)));
         return dev->lasterr = Result::bug;
     }
-    Addr addr = combineAddress(dev->areaMgmt.getActiveArea(AreaType::index), firstFreePage);
+    Addr newAddr = combineAddress(dev->superblock.getActiveArea(AreaType::index), firstFreePage);
     Addr oldSelf = node.raw.self;
-    node.raw.self = addr;
-
-    Result r = dev->driver.writePage(getPageNumber(node.raw.self, *dev), &node, sizeof(TreeNode));
+    node.raw.self = newAddr;
+    FAILPOINT;
+    // Mark Page as used
+    r = statemachine.replacePage(newAddr, oldSelf);
+    if(r != Result::ok)
+    {
+        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark tree node page used because %s", err_msg(r));
+    }
+    FAILPOINT;
+    r = dev->driver.writePage(getPageNumber(node.raw.self, *dev), &node, sizeof(TreeNode));
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not write TreeNode to page");
         return r;
     }
-
-    // Mark Page as used
-    r = dev->sumCache.setPageStatus(
-            dev->areaMgmt.getActiveArea(AreaType::index), firstFreePage, SummaryEntry::used);
-    if (r != Result::ok)
-    {
-        PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not mark Page as used!");
-        return r;
-    }
-
+    FAILPOINT;
     r = updateFlashAddressInParent(node);
     if (r != Result::ok)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not update node address in Parent!");
         return r;
     }
-
-    /*
-     * NOTE: For best space efficiency, this would be done before finding new Area.
-     * However, this would lead to invalidated valid data if something during write fails.
-     */
-    if (oldSelf != 0)
-    {
-        // invalidate former position
-        r = dev->sumCache.setPageStatus(oldSelf, SummaryEntry::dirty);
-        if (r != Result::ok)
-        {
-            PAFFS_DBG(PAFFS_TRACE_ERROR,
-                      "Could not invalidate old Page! Ignoring Errors to continue...");
-        }
-    }
-
+    FAILPOINT;
     r = dev->areaMgmt.manageActiveAreaFull(AreaType::index);
     if (r != Result::ok)
+    {
         return r;
+    }
 
     return Result::ok;
 }
@@ -1194,20 +1306,20 @@ TreeCache::writeTreeNode(TreeCacheNode& node)
 Result
 TreeCache::readTreeNode(Addr addr, TreeNode& node)
 {
-    if (dev->areaMgmt.getType(extractLogicalArea(addr)) != AreaType::index)
+    if (dev->superblock.getType(extractLogicalArea(addr)) != AreaType::index)
     {
         if (traceMask & PAFFS_TRACE_AREA)
         {
-            printf("Info: \n\t%" PTYPE_AREAPOS " used Areas\n", dev->areaMgmt.getUsedAreas());
+            printf("Info: \n\t%" PTYPE_AREAPOS " used Areas\n", dev->superblock.getUsedAreas());
             for (AreaPos i = 0; i < areasNo; i++)
             {
                 printf("\tArea %03" PTYPE_AREAPOS "  on %03" PTYPE_AREAPOS " as %10s "
                         "from page %4" PTYPE_AREAPOS " %s\n",
                        i,
-                       dev->areaMgmt.getPos(i),
-                       areaNames[dev->areaMgmt.getType(i)],
-                       dev->areaMgmt.getPos(i) * blocksPerArea * pagesPerBlock,
-                       areaStatusNames[dev->areaMgmt.getStatus(i)]);
+                       dev->superblock.getPos(i),
+                       areaNames[dev->superblock.getType(i)],
+                       dev->superblock.getPos(i) * blocksPerArea * pagesPerBlock,
+                       areaStatusNames[dev->superblock.getStatus(i)]);
                 if (i > 128)
                 {
                     printf("\n -- truncated 128-%" PRIu16 " Areas.\n", areasNo);
@@ -1218,17 +1330,17 @@ TreeCache::readTreeNode(Addr addr, TreeNode& node)
         }
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "READ TREEENODE operation on %s (Area %" PTYPE_AREAPOS ", pos %" PTYPE_AREAPOS "!",
-                  areaNames[dev->areaMgmt.getType(extractLogicalArea(addr))],
+                  areaNames[dev->superblock.getType(extractLogicalArea(addr))],
                   extractLogicalArea(addr),
-                  dev->areaMgmt.getPos(extractLogicalArea(addr)));
+                  dev->superblock.getPos(extractLogicalArea(addr)));
         return Result::bug;
     }
 
-    if (dev->areaMgmt.getType(extractLogicalArea(addr)) != AreaType::index)
+    if (dev->superblock.getType(extractLogicalArea(addr)) != AreaType::index)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
                   "READ TREE NODE operation on %s Area at %X:%X",
-                  areaNames[dev->areaMgmt.getType(extractLogicalArea(addr))],
+                  areaNames[dev->superblock.getType(extractLogicalArea(addr))],
                   extractLogicalArea(addr),
                   extractPageOffs(addr));
         return Result::bug;
@@ -1237,20 +1349,22 @@ TreeCache::readTreeNode(Addr addr, TreeNode& node)
     Result r;
     if (traceMask & PAFFS_TRACE_VERIFY_AS)
     {
-        SummaryEntry s = dev->sumCache.getPageStatus(addr, &r);
+        SummaryEntry s = dev->sumCache.getPageStatus(addr, r);
         if (s == SummaryEntry::free)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "READ operation on FREE data at %X:%X",
+                      "READ operation on FREE data at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
                       extractLogicalArea(addr),
+                      dev->superblock.getPos(extractLogicalArea(addr)),
                       extractPageOffs(addr));
             return Result::bug;
         }
         if (s == SummaryEntry::dirty)
         {
             PAFFS_DBG(PAFFS_TRACE_BUG,
-                      "READ operation on DIRTY data at %X:%X",
+                      "READ operation on DIRTY data at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
                       extractLogicalArea(addr),
+                      dev->superblock.getPos(extractLogicalArea(addr)),
                       extractPageOffs(addr));
             return Result::bug;
         }
@@ -1269,7 +1383,11 @@ TreeCache::readTreeNode(Addr addr, TreeNode& node)
         }
         else
         {
-            PAFFS_DBG(PAFFS_TRACE_ERROR, "Error reading Treenode");
+            PAFFS_DBG(PAFFS_TRACE_ERROR, "Error reading Treenode at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
+                      extractLogicalArea(addr),
+                      dev->superblock.getPos(extractLogicalArea(addr)),
+                      extractPageOffs(addr)
+                      );
             return r;
         }
     }
@@ -1277,10 +1395,13 @@ TreeCache::readTreeNode(Addr addr, TreeNode& node)
     if (node.self != addr)
     {
         PAFFS_DBG(PAFFS_TRACE_BUG,
-                  "Read Treenode at %X:%X, but its content stated that it was on %X:%X",
+                  "Read Treenode at %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS ", but its content "
+                          "stated that it was on %" PTYPE_AREAPOS "(on %" PTYPE_AREAPOS "):%" PTYPE_PAGEOFFS,
                   extractLogicalArea(addr),
+                  dev->superblock.getPos(extractLogicalArea(addr)),
                   extractPageOffs(addr),
                   extractLogicalArea(node.self),
+                  dev->superblock.getPos(extractLogicalArea(node.self)),
                   extractPageOffs(node.self));
         return Result::bug;
     }
@@ -1296,6 +1417,7 @@ TreeCache::deleteTreeNode(TreeNode& node)
         PAFFS_DBG(PAFFS_TRACE_BUG, "Tried deleting something in readOnly mode!");
         return Result::bug;
     }
-    return dev->sumCache.setPageStatus(node.self, SummaryEntry::dirty);
+    //Delays deletion until tree is in a safe state
+    return statemachine.replacePage(0, node.self);
 }
 }

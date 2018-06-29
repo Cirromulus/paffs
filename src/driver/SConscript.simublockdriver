@@ -1,0 +1,23 @@
+#Paffs drivers
+import os
+
+Import('envGlobal')
+
+print("SIMUDRIVER")
+
+envGlobal.Append(LIBS=[
+	'simuBlockDriver',
+])
+
+envGlobal.SConscript([
+	os.path.join('$PLUGINPATH', 'satfon-simulation/simu/SConscript'),
+    ],
+	exports='envGlobal'
+)
+
+env = envGlobal.Clone()
+	
+files  = ['simuBlock.cpp', 'yaffs_ecc.cpp']
+library = env.StaticLibrary('simuBlockDriver', files)
+
+envGlobal.Install('$BUILDPATH/lib', library)

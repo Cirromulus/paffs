@@ -32,20 +32,20 @@ enum class Result : uint8_t
     biterrorNotCorrected,
     notFound,
     exists,
-    toobig,
+    tooBig,
     invalidInput,
     nimpl,
     bug,
-    noparent,
-    nospace,
-    lowmem,
-    noperm,
-    dirnotempty,
-    badflash,
+    noParent,
+    noSpace,
+    noPerm,
+    lowMem,
+    dirNotEmpty,
+    badFlash,
     notMounted,
     alrMounted,
     objNameTooLong,
-    readonly,
+    readOnly,
     fail,
     num_result
 };
@@ -85,6 +85,7 @@ struct Param
     uint16_t blocksTotal;
     uint8_t  oobBytesPerPage;
     uint8_t  jumpPadNo;
+
     // Automatically filled//
     uint16_t dataBytesPerPage;
     uint16_t dataPagesPerArea;
@@ -93,6 +94,7 @@ struct Param
     uint8_t  blocksPerArea;
     uint8_t  superChainElems;
     uint32_t areasNo;
+    uint32_t mramSize;
 };
 
 extern const Param stdParam;
@@ -180,7 +182,7 @@ struct Inode
     InodeNo no;
     InodeType type;  //2 Bit;
     Permission perm : 3;
-    uint32_t reservedPages;  // Space on filesystem used in Pages
+    uint16_t reservedPages;  // Space on filesystem used in Pages
     FileSize size;           // Space on filesystem needed in bytes
     uint64_t crea;
     uint64_t mod;

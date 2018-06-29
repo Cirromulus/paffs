@@ -44,14 +44,14 @@ Btree::insertInode(const Inode& inode)
         {
             if (node->raw.as.branch.keys[i] == inode.no)
             {
-                PAFFS_DBG(PAFFS_TRACE_BUG, "BUG: Inode already existing with n° %" PTYPE_INODENO "", inode.no);
-                return Result::bug;
+                PAFFS_DBG(PAFFS_TRACE_ERROR, "BUG: Inode already existing with n° %" PTYPE_INODENO "", inode.no);
+                return Result::exists;
             }
         }
     }
 
     mCache.lockTreeCacheNode(*node);  // prevents own node from clear
-
+    FAILPOINT;
     // This prevents the cache from a commit inside invalid state
     r = mCache.reserveNodes(calculateMaxNeededNewNodesForInsertion(*node));
     if (r != Result::ok)
@@ -59,11 +59,11 @@ Btree::insertInode(const Inode& inode)
         PAFFS_DBG_S(PAFFS_TRACE_ERROR, "Could not reserve enough nodes in treecache!");
         return r;
     }
-
+    FAILPOINT;
     mCache.unlockTreeCacheNode(*node);
 
     dev->journal.addEvent(journalEntry::btree::Insert(inode));
-
+    FAILPOINT;
     /* Case: leaf has room for key and pointer.
      */
     if (node->raw.keys < leafOrder)
@@ -93,12 +93,39 @@ Btree::updateExistingInode(const Inode& inode)
             PAFFS_DBG(PAFFS_TRACE_BUG, "TreeCache is invalid");
             return Result::bug;
         }
+        if(traceMask & PAFFS_TRACE_VERIFY_AS && mJournalIsEndOfLog)
+        {
+            for(uint8_t i = 0; i < 14; i++)
+            {
+                //intentionally reading over array boundary
+                if(inode.direct[i] != 0)
+                {
+                    Result r;
+                    SummaryEntry s;
+                    if((s = dev->sumCache.getPageStatus(inode.direct[i], r)) != SummaryEntry::used)
+                    {
+                        printf("Addresslist of Inode %" PTYPE_INODENO "\n", inode.no);
+                        for(uint8_t j = 0; j < 13; j++)
+                        {
+                            //intentionally over size of 11, because we print indirects too
+                            printf("%" PRIu8 "\t%" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "\n",
+                                   j, extractLogicalArea(inode.direct[j]), extractPageOffs(inode.direct[j]));
+                        }
+                        PAFFS_DBG(PAFFS_TRACE_BUG, "Tried updating Inode %" PTYPE_INODENO " "
+                                "with invalid (%s) data at %" PRIu8 "!",
+                                  inode.no, summaryEntryNames[static_cast<int>(s)], i);
+                    }
+                }
+            }
+        }
     }
 
     TreeCacheNode* node = nullptr;
     Result r = findLeaf(inode.no, node);
     if (r != Result::ok)
+    {
         return r;
+    }
 
     uint16_t pos;
     for (pos = 0; pos < node->raw.keys; pos++)
@@ -118,8 +145,13 @@ Btree::updateExistingInode(const Inode& inode)
         return Result::bug;  // This Key did not exist
     }
 
+    if(memcmp(&node->raw.as.leaf.pInodes[pos], &inode, sizeof(Inode)) == 0)
+    {   //There is no change of the inode
+        return Result::ok;
+    }
+    FAILPOINT;
     dev->journal.addEvent(journalEntry::btree::Update(inode));
-
+    FAILPOINT;
     node->raw.as.leaf.pInodes[pos] = inode;
     node->dirty = true;
 
@@ -150,7 +182,6 @@ Btree::deleteInode(InodeNo number)
         mCache.printTreeCache();
     }
 
-    dev->journal.addEvent(journalEntry::btree::Remove(number));
     r = deleteEntry(*keyLeaf, number);
     if(traceMask & PAFFS_TRACE_VERIFY_TC)
     {
@@ -161,6 +192,9 @@ Btree::deleteInode(InodeNo number)
             return Result::bug;
         }
     }
+
+    mCache.commitIfNodesWereRemoved();
+    dev->journal.addEvent(journalEntry::btree::Remove(number));
     return r;
 }
 
@@ -247,28 +281,121 @@ Btree::getTopic()
 {
     return JournalEntry::Topic::tree;
 }
+void
+Btree::resetState()
+{
+    mCache.resetState();
+    mJournalLastSuccess = 0;
+    mJournalIsEndOfLog = false;
+}
 
 void
-Btree::processEntry(JournalEntry& entry)
+Btree::preScan(const journalEntry::Max& entry, JournalEntryPosition position)
 {
-    if (entry.topic != getTopic())
+    if(entry.base.topic == JournalEntry::Topic::superblock &&
+            entry.superblock.type == journalEntry::Superblock::Type::rootnode)
+    {
+        mJournalLastSuccess = position;
+    }
+}
+
+bool
+Btree::isInterestedIn(const journalEntry::Max& entry)
+{
+    return entry.base.topic == JournalEntry::Topic::superblock &&
+            entry.superblock.type == journalEntry::Superblock::Type::rootnode;
+}
+Result
+Btree::processEntry(const journalEntry::Max& entry, JournalEntryPosition position)
+{
+    Result r;
+    if (entry.base.topic == getTopic())
+    {   //normal operations
+        if(mJournalLastSuccess != 0 && position < mJournalLastSuccess)
+        {
+            //Skip, because these changes will be committed
+            PAFFS_DBG(PAFFS_TRACE_TREE, "Skipping, success will follow");
+            return Result::ok;
+        }
+        switch (entry.btree.op)
+        {
+        case journalEntry::BTree::Operation::insert:
+            r = insertInode(entry.btree_.insert.inode);
+            mCache.printTreeCache();
+            if(r == Result::exists)
+            {   //It was already added by a commit
+                return Result::ok;
+            }
+            return r;
+        case journalEntry::BTree::Operation::update:
+        {
+            const Inode& node = entry.btree_.update.inode;
+            if(traceMask & PAFFS_TRACE_VERBOSE)
+            {
+                printf("Inode %" PTYPE_INODENO " : %s\n", node.no,
+                       node.type == InodeType::file ? "fil" : "dir");
+                printf("   Perm: %s%s%s\n", node.perm & R ? "r" : "-",
+                        node.perm & W ? "w" : "-",
+                        node.perm & X ? "x" : "-"
+                        );
+                printf("   Size: %" PTYPE_FILSIZE " Byte (%" PRIu16 " pages)\n",
+                       node.size, node.reservedPages);
+                for(uint8_t i = 0; i < directAddrCount ; i++)
+                {
+                    if(node.direct[i] == 0)
+                    {
+                        printf("   ...\n");
+                        break;
+                    }
+                    printf("   %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS "\n",
+                           extractLogicalArea(node.direct[i]), extractPageOffs(node.direct[i]));
+                }
+            }
+            r = updateExistingInode(entry.btree_.update.inode);
+            mCache.printTreeCache();
+            if(r == Result::ok || r == Result::notFound)
+            {   //If it was deleted later on
+                return Result::ok;
+            }
+            else
+            {
+                return r;
+            }
+        }
+        case journalEntry::BTree::Operation::remove:
+            r = deleteInode(entry.btree_.remove.no);
+            if(r == Result::notFound)
+            {   //It was already committed
+                return Result::ok;
+            }
+            return r;
+        }
+        return Result::bug;
+    }
+    else if(entry.base.topic == JournalEntry::Topic::pagestate &&
+            entry.pagestate.target == getTopic())
+    {   //statemachine operations
+        return mCache.processEntry(entry);
+    }
+    else if(entry.base.topic == JournalEntry::Topic::superblock &&
+            entry.superblock.type == journalEntry::Superblock::Type::rootnode)
+    {
+        journalEntry::Max success;
+        success.pagestate_.success = journalEntry::pagestate::Success(getTopic());
+        return mCache.processEntry(success);
+    }
+    else
     {
         PAFFS_DBG(PAFFS_TRACE_BUG, "Got wrong entry to process!");
-        return;
+        return Result::invalidInput;
     }
-    const journalEntry::BTree* e = static_cast<const journalEntry::BTree*>(&entry);
-    switch (e->op)
-    {
-    case journalEntry::BTree::Operation::insert:
-        insertInode(static_cast<const journalEntry::btree::Insert*>(&entry)->inode);
-        break;
-    case journalEntry::BTree::Operation::update:
-        updateExistingInode(static_cast<const journalEntry::btree::Update*>(&entry)->inode);
-        break;
-    case journalEntry::BTree::Operation::remove:
-        deleteInode(static_cast<const journalEntry::btree::Remove*>(&entry)->no);
-        break;
-    }
+}
+
+void
+Btree::signalEndOfLog()
+{
+    mJournalIsEndOfLog = true;
+    mCache.signalEndOfLog();
 }
 
 /**
@@ -391,7 +518,7 @@ Btree::findLeaf(InodeNo key, TreeCacheNode*& outtreeCacheNode)
                       "Cache size (%" PRId16 ") too small for depth %" PRId16 "!",
                       treeNodeCacheSize,
                       depth);
-            return Result::lowmem;
+            return Result::lowMem;
         }
 
         i = 0;
@@ -936,13 +1063,16 @@ Btree::adjustRoot(TreeCacheNode& root)
         root.pointers[0]->parent = root.pointers[0];
         Result r = mCache.setRoot(*root.pointers[0]);
         if (r != Result::ok)
+        {
             return r;
+        }
+        // The actual removal is delayed until Cache gets the OK
         return mCache.removeNode(root);
     }
 
     // If it is a leaf (has no children),
     // then the whole tree is empty.
-
+    // The actual removal is delayed until Cache gets the OK
     return mCache.removeNode(root);
 }
 

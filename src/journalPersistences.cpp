@@ -21,90 +21,126 @@ namespace paffs
 uint16_t
 JournalPersistence::getSizeFromJE(const JournalEntry& entry)
 {
-    uint16_t size = 0;
     switch (entry.topic)
     {
-    case JournalEntry::Topic::invalid: size = 0; break;
-    case JournalEntry::Topic::checkpoint: size = sizeof(journalEntry::Checkpoint); break;
-    case JournalEntry::Topic::success: size = sizeof(journalEntry::Success); break;
+    case JournalEntry::Topic::invalid:
+        return 0;
+    case JournalEntry::Topic::checkpoint:
+        return sizeof(journalEntry::Checkpoint);
+    case JournalEntry::Topic::pagestate:
+        switch (static_cast<const journalEntry::Pagestate*>(&entry)->type)
+        {
+        case journalEntry::Pagestate::Type::replacePage:
+            return sizeof(journalEntry::pagestate::ReplacePage);
+        case journalEntry::Pagestate::Type::replacePagePos:
+            return sizeof(journalEntry::pagestate::ReplacePagePos);
+        case journalEntry::Pagestate::Type::success:
+            return sizeof(journalEntry::pagestate::Success);
+        case journalEntry::Pagestate::Type::invalidateOldPages:
+            return sizeof(journalEntry::pagestate::InvalidateOldPages);
+        }
+        break;
     case JournalEntry::Topic::superblock:
         switch (static_cast<const journalEntry::Superblock*>(&entry)->type)
         {
         case journalEntry::Superblock::Type::rootnode:
-            size = sizeof(journalEntry::superblock::Rootnode);
-            break;
+            return sizeof(journalEntry::superblock::Rootnode);
         case journalEntry::Superblock::Type::areaMap:
             switch (static_cast<const journalEntry::superblock::AreaMap*>(&entry)->operation)
             {
             case journalEntry::superblock::AreaMap::Operation::type:
-                size = sizeof(journalEntry::superblock::areaMap::Type);
-                break;
+                return sizeof(journalEntry::superblock::areaMap::Type);
             case journalEntry::superblock::AreaMap::Operation::status:
-                size = sizeof(journalEntry::superblock::areaMap::Status);
-                break;
+                return sizeof(journalEntry::superblock::areaMap::Status);
             case journalEntry::superblock::AreaMap::Operation::increaseErasecount:
-                size = sizeof(journalEntry::superblock::areaMap::IncreaseErasecount);
-                break;
+                return sizeof(journalEntry::superblock::areaMap::IncreaseErasecount);
             case journalEntry::superblock::AreaMap::Operation::position:
-                size = sizeof(journalEntry::superblock::areaMap::Type);
-                break;
+                return sizeof(journalEntry::superblock::areaMap::Type);
             case journalEntry::superblock::AreaMap::Operation::swap:
-                size = sizeof(journalEntry::superblock::areaMap::Swap);
-                break;
+                return sizeof(journalEntry::superblock::areaMap::Swap);
             }
             break;
         case journalEntry::Superblock::Type::activeArea:
-            size = sizeof(journalEntry::superblock::ActiveArea);
-            break;
+            return sizeof(journalEntry::superblock::ActiveArea);
         case journalEntry::Superblock::Type::usedAreas:
-            size = sizeof(journalEntry::superblock::UsedAreas);
-            break;
+            return sizeof(journalEntry::superblock::UsedAreas);
         }
         break;
-    case JournalEntry::Topic::tree:
-        switch (static_cast<const journalEntry::BTree*>(&entry)->op)
+    case JournalEntry::Topic::areaMgmt:
+        switch (static_cast<const journalEntry::AreaMgmt*>(&entry)->operation)
         {
-        case journalEntry::BTree::Operation::insert:
-            size = sizeof(journalEntry::btree::Insert);
-            break;
-        case journalEntry::BTree::Operation::update:
-            size = sizeof(journalEntry::btree::Update);
-            break;
-        case journalEntry::BTree::Operation::remove:
-            size = sizeof(journalEntry::btree::Remove);
-            break;
+        case journalEntry::AreaMgmt::Operation::initAreaAs:
+            return sizeof(journalEntry::areaMgmt::InitAreaAs);
+        case journalEntry::AreaMgmt::Operation::closeArea:
+            return sizeof(journalEntry::areaMgmt::CloseArea);
+        case journalEntry::AreaMgmt::Operation::retireArea:
+            return sizeof(journalEntry::areaMgmt::RetireArea);
+        case journalEntry::AreaMgmt::Operation::deleteAreaContents:
+            return sizeof(journalEntry::areaMgmt::DeleteAreaContents);
+        case journalEntry::AreaMgmt::Operation::deleteArea:
+            return sizeof(journalEntry::areaMgmt::DeleteArea);
+        }
+        break;
+    case JournalEntry::Topic::garbage:
+        switch (static_cast<const journalEntry::GarbageCollection*>(&entry)->operation)
+        {
+        case journalEntry::GarbageCollection::Operation::moveValidData:
+            return sizeof(journalEntry::garbageCollection::MoveValidData);
         }
         break;
     case JournalEntry::Topic::summaryCache:
         switch (static_cast<const journalEntry::SummaryCache*>(&entry)->subtype)
         {
         case journalEntry::SummaryCache::Subtype::commit:
-            size = sizeof(journalEntry::summaryCache::Commit);
-            break;
+            return sizeof(journalEntry::summaryCache::Commit);
         case journalEntry::SummaryCache::Subtype::remove:
-            size = sizeof(journalEntry::summaryCache::Remove);
-            break;
+            return sizeof(journalEntry::summaryCache::Remove);
+        case journalEntry::SummaryCache::Subtype::reset:
+            return sizeof(journalEntry::summaryCache::ResetASWritten);
         case journalEntry::SummaryCache::Subtype::setStatus:
-            size = sizeof(journalEntry::summaryCache::SetStatus);
-            break;
+            return sizeof(journalEntry::summaryCache::SetStatus);
+        case journalEntry::SummaryCache::Subtype::setStatusBlock:
+            return sizeof(journalEntry::summaryCache::SetStatusBlock);
         }
         break;
-    case JournalEntry::Topic::inode:
-        switch (static_cast<const journalEntry::Inode*>(&entry)->operation)
+    case JournalEntry::Topic::tree:
+        switch (static_cast<const journalEntry::BTree*>(&entry)->op)
         {
-        case journalEntry::Inode::Operation::add: size = sizeof(journalEntry::inode::Add); break;
-        case journalEntry::Inode::Operation::write:
-            size = sizeof(journalEntry::inode::Write);
-            break;
-        case journalEntry::Inode::Operation::remove:
-            size = sizeof(journalEntry::inode::Remove);
-            break;
-        case journalEntry::Inode::Operation::commit:
-            size = sizeof(journalEntry::inode::Commit);
-            break;
+        case journalEntry::BTree::Operation::insert:
+            return sizeof(journalEntry::btree::Insert);
+        case journalEntry::BTree::Operation::update:
+            return sizeof(journalEntry::btree::Update);
+        case journalEntry::BTree::Operation::remove:
+            return sizeof(journalEntry::btree::Remove);
         }
+        break;
+    case JournalEntry::Topic::pac:
+        switch (static_cast<const journalEntry::PAC*>(&entry)->operation)
+        {
+        case journalEntry::PAC::Operation::setAddress:
+            return sizeof(journalEntry::pac::SetAddress);
+        }
+        break;
+    case JournalEntry::Topic::dataIO:
+        switch(static_cast<const journalEntry::DataIO*>(&entry)->operation)
+        {
+        case journalEntry::DataIO::Operation::newInodeSize:
+            return sizeof(journalEntry::dataIO::NewInodeSize);
+        }
+        break;
+    case JournalEntry::Topic::device:
+        switch (static_cast<const journalEntry::Device*>(&entry)->action)
+        {
+            case journalEntry::Device::Action::mkObjInode:
+                return sizeof(journalEntry::device::MkObjInode);
+            case journalEntry::Device::Action::insertIntoDir:
+                return sizeof(journalEntry::device::InsertIntoDir);
+            case journalEntry::Device::Action::removeObj:
+                return sizeof(journalEntry::device::RemoveObj);
+        }
+        break;
     }
-    return size;
+    return 0;
 }
 
 uint16_t
@@ -122,16 +158,16 @@ MramPersistence::rewind()
 }
 
 Result
-MramPersistence::seek(EntryIdentifier& addr)
+MramPersistence::seek(JournalEntryPosition& addr)
 {
     curr = addr.mram.offs;
     return Result::ok;
 }
 
-EntryIdentifier
+JournalEntryPosition
 MramPersistence::tell()
 {
-    return EntryIdentifier(curr);
+    return JournalEntryPosition(curr);
 }
 
 Result
@@ -139,17 +175,31 @@ MramPersistence::appendEntry(const JournalEntry& entry)
 {
     if (curr + sizeof(journalEntry::Max) > mramSize)
     {
-        return Result::nospace;
+        return Result::noSpace;
     }
     uint16_t size = getSizeFromJE(entry);
     device->driver.writeMRAM(curr, &entry, size);
-    PAFFS_DBG_S((traceMask & PAFFS_TRACE_JOURNAL) & PAFFS_TRACE_VERBOSE,
+    PAFFS_DBG_S(PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE,
                 "Wrote Entry to %" PRIu32 "-%" PRIu32,
                 curr,
                 curr + size);
     curr += size;
     device->driver.writeMRAM(0, &curr, sizeof(PageAbs));
+    if(isLowMem())
+    {
+        return Result::lowMem;
+    }
     return Result::ok;
+}
+
+bool
+MramPersistence::isLowMem()
+{
+    if(mramSize == 0)
+    {
+        return false;
+    }
+    return mramSize - curr < reservedLogsize;
 }
 
 Result
@@ -172,7 +222,7 @@ MramPersistence::readNextElem(journalEntry::Max& entry)
 
     device->driver.readMRAM(curr, &entry, sizeof(journalEntry::Max));
     uint16_t size = getSizeFromMax(entry);
-    PAFFS_DBG_S(((traceMask & PAFFS_TRACE_JOURNAL) & PAFFS_TRACE_VERBOSE),
+    PAFFS_DBG_S(PAFFS_TRACE_JOUR_PERS,
                 "Read entry at %" PRIu32 "-%" PRIu32,
                 curr,
                 curr + size);
@@ -194,17 +244,17 @@ FlashPersistence::rewind()
 {
     // TODO: ActiveArea has to be consistent even after a remount
     // TODO: Save AA in Superpage
-    if (device->areaMgmt.getActiveArea(AreaType::journal) == 0)
+    if (device->superblock.getActiveArea(AreaType::journal) == 0)
     {
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Invalid journal Area (0)!");
         return Result::bug;
     }
-    curr.addr = combineAddress(device->areaMgmt.getActiveArea(AreaType::journal), 0);
+    curr.addr = combineAddress(device->superblock.getActiveArea(AreaType::journal), 0);
     curr.offs = 0;
     return Result::ok;
 }
 Result
-FlashPersistence::seek(EntryIdentifier& addr)
+FlashPersistence::seek(JournalEntryPosition& addr)
 {
     if (buf.dirty)
     {
@@ -220,10 +270,10 @@ FlashPersistence::seek(EntryIdentifier& addr)
     }
     return Result::ok;
 }
-EntryIdentifier
+JournalEntryPosition
 FlashPersistence::tell()
 {
-    return EntryIdentifier(curr);
+    return JournalEntryPosition(curr);
 }
 Result
 FlashPersistence::appendEntry(const JournalEntry& entry)
@@ -272,8 +322,23 @@ FlashPersistence::appendEntry(const JournalEntry& entry)
         // just init current page b.c. we assume free pages after last page
         loadCurrentPage(false);
     }
+    if(isLowMem())
+    {
+        return Result::lowMem;
+    }
     return Result::ok;
 }
+
+bool
+FlashPersistence::isLowMem()
+{
+    if(mramSize == 0)
+    {
+        return false;
+    }
+    return totalPagesPerArea * dataBytesPerPage - extractPageOffs(curr.addr) < reservedLogsize;
+}
+
 Result
 FlashPersistence::clear()
 {
@@ -304,7 +369,7 @@ FlashPersistence::readNextElem(journalEntry::Max& entry)
            curr.offs + sizeof(journalEntry::Max) > dataPagesPerArea ? dataPagesPerArea - curr.offs
                                                                     : sizeof(journalEntry::Max));
     uint16_t size = getSizeFromMax(entry);
-    PAFFS_DBG_S((PAFFS_TRACE_JOURNAL | PAFFS_TRACE_VERBOSE),
+    PAFFS_DBG_S(PAFFS_TRACE_JOUR_PERS,
                 "Read entry at %" PTYPE_AREAPOS ":%" PTYPE_PAGEOFFS " %" PRIu16 "-%" PRIu16,
                 extractLogicalArea(curr.addr),
                 extractPageOffs(curr.addr),
@@ -361,9 +426,9 @@ FlashPersistence::findNextPos(bool forACheckpoint)
     {
         // Ouch, we dont want to reach this
         PAFFS_DBG(PAFFS_TRACE_ERROR, "Could not find a free page in journal!");
-        return Result::nospace;
+        return Result::noSpace;
     }
-    curr = EntryIdentifier(
+    curr = JournalEntryPosition(
                    combineAddress(extractLogicalArea(curr.addr), extractPageOffs(curr.addr) + 1), 0)
                    .flash;
     return Result::ok;

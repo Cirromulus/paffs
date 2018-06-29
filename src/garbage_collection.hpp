@@ -15,15 +15,30 @@
 #pragma once
 
 #include "commonTypes.hpp"
+#include "journal.hpp"
 
 namespace paffs
 {
-class GarbageCollection
+class GarbageCollection : public JournalTopic
 {
     Device* dev;
 
+    enum class Statemachine
+    {
+        ok,
+        moveValidData,  //This is pre-action
+        deletedOldArea, //these are post-action
+        swappedPosition,
+        setNewSummary,
+    } state;
+    AreaPos journalTargetArea;
+    AreaType journalTargetAreaType;
+
 public:
-    inline GarbageCollection(Device* mdev) : dev(mdev){};
+    inline GarbageCollection(Device* mdev) : dev(mdev)
+    {
+        resetState();
+    };
 
     /* Special case: Target=unset.
      * This frees any Type (with a favour to areas with committed AS'es)
@@ -35,12 +50,23 @@ public:
      *	Moves all valid Pages to new Area.
      */
     Result
-    moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea, SummaryEntry* summary);
+    moveValidDataToNewArea(AreaPos srcArea, AreaPos dstArea, bool& validDataLeft, SummaryEntry* summary);
+
+    JournalEntry::Topic
+    getTopic() override;
+    void
+    resetState() override;
+    bool
+    isInterestedIn(const journalEntry::Max& entry) override;
+    Result
+    processEntry(const journalEntry::Max& entry, JournalEntryPosition) override;
+    void
+    signalEndOfLog() override;
 
 private:
-    PageOffs
-    countDirtyPages(SummaryEntry* summary);
+    void
+    countDirtyAndUsedPages(PageOffs& dirty, PageOffs &used, SummaryEntry* summary);
     AreaPos
-    findNextBestArea(AreaType target, SummaryEntry* summaryOut, bool* srcAreaContainsData);
+    findNextBestArea(AreaType target, SummaryEntry* summaryOut, bool& srcAreaContainsValidData);
 };
 }
