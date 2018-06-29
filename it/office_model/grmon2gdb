@@ -1,3 +1,3 @@
 target extended-remote :2222
-file /home/user/development/gittemp/paffs/build/it_debug/it/office_model/office.elf 
-load
+#file /home/user/development/gittemp/paffs/build/it_debug/it/office_model/office.elf 
+#load

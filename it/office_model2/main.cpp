@@ -16,16 +16,10 @@ extern "C" {
 #include "system.h"
 #include <sys/time.h>
 }
-#include <gpio.h>
 #include <paffs.hpp>
-#include <sevensegment.h>
 
 #include "../misc/cmd.hpp"
 
-#include <string.h>
-#include <stdio.h>
-
-using namespace outpost::nexys3;
 using namespace paffs;
 
 // initial bad blocks on NAND board 0
@@ -64,46 +58,22 @@ rtems_task task_system_init(rtems_task_argument)
 {
     printf("\n\n\n\nBuild: " __DATE__ " " __TIME__ "\n");
 
-    SevenSegment::clear();
-    SevenSegment::write(0, 'P');
-    SevenSegment::write(1, 'A');
-    SevenSegment::write(2, 'F');
-    SevenSegment::write(3, 'S');
+
 
     BadBlockList badBlocks[] = {BadBlockList(badBlocksDev0, 4), BadBlockList(badBlocksDev1, 2)};
-
-    uint8_t leds = 0;
-    for (uint_fast8_t i = 0; i < 10; ++i)
-    {
-        leds >>= 1;
-        leds |= 0b10000000;
-        Gpio::set(leds);
-        rtems_task_wake_after(25);
-    }
 
     std::vector<paffs::Driver*> drv;
     drv.push_back(paffs::getDriver(0));
     Paffs* fs = new(paffsRaw) Paffs(drv);
     fs->setTraceMask(PAFFS_TRACE_SOME);
 
+
     CmdHandler cmd(fs, badBlocks);
 
     cmd.prompt();
 
-    printf("Now idling.\n");
-    rtems_stack_checker_report_usage();
-    while (1)
+    while(true)
     {
-        for (uint_fast8_t i = 0; i < 12; ++i)
-        {
-            leds <<= 1;
-
-            if (i <= 3)
-            {
-                leds |= 1;
-            }
-            Gpio::set(leds);
-            rtems_task_wake_after(75);
-        }
+        rtems_task_wake_after(1000);
     }
 }

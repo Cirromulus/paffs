@@ -333,7 +333,6 @@ public:
     }
 
 private:
-
     static void
     writeHeader(outpost::Slice<uint8_t> buffer,
                 Operation operation,
@@ -343,6 +342,8 @@ private:
     bool
     checkResponseHeader(hal::SpaceWire::ReceiveBuffer& buffer,
                         std::size_t expectedPayloadLength);
+    void
+    hexDump (char *desc, const void *addr, int len);
 
     hal::SpaceWire& mSpacewire;
     ErrorCounter mErrorCounter;

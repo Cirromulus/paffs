@@ -85,6 +85,9 @@ Device::format(const BadBlockList& badBlockList, bool complete)
     }
     PAFFS_DBG_S(PAFFS_TRACE_INFO, "Initialized NAND Devices.");
 
+    //This disable is only to supress a journal buffer overflow that is possible
+    //if MRAM is small. Format would fail anyway if not finished properly.
+    journal.disable();
 
     BitList<AreaType::no> hadAreaType;
     uint8_t hadSuperblocks = 0;
@@ -146,29 +149,31 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         // erasecount is already set to 0
         superblock.setPos(area, area);
 
-        bool anyBlockInAreaBad = false;
-        for (BlockAbs block = 0; block < blocksPerArea; block++)
-        {
-            if (driver.checkBad(area * blocksPerArea + block) != Result::ok)
-            {
-                PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
-                            "Found marked bad block %" PTYPE_BLOCKABS " during formatting, "
-                            "retiring area %" PTYPE_AREAPOS,
-                            area * blocksPerArea + block,
-                            area);
-                anyBlockInAreaBad = true;
-            }
-        }
-        if (anyBlockInAreaBad)
-        {
-            areaMgmt.retireArea(area);
-            continue;
-        }
-
-        if (complete ||
+        if ((complete || area <= superChainElems + 4) ||
                 !(hadAreaType.getBit(AreaType::superblock) &&
                   hadAreaType.getBit(AreaType::garbageBuffer)))
         {
+            //---- FIXME DEBUG, this has to be done before if block
+            bool anyBlockInAreaBad = false;
+            for (BlockAbs block = 0; block < blocksPerArea; block++)
+            {
+                if (driver.checkBad(area * blocksPerArea + block) != Result::ok)
+                {
+                    PAFFS_DBG_S(PAFFS_TRACE_BAD_BLOCKS,
+                                "Found marked bad block %" PTYPE_BLOCKABS " during formatting, "
+                                "retiring area %" PTYPE_AREAPOS,
+                                area * blocksPerArea + block,
+                                area);
+                    anyBlockInAreaBad = true;
+                }
+            }
+            if (anyBlockInAreaBad)
+            {
+                areaMgmt.retireArea(area);
+                continue;
+            }
+            //--------------
+
             for (BlockAbs p = 0; p < blocksPerArea; p++)
             {
                 r = driver.eraseBlock(p + area * blocksPerArea);
@@ -264,12 +269,13 @@ Device::format(const BadBlockList& badBlockList, bool complete)
         destroyDevice();
         return r;
     }
-
+    journal.clear();
     PAFFS_DBG_S(PAFFS_TRACE_INFO, "Done");
 
     destroyDevice();
     driver.deInitializeNand();
     return Result::ok;
+;
 }
 
 Result
@@ -484,9 +490,9 @@ Device::debugPrintStatus()
                areaNames[superblock.getType(i)],
                dirtyPages, freePages,
                areaStatusNames[superblock.getStatus(i)]);
-        if (i > 128)
+        if (i > 64)
         {
-            printf("\n -- truncated 128-%" PTYPE_AREAPOS " Areas.\n", areasNo);
+            printf("\n -- truncated 64-%" PTYPE_AREAPOS " Areas.\n", areasNo);
             break;
         }
     }
@@ -1633,7 +1639,7 @@ Device::getObjInfo(const char* fullPath, ObjInfo& nfo)
         return lasterr = r;
     }
     nfo.created = outpost::time::GpsTime::afterEpoch(outpost::time::Milliseconds(object->crea));
-    nfo.modified = outpost::time::GpsTime::afterEpoch(outpost::time::Milliseconds(object->crea));
+    nfo.modified = outpost::time::GpsTime::afterEpoch(outpost::time::Milliseconds(object->mod));
     ;
     nfo.perm = object->perm;
     nfo.size = object->size;

@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <paffs.hpp>
+
 extern const char* commandNames[];
 extern const char* commandUsage[];
 
@@ -25,9 +27,11 @@ class CmdParser
         quit = 0,
         help,
         cat,
+        info,
         ls,
         cd,
         append,
+        fill,
         mkdir,
         touch,
         del,
@@ -79,6 +83,13 @@ class CmdParser
         Cat(char* path) : Command(CommandID::cat, path){};
     };
 
+
+    struct Info : public Command
+    {
+        inline
+        Info(char* path) : Command(CommandID::info, path){};
+    };
+
     struct Ls : public Command
     {
         inline
@@ -97,6 +108,12 @@ class CmdParser
     {
         inline
         Append(char* path, char* string) : Command(CommandID::append, path, string){};
+    };
+
+    struct Fill : public Command
+    {
+        inline
+        Fill(char* path, char* number) : Command(CommandID::fill, path, number){};
     };
 
     struct Mkdir : public Command
@@ -137,4 +154,17 @@ class CmdParser
 
     void
     listCommands();
+};
+
+class CmdHandler
+{
+    paffs::Paffs* fs;
+    paffs::BadBlockList* badBlocks;
+public:
+    inline
+    CmdHandler(paffs::Paffs* filesystem, paffs::BadBlockList* badBlockList)
+        : fs(filesystem), badBlocks(badBlockList){};
+
+    void
+    prompt();
 };

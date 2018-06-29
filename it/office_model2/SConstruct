@@ -4,17 +4,20 @@ rootpath = Dir('../../').abspath
 buildpath = os.path.join(rootpath, 'build')
 pluginpath = os.path.join(rootpath, '../')
 extpath = os.path.join(rootpath, 'ext')
-print("Integration Test nexys3")
+print("Integration Test artix7")
 
 envGlobal = Environment(toolpath=[os.path.join(pluginpath, 'scons-build-tools/site_tools')],
                         tools=['compiler_sparc_rtems_gcc', 'settings_buildpath', 'utils_buildsize', 'utils_buildformat'],
                         OS='rtems',
-                        BOARD='nexys3',
-                        DEVICE_SIZE={
-                            'name' : 'Eu:CROPIS CDH OBC SDM',
-                            'flash': 2097151,
-                            'ram'  : 134217728,
+                        BOARD='artix7',
+                         DEVICE_SIZE={
+                            'name' : 'Artix7 - LEON3',
+                            'flash': 8388608,
+                            'ram'  : 8388608
                         },
+                        COMPILERPREFIX='sparc-rtems4.10.x-',
+                        CXXFLAGS_language=['-std=c++11'],
+                        CCFLAGS_debug=['-g'],
                         ENV=os.environ)
 
 buildfolder = os.path.join(buildpath, 'it_debug/')
@@ -38,18 +41,19 @@ envGlobal.Tool('settings_buildpath')
 envGlobal['BASEPATH'] = rootpath 
 envGlobal['BUILDPATH'] = os.path.abspath(buildfolder)
 envGlobal['OUTPOST_CORE_PATH'] = os.path.join(pluginpath, 'outpost-core')
+envGlobal['OUTPOST_PLATFORM_PATH'] = os.path.join(pluginpath, 'outpost-platform-leon/')
 envGlobal['EXTPATH'] = extpath
 envGlobal['CXXFLAGS_language'] = ['-std=gnu++11']
 envGlobal['CFLAGS_language'] = ['-std=gnu99']
 
 envGlobal.Append(CPPPATH=[
     #This defines which config paffs will use.
-    os.path.abspath("./config/")
+    os.path.abspath("./config/"),
 ])
 
 envGlobal.SConscript([
         os.path.join(rootpath, 'src/SConscript'),
-        os.path.join(rootpath, 'src/driver/SConscript.office_model_nexys3'),
+        os.path.join(rootpath, 'src/driver/SConscript.office_model_2_artix7'),
     ],
     exports=['envGlobal'])
 
@@ -58,10 +62,11 @@ env = envGlobal.Clone()
 files = env.Glob('*.cpp')
 files.append(os.path.abspath('../misc/cmd.cpp'))
 
-programElf = env.Program('paffs-nexys3.elf', files)
-programBin = env.Bin(programElf) 
+programElf = env.Program('paffs-artix7.elf', files)
+programBin = env.Bin(programElf)
+#programListing = env.Listing(programElf)
 
-envGlobal.Alias('build', programBin)
+envGlobal.Alias('build', [programBin])
 envGlobal.Install('$BUILDPATH', programElf)
 envGlobal.Install('$BUILDPATH', programBin)
 envGlobal.Default('build')

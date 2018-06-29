@@ -3,31 +3,31 @@ import os
 
 Import('envGlobal')
 
-print("NEXYSDRIVER")
+print("ARTIXDRIVER")
 
 extpath = envGlobal['EXTPATH']
-nexys3path = os.path.join('$EXTPATH', 'nexys3')
+
 
 envGlobal.Append(CPPPATH=[
-    extpath,
-	nexys3path,
+	extpath,
 ])
+
 
 env = envGlobal.Clone()
 
 files  = [
-    'office_model_nexys3.cpp',
+    'office_model_2_artix7.cpp',
     'yaffs_ecc.cpp'
 ]
 
-files.extend(env.Glob(nexys3path+'/*.cpp'))
 files.extend(env.Glob(extpath+'/*.cpp'))
 files.extend(env.Glob(extpath+'/*.c'))
 
-library = env.StaticLibrary('nexysDriver', files)
+
+library = env.StaticLibrary('artixDriver', files)
 
 envGlobal.Append(LIBS=[
-	'nexysDriver',
+	'artixDriver',
 	'outpost_hal',
 	'outpost_rtos',
 	'outpost_utils',

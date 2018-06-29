@@ -104,7 +104,7 @@ pipeline {
                 }
             }
         }
-        stage("build-embedded") {
+        stage("build-embedded-officemodel-1") {
             agent {
                 label 'sparc-rtems'
             }
@@ -115,7 +115,22 @@ pipeline {
                 unstash 'outpost-core'
                 
                 dir('paffs') {
-                    sh 'make build-embedded'
+                    sh 'make build-embedded-om1'
+                }
+            }
+        }
+                stage("build-embedded-officemodel-2") {
+            agent {
+                label 'sparc-rtems'
+            }
+            steps {
+                unstash 'paffs'
+                unstash 'scons-build-tools'
+                unstash 'satfon-simulation'
+                unstash 'outpost-core'
+                
+                dir('paffs') {
+                    sh 'make build-embedded-om2'
                 }
             }
         }
