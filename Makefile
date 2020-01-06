@@ -11,6 +11,7 @@ else
   MAKEJOBS=-j$(NPROCS)
 endif
 
+SCONS=scons-2
 TESTDIR=./test/
 OM1INTEGRATIONDIR=./it/office_model
 OM2INTEGRATIONDIR=./it/office_model2
@@ -20,30 +21,30 @@ MISCDIR=./it/misc
 all: build-integration-debug build-misc
 
 build-embedded-om1:
-	@scons $(MAKEJOBS) -C $(OM1INTEGRATIONDIR)
+	$(SCONS) $(MAKEJOBS) -C $(OM1INTEGRATIONDIR)
 build-embedded-om2:
-	@scons $(MAKEJOBS) -C $(OM2INTEGRATIONDIR)
+	$(SCONS) $(MAKEJOBS) -C $(OM2INTEGRATIONDIR)
 
 build-integration:
-	@scons $(MAKEJOBS) -C $(INTEGRATIONDIR) --release-build
+	$(SCONS) $(MAKEJOBS) -C $(INTEGRATIONDIR) --release-build
 
 build-integration-debug:
-	@scons $(MAKEJOBS) -C $(INTEGRATIONDIR)
+	$(SCONS) $(MAKEJOBS) -C $(INTEGRATIONDIR)
 
 build-integration-bigflash:
-	@scons $(MAKEJOBS) -C $(INTEGRATIONDIR) --release-build --bigflash
+	$(SCONS) $(MAKEJOBS) -C $(INTEGRATIONDIR) --release-build --bigflash
 
 build-integration-bigflash-debug:
-	@scons $(MAKEJOBS) -C $(INTEGRATIONDIR) --bigflash
+	$(SCONS) $(MAKEJOBS) -C $(INTEGRATIONDIR) --bigflash
 
 build-unittest:
-	@scons $(MAKEJOBS) -C $(TESTDIR) --release-build
+	$(SCONS) $(MAKEJOBS) -C $(TESTDIR) --release-build
 
 build-unittest-debug:
-	@scons $(MAKEJOBS) -C $(TESTDIR)
+	$(SCONS) $(MAKEJOBS) -C $(TESTDIR)
 
 build-misc:
-	@scons $(MAKEJOBS) -C $(MISCDIR)
+	$(SCONS) $(MAKEJOBS) -C $(MISCDIR)
 
 test: test-unit test-integration
 
@@ -76,9 +77,9 @@ doc:
 .PHONY: doc
 
 clean:
-	@scons -C $(TESTDIR) -c
-	@scons -C $(INTEGRATIONDIR) -c
-	@scons -C $(OM1INTEGRATIONDIR) -c
-	@scons -C $(OM2INTEGRATIONDIR) -c
+	$(SCONS) -C $(TESTDIR) -c
+	$(SCONS) -C $(INTEGRATIONDIR) -c
+	$(SCONS) -C $(OM1INTEGRATIONDIR) -c
+	$(SCONS) -C $(OM2INTEGRATIONDIR) -c
 	rm -rf build/
 	@$(MAKE) -C doc/PAFFS_DOCUMENTATION clean
